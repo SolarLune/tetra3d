@@ -1,7 +1,6 @@
 package ebiten3d
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -12,9 +11,10 @@ type Camera struct {
 	ColorTexture *ebiten.Image
 	Near, Far    float64
 
-	Position     vector.Vector
-	LookAtTarget vector.Vector
+	Position vector.Vector
+	lookDir  vector.Vector
 
+	EyeMatrix  Matrix4
 	Transform  Matrix4
 	Projection Matrix4
 	// Drawcalls   []Drawcall
@@ -27,10 +27,13 @@ func NewCamera(w, h int) *Camera {
 		Near:         0.1,
 		Far:          100,
 
-		Position:     UnitVector(0),
-		LookAtTarget: UnitVector(0),
+		Position:  UnitVector(0),
+		EyeMatrix: NewMatrix4(),
+		Transform: NewMatrix4(),
 		// Draw:    &Drawcalls{},
 	}
+
+	cam.LookAt(cam.Position.Add(vector.Vector{0, 0, 1}), vector.Y)
 
 	cam.SetPerspectiveView(75)
 
@@ -41,14 +44,16 @@ func NewCamera(w, h int) *Camera {
 
 func (camera *Camera) UpdateTransform() {
 
-	// T * R * S * O
+	camera.Transform = NewMatrix4()
+	camera.Transform = camera.Transform.Mult(Translate(-camera.Position[0], -camera.Position[1], camera.Position[2]))
+	// camera.Transform = camera.Transform.Mult(camera.EyeMatrix)
 
-	camera.Transform = LookAt(camera.LookAtTarget, camera.Position, vector.Y)
+}
 
-	// camera.Transform = NewMatrix4()
-	// camera.Transform = camera.Transform.Dot(Scale(camera.Scale[0], camera.Scale[1], camera.Scale[2]))
-	// camera.Transform = camera.Transform.Dot(Translate(camera.Position[0], camera.Position[1], camera.Position[2]))
-
+// LookAt sets the Camera's rotation such that it is looking at the target 3D Vector in world space.
+func (camera *Camera) LookAt(target, up vector.Vector) {
+	camera.lookDir = target.Sub(camera.Position).Unit()
+	camera.EyeMatrix = LookAt(target, camera.Position, up)
 }
 
 func (camera *Camera) SetPerspectiveView(fovy float64) {
@@ -64,11 +69,8 @@ func (camera *Camera) ProjectToScreen(vert vector.Vector) vector.Vector {
 	w, h := camera.ColorTexture.Size()
 	width, height := float64(w), float64(h)
 
-	vd := (-vert[3]) / camera.Far
-	vx := vert[0] * (1 - vd)
-	vy := vert[1] * (1 - vd)
-
-	fmt.Println(vert)
+	vx := (vert[0] / vert[3])
+	vy := ((1 - vert[1]) / vert[3])
 
 	vect := vector.Vector{
 		vx*width + (width / 2),
@@ -79,25 +81,6 @@ func (camera *Camera) ProjectToScreen(vert vector.Vector) vector.Vector {
 
 }
 
-// func (camera *Camera) ProjectToScreen(vert vector.Vector) vector.Vector {
-
-// 	w, h := camera.ColorTexture.Size()
-// 	width, height := float64(w), float64(h)
-
-// 	// vd := (-vert[2] * 100) / camera.Far
-// 	vd := (-vert[2] * 100) / camera.Far
-// 	vx := vert[0] * (1 - vd)
-// 	vy := vert[1] * (1 - vd)
-
-// 	vect := vector.Vector{
-// 		vx*width + (width / 2),
-// 		vy*height + (height / 2),
-// 	}
-
-// 	return vect
-
-// }
-
 func (camera *Camera) Begin() {
 	camera.UpdateTransform()
 	camera.ColorTexture.Clear()
@@ -105,39 +88,47 @@ func (camera *Camera) Begin() {
 
 func (camera *Camera) Render(model *Model) {
 
-	drawOptions := &ebiten.DrawTrianglesOptions{}
-
 	// projection * view * model
 
 	model.UpdateTransform()
 
-	mvpMatrix := camera.Projection.Mult(camera.Transform).Mult(model.Transform)
+	mvpMatrix := camera.Projection.Mult(camera.EyeMatrix).Mult(camera.Transform).Mult(model.Transform)
 
-	verts := model.TransformedVertices(mvpMatrix)
+	verts := model.TransformedVertices(mvpMatrix, camera)
 
-	for index, vert := range verts {
-		projected := camera.ProjectToScreen(vert)
-		vertexList[index].DstX = float32(projected[0])
-		vertexList[index].DstY = float32(projected[1])
-	}
+	vertexListIndex := 0
 
-	i := 0
+	tris := []*Triangle{}
 
-	lookDir := camera.LookVector()
-	drawnTriangleCount := 0
+	for index := 0; index < len(verts); index += 3 {
 
-	for _, tri := range model.Mesh.Triangles {
+		// If any vertex is behind the camera, then skip it
+		for i := index; i < index+3; i++ {
+
+			if verts[i][0] < 0 || verts[i][1] < 0 || verts[i][2] < 0 {
+				continue
+			}
+
+		}
+
+		v0 := verts[index]
+		v1 := verts[index+1]
+		v2 := verts[index+2]
 
 		// Backface Culling
+
 		if model.Mesh.BackfaceCulling {
 
 			normal := calculateNormal(
-				verts[tri.Indices[0]][:3],
-				verts[tri.Indices[1]][:3],
-				verts[tri.Indices[2]][:3],
+				v0[:3],
+				v1[:3],
+				v2[:3],
 			)
 
-			result := lookDir.Dot(normal)
+			// result := camera.Transform.Forward().Dot(normal)
+
+			center := v0.Add(v1).Add(v2).Scale(1.0 / 3.0)
+			result := camera.Position.Sub(center).Unit().Dot(normal)
 
 			if result > 0 {
 				continue
@@ -145,29 +136,64 @@ func (camera *Camera) Render(model *Model) {
 
 		}
 
-		for _, index := range tri.Indices {
-			// vertexList[index].ColorR = float32(tri.Normal.X()) * 10
-			// vertexList[index].ColorG = float32(tri.Normal.Y()) * 10
-			// vertexList[index].ColorB = float32(tri.Normal.Z()) * 10
-			indexList[i] = index
-			i++
-		}
+		tris = append(tris, model.closestTris[index/3])
 
-		drawnTriangleCount++
+		projected := camera.ProjectToScreen(v0)
+		vertexList[vertexListIndex].DstX = float32(int(projected[0]))
+		vertexList[vertexListIndex].DstY = float32(int(projected[1]))
+
+		projected = camera.ProjectToScreen(v1)
+		vertexList[vertexListIndex+1].DstX = float32(int(projected[0]))
+		vertexList[vertexListIndex+1].DstY = float32(int(projected[1]))
+
+		projected = camera.ProjectToScreen(v2)
+		vertexList[vertexListIndex+2].DstX = float32(int(projected[0]))
+		vertexList[vertexListIndex+2].DstY = float32(int(projected[1]))
+
+		vertexListIndex += 3
+	}
+
+	srcW := 0.0
+	srcH := 0.0
+
+	if model.Mesh.Image != nil {
+		srcW = float64(model.Mesh.Image.Bounds().Dx())
+		srcH = float64(model.Mesh.Image.Bounds().Dy())
+	}
+
+	index := 0
+
+	for _, tri := range tris {
+
+		for _, vert := range tri.Vertices {
+
+			// Vertex colors
+
+			vertexList[index].ColorR = float32(vert.Color[0])
+			vertexList[index].ColorG = float32(vert.Color[1])
+			vertexList[index].ColorB = float32(vert.Color[2])
+			vertexList[index].ColorA = float32(vert.Color[3])
+
+			vertexList[index].SrcX = float32(vert.UV[0] * srcW)
+			vertexList[index].SrcY = float32(vert.UV[1] * srcH)
+
+			indexList[index] = uint16(index)
+
+			index++
+
+		}
 
 	}
 
-	indices := indexList[:drawnTriangleCount*3]
-	// sort.Slice(indices, func(i, j int) bool {
-	// 	return indices[i]
-	// })
+	// }
 
-	camera.ColorTexture.DrawTriangles(vertexList[:len(model.Mesh.Vertices)], indices, defaultImg, drawOptions)
+	img := model.Mesh.Image
+	if img == nil {
+		img = defaultImg
+	}
 
-}
+	camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, nil)
 
-func (camera *Camera) LookVector() vector.Vector {
-	return camera.Position.Sub(camera.LookAtTarget).Unit()
 }
 
 // Cribbed from https://github.com/fogleman/fauxgl vvvvvv

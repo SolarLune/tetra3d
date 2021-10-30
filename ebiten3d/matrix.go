@@ -61,6 +61,30 @@ func Rotate(vector vector.Vector, angle float64) Matrix4 {
 
 }
 
+func (matrix Matrix4) Right() vector.Vector {
+	return vector.Vector{
+		matrix[0][0],
+		matrix[0][1],
+		matrix[0][2],
+	}
+}
+
+func (matrix Matrix4) Up() vector.Vector {
+	return vector.Vector{
+		matrix[1][0],
+		matrix[1][1],
+		matrix[1][2],
+	}
+}
+
+func (matrix Matrix4) Forward() vector.Vector {
+	return vector.Vector{
+		-matrix[2][0],
+		-matrix[2][1],
+		-matrix[2][2],
+	}
+}
+
 func (matrix Matrix4) Rotate(v vector.Vector, angle float64) Matrix4 {
 	mat := matrix.Clone()
 	mat.MultVec(v)
@@ -177,11 +201,6 @@ func (matrix Matrix4) Columns() [][]float64 {
 
 // }
 
-func (matrix Matrix4) Invert() Matrix4 {
-	newMat := matrix.Clone()
-	return newMat
-}
-
 func (matrix Matrix4) String() string {
 	s := "{"
 	for i, y := range matrix {
@@ -196,16 +215,30 @@ func (matrix Matrix4) String() string {
 	return s
 }
 
-func LookAt(center, target, up vector.Vector) Matrix4 {
-	z := target.Sub(center).Unit()
+func LookAt(eye, center, up vector.Vector) Matrix4 {
+	z := eye.Sub(center).Unit()
 	x, _ := up.Cross(z)
 	x = x.Unit()
 	y, _ := z.Cross(x)
-
 	return Matrix4{
-		{x[0], x[1], x[2], -x.Dot(center)},
-		{y[0], y[1], y[2], -y.Dot(center)},
-		{z[0], z[1], z[2], -z.Dot(center)},
+		{x[0], x[1], x[2], -x.Dot(eye)},
+		{y[0], y[1], y[2], -y.Dot(eye)},
+		{z[0], z[1], z[2], -z.Dot(eye)},
 		{0, 0, 0, 1},
 	}
 }
+
+// func LookAt(target, center, up vector.Vector) Matrix4 {
+// 	z := target.Sub(center).Unit()
+// 	x, _ := up.Cross(z)
+// 	x = x.Unit()
+// 	y, _ := z.Cross(x)
+
+// 	return Matrix4{
+// 		{x[0], x[1], x[2], -x.Dot(center)},
+// 		{y[0], y[1], y[2], -y.Dot(center)},
+// 		{z[0], z[1], z[2], -z.Dot(center)},
+// 		{0, 0, 0, 1},
+// 	}
+
+// }

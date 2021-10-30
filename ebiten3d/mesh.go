@@ -1,26 +1,27 @@
 package ebiten3d
 
 import (
-	"log"
-	"os"
-	"strconv"
-	"strings"
-
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
 )
 
 type Mesh struct {
-	Vertices        []vector.Vector
 	Triangles       []*Triangle
 	BackfaceCulling bool
+	Image           *ebiten.Image
 }
 
-func NewMesh() *Mesh {
+func NewMesh(verts ...*Vertex) *Mesh {
 
 	mesh := &Mesh{
-		Vertices:        []vector.Vector{},
 		Triangles:       []*Triangle{},
 		BackfaceCulling: true,
+	}
+	for i := 0; i < len(verts); i += 3 {
+		if len(verts) < i {
+			panic("error: NewMesh() did not receive enough vertices")
+		}
+		mesh.AddTriangles(verts[i], verts[i+1], verts[i+2])
 	}
 	return mesh
 
@@ -28,12 +29,20 @@ func NewMesh() *Mesh {
 
 func (mesh *Mesh) Clone() *Mesh {
 	newMesh := NewMesh()
-	newMesh.Vertices = append(newMesh.Vertices, mesh.Vertices...)
-	newMesh.Triangles = append(newMesh.Triangles, mesh.Triangles...)
-	for _, t := range newMesh.Triangles {
-		t.Mesh = mesh
+	for _, t := range mesh.Triangles {
+		newTri := t.Clone()
+		newMesh.Triangles = append(newMesh.Triangles, newTri)
+		newTri.Mesh = mesh
 	}
 	return newMesh
+}
+
+func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
+	for i := 0; i < len(verts); i += 3 {
+		tri := NewTriangle(mesh)
+		mesh.Triangles = append(mesh.Triangles, tri)
+		tri.SetVertices(verts[i], verts[i+1], verts[i+2])
+	}
 }
 
 // func (model *Model) WorldSpaceToClipSpace(matrix Matrix4) []Vec {
@@ -52,147 +61,199 @@ func (mesh *Mesh) Clone() *Mesh {
 
 // }
 
-func LoadMeshFromOBJFile(filepath string) *Mesh {
+// func LoadMeshFromOBJFile(filepath string) *Mesh {
 
-	loadedFile, err := os.ReadFile(filepath)
+// 	loadedFile, err := os.ReadFile(filepath)
 
-	if err != nil {
-		log.Println(err.Error())
-	} else {
-		return LoadMeshFromOBJData(loadedFile)
-	}
+// 	if err != nil {
+// 		log.Println(err.Error())
+// 	} else {
+// 		return LoadMeshFromOBJData(loadedFile)
+// 	}
 
-	return nil
+// 	return nil
 
-}
+// }
 
-func LoadMeshFromOBJData(objData []byte) *Mesh {
+// func LoadMeshFromOBJData(objData []byte) *Mesh {
 
-	model := NewMesh()
+// 	mesh := NewMesh()
 
-	for _, line := range strings.Split(string(objData), "\n") {
+// 	verts := []*Vertex{}
 
-		elements := strings.Split(line, " ")
+// 	for _, line := range strings.Split(string(objData), "\n") {
 
-		switch elements[0] {
-		case "v":
-			floatValueX, _ := strconv.ParseFloat(strings.TrimSpace(elements[1]), 64)
-			floatValueY, _ := strconv.ParseFloat(strings.TrimSpace(elements[2]), 64)
-			floatValueZ, _ := strconv.ParseFloat(strings.TrimSpace(elements[3]), 64)
+// 		elements := strings.Split(line, " ")
 
-			model.Vertices = append(model.Vertices, vector.Vector{floatValueX, floatValueY, floatValueZ})
-		case "f":
-			newFace := NewTriangle(model)
-			index0, _ := strconv.ParseInt(strings.TrimSpace(elements[1]), 0, 64)
-			index1, _ := strconv.ParseInt(strings.TrimSpace(elements[2]), 0, 64)
-			index2, _ := strconv.ParseInt(strings.TrimSpace(elements[3]), 0, 64)
+// 		switch elements[0] {
+// 		case "v":
+// 			floatValueX, _ := strconv.ParseFloat(strings.TrimSpace(elements[1]), 64)
+// 			floatValueY, _ := strconv.ParseFloat(strings.TrimSpace(elements[2]), 64)
+// 			floatValueZ, _ := strconv.ParseFloat(strings.TrimSpace(elements[3]), 64)
 
-			// Interestingly, the indices seem to be 1-based, not 0-based
-			newFace.Indices = append(newFace.Indices, uint16(index0-1), uint16(index1-1), uint16(index2-1))
-			model.Triangles = append(model.Triangles, newFace)
-		}
+// 			// mesh.Vertices = append(mesh.Vertices, vector.Vector{floatValueX, floatValueY, floatValueZ})
+// 			verts = append(verts, NewVertex(vector.Vector{floatValueX, floatValueY, floatValueZ}))
 
-	}
+// 		}
 
-	return model
+// 	}
 
-}
+// 	for _, line := range strings.Split(string(objData), "\n") {
+
+// 		elements := strings.Split(line, " ")
+
+// 		switch elements[0] {
+
+// 		case "f":
+
+// 			mesh.AddTriangle()
+// 			index0, _ := strconv.ParseInt(strings.TrimSpace(elements[1]), 0, 64)
+// 			index1, _ := strconv.ParseInt(strings.TrimSpace(elements[2]), 0, 64)
+// 			index2, _ := strconv.ParseInt(strings.TrimSpace(elements[3]), 0, 64)
+
+// 			// Interestingly, the indices seem to be 1-based, not 0-based
+// 			// newFace.Indices = append(newFace.Indices, uint16(index0-1), uint16(index1-1), uint16(index2-1))
+// 			// mesh.Triangles = append(mesh.Triangles, newFace)
+
+// 		}
+
+// 	}
+
+// 	return mesh
+
+// }
 
 func NewCube() *Mesh {
 
-	model := NewMesh()
+	mesh := NewMesh()
 
-	verts := []vector.Vector{
-		{1, 1, 1},   // RFU
-		{1, -1, 1},  // RBU
-		{-1, -1, 1}, // LBU
-		{-1, 1, 1},  // LFU
+	type v = vector.Vector
 
-		{1, 1, -1},   // LFD
-		{1, -1, -1},  // LFD
-		{-1, -1, -1}, // LFD
-		{-1, 1, -1},  // LFD
-	}
+	mesh.AddTriangles(
 
-	indices := []uint16{
+		// Top
 
-		1, 2, 3,
-		4, 7, 6,
+		NewVertex(-1, 1, -1, 0, 0),
+		NewVertex(1, 1, 1, 1, 1),
+		NewVertex(1, 1, -1, 1, 0),
 
-		4, 5, 1,
-		1, 5, 6,
+		NewVertex(-1, 1, 1, 0, 1),
+		NewVertex(1, 1, 1, 1, 1),
+		NewVertex(-1, 1, -1, 0, 0),
 
-		6, 7, 3,
-		4, 0, 3,
+		// Bottom
 
-		0, 1, 3,
-		5, 4, 6,
+		NewVertex(1, -1, -1, 1, 0),
+		NewVertex(1, -1, 1, 1, 1),
+		NewVertex(-1, -1, -1, 0, 0),
 
-		0, 4, 1,
-		2, 1, 6,
+		NewVertex(-1, -1, -1, 0, 0),
+		NewVertex(1, -1, 1, 1, 1),
+		NewVertex(-1, -1, 1, 0, 1),
 
-		2, 6, 3,
-		7, 4, 3,
-	}
+		// Front
 
-	model.Vertices = append(model.Vertices, verts...)
+		NewVertex(-1, 1, 1, 0, 0),
+		NewVertex(1, -1, 1, 1, 1),
+		NewVertex(1, 1, 1, 1, 0),
 
-	for i := 0; i < len(indices); i += 3 {
-		newTri := NewTriangle(model)
-		newTri.Indices = []uint16{indices[i], indices[i+1], indices[i+2]}
-		newTri.RecalculateNormal()
-		model.Triangles = append(model.Triangles, newTri)
-	}
+		NewVertex(-1, -1, 1, 0, 1),
+		NewVertex(1, -1, 1, 1, 1),
+		NewVertex(-1, 1, 1, 0, 0),
 
-	return model
+		// Back
+
+		NewVertex(1, 1, -1, 1, 0),
+		NewVertex(1, -1, -1, 1, 1),
+		NewVertex(-1, 1, -1, 0, 0),
+
+		NewVertex(-1, 1, -1, 0, 0),
+		NewVertex(1, -1, -1, 1, 1),
+		NewVertex(-1, -1, -1, 0, 1),
+
+		// Right
+
+		NewVertex(1, 1, -1, 1, 0),
+		NewVertex(1, 1, 1, 1, 1),
+		NewVertex(1, -1, -1, 0, 0),
+
+		NewVertex(1, -1, -1, 0, 0),
+		NewVertex(1, 1, 1, 1, 1),
+		NewVertex(1, -1, 1, 0, 1),
+
+		// Left
+
+		NewVertex(-1, -1, -1, 0, 0),
+		NewVertex(-1, 1, 1, 1, 1),
+		NewVertex(-1, 1, -1, 1, 0),
+
+		NewVertex(-1, -1, 1, 0, 1),
+		NewVertex(-1, 1, 1, 1, 1),
+		NewVertex(-1, -1, -1, 0, 0),
+	)
+
+	return mesh
 
 }
 
 func NewPlane() *Mesh {
 
-	model := NewMesh()
+	mesh := NewMesh()
 
-	verts := []vector.Vector{
-		{1, 0, 1},   // RF
-		{1, 0, -1},  // RB
-		{-1, 0, -1}, // LB
-		{-1, 0, 1},  // LF
-	}
+	type v = vector.Vector
 
-	indices := []uint16{
-		0, 1, 2,
-		2, 3, 0,
-	}
+	mesh.AddTriangles(
 
-	model.Vertices = append(model.Vertices, verts...)
+		NewVertex(-1, 0, -1, 0, 0),
+		NewVertex(1, 0, 1, 1, 1),
+		NewVertex(1, 0, -1, 1, 0),
 
-	for i := 0; i < len(indices); i += 3 {
-		newTri := NewTriangle(model)
-		newTri.Indices = []uint16{indices[i], indices[i+1], indices[i+2]}
-		newTri.RecalculateNormal()
-		model.Triangles = append(model.Triangles, newTri)
-	}
+		NewVertex(-1, 0, 1, 0, 1),
+		NewVertex(1, 0, 1, 1, 1),
+		NewVertex(-1, 0, -1, 0, 0),
 
-	return model
+		// NewVertex(-1, 2, -1, 0, 0),
+		// NewVertex(1, 2, 1, 1, 1),
+		// NewVertex(1, 0, -1, 1, 0),
+
+		// NewVertex(-1, 0, 1, 0, 1),
+		// NewVertex(1, 2, 1, 1, 1),
+		// NewVertex(-1, 2, -1, 0, 0),
+	)
+
+	return mesh
 
 }
 
 type Triangle struct {
-	Indices []uint16
-	Normal  vector.Vector
-	Mesh    *Mesh
+	Vertices []*Vertex
+	Normal   vector.Vector
+	Mesh     *Mesh
 }
 
 func NewTriangle(mesh *Mesh) *Triangle {
-	return &Triangle{
-		Indices: []uint16{},
-		Mesh:    mesh,
+	tri := &Triangle{
+		Vertices: []*Vertex{},
+		Mesh:     mesh,
 	}
+	return tri
+}
+
+func (tri *Triangle) SetVertices(verts ...*Vertex) {
+
+	if len(verts) < 3 {
+		panic("Error: Triangle.AddVertices() received less than 3 vertices.")
+	}
+
+	tri.Vertices = verts
+
 }
 
 func (tri *Triangle) Clone() *Triangle {
 	newTri := NewTriangle(tri.Mesh)
-	newTri.Indices = append(newTri.Indices, tri.Indices...)
+	for _, vertex := range tri.Vertices {
+		newTri.SetVertices(vertex.Clone())
+	}
 	newTri.RecalculateNormal()
 	return newTri
 }
@@ -200,19 +261,54 @@ func (tri *Triangle) Clone() *Triangle {
 func (tri *Triangle) RecalculateNormal() {
 
 	tri.Normal = calculateNormal(
-		tri.Mesh.Vertices[tri.Indices[0]],
-		tri.Mesh.Vertices[tri.Indices[1]],
-		tri.Mesh.Vertices[tri.Indices[2]],
+		tri.Vertices[0].Position,
+		tri.Vertices[1].Position,
+		tri.Vertices[2].Position,
 	)
 
 }
 
-func (tri *Triangle) Vertices() []vector.Vector {
-	verts := []vector.Vector{}
-	for _, index := range tri.Indices {
-		verts = append(verts, tri.Mesh.Vertices[index])
+func (tri *Triangle) Center() vector.Vector {
+
+	v := vector.Vector{0, 0, 0}
+	for _, vert := range tri.Vertices {
+		v = v.Add(vert.Position)
 	}
-	return verts
+	v = v.Scale(1.0 / float64(len(tri.Vertices)))
+	return v
+
+}
+
+func (tri *Triangle) NearestPoint(from vector.Vector) vector.Vector {
+
+	var closest vector.Vector
+	for _, vert := range tri.Vertices {
+		if closest == nil || from.Sub(vert.Position).Magnitude() < from.Sub(closest).Magnitude() {
+			closest = vert.Position
+		}
+	}
+	return closest
+
+}
+
+type Vertex struct {
+	Position vector.Vector
+	Color    vector.Vector
+	UV       vector.Vector
+}
+
+func NewVertex(x, y, z, u, v float64) *Vertex {
+	return &Vertex{
+		Position: vector.Vector{x, y, z},
+		Color:    vector.Vector{1, 1, 1, 1},
+		UV:       vector.Vector{u, v},
+	}
+}
+
+func (vertex *Vertex) Clone() *Vertex {
+	newVert := NewVertex(vertex.Position[0], vertex.Position[1], vertex.Position[2], vertex.UV[0], vertex.UV[1])
+	newVert.Color = vertex.Color.Clone()
+	return newVert
 }
 
 func calculateNormal(p1, p2, p3 vector.Vector) vector.Vector {

@@ -1,13 +1,18 @@
 package ebiten3d
 
-import "github.com/kvartborg/vector"
+import (
+	"sort"
+
+	"github.com/kvartborg/vector"
+)
 
 type Model struct {
-	Mesh      *Mesh
-	Transform Matrix4
-	Scale     vector.Vector
-	Position  vector.Vector
-	Rotation  vector.Vector
+	Mesh        *Mesh
+	Transform   Matrix4
+	Scale       vector.Vector
+	Position    vector.Vector
+	Rotation    vector.Vector // Rotation is effectively a Quaternion (a 4D vector; the first three arguments control the axis, and the fourth controls the angle).
+	closestTris []*Triangle
 }
 
 func NewModel(mesh *Mesh) *Model {
@@ -33,13 +38,22 @@ func (model *Model) UpdateTransform() {
 
 }
 
-func (model *Model) TransformedVertices(mvpMatrix Matrix4) []vector.Vector {
+func (model *Model) TransformedVertices(mvpMatrix Matrix4, camera *Camera) []vector.Vector {
 
 	verts := []vector.Vector{}
 
-	for _, vert := range model.Mesh.Vertices {
-		// verts = append(verts, mvpMatrix.MultVec(vert))
-		verts = append(verts, mvpMatrix.MultVecW(vert))
+	model.closestTris = append([]*Triangle{}, model.Mesh.Triangles...)
+
+	sort.SliceStable(model.closestTris, func(i, j int) bool {
+		a := mvpMatrix.MultVecW(model.closestTris[i].Center())
+		b := mvpMatrix.MultVecW(model.closestTris[j].Center())
+		return camera.Position.Sub(a).Magnitude() > camera.Position.Sub(b).Magnitude()
+	})
+
+	for _, tri := range model.closestTris {
+		for _, vert := range tri.Vertices {
+			verts = append(verts, mvpMatrix.MultVecW(vert.Position))
+		}
 	}
 
 	return verts

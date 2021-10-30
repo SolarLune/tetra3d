@@ -2,7 +2,6 @@ package ebiten3d
 
 import (
 	"image/color"
-	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
@@ -19,8 +18,7 @@ func init() {
 	defaultImg.Fill(color.White)
 
 	for i := 0; i < ebiten.MaxIndicesNum; i++ {
-		// vertexList = append(vertexList, ebiten.Vertex{ColorR: 1, ColorG: 0, ColorB: 0, ColorA: 1})
-		vertexList = append(vertexList, ebiten.Vertex{ColorR: rand.Float32(), ColorG: rand.Float32(), ColorB: rand.Float32(), ColorA: 1})
+		vertexList = append(vertexList, ebiten.Vertex{})
 		indexList = append(indexList, 0)
 	}
 

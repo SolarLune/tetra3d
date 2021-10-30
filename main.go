@@ -1,14 +1,17 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"image/color"
 	"os"
 	"runtime/pprof"
 	"time"
 
+	_ "image/png"
+
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/solarlune/ebiten3d/ebiten3d"
 )
 
@@ -42,50 +45,77 @@ func NewGame() *Game {
 func (g *Game) Init() {
 
 	// g.Bunny = ebiten3d.NewModel(ebiten3d.LoadMeshFromOBJFile("ebiten3d/cube.obj"))
-	// g.Model = ebiten3d.NewModel(ebiten3d.NewPlane())
 	g.Model = ebiten3d.NewModel(ebiten3d.NewCube())
+	// g.Model = ebiten3d.NewModel(ebiten3d.NewPlane())
+	g.Model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// g.Model = ebiten3d.NewModel(ebiten3d.NewCube())
 	// g.Model.Rotation = vector.Vector{1, 0, 0, 0}
 	// g.Model.Mesh.BackfaceCulling = false
-	g.Model.Scale = g.Model.Scale.Scale(0.1)
+	// g.Model.Scale = g.Model.Scale.Scale(0.1)
 
 	g.Camera = ebiten3d.NewCamera(g.Width, g.Height)
-	// g.Camera.SetOrthographicView()
 	g.Camera.SetPerspectiveView(90)
 
-	g.Camera.Position[2] = -20000000
-	// g.Camera.Position[1] = 5
-
-	// g.Camera.Position[2] = -40
-	// g.Camera.Position[1] = 5
+	g.Camera.Position[2] = -10
+	g.Camera.Position[1] = 1
 
 }
 
 func (g *Game) Update() error {
 
-	// g.Camera.Position[0] -= 0.1
-	// g.Camera.Position[2] += 0.2
+	var err error
 
-	g.Model.Rotation[3] += 0.025
+	moveSpd := 0.1
 
-	g.Camera.LookAtTarget = vector.Vector{0, 0, 0}
+	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+		err = errors.New("quit")
+	}
 
-	// fmt.Println(g.Camera.LookAtTarget)
+	if ebiten.IsKeyPressed(ebiten.KeyRight) {
+		g.Camera.Position[0] += moveSpd
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+		g.Camera.Position[0] -= moveSpd
+	}
 
-	// g.Camera.Position = g.Camera.Position.Rotate(0.001, vector.Y)
+	if ebiten.IsKeyPressed(ebiten.KeyUp) {
+		g.Camera.Position[2] += moveSpd
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+		g.Camera.Position[2] -= moveSpd
+	}
 
-	// g.Camera.LookAtTarget = g.Bunny.Position
+	if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		g.Camera.Position[1] += moveSpd
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyControl) {
+		g.Camera.Position[1] -= moveSpd
+	}
+
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
+		g.Model.Rotation[3] += 0.025
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
+		g.Model.Rotation[3] -= 0.025
+	}
+
+	// g.Camera.LookAt(g.Model.Position, vector.Y)
+
+	// fmt.Println(g.Model.Position)
+	// fmt.Println(g.Camera.EyeMatrix)
 
 	if ebiten.IsKeyPressed(ebiten.KeyR) {
 		g.Init()
 	}
 
-	return nil
+	return err
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Clear, but with a color
 	screen.Fill(color.White)
+	// screen.Fill(color.Black)
 
 	// g.Camera.Transform = ebiten3d.LookAt(vector.Vector{0, 0, 0}, vector.Vector{0, 5, 5}, vector.Vector{0, 1, 0})
 
@@ -101,6 +131,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// for i := 0; i < 20; i++ {
 	// g.Bunny.Position = vector.Vector{0, 0, 0}
+
 	g.Camera.Render(g.Model)
 
 	// g.Bunny.Position = vector.Vector{10, 0, 10}
@@ -108,7 +139,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// }
 
-	screen.DrawImage(g.Camera.ColorTexture, &ebiten.DrawImageOptions{})
+	screen.DrawImage(g.Camera.ColorTexture, nil)
 
 }
 
@@ -138,9 +169,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 func main() {
 
 	ebiten.SetWindowTitle("ebiten3D Test")
-	// ebiten.SetWindowSize(640, 480)
 	ebiten.SetWindowResizable(true)
-	// ebiten.SetMaxTPS(1)
 
 	game := NewGame()
 
