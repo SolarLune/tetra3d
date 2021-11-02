@@ -127,29 +127,27 @@ func NewCube() *Mesh {
 
 	mesh := NewMesh()
 
-	type v = vector.Vector
-
 	mesh.AddTriangles(
 
 		// Top
 
-		NewVertex(-1, 1, -1, 0, 0),
-		NewVertex(1, 1, 1, 1, 1),
 		NewVertex(1, 1, -1, 1, 0),
-
-		NewVertex(-1, 1, 1, 0, 1),
 		NewVertex(1, 1, 1, 1, 1),
 		NewVertex(-1, 1, -1, 0, 0),
+
+		NewVertex(-1, 1, -1, 0, 0),
+		NewVertex(1, 1, 1, 1, 1),
+		NewVertex(-1, 1, 1, 0, 1),
 
 		// Bottom
 
+		NewVertex(-1, -1, -1, 0, 0),
+		NewVertex(1, -1, 1, 1, 1),
 		NewVertex(1, -1, -1, 1, 0),
-		NewVertex(1, -1, 1, 1, 1),
-		NewVertex(-1, -1, -1, 0, 0),
 
-		NewVertex(-1, -1, -1, 0, 0),
-		NewVertex(1, -1, 1, 1, 1),
 		NewVertex(-1, -1, 1, 0, 1),
+		NewVertex(1, -1, 1, 1, 1),
+		NewVertex(-1, -1, -1, 0, 0),
 
 		// Front
 
@@ -204,26 +202,47 @@ func NewPlane() *Mesh {
 
 	mesh.AddTriangles(
 
-		NewVertex(-1, 0, -1, 0, 0),
-		NewVertex(1, 0, 1, 1, 1),
 		NewVertex(1, 0, -1, 1, 0),
-
-		NewVertex(-1, 0, 1, 0, 1),
 		NewVertex(1, 0, 1, 1, 1),
 		NewVertex(-1, 0, -1, 0, 0),
 
-		// NewVertex(-1, 2, -1, 0, 0),
-		// NewVertex(1, 2, 1, 1, 1),
-		// NewVertex(1, 0, -1, 1, 0),
-
-		// NewVertex(-1, 0, 1, 0, 1),
-		// NewVertex(1, 2, 1, 1, 1),
-		// NewVertex(-1, 2, -1, 0, 0),
+		NewVertex(-1, 0, -1, 0, 0),
+		NewVertex(1, 0, 1, 1, 1),
+		NewVertex(-1, 0, 1, 0, 1),
 	)
 
 	return mesh
 
 }
+
+// func NewWeirdDebuggingStatueThing() *Mesh {
+
+// 	mesh := NewMesh()
+
+// 	type v = vector.Vector
+
+// 	mesh.AddTriangles(
+
+// 		NewVertex(1, 0, -1, 1, 0),
+// 		NewVertex(1, 0, 1, 1, 1),
+// 		NewVertex(-1, 0, -1, 0, 0),
+
+// 		NewVertex(-1, 0, -1, 0, 0),
+// 		NewVertex(1, 0, 1, 1, 1),
+// 		NewVertex(-1, 0, 1, 0, 1),
+
+// 		NewVertex(-1, 2, -1, 0, 0),
+// 		NewVertex(1, 2, 1, 1, 1),
+// 		NewVertex(1, 0, -1, 1, 0),
+
+// 		NewVertex(-1, 0, 1, 0, 1),
+// 		NewVertex(1, 2, 1, 1, 1),
+// 		NewVertex(-1, 2, -1, 0, 0),
+// 	)
+
+// 	return mesh
+
+// }
 
 type Triangle struct {
 	Vertices []*Vertex
@@ -246,6 +265,8 @@ func (tri *Triangle) SetVertices(verts ...*Vertex) {
 	}
 
 	tri.Vertices = verts
+
+	tri.RecalculateNormal()
 
 }
 
@@ -317,7 +338,6 @@ func calculateNormal(p1, p2, p3 vector.Vector) vector.Vector {
 	v1 := p3.Sub(p2)
 
 	cross, _ := v0.Cross(v1)
-	cross = cross.Unit()
-	return cross
+	return cross.Unit()
 
 }

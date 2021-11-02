@@ -1,7 +1,7 @@
 package ebiten3d
 
 import (
-	"math"
+	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
@@ -12,12 +12,14 @@ type Camera struct {
 	Near, Far    float64
 
 	Position vector.Vector
-	lookDir  vector.Vector
+	Rotation Quaternion // Quaternion, essentially
 
-	EyeMatrix  Matrix4
-	Transform  Matrix4
-	Projection Matrix4
-	// Drawcalls   []Drawcall
+	Perspective bool
+	fieldOfView float64
+
+	// Debug info
+
+	DebugDrawCount int
 }
 
 func NewCamera(w, h int) *Camera {
@@ -27,50 +29,50 @@ func NewCamera(w, h int) *Camera {
 		Near:         0.1,
 		Far:          100,
 
-		Position:  UnitVector(0),
-		EyeMatrix: NewMatrix4(),
-		Transform: NewMatrix4(),
+		Position: UnitVector(0),
+		Rotation: NewQuaternion(vector.Vector{0, 1, 0}, 0),
 		// Draw:    &Drawcalls{},
 	}
 
-	cam.LookAt(cam.Position.Add(vector.Vector{0, 0, 1}), vector.Y)
+	cam.SetPerspective(45)
 
-	cam.SetPerspectiveView(75)
+	// cam.LookAt(cam.Position.Add(vector.Vector{0, 0, -1}), vector.Y)
 
 	// cam.DepthTexture = ebiten.NewImage(buffer.Size())
 
 	return cam
 }
 
-func (camera *Camera) UpdateTransform() {
+func (camera *Camera) ViewMatrix() Matrix4 {
 
-	camera.Transform = NewMatrix4()
-	camera.Transform = camera.Transform.Mult(Translate(-camera.Position[0], -camera.Position[1], camera.Position[2]))
-	// camera.Transform = camera.Transform.Mult(camera.EyeMatrix)
+	transform := Translate(camera.Position[0], -camera.Position[1], camera.Position[2])
+	transform = transform.Mult(Rotate(camera.Rotation.Axis, camera.Rotation.Angle))
+	transform = transform.Mult(Perspective(camera.fieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy())))
+
+	return transform
 
 }
 
-// LookAt sets the Camera's rotation such that it is looking at the target 3D Vector in world space.
-func (camera *Camera) LookAt(target, up vector.Vector) {
-	camera.lookDir = target.Sub(camera.Position).Unit()
-	camera.EyeMatrix = LookAt(target, camera.Position, up)
+// TODO: Implement some kind of LookAt functionality.
+// func (camera *Camera) LookAt(target, up vector.Vector) { }
+
+// TODO: Implement orthographic perspective.
+// func (camera *Camera) SetOrthographic() { }
+
+func (camera *Camera) SetPerspective(fovY float64) {
+	camera.fieldOfView = fovY
+	camera.Perspective = true
 }
 
-func (camera *Camera) SetPerspectiveView(fovy float64) {
-	ymax := camera.Near * math.Tan((fovy*math.Pi)/360)
-	width, height := camera.ColorTexture.Size()
-	aspect := float64(width) / float64(height)
-	xmax := ymax * aspect
-	camera.Projection = frustum(-xmax, xmax, -ymax, ymax, camera.Near, camera.Far)
-}
-
-func (camera *Camera) ProjectToScreen(vert vector.Vector) vector.Vector {
+// viewPointToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
+func (camera *Camera) viewPointToScreen(vert vector.Vector) vector.Vector {
 
 	w, h := camera.ColorTexture.Size()
 	width, height := float64(w), float64(h)
 
-	vx := (vert[0] / vert[3])
-	vy := ((1 - vert[1]) / vert[3])
+	// Again, this function should only be called with pre-transformed 4D vertex arguments.
+	vx := vert[0] / vert[3]
+	vy := vert[1] / vert[3]
 
 	vect := vector.Vector{
 		vx*width + (width / 2),
@@ -81,152 +83,172 @@ func (camera *Camera) ProjectToScreen(vert vector.Vector) vector.Vector {
 
 }
 
+// WorldToScreen transforms a 3D position in the world to screen coordinates.
+func (camera *Camera) WorldToScreen(vert vector.Vector) vector.Vector {
+	// The negating of these values are the same as the negating in Model.Transform() and the opposite of Camera.ViewMatrix().
+	v := Translate(-vert[0], vert[1], -vert[2]).Mult(camera.ViewMatrix())
+	return camera.viewPointToScreen(v.MultVecW(vector.Vector{0, 0, 0}))
+}
+
+// worldToView transforms a 3D position in the world to view coordinates (i.e. this type of coordinate needs to be mapped to the screen still).
+func (camera *Camera) worldToView(vert vector.Vector) vector.Vector {
+	// The negating of these values are the same as the negating in Model.Transform() and the opposite of Camera.ViewMatrix().
+	v := Translate(-vert[0], vert[1], -vert[2]).Mult(camera.ViewMatrix())
+	return v.MultVecW(vector.Vector{0, 0, 0})
+}
+
+// Begin is called at the beginning of a single frame.
 func (camera *Camera) Begin() {
-	camera.UpdateTransform()
 	camera.ColorTexture.Clear()
+	camera.DebugDrawCount = 0
 }
 
-func (camera *Camera) Render(model *Model) {
+func (camera *Camera) pointInsideScreen(vert vector.Vector) bool {
 
-	// projection * view * model
+	w, h := camera.ColorTexture.Size()
+	width := float64(w)
+	height := float64(h)
+	return vert[0] >= 0 && vert[0] <= width && vert[1] >= 0 && vert[1] <= height
 
-	model.UpdateTransform()
+}
 
-	mvpMatrix := camera.Projection.Mult(camera.EyeMatrix).Mult(camera.Transform).Mult(model.Transform)
+func (camera *Camera) Render(models ...*Model) {
 
-	verts := model.TransformedVertices(mvpMatrix, camera)
+	sort.SliceStable(models, func(i, j int) bool {
+		return models[i].Position.Sub(camera.Position).Magnitude() > models[j].Position.Sub(camera.Position).Magnitude()
+	})
 
-	vertexListIndex := 0
+	viewMatrix := camera.ViewMatrix()
 
-	tris := []*Triangle{}
+	for _, model := range models {
 
-	for index := 0; index < len(verts); index += 3 {
+		if !model.Visible {
+			continue
+		}
 
-		// If any vertex is behind the camera, then skip it
-		for i := index; i < index+3; i++ {
+		// TODO: Enhance this with a comparison, not of the (usually central) position directly, but of the extant of the bounding box / sphere of the model.
+		if model.FrustumCull {
 
-			if verts[i][0] < 0 || verts[i][1] < 0 || verts[i][2] < 0 {
+			viewPos := camera.worldToView(model.Position)
+			screenPos := camera.WorldToScreen(model.Position)
+
+			// Either the object lies outside of the screen (screenPos[0] < 0, as an example) or behind it (viewPos[3] > 0)
+			if !camera.pointInsideScreen(screenPos) || viewPos[3] > 0 {
 				continue
 			}
 
 		}
 
-		v0 := verts[index]
-		v1 := verts[index+1]
-		v2 := verts[index+2]
+		verts := model.TransformedVertices(viewMatrix, camera.Position)
 
-		// Backface Culling
+		vertexListIndex := 0
 
-		if model.Mesh.BackfaceCulling {
+		modelTransform := model.Transform()
 
-			normal := calculateNormal(
-				v0[:3],
-				v1[:3],
-				v2[:3],
-			)
+		for index := 0; index < len(verts); index += 3 {
 
-			// result := camera.Transform.Forward().Dot(normal)
+			v0 := verts[index]
+			v1 := verts[index+1]
+			v2 := verts[index+2]
 
-			center := v0.Add(v1).Add(v2).Scale(1.0 / 3.0)
-			result := camera.Position.Sub(center).Unit().Dot(normal)
+			// // Skip if all vertices are behind the camera; this works well, but it's faster to avoid rendering objects if the center is behind the camera, as above
+			// if v0[3] > 0 && v1[3] > 0 && v2[3] > 0 {
+			// 	continue
+			// }
 
-			if result > 0 {
-				continue
+			// Backface Culling
+
+			tri := model.closestTris[index/3]
+
+			// TODO: Mis-behaves when viewing objects from behind at certain distances
+			if model.Mesh.BackfaceCulling {
+
+				normal := modelTransform.MultVec(tri.Normal)
+
+				// dot := modelTransform.MultVec(camera.Position).Sub(modelTransform.MultVec(tri.Vertices[0].Position)).Dot(normal)
+
+				eye := tri.Vertices[0].Position.Sub(camera.Position).Unit()
+
+				dot := eye.Dot(normal)
+
+				if dot < 0 {
+					continue
+				}
+
+			}
+
+			p0 := camera.viewPointToScreen(v0)
+			p1 := camera.viewPointToScreen(v1)
+			p2 := camera.viewPointToScreen(v2)
+
+			// Skip if the vertex is wholly outside of the screen - This is one approach to do this that is relatively safe and simple, but it's more performant to do this as early as
+			// possible (i.e. before transforming vertex transformation), rather than later.
+			// if !camera.pointInsideScreen(p0) && !camera.pointInsideScreen(p1) && !camera.pointInsideScreen(p2) {
+			// 	continue
+			// }
+
+			triList[vertexListIndex/3] = tri
+
+			vertexList[vertexListIndex].DstX = float32(int(p0[0]))
+			vertexList[vertexListIndex].DstY = float32(int(p0[1]))
+
+			vertexList[vertexListIndex+1].DstX = float32(int(p1[0]))
+			vertexList[vertexListIndex+1].DstY = float32(int(p1[1]))
+
+			vertexList[vertexListIndex+2].DstX = float32(int(p2[0]))
+			vertexList[vertexListIndex+2].DstY = float32(int(p2[1]))
+
+			vertexListIndex += 3
+
+		}
+
+		if vertexListIndex == 0 {
+			continue
+		}
+
+		srcW := 0.0
+		srcH := 0.0
+
+		if model.Mesh.Image != nil {
+			srcW = float64(model.Mesh.Image.Bounds().Dx())
+			srcH = float64(model.Mesh.Image.Bounds().Dy())
+		}
+
+		index := 0
+
+		for _, tri := range triList[:vertexListIndex/3] {
+
+			for _, vert := range tri.Vertices {
+
+				// Vertex colors
+
+				vertexList[index].ColorR = float32(vert.Color[0])
+				vertexList[index].ColorG = float32(vert.Color[1])
+				vertexList[index].ColorB = float32(vert.Color[2])
+				vertexList[index].ColorA = float32(vert.Color[3])
+
+				vertexList[index].SrcX = float32(vert.UV[0] * srcW)
+				vertexList[index].SrcY = float32(vert.UV[1] * srcH)
+
+				indexList[index] = uint16(index)
+
+				index++
+
 			}
 
 		}
 
-		tris = append(tris, model.closestTris[index/3])
+		// }
 
-		projected := camera.ProjectToScreen(v0)
-		vertexList[vertexListIndex].DstX = float32(int(projected[0]))
-		vertexList[vertexListIndex].DstY = float32(int(projected[1]))
-
-		projected = camera.ProjectToScreen(v1)
-		vertexList[vertexListIndex+1].DstX = float32(int(projected[0]))
-		vertexList[vertexListIndex+1].DstY = float32(int(projected[1]))
-
-		projected = camera.ProjectToScreen(v2)
-		vertexList[vertexListIndex+2].DstX = float32(int(projected[0]))
-		vertexList[vertexListIndex+2].DstY = float32(int(projected[1]))
-
-		vertexListIndex += 3
-	}
-
-	srcW := 0.0
-	srcH := 0.0
-
-	if model.Mesh.Image != nil {
-		srcW = float64(model.Mesh.Image.Bounds().Dx())
-		srcH = float64(model.Mesh.Image.Bounds().Dy())
-	}
-
-	index := 0
-
-	for _, tri := range tris {
-
-		for _, vert := range tri.Vertices {
-
-			// Vertex colors
-
-			vertexList[index].ColorR = float32(vert.Color[0])
-			vertexList[index].ColorG = float32(vert.Color[1])
-			vertexList[index].ColorB = float32(vert.Color[2])
-			vertexList[index].ColorA = float32(vert.Color[3])
-
-			vertexList[index].SrcX = float32(vert.UV[0] * srcW)
-			vertexList[index].SrcY = float32(vert.UV[1] * srcH)
-
-			indexList[index] = uint16(index)
-
-			index++
-
+		img := model.Mesh.Image
+		if img == nil {
+			img = defaultImg
 		}
 
+		camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, nil)
+
+		camera.DebugDrawCount++
+
 	}
-
-	// }
-
-	img := model.Mesh.Image
-	if img == nil {
-		img = defaultImg
-	}
-
-	camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, nil)
 
 }
-
-// Cribbed from https://github.com/fogleman/fauxgl vvvvvv
-
-func frustum(l, r, b, t, n, f float64) Matrix4 {
-	t1 := 2 * n
-	t2 := r - l
-	t3 := t - b
-	t4 := f - n
-	return Matrix4{
-		{t1 / t2, 0, (r + l) / t2, 0},
-		{0, t1 / t3, (t + b) / t3, 0},
-		{0, 0, (-(f + n)) / t4, (-t1 * f) / t4},
-		{0, 0, -1, 0},
-	}
-}
-
-// func (camera *Camera) SetOrthographicView() {
-
-// 	w, h := camera.ColorTexture.Size()
-
-// 	width := float64(w)
-// 	height := float64(h)
-
-// 	l, t := -width/2, -height/2
-// 	r, b := width/2, height/2
-// 	n, f := camera.Near, camera.Far
-
-// 	camera.Projection = Matrix4{
-// 		{2 / (r - l), 0, 0, -(r + l) / (r - l)},
-// 		{0, 2 / (t - b), 0, -(t + b) / (t - b)},
-// 		{0, 0, -2 / (f - n), -(f + n) / (f - n)},
-// 		{0, 0, 0, 1}}
-// }
-
-//Cribbed from https://github.com/fogleman/fauxgl ^^^^^^^

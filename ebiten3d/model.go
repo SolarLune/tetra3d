@@ -6,53 +6,62 @@ import (
 	"github.com/kvartborg/vector"
 )
 
+// Model represents a singular visual instantiation of a Mesh. A Mesh contains the vertex information (what to draw); a Model references the Mesh to draw it with a specific
+// Position, Rotation, and/or Scale (where and how to draw).
 type Model struct {
 	Mesh        *Mesh
-	Transform   Matrix4
-	Scale       vector.Vector
 	Position    vector.Vector
-	Rotation    vector.Vector // Rotation is effectively a Quaternion (a 4D vector; the first three arguments control the axis, and the fourth controls the angle).
+	Scale       vector.Vector
+	Rotation    Quaternion
 	closestTris []*Triangle
+	FrustumCull bool
+	Visible     bool
 }
 
+// NewModel creates a new Model (or instance) of the Mesh provided.
 func NewModel(mesh *Mesh) *Model {
 
 	return &Model{
-		Mesh:      mesh,
-		Transform: NewMatrix4(),
-		Position:  UnitVector(0),
-		Scale:     UnitVector(1),
-		Rotation:  vector.Vector{0, 1, 0, 0},
+		Mesh:        mesh,
+		Position:    UnitVector(0),
+		Rotation:    NewQuaternion(vector.Vector{0, 1, 0}, 0),
+		Scale:       UnitVector(1),
+		Visible:     true,
+		FrustumCull: true,
 	}
 
 }
 
-func (model *Model) UpdateTransform() {
+func (model *Model) Transform() Matrix4 {
 
 	// T * R * S * O
 
-	model.Transform = NewMatrix4()
-	model.Transform = model.Transform.Mult(Scale(model.Scale[0], model.Scale[1], model.Scale[2]))
-	model.Transform = model.Transform.Mult(Rotate(model.Rotation[:3], model.Rotation[3]))
-	model.Transform = model.Transform.Mult(Translate(model.Position[0], model.Position[1], model.Position[2]))
+	transform := NewMatrix4()
+	transform = transform.Mult(Scale(model.Scale[0], model.Scale[1], model.Scale[2]))
+	transform = transform.Mult(Rotate(model.Rotation.Axis, model.Rotation.Angle))
+	transform = transform.Mult(Translate(-model.Position[0], model.Position[1], -model.Position[2]))
+	return transform
 
 }
 
-func (model *Model) TransformedVertices(mvpMatrix Matrix4, camera *Camera) []vector.Vector {
+// TransformedVertices returns the vertices of the Model, as transformed by the Camera's view matrix, sorted by distance to the Camera's position.
+func (model *Model) TransformedVertices(viewMatrix Matrix4, cameraPosition vector.Vector) []vector.Vector {
 
 	verts := []vector.Vector{}
 
 	model.closestTris = append([]*Triangle{}, model.Mesh.Triangles...)
 
+	mvp := model.Transform().Mult(viewMatrix)
+
 	sort.SliceStable(model.closestTris, func(i, j int) bool {
-		a := mvpMatrix.MultVecW(model.closestTris[i].Center())
-		b := mvpMatrix.MultVecW(model.closestTris[j].Center())
-		return camera.Position.Sub(a).Magnitude() > camera.Position.Sub(b).Magnitude()
+		a := mvp.MultVecW(model.closestTris[i].Center())
+		b := mvp.MultVecW(model.closestTris[j].Center())
+		return cameraPosition.Sub(a).Magnitude() > cameraPosition.Sub(b).Magnitude()
 	})
 
 	for _, tri := range model.closestTris {
 		for _, vert := range tri.Vertices {
-			verts = append(verts, mvpMatrix.MultVecW(vert.Position))
+			verts = append(verts, mvp.MultVecW(vert.Position))
 		}
 	}
 

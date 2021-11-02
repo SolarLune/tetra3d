@@ -11,6 +11,7 @@ var defaultImg *ebiten.Image
 
 var vertexList = make([]ebiten.Vertex, 0, ebiten.MaxIndicesNum)
 var indexList = make([]uint16, 0, ebiten.MaxIndicesNum)
+var triList = make([]*Triangle, 0, ebiten.MaxIndicesNum/3)
 
 func init() {
 
@@ -20,6 +21,10 @@ func init() {
 	for i := 0; i < ebiten.MaxIndicesNum; i++ {
 		vertexList = append(vertexList, ebiten.Vertex{})
 		indexList = append(indexList, 0)
+	}
+
+	for i := 0; i < cap(triList); i++ {
+		triList = append(triList, nil)
 	}
 
 }

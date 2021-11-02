@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
+	"math"
 	"os"
 	"runtime/pprof"
 	"time"
@@ -12,20 +13,22 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/solarlune/ebiten3d/ebiten3d"
 )
 
 type Game struct {
 	Width, Height int
-	Model         *ebiten3d.Model
+	Models        []*ebiten3d.Model
 	Camera        *ebiten3d.Camera
+	Time          float64
 }
 
 func NewGame() *Game {
 
 	game := &Game{
-		Width:  640,
-		Height: 360,
+		Width:  320,
+		Height: 180,
 	}
 
 	game.Init()
@@ -44,20 +47,75 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	// g.Bunny = ebiten3d.NewModel(ebiten3d.LoadMeshFromOBJFile("ebiten3d/cube.obj"))
-	g.Model = ebiten3d.NewModel(ebiten3d.NewCube())
-	// g.Model = ebiten3d.NewModel(ebiten3d.NewPlane())
-	g.Model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
-	// g.Model = ebiten3d.NewModel(ebiten3d.NewCube())
-	// g.Model.Rotation = vector.Vector{1, 0, 0, 0}
-	// g.Model.Mesh.BackfaceCulling = false
-	// g.Model.Scale = g.Model.Scale.Scale(0.1)
+	g.Models = []*ebiten3d.Model{}
+
+	// g.Models = append(g.Models, g.ConstructGrid(40, 2)...)
+
+	// x := ebiten3d.NewModel(ebiten3d.NewCube())
+	// x.Position[0] = 10
+	// x.Scale = vector.Vector{0.25, 0.25, 0.25}
+	// for _, t := range x.Mesh.Triangles {
+	// 	for _, v := range t.Vertices {
+	// 		v.Color = vector.Vector{1, 0, 0, 1}
+	// 	}
+	// }
+	// g.Models = append(g.Models, x)
+
+	// y := ebiten3d.NewModel(ebiten3d.NewCube())
+	// y.Position[1] = 10
+	// y.Scale = vector.Vector{0.25, 0.25, 0.25}
+	// for _, t := range y.Mesh.Triangles {
+	// 	for _, v := range t.Vertices {
+	// 		v.Color = vector.Vector{0, 1, 0, 1}
+	// 	}
+	// }
+	// g.Models = append(g.Models, y)
+
+	// z := ebiten3d.NewModel(ebiten3d.NewCube())
+	// z.Position[2] = 10
+	// z.Scale = vector.Vector{0.25, 0.25, 0.25}
+	// for _, t := range z.Mesh.Triangles {
+	// 	for _, v := range t.Vertices {
+	// 		v.Color = vector.Vector{0, 0, 1, 1}
+	// 	}
+	// }
+	// g.Models = append(g.Models, z)
+
+	// m := ebiten3d.NewModel(ebiten3d.NewCube())
+	// m.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// g.Models = append(g.Models, m)
+
+	for i := 0; i < 60; i++ {
+		for j := 0; j < 20; j++ {
+			model := ebiten3d.NewModel(ebiten3d.NewCube())
+			model.Position[0] = float64(i) * 6
+			model.Position[2] = float64(j) * 6
+			model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+			g.Models = append(g.Models, model)
+		}
+	}
+
+	model := ebiten3d.NewModel(ebiten3d.NewCube())
+	model.Position[0] = -12
+	model.Position[1] = 4
+	model.Position[2] = 140
+	model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	g.Models = append(g.Models, model)
+	g.Models = append(g.Models, model)
+
+	// model := ebiten3d.NewModel(ebiten3d.NewCube())
+	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// g.Models = append(g.Models, model)
+
+	// model = ebiten3d.NewModel(ebiten3d.NewPlane())
+	// model.Position[2] = -5
+	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// g.Models = append(g.Models, model)
 
 	g.Camera = ebiten3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetPerspectiveView(90)
-
-	g.Camera.Position[2] = -10
-	g.Camera.Position[1] = 1
+	g.Camera.Position[0] = 12
+	g.Camera.Position[1] = 4
+	g.Camera.Position[2] = 140
 
 }
 
@@ -65,11 +123,15 @@ func (g *Game) Update() error {
 
 	var err error
 
-	moveSpd := 0.1
+	moveSpd := 0.2
+
+	g.Time += 1.0 / 60
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
+
+	// Movement is global; you could use Camera.Forward(), Camera.Right(), and Camera.Up() for local axis movement.
 
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
 		g.Camera.Position[0] += moveSpd
@@ -79,10 +141,10 @@ func (g *Game) Update() error {
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		g.Camera.Position[2] += moveSpd
+		g.Camera.Position[2] -= moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		g.Camera.Position[2] -= moveSpd
+		g.Camera.Position[2] += moveSpd
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
@@ -92,20 +154,35 @@ func (g *Game) Update() error {
 		g.Camera.Position[1] -= moveSpd
 	}
 
+	if ebiten.IsKeyPressed(ebiten.KeyQ) {
+		g.Camera.Rotation.Angle -= 0.01
+	}
+
+	if ebiten.IsKeyPressed(ebiten.KeyE) {
+		g.Camera.Rotation.Angle += 0.01
+	}
+
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.Model.Rotation[3] += 0.025
+		for _, m := range g.Models {
+			m.Rotation.Angle += 0.025
+		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.Model.Rotation[3] -= 0.025
+		for _, m := range g.Models {
+			m.Rotation.Angle -= 0.025
+		}
 	}
 
-	// g.Camera.LookAt(g.Model.Position, vector.Y)
-
-	// fmt.Println(g.Model.Position)
-	// fmt.Println(g.Camera.EyeMatrix)
+	for _, m := range g.Models {
+		m.Position[1] = math.Sin((((m.Position[0] + m.Position[2]) * 0.01) + g.Time) * math.Pi)
+	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyR) {
 		g.Init()
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
+		g.StartProfiling()
 	}
 
 	return err
@@ -132,7 +209,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// for i := 0; i < 20; i++ {
 	// g.Bunny.Position = vector.Vector{0, 0, 0}
 
-	g.Camera.Render(g.Model)
+	g.Camera.Render(g.Models...)
 
 	// g.Bunny.Position = vector.Vector{10, 0, 10}
 	// ebiten3d.DrawModel(g.Camera, g.Bunny)
@@ -172,6 +249,8 @@ func main() {
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()
+
+	game.StartProfiling()
 
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
