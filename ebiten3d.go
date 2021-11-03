@@ -1,4 +1,4 @@
-package ebiten3d
+package jank
 
 import (
 	"image/color"

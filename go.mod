@@ -1,4 +1,4 @@
-module github.com/solarlune/ebiten3d
+module github.com/solarlune/jank
 
 go 1.14
 

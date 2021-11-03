@@ -11,16 +11,20 @@ import (
 
 	_ "image/png"
 
+	"github.com/kvartborg/vector"
+	"github.com/solarlune/jank"
+
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/solarlune/ebiten3d/ebiten3d"
 )
+
+const ScreenWidth = 320
 
 type Game struct {
 	Width, Height int
-	Models        []*ebiten3d.Model
-	Camera        *ebiten3d.Camera
+	Models        []*jank.Model
+	Camera        *jank.Camera
 	Time          float64
 }
 
@@ -47,11 +51,11 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	g.Models = []*ebiten3d.Model{}
+	g.Models = []*jank.Model{}
 
 	// g.Models = append(g.Models, g.ConstructGrid(40, 2)...)
 
-	// x := ebiten3d.NewModel(ebiten3d.NewCube())
+	// x := jank.NewModel(jank.NewCube())
 	// x.Position[0] = 10
 	// x.Scale = vector.Vector{0.25, 0.25, 0.25}
 	// for _, t := range x.Mesh.Triangles {
@@ -61,7 +65,7 @@ func (g *Game) Init() {
 	// }
 	// g.Models = append(g.Models, x)
 
-	// y := ebiten3d.NewModel(ebiten3d.NewCube())
+	// y := jank.NewModel(jank.NewCube())
 	// y.Position[1] = 10
 	// y.Scale = vector.Vector{0.25, 0.25, 0.25}
 	// for _, t := range y.Mesh.Triangles {
@@ -71,7 +75,7 @@ func (g *Game) Init() {
 	// }
 	// g.Models = append(g.Models, y)
 
-	// z := ebiten3d.NewModel(ebiten3d.NewCube())
+	// z := jank.NewModel(jank.NewCube())
 	// z.Position[2] = 10
 	// z.Scale = vector.Vector{0.25, 0.25, 0.25}
 	// for _, t := range z.Mesh.Triangles {
@@ -81,45 +85,46 @@ func (g *Game) Init() {
 	// }
 	// g.Models = append(g.Models, z)
 
-	// m := ebiten3d.NewModel(ebiten3d.NewCube())
-	// m.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// m := jank.NewModel(jank.NewCube())
+	// m.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("jank/testimage.png")
 	// g.Models = append(g.Models, m)
 
-	for i := 0; i < 60; i++ {
-		for j := 0; j < 20; j++ {
-			model := ebiten3d.NewModel(ebiten3d.NewCube())
-			model.Position[0] = float64(i) * 6
-			model.Position[2] = float64(j) * 6
-			model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
-			g.Models = append(g.Models, model)
-		}
-	}
+	// for i := 0; i < 60; i++ {
+	// 	for j := 0; j < 20; j++ {
+	// 		model := jank.NewModel(jank.NewCube())
+	// 		model.Position[0] = float64(i) * 6
+	// 		model.Position[2] = float64(j) * 6
+	// 		model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("testimage.png")
+	// 		g.Models = append(g.Models, model)
+	// 	}
+	// }
 
-	// meshes, _ := ebiten3d.LoadMeshFromDAEFile("ebiten3d/examples.dae")
-	// testCube := ebiten3d.NewModel(meshes["Sphere"])
-	// g.Models = append(g.Models, testCube)
-	// testCube.Mesh.BackfaceCulling = false
-	// testCube.Rotation.Axis = vector.Vector{1, 0, 0}
-	// testCube.Rotation.Angle = math.Pi / 2
+	meshes, _ := jank.LoadMeshesFromDAEFile("examples.dae")
+	testCube := jank.NewModel(meshes["Crates"])
+	testCube.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	g.Models = append(g.Models, testCube)
+	testCube.Mesh.BackfaceCulling = false
+	testCube.Rotation.Axis = vector.Vector{1, 0, 0}
+	testCube.Rotation.Angle = math.Pi / 2
 
-	// model := ebiten3d.NewModel(ebiten3d.NewCube())
+	// model := jank.NewModel(jank.NewCube())
 	// model.Position[0] = -12
 	// model.Position[1] = 4
 	// model.Position[2] = 140
-	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("jank/testimage.png")
 	// g.Models = append(g.Models, model)
 	// g.Models = append(g.Models, model)
 
-	// model := ebiten3d.NewModel(ebiten3d.NewCube())
-	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// model := jank.NewModel(jank.NewCube())
+	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("jank/testimage.png")
 	// g.Models = append(g.Models, model)
 
-	// model = ebiten3d.NewModel(ebiten3d.NewPlane())
+	// model = jank.NewModel(jank.NewPlane())
 	// model.Position[2] = -5
-	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("jank/testimage.png")
 	// g.Models = append(g.Models, model)
 
-	g.Camera = ebiten3d.NewCamera(g.Width, g.Height)
+	g.Camera = jank.NewCamera(g.Width, g.Height)
 	g.Camera.Position[0] = 0
 	g.Camera.Position[1] = 0
 	g.Camera.Position[2] = 12
@@ -204,7 +209,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
 	screen.Fill(color.RGBA{20, 30, 40, 255})
 
-	g.Camera.Begin()
+	g.Camera.Clear()
 
 	g.Camera.Render(g.Models...)
 
@@ -232,17 +237,15 @@ func (g *Game) StartProfiling() {
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	return ScreenWidth, g.Height
 }
 
 func main() {
 
-	ebiten.SetWindowTitle("ebiten3D Test")
+	ebiten.SetWindowTitle("jank Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()
-
-	game.StartProfiling()
 
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)

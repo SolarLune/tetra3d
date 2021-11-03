@@ -1,4 +1,4 @@
-package ebiten3d
+package jank
 
 type Color struct {
 	R, G, B, A float32

@@ -1,4 +1,4 @@
-package ebiten3d
+package jank
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
@@ -9,6 +9,7 @@ type Mesh struct {
 	Triangles       []*Triangle
 	BackfaceCulling bool
 	Image           *ebiten.Image
+	FilterMode      ebiten.Filter
 }
 
 func NewMesh(verts ...*Vertex) *Mesh {
@@ -16,6 +17,7 @@ func NewMesh(verts ...*Vertex) *Mesh {
 	mesh := &Mesh{
 		Triangles:       []*Triangle{},
 		BackfaceCulling: true,
+		FilterMode:      ebiten.FilterNearest,
 	}
 	for i := 0; i < len(verts); i += 3 {
 		if len(verts) < i {

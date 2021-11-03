@@ -1,4 +1,4 @@
-package ebiten3d
+package jank
 
 import (
 	"image/color"
@@ -97,8 +97,8 @@ func (camera *Camera) worldToView(vert vector.Vector) vector.Vector {
 	return v.MultVecW(vector.Vector{0, 0, 0})
 }
 
-// Begin is called at the beginning of a single frame.
-func (camera *Camera) Begin() {
+// Clear is called at the beginning of a single rendered frame; it clears the backing textures before rendering.
+func (camera *Camera) Clear() {
 	camera.ColorTexture.Clear()
 	camera.DebugDrawCount = 0
 }
@@ -112,6 +112,8 @@ func (camera *Camera) pointInsideScreen(vert vector.Vector) bool {
 
 }
 
+// Render renders the models passed - note that models rendered one after another in multiple Render() calls will be rendered on top of each other.
+// Models need to be passed into the same Render() call to be sorted in depth.
 func (camera *Camera) Render(models ...*Model) {
 
 	sort.SliceStable(models, func(i, j int) bool {
@@ -228,7 +230,10 @@ func (camera *Camera) Render(models ...*Model) {
 				vertexList[index].ColorA = vert.Color.A
 
 				vertexList[index].SrcX = float32(vert.UV[0] * srcW)
-				vertexList[index].SrcY = float32(vert.UV[1] * srcH)
+
+				// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
+				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
+				vertexList[index].SrcY = float32((1 - vert.UV[1]) * srcH)
 
 				indexList[index] = uint16(index)
 
@@ -255,6 +260,7 @@ func (camera *Camera) Render(models ...*Model) {
 
 			t := &ebiten.DrawTrianglesOptions{}
 			t.ColorM.Scale(model.Color.RGBA64())
+			t.Filter = model.Mesh.FilterMode
 			camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
 
 		}
