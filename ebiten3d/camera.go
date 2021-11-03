@@ -1,25 +1,25 @@
 package ebiten3d
 
 import (
+	"image/color"
 	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/kvartborg/vector"
 )
 
 type Camera struct {
 	ColorTexture *ebiten.Image
 	Near, Far    float64
+	Perspective  bool
+	fieldOfView  float64
 
 	Position vector.Vector
 	Rotation Quaternion // Quaternion, essentially
 
-	Perspective bool
-	fieldOfView float64
-
-	// Debug info
-
 	DebugDrawCount int
+	Wireframe      bool
 }
 
 func NewCamera(w, h int) *Camera {
@@ -222,10 +222,10 @@ func (camera *Camera) Render(models ...*Model) {
 
 				// Vertex colors
 
-				vertexList[index].ColorR = float32(vert.Color[0])
-				vertexList[index].ColorG = float32(vert.Color[1])
-				vertexList[index].ColorB = float32(vert.Color[2])
-				vertexList[index].ColorA = float32(vert.Color[3])
+				vertexList[index].ColorR = vert.Color.R
+				vertexList[index].ColorG = vert.Color.G
+				vertexList[index].ColorB = vert.Color.B
+				vertexList[index].ColorA = vert.Color.A
 
 				vertexList[index].SrcX = float32(vert.UV[0] * srcW)
 				vertexList[index].SrcY = float32(vert.UV[1] * srcH)
@@ -238,14 +238,26 @@ func (camera *Camera) Render(models ...*Model) {
 
 		}
 
-		// }
-
 		img := model.Mesh.Image
 		if img == nil {
 			img = defaultImg
 		}
 
-		camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, nil)
+		if camera.Wireframe {
+
+			for i := 0; i < vertexListIndex-2; i++ {
+				v1 := vertexList[i]
+				v2 := vertexList[i+1]
+				ebitenutil.DrawLine(camera.ColorTexture, float64(v1.DstX), float64(v1.DstY), float64(v2.DstX), float64(v2.DstY), color.RGBA{uint8(v1.ColorR * 255), uint8(v1.ColorG * 255), uint8(v1.ColorB * 255), uint8(v1.ColorA * 255)})
+			}
+
+		} else {
+
+			t := &ebiten.DrawTrianglesOptions{}
+			t.ColorM.Scale(model.Color.RGBA64())
+			camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+
+		}
 
 		camera.DebugDrawCount++
 

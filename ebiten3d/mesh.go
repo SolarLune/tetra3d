@@ -45,6 +45,17 @@ func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
 	}
 }
 
+func (mesh *Mesh) SetVertexColor(r, g, b, a float32) {
+	for _, t := range mesh.Triangles {
+		for _, v := range t.Vertices {
+			v.Color.R = r
+			v.Color.G = g
+			v.Color.B = b
+			v.Color.A = a
+		}
+	}
+}
+
 // func (model *Model) WorldSpaceToClipSpace(matrix Matrix4) []Vec {
 
 // 	verts := []Vec{}
@@ -248,12 +259,14 @@ type Triangle struct {
 	Vertices []*Vertex
 	Normal   vector.Vector
 	Mesh     *Mesh
+	Center   vector.Vector
 }
 
 func NewTriangle(mesh *Mesh) *Triangle {
 	tri := &Triangle{
 		Vertices: []*Vertex{},
 		Mesh:     mesh,
+		Center:   vector.Vector{0, 0, 0},
 	}
 	return tri
 }
@@ -266,7 +279,7 @@ func (tri *Triangle) SetVertices(verts ...*Vertex) {
 
 	tri.Vertices = verts
 
-	tri.RecalculateNormal()
+	tri.Recalculate()
 
 }
 
@@ -275,11 +288,13 @@ func (tri *Triangle) Clone() *Triangle {
 	for _, vertex := range tri.Vertices {
 		newTri.SetVertices(vertex.Clone())
 	}
-	newTri.RecalculateNormal()
+	newTri.Recalculate()
 	return newTri
 }
 
-func (tri *Triangle) RecalculateNormal() {
+// Recalculate re-calculates the normal and center for the Triangle. Note that this should only be called if you manually change a vertex's individual position. Otherwise,
+// it's called automatically when setting the vertices for a Triangle.
+func (tri *Triangle) Recalculate() {
 
 	tri.Normal = calculateNormal(
 		tri.Vertices[0].Position,
@@ -287,16 +302,9 @@ func (tri *Triangle) RecalculateNormal() {
 		tri.Vertices[2].Position,
 	)
 
-}
-
-func (tri *Triangle) Center() vector.Vector {
-
-	v := vector.Vector{0, 0, 0}
-	for _, vert := range tri.Vertices {
-		v = v.Add(vert.Position)
-	}
-	v = v.Scale(1.0 / float64(len(tri.Vertices)))
-	return v
+	tri.Center[0] = (tri.Vertices[0].Position[0] + tri.Vertices[1].Position[0] + tri.Vertices[2].Position[0]) / 3
+	tri.Center[1] = (tri.Vertices[1].Position[0] + tri.Vertices[1].Position[1] + tri.Vertices[2].Position[1]) / 3
+	tri.Center[2] = (tri.Vertices[2].Position[0] + tri.Vertices[1].Position[2] + tri.Vertices[2].Position[2]) / 3
 
 }
 
@@ -314,14 +322,14 @@ func (tri *Triangle) NearestPoint(from vector.Vector) vector.Vector {
 
 type Vertex struct {
 	Position vector.Vector
-	Color    vector.Vector
+	Color    Color
 	UV       vector.Vector
 }
 
 func NewVertex(x, y, z, u, v float64) *Vertex {
 	return &Vertex{
 		Position: vector.Vector{x, y, z},
-		Color:    vector.Vector{1, 1, 1, 1},
+		Color:    NewColor(1, 1, 1, 1),
 		UV:       vector.Vector{u, v},
 	}
 }

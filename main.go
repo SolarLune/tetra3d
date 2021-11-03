@@ -95,13 +95,20 @@ func (g *Game) Init() {
 		}
 	}
 
-	model := ebiten3d.NewModel(ebiten3d.NewCube())
-	model.Position[0] = -12
-	model.Position[1] = 4
-	model.Position[2] = 140
-	model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
-	g.Models = append(g.Models, model)
-	g.Models = append(g.Models, model)
+	// meshes, _ := ebiten3d.LoadMeshFromDAEFile("ebiten3d/examples.dae")
+	// testCube := ebiten3d.NewModel(meshes["Sphere"])
+	// g.Models = append(g.Models, testCube)
+	// testCube.Mesh.BackfaceCulling = false
+	// testCube.Rotation.Axis = vector.Vector{1, 0, 0}
+	// testCube.Rotation.Angle = math.Pi / 2
+
+	// model := ebiten3d.NewModel(ebiten3d.NewCube())
+	// model.Position[0] = -12
+	// model.Position[1] = 4
+	// model.Position[2] = 140
+	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
+	// g.Models = append(g.Models, model)
+	// g.Models = append(g.Models, model)
 
 	// model := ebiten3d.NewModel(ebiten3d.NewCube())
 	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("ebiten3d/testimage.png")
@@ -113,9 +120,9 @@ func (g *Game) Init() {
 	// g.Models = append(g.Models, model)
 
 	g.Camera = ebiten3d.NewCamera(g.Width, g.Height)
-	g.Camera.Position[0] = 12
-	g.Camera.Position[1] = 4
-	g.Camera.Position[2] = 140
+	g.Camera.Position[0] = 0
+	g.Camera.Position[1] = 0
+	g.Camera.Position[2] = 12
 
 }
 
@@ -185,36 +192,21 @@ func (g *Game) Update() error {
 		g.StartProfiling()
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+		g.Camera.Wireframe = !g.Camera.Wireframe
+	}
+
 	return err
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Clear, but with a color
-	screen.Fill(color.White)
-	// screen.Fill(color.Black)
-
-	// g.Camera.Transform = ebiten3d.LookAt(vector.Vector{0, 0, 0}, vector.Vector{0, 5, 5}, vector.Vector{0, 1, 0})
-
-	// g.Camera.Position[2] += 0.05
-	// g.Camera.Position[0] += 0.01
-
-	// g.Camera.Position[1] += 0.01
-	// g.Bunny.Position[0] += 0.01
-
-	// Begin updates the camera transforms and clears the backbuffer
+	screen.Fill(color.RGBA{20, 30, 40, 255})
 
 	g.Camera.Begin()
 
-	// for i := 0; i < 20; i++ {
-	// g.Bunny.Position = vector.Vector{0, 0, 0}
-
 	g.Camera.Render(g.Models...)
-
-	// g.Bunny.Position = vector.Vector{10, 0, 10}
-	// ebiten3d.DrawModel(g.Camera, g.Bunny)
-
-	// }
 
 	screen.DrawImage(g.Camera.ColorTexture, nil)
 

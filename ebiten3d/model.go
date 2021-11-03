@@ -16,6 +16,7 @@ type Model struct {
 	closestTris []*Triangle
 	FrustumCull bool
 	Visible     bool
+	Color       Color
 }
 
 // NewModel creates a new Model (or instance) of the Mesh provided.
@@ -28,6 +29,7 @@ func NewModel(mesh *Mesh) *Model {
 		Scale:       UnitVector(1),
 		Visible:     true,
 		FrustumCull: true,
+		Color:       NewColor(1, 1, 1, 1),
 	}
 
 }
@@ -54,8 +56,8 @@ func (model *Model) TransformedVertices(viewMatrix Matrix4, cameraPosition vecto
 	mvp := model.Transform().Mult(viewMatrix)
 
 	sort.SliceStable(model.closestTris, func(i, j int) bool {
-		a := mvp.MultVecW(model.closestTris[i].Center())
-		b := mvp.MultVecW(model.closestTris[j].Center())
+		a := mvp.MultVecW(model.closestTris[i].Center)
+		b := mvp.MultVecW(model.closestTris[j].Center)
 		return cameraPosition.Sub(a).Magnitude() > cameraPosition.Sub(b).Magnitude()
 	})
 
