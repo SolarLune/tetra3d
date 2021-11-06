@@ -44,24 +44,23 @@ func (g *Game) Init() {
 
 	meshes, _ := jank3d.LoadMeshesFromDAEFile("examples.dae")
 
-	mesh := meshes["LongPlane"]
+	mesh := meshes["Suzanne"]
 	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
 	model := jank3d.NewModel(mesh)
-	model.FrustumCulling = false
 	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
 	g.Models = append(g.Models, model)
 
-	mesh = meshes["Suzanne"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	model = jank3d.NewModel(mesh)
-	model.Position[0] += 4
-	g.Models = append(g.Models, model)
+	// mesh = meshes["Suzanne"]
+	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	// model = jank3d.NewModel(mesh)
+	// model.Position[0] += 4
+	// g.Models = append(g.Models, model)
 
-	mesh = meshes["Sphere"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	model = jank3d.NewModel(mesh)
-	model.Position[0] += 8
-	g.Models = append(g.Models, model)
+	// mesh = meshes["Sphere"]
+	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	// model = jank3d.NewModel(mesh)
+	// model.Position[0] += 8
+	// g.Models = append(g.Models, model)
 
 	g.Camera = jank3d.NewCamera(g.Width, g.Height)
 	g.Camera.Position[1] = 5
@@ -137,6 +136,10 @@ func (g *Game) Update() error {
 		g.StartProfiling()
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
+		g.DrawDebugText = !g.DrawDebugText
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
 		g.Camera.DebugDrawWireframe = !g.Camera.DebugDrawWireframe
 	}
@@ -145,8 +148,8 @@ func (g *Game) Update() error {
 		g.Camera.DebugDrawNormals = !g.Camera.DebugDrawNormals
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
+	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
+		g.Camera.DebugDrawBoundingSphere = !g.Camera.DebugDrawBoundingSphere
 	}
 
 	return err

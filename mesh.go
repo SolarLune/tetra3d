@@ -12,6 +12,7 @@ type Mesh struct {
 	Triangles      []*Triangle
 	Image          *ebiten.Image
 	FilterMode     ebiten.Filter
+	BoundingSphere *Sphere
 }
 
 func NewMesh(name string, verts ...*Vertex) *Mesh {
@@ -22,6 +23,7 @@ func NewMesh(name string, verts ...*Vertex) *Mesh {
 		sortedVertices: []*Vertex{},
 		Triangles:      []*Triangle{},
 		FilterMode:     ebiten.FilterNearest,
+		BoundingSphere: NewSphere(vector.Vector{0, 0, 0}, 0),
 	}
 	for i := 0; i < len(verts); i += 3 {
 		if len(verts) < i {
@@ -29,6 +31,7 @@ func NewMesh(name string, verts ...*Vertex) *Mesh {
 		}
 		mesh.AddTriangles(verts[i], verts[i+1], verts[i+2])
 	}
+	mesh.UpdateBounds()
 	return mesh
 
 }
@@ -78,83 +81,37 @@ func (mesh *Mesh) ApplyMatrix(matrix Matrix4) {
 
 }
 
-// func (model *Model) WorldSpaceToClipSpace(matrix Matrix4) []Vec {
+// UpdateBounds updates the mesh's bounding sphere, which is used for frustum culling checks; call this after manually changing vertex positions.
+func (mesh *Mesh) UpdateBounds() {
 
-// 	verts := []Vec{}
+	extent0 := vector.Vector{0, 0, 0}
+	extent1 := vector.Vector{0, 0, 0}
 
-// 	for _, vert := range model.Vertices {
+	for _, v := range mesh.Vertices {
 
-// 		newV := vert.Clone()
+		if v.Position[0] < extent0[0] {
+			extent0[0] = v.Position[0]
+		} else if v.Position[0] > extent1[0] {
+			extent1[0] = v.Position[0]
+		}
 
-// 		verts = append(verts, newV)
+		if v.Position[1] < extent0[1] {
+			extent0[1] = v.Position[1]
+		} else if v.Position[1] > extent1[1] {
+			extent1[1] = v.Position[1]
+		}
 
-// 	}
+		if v.Position[2] < extent0[2] {
+			extent0[2] = v.Position[2]
+		} else if v.Position[2] > extent1[2] {
+			extent1[2] = v.Position[2]
+		}
 
-// 	return verts
+	}
 
-// }
+	mesh.BoundingSphere.Radius = extent1.Sub(extent0).Magnitude() / 2
 
-// func LoadMeshFromOBJFile(filepath string) *Mesh {
-
-// 	loadedFile, err := os.ReadFile(filepath)
-
-// 	if err != nil {
-// 		log.Println(err.Error())
-// 	} else {
-// 		return LoadMeshFromOBJData(loadedFile)
-// 	}
-
-// 	return nil
-
-// }
-
-// func LoadMeshFromOBJData(objData []byte) *Mesh {
-
-// 	mesh := NewMesh()
-
-// 	verts := []*Vertex{}
-
-// 	for _, line := range strings.Split(string(objData), "\n") {
-
-// 		elements := strings.Split(line, " ")
-
-// 		switch elements[0] {
-// 		case "v":
-// 			floatValueX, _ := strconv.ParseFloat(strings.TrimSpace(elements[1]), 64)
-// 			floatValueY, _ := strconv.ParseFloat(strings.TrimSpace(elements[2]), 64)
-// 			floatValueZ, _ := strconv.ParseFloat(strings.TrimSpace(elements[3]), 64)
-
-// 			// mesh.Vertices = append(mesh.Vertices, vector.Vector{floatValueX, floatValueY, floatValueZ})
-// 			verts = append(verts, NewVertex(vector.Vector{floatValueX, floatValueY, floatValueZ}))
-
-// 		}
-
-// 	}
-
-// 	for _, line := range strings.Split(string(objData), "\n") {
-
-// 		elements := strings.Split(line, " ")
-
-// 		switch elements[0] {
-
-// 		case "f":
-
-// 			mesh.AddTriangle()
-// 			index0, _ := strconv.ParseInt(strings.TrimSpace(elements[1]), 0, 64)
-// 			index1, _ := strconv.ParseInt(strings.TrimSpace(elements[2]), 0, 64)
-// 			index2, _ := strconv.ParseInt(strings.TrimSpace(elements[3]), 0, 64)
-
-// 			// Interestingly, the indices seem to be 1-based, not 0-based
-// 			// newFace.Indices = append(newFace.Indices, uint16(index0-1), uint16(index1-1), uint16(index2-1))
-// 			// mesh.Triangles = append(mesh.Triangles, newFace)
-
-// 		}
-
-// 	}
-
-// 	return mesh
-
-// }
+}
 
 func NewCube() *Mesh {
 

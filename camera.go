@@ -3,6 +3,7 @@ package jank3d
 import (
 	"fmt"
 	"image/color"
+	"math"
 	"sort"
 	"time"
 
@@ -29,9 +30,10 @@ type Camera struct {
 	Position vector.Vector
 	Rotation Quaternion // Quaternion, essentially
 
-	DebugInfo          DebugInfo
-	DebugDrawWireframe bool
-	DebugDrawNormals   bool
+	DebugInfo               DebugInfo
+	DebugDrawWireframe      bool
+	DebugDrawNormals        bool
+	DebugDrawBoundingSphere bool
 }
 
 func NewCamera(w, h int) *Camera {
@@ -120,15 +122,6 @@ func (camera *Camera) Clear() {
 	camera.DebugInfo.DrawnTris = 0
 }
 
-func (camera *Camera) pointInsideScreen(vert vector.Vector) bool {
-
-	w, h := camera.ColorTexture.Size()
-	width := float64(w)
-	height := float64(h)
-	return vert[0] >= 0 && vert[0] <= width && vert[1] >= 0 && vert[1] <= height
-
-}
-
 // Render renders the models passed - note that models rendered one after another in multiple Render() calls will be rendered on top of each other.
 // Models need to be passed into the same Render() call to be sorted in depth.
 func (camera *Camera) Render(models ...*Model) {
@@ -153,13 +146,28 @@ func (camera *Camera) Render(models ...*Model) {
 			continue
 		}
 
-		// TODO: Enhance this with a comparison, not of the (usually central) position directly, but of the extant of the bounding box / sphere of the model.
 		if model.FrustumCulling {
 
 			screenPos := camera.WorldToScreen(model.Position)
+			capped := screenPos.Clone()
+			r := camera.WorldToScreen(model.Position.Add(vector.Vector{model.Mesh.BoundingSphere.Radius, 0, 0}))
+			radius := r.Sub(screenPos).Magnitude()
 
-			// Either the object lies outside of the screen (screenPos[0] < 0, as an example) or behind it (viewPos[3] > 0)
-			if !camera.pointInsideScreen(screenPos) {
+			w, h := camera.ColorTexture.Size()
+
+			if capped[0] > float64(w) {
+				capped[0] = float64(w)
+			} else if capped[0] < 0 {
+				capped[0] = 0
+			}
+
+			if capped[1] > float64(h) {
+				capped[1] = float64(h)
+			} else if capped[1] < 0 {
+				capped[1] = 0
+			}
+
+			if capped.Sub(screenPos).Magnitude() > radius {
 				continue
 			}
 
@@ -190,12 +198,13 @@ func (camera *Camera) Render(models ...*Model) {
 
 			// Backface Culling
 
-			normal := calculateNormal(tri.Vertices[0].transformed[:3], tri.Vertices[1].transformed[:3], tri.Vertices[2].transformed[:3])
-
 			if model.BackfaceCulling {
 
 				// SHOUTOUTS TO MOD DB FOR POINTING ME IN THE RIGHT DIRECTION FOR THIS BECAUSE GOOD LORDT:
 				// https://moddb.fandom.com/wiki/Backface_culling#Polygons_in_object_space_are_transformed_into_world_space
+
+				// We use Vertex.transformed[:3] here because the fourth W component messes up normal calculation otherwise
+				normal := calculateNormal(tri.Vertices[0].transformed[:3], tri.Vertices[1].transformed[:3], tri.Vertices[2].transformed[:3])
 
 				dot := normal.Dot(tri.Vertices[0].transformed[:3])
 
@@ -300,6 +309,29 @@ func (camera *Camera) Render(models ...*Model) {
 				transformedNormal := camera.viewPointToScreen(model.Transform().Mult(viewMatrix).MultVecW(tri.Center.Add(tri.Normal.Scale(0.1))))
 				ebitenutil.DrawLine(camera.ColorTexture, center[0], center[1], transformedNormal[0], transformedNormal[1], color.RGBA{60, 158, 255, 255})
 				triIndex++
+			}
+
+		}
+
+		if camera.DebugDrawBoundingSphere {
+
+			sphere := model.Mesh.BoundingSphere
+			transformedCenter := camera.viewPointToScreen(model.Transform().Mult(viewMatrix).MultVecW(model.Position.Add(sphere.Position)))
+			transformedRadius := camera.viewPointToScreen(model.Transform().Mult(viewMatrix).MultVecW(model.Position.Add(sphere.Position.Add(vector.Vector{sphere.Radius, 0, 0}))))
+			radius := transformedRadius.Sub(transformedCenter).Magnitude()
+
+			stepCount := float64(32)
+
+			for i := 0; i < int(stepCount); i++ {
+
+				x := (math.Sin(math.Pi*2*float64(i)/stepCount) * radius)
+				y := (math.Cos(math.Pi*2*float64(i)/stepCount) * radius)
+
+				x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
+				y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
+
+				ebitenutil.DrawLine(camera.ColorTexture, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, color.White)
+
 			}
 
 		}
