@@ -1,4 +1,4 @@
-package jank
+package jank3d
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
@@ -6,18 +6,22 @@ import (
 )
 
 type Mesh struct {
-	Triangles       []*Triangle
-	BackfaceCulling bool
-	Image           *ebiten.Image
-	FilterMode      ebiten.Filter
+	Name           string
+	Vertices       []*Vertex
+	sortedVertices []*Vertex
+	Triangles      []*Triangle
+	Image          *ebiten.Image
+	FilterMode     ebiten.Filter
 }
 
-func NewMesh(verts ...*Vertex) *Mesh {
+func NewMesh(name string, verts ...*Vertex) *Mesh {
 
 	mesh := &Mesh{
-		Triangles:       []*Triangle{},
-		BackfaceCulling: true,
-		FilterMode:      ebiten.FilterNearest,
+		Name:           name,
+		Vertices:       []*Vertex{},
+		sortedVertices: []*Vertex{},
+		Triangles:      []*Triangle{},
+		FilterMode:     ebiten.FilterNearest,
 	}
 	for i := 0; i < len(verts); i += 3 {
 		if len(verts) < i {
@@ -30,7 +34,7 @@ func NewMesh(verts ...*Vertex) *Mesh {
 }
 
 func (mesh *Mesh) Clone() *Mesh {
-	newMesh := NewMesh()
+	newMesh := NewMesh(mesh.Name)
 	for _, t := range mesh.Triangles {
 		newTri := t.Clone()
 		newMesh.Triangles = append(newMesh.Triangles, newTri)
@@ -43,6 +47,8 @@ func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
 	for i := 0; i < len(verts); i += 3 {
 		tri := NewTriangle(mesh)
 		mesh.Triangles = append(mesh.Triangles, tri)
+		mesh.Vertices = append(mesh.Vertices, verts...)
+		mesh.sortedVertices = append(mesh.sortedVertices, verts...)
 		tri.SetVertices(verts[i], verts[i+1], verts[i+2])
 	}
 }
@@ -56,6 +62,20 @@ func (mesh *Mesh) SetVertexColor(r, g, b, a float32) {
 			v.Color.A = a
 		}
 	}
+}
+
+// Repositions all vertices to take effect of the given Matrix. You can use this to, for example, translate (move) all vertices
+// of a Mesh to the right by 5 units ( mesh.ApplyMatrix(jank3d.Translate(5, 0, 0)) ), or rotate all vertices around the center by
+// 90 degrees on the Y axis ( mesh.ApplyMatrix(jank3d.Rotate(0, 1, 0, math.Pi/2) ) ) .
+func (mesh *Mesh) ApplyMatrix(matrix Matrix4) {
+
+	for _, tri := range mesh.Triangles {
+		for _, vert := range tri.Vertices {
+			vert.Position = matrix.MultVec(vert.Position)
+		}
+		tri.RecalculateCenter()
+	}
+
 }
 
 // func (model *Model) WorldSpaceToClipSpace(matrix Matrix4) []Vec {
@@ -138,9 +158,7 @@ func (mesh *Mesh) SetVertexColor(r, g, b, a float32) {
 
 func NewCube() *Mesh {
 
-	mesh := NewMesh()
-
-	mesh.AddTriangles(
+	mesh := NewMesh("Cube",
 
 		// Top
 
@@ -209,12 +227,7 @@ func NewCube() *Mesh {
 
 func NewPlane() *Mesh {
 
-	mesh := NewMesh()
-
-	type v = vector.Vector
-
-	mesh.AddTriangles(
-
+	mesh := NewMesh("Plane",
 		NewVertex(1, 0, -1, 1, 0),
 		NewVertex(1, 0, 1, 1, 1),
 		NewVertex(-1, 0, -1, 0, 0),
@@ -280,8 +293,12 @@ func (tri *Triangle) SetVertices(verts ...*Vertex) {
 	}
 
 	tri.Vertices = verts
+	for _, v := range verts {
+		v.triangle = tri
+	}
 
-	tri.Recalculate()
+	tri.RecalculateCenter()
+	tri.RecalculateNormal()
 
 }
 
@@ -290,49 +307,42 @@ func (tri *Triangle) Clone() *Triangle {
 	for _, vertex := range tri.Vertices {
 		newTri.SetVertices(vertex.Clone())
 	}
-	newTri.Recalculate()
+	newTri.RecalculateCenter()
 	return newTri
 }
 
-// Recalculate re-calculates the normal and center for the Triangle. Note that this should only be called if you manually change a vertex's individual position. Otherwise,
-// it's called automatically when setting the vertices for a Triangle.
-func (tri *Triangle) Recalculate() {
-
-	tri.Normal = calculateNormal(
-		tri.Vertices[0].Position,
-		tri.Vertices[1].Position,
-		tri.Vertices[2].Position,
-	)
+// RecalculateCenter recalculates the center for the Triangle. Note that this should only be called if you manually change a vertex's
+// individual position. Otherwise, it's called automatically when setting the vertices for a Triangle.
+func (tri *Triangle) RecalculateCenter() {
 
 	tri.Center[0] = (tri.Vertices[0].Position[0] + tri.Vertices[1].Position[0] + tri.Vertices[2].Position[0]) / 3
-	tri.Center[1] = (tri.Vertices[1].Position[0] + tri.Vertices[1].Position[1] + tri.Vertices[2].Position[1]) / 3
-	tri.Center[2] = (tri.Vertices[2].Position[0] + tri.Vertices[1].Position[2] + tri.Vertices[2].Position[2]) / 3
+	tri.Center[1] = (tri.Vertices[0].Position[1] + tri.Vertices[1].Position[1] + tri.Vertices[2].Position[1]) / 3
+	tri.Center[2] = (tri.Vertices[0].Position[2] + tri.Vertices[1].Position[2] + tri.Vertices[2].Position[2]) / 3
 
 }
 
-func (tri *Triangle) NearestPoint(from vector.Vector) vector.Vector {
-
-	var closest vector.Vector
-	for _, vert := range tri.Vertices {
-		if closest == nil || from.Sub(vert.Position).Magnitude() < from.Sub(closest).Magnitude() {
-			closest = vert.Position
-		}
-	}
-	return closest
-
+// RecalculateNormal recalculates the normal for the Triangle. Note that this should only be called if you manually change a vertex's
+// individual position. Otherwise, it's called automatically when setting the vertices for a Triangle. Also note that normals are
+// automatically set when loading Meshes from model files; if you call RecalculateNormal(), you'll lose any custom-defined normals
+// that you defined in your modeler in favor of the default.
+func (tri *Triangle) RecalculateNormal() {
+	tri.Normal = calculateNormal(tri.Vertices[0].Position, tri.Vertices[1].Position, tri.Vertices[2].Position)
 }
 
 type Vertex struct {
-	Position vector.Vector
-	Color    Color
-	UV       vector.Vector
+	Position    vector.Vector
+	Color       Color
+	UV          vector.Vector
+	transformed vector.Vector
+	triangle    *Triangle
 }
 
 func NewVertex(x, y, z, u, v float64) *Vertex {
 	return &Vertex{
-		Position: vector.Vector{x, y, z},
-		Color:    NewColor(1, 1, 1, 1),
-		UV:       vector.Vector{u, v},
+		Position:    vector.Vector{x, y, z},
+		Color:       NewColor(1, 1, 1, 1),
+		UV:          vector.Vector{u, v},
+		transformed: vector.Vector{0, 0, 0},
 	}
 }
 

@@ -1,4 +1,4 @@
-package jank
+package jank3d
 
 import (
 	"math"
@@ -37,10 +37,10 @@ func Scale(x, y, z float64) Matrix4 {
 	return mat
 }
 
-func Rotate(vector vector.Vector, angle float64) Matrix4 {
+func Rotate(x, y, z float64, angle float64) Matrix4 {
 
 	mat := NewMatrix4()
-	vector = vector.Unit()
+	vector := vector.Vector{x, y, z}.Unit()
 	s := math.Sin(angle)
 	c := math.Cos(angle)
 	m := 1 - c

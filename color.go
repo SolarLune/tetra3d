@@ -1,4 +1,4 @@
-package jank
+package jank3d
 
 type Color struct {
 	R, G, B, A float32

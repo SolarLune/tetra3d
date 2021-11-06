@@ -1,12 +1,15 @@
-package jank
+package jank3d
 
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/kvartborg/vector"
 )
 
 type daeSource struct {
@@ -86,6 +89,8 @@ func LoadMeshesFromDAEData(data []byte) (map[string]*Mesh, error) {
 
 	err := xml.Unmarshal(data, daeGeo)
 
+	toYUp := Rotate(1, 0, 0, math.Pi/2)
+
 	if err == nil {
 
 		for _, geo := range daeGeo.Geometries {
@@ -125,36 +130,41 @@ func LoadMeshesFromDAEData(data []byte) (map[string]*Mesh, error) {
 			}
 
 			verts := []*Vertex{}
+			normals := map[*Vertex]vector.Vector{}
 
 			x, y, z := 0.0, 0.0, 0.0
 			u, v := 0.0, 0.0
 			r, g, b, a := float32(1.0), float32(1.0), float32(1.0), float32(1.0)
+			nx, ny, nz := 0.0, 0.0, 0.0
 
 			for i := 0; i < len(triangleIndices); i++ {
 
 				triIndex := triangleIndices[i]
 
-				prop := triangleOrder[i%len(triangleOrder)]
-
 				tv := int(triIndex)
 
-				if prop == "vertex" {
+				switch triangleOrder[i%len(triangleOrder)] {
 
+				case "vertex":
 					x = sourceData["vertex"][tv*3]
 					y = sourceData["vertex"][(tv*3)+1]
 					z = sourceData["vertex"][(tv*3)+2]
 
-				} else if prop == "uv" {
-
+				case "uv":
 					u = sourceData["uv"][tv*2]
 					v = sourceData["uv"][(tv*2)+1]
 
-				} else if prop == "color" {
-
+				case "color":
 					r = float32(sourceData["color"][tv*4])
 					g = float32(sourceData["color"][(tv*4)+1])
 					b = float32(sourceData["color"][(tv*4)+2])
 					a = float32(sourceData["color"][(tv*4)+3])
+
+				case "normal":
+
+					nx = sourceData["normal"][tv*3]
+					ny = sourceData["normal"][(tv*3)+1]
+					nz = sourceData["normal"][(tv*3)+2]
 
 				}
 
@@ -169,11 +179,33 @@ func LoadMeshesFromDAEData(data []byte) (map[string]*Mesh, error) {
 
 					verts = append(verts, vert)
 
+					normals[vert] = vector.Vector{nx, ny, nz}
+
 				}
 
 			}
 
-			mesh := NewMesh(verts...)
+			mesh := NewMesh(geo.Name, verts...)
+
+			if len(normals) > 0 {
+
+				for _, tri := range mesh.Triangles {
+
+					normal := vector.Vector{0, 0, 0}
+					for _, vert := range tri.Vertices {
+						normal = normal.Add(normals[vert])
+					}
+					normal = normal.Scale(1.0 / 3.0).Unit()
+
+					normal = toYUp.MultVec(normal)
+					normal[2] *= -1
+					normal[1] *= -1
+					tri.Normal = normal
+
+				}
+
+			}
+
 			meshes[geo.Name] = mesh
 
 		}

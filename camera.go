@@ -1,13 +1,24 @@
-package jank
+package jank3d
 
 import (
+	"fmt"
 	"image/color"
 	"sort"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/kvartborg/vector"
 )
+
+type DebugInfo struct {
+	Frametime    time.Duration
+	DrawnObjects int
+	TotalObjects int
+	DrawnTris    int
+	TotalTris    int
+}
 
 type Camera struct {
 	ColorTexture *ebiten.Image
@@ -18,8 +29,9 @@ type Camera struct {
 	Position vector.Vector
 	Rotation Quaternion // Quaternion, essentially
 
-	DebugDrawCount int
-	Wireframe      bool
+	DebugInfo          DebugInfo
+	DebugDrawWireframe bool
+	DebugDrawNormals   bool
 }
 
 func NewCamera(w, h int) *Camera {
@@ -31,26 +43,29 @@ func NewCamera(w, h int) *Camera {
 
 		Position: UnitVector(0),
 		Rotation: NewQuaternion(vector.Vector{0, 1, 0}, 0),
-		// Draw:    &Drawcalls{},
 	}
 
-	cam.SetPerspective(45)
-
-	// cam.LookAt(cam.Position.Add(vector.Vector{0, 0, -1}), vector.Y)
-
-	// cam.DepthTexture = ebiten.NewImage(buffer.Size())
+	cam.SetPerspective(60)
 
 	return cam
 }
 
 func (camera *Camera) ViewMatrix() Matrix4 {
 
-	transform := Translate(camera.Position[0], -camera.Position[1], camera.Position[2])
-	transform = transform.Mult(Rotate(camera.Rotation.Axis, camera.Rotation.Angle))
-	transform = transform.Mult(Perspective(camera.fieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy())))
+	transform := Translate(-camera.Position[0], -camera.Position[1], -camera.Position[2])
+	rotate := Rotate(camera.Rotation.Axis[0], camera.Rotation.Axis[1], camera.Rotation.Axis[2], camera.Rotation.Angle)
+	// We invert the Z portion of the rotation because the Camera is looking down -Z
+	rotate[2][0] *= -1
+	rotate[2][1] *= -1
+	rotate[2][2] *= -1
+	transform = transform.Mult(rotate)
 
 	return transform
 
+}
+
+func (camera *Camera) Projection() Matrix4 {
+	return Perspective(camera.fieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy()))
 }
 
 // TODO: Implement some kind of LookAt functionality.
@@ -71,7 +86,7 @@ func (camera *Camera) viewPointToScreen(vert vector.Vector) vector.Vector {
 	width, height := float64(w), float64(h)
 
 	// Again, this function should only be called with pre-transformed 4D vertex arguments.
-	vx := vert[0] / vert[3]
+	vx := vert[0] / vert[3] * -1
 	vy := vert[1] / vert[3]
 
 	vect := vector.Vector{
@@ -85,22 +100,24 @@ func (camera *Camera) viewPointToScreen(vert vector.Vector) vector.Vector {
 
 // WorldToScreen transforms a 3D position in the world to screen coordinates.
 func (camera *Camera) WorldToScreen(vert vector.Vector) vector.Vector {
-	// The negating of these values are the same as the negating in Model.Transform() and the opposite of Camera.ViewMatrix().
-	v := Translate(-vert[0], vert[1], -vert[2]).Mult(camera.ViewMatrix())
+	v := Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 	return camera.viewPointToScreen(v.MultVecW(vector.Vector{0, 0, 0}))
 }
 
 // worldToView transforms a 3D position in the world to view coordinates (i.e. this type of coordinate needs to be mapped to the screen still).
 func (camera *Camera) worldToView(vert vector.Vector) vector.Vector {
-	// The negating of these values are the same as the negating in Model.Transform() and the opposite of Camera.ViewMatrix().
-	v := Translate(-vert[0], vert[1], -vert[2]).Mult(camera.ViewMatrix())
+	v := Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 	return v.MultVecW(vector.Vector{0, 0, 0})
 }
 
 // Clear is called at the beginning of a single rendered frame; it clears the backing textures before rendering.
 func (camera *Camera) Clear() {
 	camera.ColorTexture.Clear()
-	camera.DebugDrawCount = 0
+	camera.DebugInfo.Frametime = 0
+	camera.DebugInfo.DrawnObjects = 0
+	camera.DebugInfo.TotalObjects = 0
+	camera.DebugInfo.TotalTris = 0
+	camera.DebugInfo.DrawnTris = 0
 }
 
 func (camera *Camera) pointInsideScreen(vert vector.Vector) bool {
@@ -120,60 +137,69 @@ func (camera *Camera) Render(models ...*Model) {
 		return models[i].Position.Sub(camera.Position).Magnitude() > models[j].Position.Sub(camera.Position).Magnitude()
 	})
 
-	viewMatrix := camera.ViewMatrix()
+	viewMatrix := camera.ViewMatrix().Mult(camera.Projection())
+
+	// TODO: Add debug draw frametime
+
+	frametimeStart := time.Now()
+
+	camera.DebugInfo.TotalObjects += len(models)
 
 	for _, model := range models {
+
+		camera.DebugInfo.TotalTris += len(model.Mesh.Triangles)
 
 		if !model.Visible {
 			continue
 		}
 
 		// TODO: Enhance this with a comparison, not of the (usually central) position directly, but of the extant of the bounding box / sphere of the model.
-		if model.FrustumCull {
+		if model.FrustumCulling {
 
-			viewPos := camera.worldToView(model.Position)
 			screenPos := camera.WorldToScreen(model.Position)
 
 			// Either the object lies outside of the screen (screenPos[0] < 0, as an example) or behind it (viewPos[3] > 0)
-			if !camera.pointInsideScreen(screenPos) || viewPos[3] > 0 {
+			if !camera.pointInsideScreen(screenPos) {
 				continue
 			}
 
 		}
 
-		verts := model.TransformedVertices(viewMatrix, camera.Position)
+		// model.closestTris is set within TransformedVertices().
+		model.TransformedVertices(viewMatrix, camera.Position)
 
 		vertexListIndex := 0
 
-		modelTransform := model.Transform()
+		for _, tri := range model.closestTris {
 
-		for index := 0; index < len(verts); index += 3 {
+			v0 := tri.Vertices[0].transformed
+			v1 := tri.Vertices[1].transformed
+			v2 := tri.Vertices[2].transformed
 
-			v0 := verts[index]
-			v1 := verts[index+1]
-			v2 := verts[index+2]
+			// Skip if all vertices are behind the camera; this fixes triangles drawing inverted when they move behind the camera, but it conversely makes it impossible
+			// to draw triangles that are stretch on behind the camera (think the flooring and walls in a hallway that goes ahead of and behind the camera).
+			// A workaround is to segment the hallway and not allow the camera to get overly close, but the only real solution is to TODO: get rid of this and
+			// add triangle clipping so any triangles that are too long get clipped.
+			if v0[3] > 0 || v1[3] > 0 || v2[3] > 0 {
+				continue
+			}
 
-			// // Skip if all vertices are behind the camera; this works well, but it's faster to avoid rendering objects if the center is behind the camera, as above
-			// if v0[3] > 0 && v1[3] > 0 && v2[3] > 0 {
-			// 	continue
-			// }
+			if !model.FrustumCulling {
+				fmt.Println(v0[3], v1[3], v2[3])
+			}
 
 			// Backface Culling
 
-			tri := model.closestTris[index/3]
+			normal := calculateNormal(tri.Vertices[0].transformed[:3], tri.Vertices[1].transformed[:3], tri.Vertices[2].transformed[:3])
 
-			// TODO: Mis-behaves when viewing objects from behind at certain distances
-			if model.Mesh.BackfaceCulling {
+			if model.BackfaceCulling {
 
-				normal := modelTransform.MultVec(tri.Normal)
+				// SHOUTOUTS TO MOD DB FOR POINTING ME IN THE RIGHT DIRECTION FOR THIS BECAUSE GOOD LORDT:
+				// https://moddb.fandom.com/wiki/Backface_culling#Polygons_in_object_space_are_transformed_into_world_space
 
-				// dot := modelTransform.MultVec(camera.Position).Sub(modelTransform.MultVec(tri.Vertices[0].Position)).Dot(normal)
+				dot := normal.Dot(tri.Vertices[0].transformed[:3])
 
-				eye := tri.Vertices[0].Position.Sub(camera.Position).Unit()
-
-				dot := eye.Dot(normal)
-
-				if dot < 0 {
+				if dot > 0 {
 					continue
 				}
 
@@ -182,12 +208,6 @@ func (camera *Camera) Render(models ...*Model) {
 			p0 := camera.viewPointToScreen(v0)
 			p1 := camera.viewPointToScreen(v1)
 			p2 := camera.viewPointToScreen(v2)
-
-			// Skip if the vertex is wholly outside of the screen - This is one approach to do this that is relatively safe and simple, but it's more performant to do this as early as
-			// possible (i.e. before transforming vertex transformation), rather than later.
-			// if !camera.pointInsideScreen(p0) && !camera.pointInsideScreen(p1) && !camera.pointInsideScreen(p2) {
-			// 	continue
-			// }
 
 			triList[vertexListIndex/3] = tri
 
@@ -248,25 +268,60 @@ func (camera *Camera) Render(models ...*Model) {
 			img = defaultImg
 		}
 
-		if camera.Wireframe {
+		t := &ebiten.DrawTrianglesOptions{}
+		t.ColorM.Scale(model.Color.RGBA64())
+		t.Filter = model.Mesh.FilterMode
+		camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
 
-			for i := 0; i < vertexListIndex-2; i++ {
+		camera.DebugInfo.DrawnObjects++
+		camera.DebugInfo.DrawnTris += vertexListIndex / 3
+
+		if camera.DebugDrawWireframe {
+
+			for i := 0; i < vertexListIndex; i += 3 {
 				v1 := vertexList[i]
 				v2 := vertexList[i+1]
-				ebitenutil.DrawLine(camera.ColorTexture, float64(v1.DstX), float64(v1.DstY), float64(v2.DstX), float64(v2.DstY), color.RGBA{uint8(v1.ColorR * 255), uint8(v1.ColorG * 255), uint8(v1.ColorB * 255), uint8(v1.ColorA * 255)})
+				v3 := vertexList[i+2]
+				ebitenutil.DrawLine(camera.ColorTexture, float64(v1.DstX), float64(v1.DstY), float64(v2.DstX), float64(v2.DstY), color.White)
+				ebitenutil.DrawLine(camera.ColorTexture, float64(v2.DstX), float64(v2.DstY), float64(v3.DstX), float64(v3.DstY), color.White)
+				ebitenutil.DrawLine(camera.ColorTexture, float64(v3.DstX), float64(v3.DstY), float64(v1.DstX), float64(v1.DstY), color.White)
 			}
-
-		} else {
-
-			t := &ebiten.DrawTrianglesOptions{}
-			t.ColorM.Scale(model.Color.RGBA64())
-			t.Filter = model.Mesh.FilterMode
-			camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
 
 		}
 
-		camera.DebugDrawCount++
+		if camera.DebugDrawNormals {
+
+			triIndex := 0
+			for _, tri := range triList[:vertexListIndex/3] {
+				p0 := vertexList[triIndex*3]
+				p1 := vertexList[(triIndex*3)+1]
+				p2 := vertexList[(triIndex*3)+2]
+				center := []float64{(float64(p0.DstX) + float64(p1.DstX) + float64(p2.DstX)) / 3, (float64(p0.DstY) + float64(p1.DstY) + float64(p2.DstY)) / 3}
+				transformedNormal := camera.viewPointToScreen(model.Transform().Mult(viewMatrix).MultVecW(tri.Center.Add(tri.Normal.Scale(0.1))))
+				ebitenutil.DrawLine(camera.ColorTexture, center[0], center[1], transformedNormal[0], transformedNormal[1], color.RGBA{60, 158, 255, 255})
+				triIndex++
+			}
+
+		}
 
 	}
+
+	camera.DebugInfo.Frametime += time.Since(frametimeStart)
+
+}
+
+func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
+	dr := &ebiten.DrawImageOptions{}
+	dr.GeoM.Translate(0, textScale*16)
+	dr.GeoM.Scale(textScale, textScale)
+	text.DrawWithOptions(screen, fmt.Sprintf(
+		"FPS: %f\nFrame time: %fms\nRendered Objects:%d/%d\nRendered Triangles: %d/%d",
+		ebiten.CurrentFPS(),
+		camera.DebugInfo.Frametime.Seconds()*1000,
+		camera.DebugInfo.DrawnObjects,
+		camera.DebugInfo.TotalObjects,
+		camera.DebugInfo.DrawnTris,
+		camera.DebugInfo.TotalTris),
+		debugFontFace, dr)
 
 }

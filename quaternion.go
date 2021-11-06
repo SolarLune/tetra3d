@@ -1,6 +1,8 @@
-package jank
+package jank3d
 
-import "github.com/kvartborg/vector"
+import (
+	"github.com/kvartborg/vector"
+)
 
 // Quaternion represents a rotation in radians around a given 3D axis. This being the case, a Quaternion can easily also be stored in a 4-dimensional vector; it's separated
 // here into a Vector and angle for simplicity and readability.
@@ -18,7 +20,7 @@ func NewQuaternion(axis vector.Vector, angle float64) Quaternion {
 	return quat
 }
 
-// Rotate uses the Quaternion to rotate the given Vector by the axis and angle given.
-func (quat Quaternion) Rotate(vec vector.Vector) vector.Vector {
+// RotateVector uses the Quaternion to rotate the given Vector by the axis and angle given.
+func (quat Quaternion) RotateVector(vec vector.Vector) vector.Vector {
 	return vec.Rotate(-quat.Angle, quat.Axis) // Angle is negative here to match the coordinate system.
 }
