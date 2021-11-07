@@ -48,6 +48,18 @@ func (model *Model) Transform() Matrix4 {
 
 }
 
+func (model *Model) BoundingSphereRadius() float64 {
+
+	m := 0.0
+	for _, v := range model.Scale {
+		if m < v {
+			m = v
+		}
+	}
+	return model.Mesh.BoundingSphere.Radius * m
+
+}
+
 func (model *Model) triangleInList(tri *Triangle, triList []*Triangle) bool {
 
 	for _, t := range triList {

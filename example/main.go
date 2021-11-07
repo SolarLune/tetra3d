@@ -11,7 +11,6 @@ import (
 
 	_ "image/png"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/jank3d"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -30,8 +29,8 @@ type Game struct {
 func NewGame() *Game {
 
 	game := &Game{
-		Width:  1920,
-		Height: 1080,
+		Width:  320,
+		Height: 180,
 	}
 
 	game.Init()
@@ -45,9 +44,10 @@ func (g *Game) Init() {
 
 	meshes, _ := jank3d.LoadMeshesFromDAEFile("examples.dae")
 
-	mesh := meshes["Suzanne"]
+	mesh := meshes["Triangle"]
 	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
 	model := jank3d.NewModel(mesh)
+	// model.Scale = model.Scale.Scale(4)
 	g.Models = append(g.Models, model)
 
 	mesh = meshes["Crates"]
@@ -71,10 +71,10 @@ func (g *Game) Init() {
 	g.Models = append(g.Models, model)
 
 	g.Camera = jank3d.NewCamera(g.Width, g.Height)
-	g.Camera.Position[1] = 5
+	g.Camera.Position[1] = 1
 	g.Camera.Position[2] = 5
-	g.Camera.Rotation.Axis = vector.Vector{1, 0, 0}
-	g.Camera.Rotation.Angle = -math.Pi / 4
+	// g.Camera.Rotation.Axis = vector.Vector{1, 0, 0}
+	// g.Camera.Rotation.Angle = -math.Pi / 4
 
 }
 

@@ -29,7 +29,7 @@ The following is a rough to-do list (tasks with checks have been implented):
 - [x] -- Backface culling
 - [ ] -- Near / Far culling
 - [x] -- Frustum culling
-- [ ] -- Triangle clipping to window (without clipping, there can be massive slowdown and memory usage if a triangle draws at a large scale beyond the screen)
+- [ ] -- Triangle clipping to view
 - [x] Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [ ] -- More advanced depth sorting (of each triangle of all models rendered at a given time).
 - [ ] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) (currently triangles are just rendered in order of their distance to the camera, and objects are similarly sorted)
@@ -39,6 +39,7 @@ The following is a rough to-do list (tasks with checks have been implented):
 - [x] -- Normal rendering
 - [x] Basic Texturing
 - [ ] -- Multitexturing?
+- [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
 - [x] DAE model loading
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
@@ -174,3 +175,7 @@ func main() {
 Huge shout-out to the open-source community (i.e. StackOverflow, [fauxgl](https://github.com/fogleman/fauxgl), [tinyrenderer](https://github.com/ssloy/tinyrenderer), [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems), etc) at large for sharing the information and code to make this possible; I would definitely have never made this happen otherwise.
 
 Jank3D depends on kvartborg's [Vector](https://github.com/kvartborg/vector) package and [Ebiten](https://ebiten.org/) itself for rendering.
+
+## Support
+
+If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune), haha. Thanks~!

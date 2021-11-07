@@ -79,6 +79,8 @@ func (mesh *Mesh) ApplyMatrix(matrix Matrix4) {
 		tri.RecalculateCenter()
 	}
 
+	mesh.UpdateBounds()
+
 }
 
 // UpdateBounds updates the mesh's bounding sphere, which is used for frustum culling checks; call this after manually changing vertex positions.
@@ -110,6 +112,7 @@ func (mesh *Mesh) UpdateBounds() {
 	}
 
 	mesh.BoundingSphere.Radius = extent1.Sub(extent0).Magnitude() / 2
+	mesh.BoundingSphere.Position = extent0.Add(extent1).Scale(0.5)
 
 }
 

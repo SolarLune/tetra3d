@@ -87,9 +87,17 @@ func (camera *Camera) viewPointToScreen(vert vector.Vector) vector.Vector {
 	w, h := camera.ColorTexture.Size()
 	width, height := float64(w), float64(h)
 
+	v3 := vert[3]
+
+	// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
+	// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
+	if v3 > 0 {
+		v3 = -0.000001
+	}
+
 	// Again, this function should only be called with pre-transformed 4D vertex arguments.
-	vx := vert[0] / vert[3] * -1
-	vy := vert[1] / vert[3]
+	vx := vert[0] / v3 * -1
+	vy := vert[1] / v3
 
 	vect := vector.Vector{
 		vx*width + (width / 2),
@@ -122,6 +130,101 @@ func (camera *Camera) Clear() {
 	camera.DebugInfo.DrawnTris = 0
 }
 
+// func (camera *Camera) clipEdge(start, end vector.Vector) []vector.Vector {
+
+// 	startIn := start[3] < 0
+// 	endIn := end[3] < 0
+
+// 	newStart := start
+// 	newEnd := end
+
+// 	if (startIn && !endIn) || (endIn && !startIn) {
+
+// 		d0 := start[3]
+// 		d1 := end[3]
+// 		factor := 1.0 / (d0 - d1)
+
+// 		// factor*(d1 * v0.p - d0 * v1.p)
+// 		v := start.Sub(end).Scale(factor).Scale(factor)
+// 		fmt.Println(v)
+
+// 		// v[3] *= -1
+
+// 		if startIn {
+// 			newEnd = v
+// 		} else {
+// 			newStart = v
+// 		}
+
+// 		fmt.Println("old start, end", start, end)
+// 		if startIn {
+// 			fmt.Println("new end", newEnd)
+// 		} else {
+// 			fmt.Println("new start", newStart)
+// 		}
+
+// 	}
+
+// 	return []vector.Vector{newStart, newEnd}
+
+// }
+
+// func (camera *Camera) clipTriangle(verts ...vector.Vector) []vector.Vector {
+
+// 	out := []vector.Vector{}
+
+// 	if verts[0][3] > 0 && verts[1][3] > 0 && verts[2][3] > 0 {
+// 		return out
+// 	} else if verts[0][3] < 0 && verts[1][3] < 0 && verts[2][3] < 0 {
+// 		return verts
+// 	}
+
+// 	newVerts := append([]vector.Vector{}, camera.clipEdge(verts[0], verts[1])...)
+// 	newVerts = append(newVerts, camera.clipEdge(verts[1], verts[2])...)
+// 	newVerts = append(newVerts, camera.clipEdge(verts[2], verts[0])...)
+
+// 	added := func(vert vector.Vector) bool {
+// 		for _, v := range out {
+// 			if vert[0] == v[0] && vert[1] == v[1] && vert[2] == v[2] && vert[3] == v[3] {
+// 				return true
+// 			}
+// 		}
+// 		return false
+// 	}
+
+// 	for _, v := range newVerts {
+// 		if !added(v) {
+// 			out = append(out, v)
+// 		}
+// 	}
+
+// 	fmt.Println("clipped: ", out)
+
+// 	// for i := 0; i < len(verts); i++ {
+
+// 	// 	vert := verts[i]
+// 	// 	var prevVertex vector.Vector
+// 	// 	if i == 0 {
+// 	// 		prevVertex = verts[len(verts)-1]
+// 	// 	} else {
+// 	// 		prevVertex = verts[i-1]
+// 	// 	}
+
+// 	// 	if clip.PointInFront(vert) {
+// 	// 		fmt.Println("intersection")
+// 	// 		out = append(out, clip.Intersection(prevVertex, vert))
+// 	// 	} else {
+// 	// 		out = append(out, verts[i])
+// 	// 	}
+
+// 	// }
+
+// 	fmt.Println(out)
+
+// 	return out
+
+// }
+
 // Render renders the models passed - note that models rendered one after another in multiple Render() calls will be rendered on top of each other.
 // Models need to be passed into the same Render() call to be sorted in depth.
 func (camera *Camera) Render(models ...*Model) {
@@ -150,7 +253,7 @@ func (camera *Camera) Render(models ...*Model) {
 
 			screenPos := camera.WorldToScreen(model.Position)
 			capped := screenPos.Clone()
-			r := camera.WorldToScreen(model.Position.Add(vector.Vector{model.Mesh.BoundingSphere.Radius, 0, 0}))
+			r := camera.WorldToScreen(model.Position.Add(vector.Vector{model.BoundingSphereRadius() + model.Mesh.BoundingSphere.Position.Magnitude(), 0, 0}))
 			radius := r.Sub(screenPos).Magnitude()
 
 			w, h := camera.ColorTexture.Size()
@@ -188,7 +291,7 @@ func (camera *Camera) Render(models ...*Model) {
 			// to draw triangles that are stretch on behind the camera (think the flooring and walls in a hallway that goes ahead of and behind the camera).
 			// A workaround is to segment the hallway and not allow the camera to get overly close, but the only real solution is to TODO: get rid of this and
 			// add triangle clipping so any triangles that are too long get clipped.
-			if v0[3] > 0 || v1[3] > 0 || v2[3] > 0 {
+			if v0[3] > 0 && v1[3] > 0 && v2[3] > 0 {
 				continue
 			}
 
@@ -298,11 +401,8 @@ func (camera *Camera) Render(models ...*Model) {
 
 			triIndex := 0
 			for _, tri := range triList[:vertexListIndex/3] {
-				p0 := vertexList[triIndex*3]
-				p1 := vertexList[(triIndex*3)+1]
-				p2 := vertexList[(triIndex*3)+2]
-				center := []float64{(float64(p0.DstX) + float64(p1.DstX) + float64(p2.DstX)) / 3, (float64(p0.DstY) + float64(p1.DstY) + float64(p2.DstY)) / 3}
-				transformedNormal := camera.viewPointToScreen(model.Transform().Mult(viewMatrix).MultVecW(tri.Center.Add(tri.Normal.Scale(0.1))))
+				center := camera.WorldToScreen(model.Transform().MultVecW(tri.Center))
+				transformedNormal := camera.WorldToScreen(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(0.1))))
 				ebitenutil.DrawLine(camera.ColorTexture, center[0], center[1], transformedNormal[0], transformedNormal[1], color.RGBA{60, 158, 255, 255})
 				triIndex++
 			}
@@ -312,8 +412,9 @@ func (camera *Camera) Render(models ...*Model) {
 		if camera.DebugDrawBoundingSphere {
 
 			sphere := model.Mesh.BoundingSphere
+
 			transformedCenter := camera.WorldToScreen(model.Position.Add(sphere.Position))
-			transformedRadius := camera.WorldToScreen(model.Position.Add(sphere.Position).Add(vector.Vector{sphere.Radius, 0, 0}))
+			transformedRadius := camera.WorldToScreen(model.Position.Add(sphere.Position).Add(vector.Vector{model.BoundingSphereRadius(), 0, 0}))
 			radius := transformedRadius.Sub(transformedCenter).Magnitude()
 
 			stepCount := float64(32)
