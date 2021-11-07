@@ -29,7 +29,7 @@ The following is a rough to-do list (tasks with checks have been implented):
 - [x] -- Backface culling
 - [ ] -- Near / Far culling
 - [x] -- Frustum culling
-- [ ] -- Triangle clipping to the window (without clipping triangles, there can be massive slowdown and memory usage if a triangle draws at a large scale beyond the screen)
+- [ ] -- Triangle clipping to window (without clipping, there can be massive slowdown and memory usage if a triangle draws at a large scale beyond the screen)
 - [x] Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [ ] -- More advanced depth sorting (of each triangle of all models rendered at a given time).
 - [ ] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) (currently triangles are just rendered in order of their distance to the camera, and objects are similarly sorted)

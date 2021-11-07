@@ -173,11 +173,11 @@ func (camera *Camera) Render(models ...*Model) {
 
 		}
 
-		// model.closestTris is set within TransformedVertices().
 		model.TransformedVertices(viewMatrix, camera.Position)
 
 		vertexListIndex := 0
 
+		// model.closestTris is set within TransformedVertices().
 		for _, tri := range model.closestTris {
 
 			v0 := tri.Vertices[0].transformed
@@ -190,10 +190,6 @@ func (camera *Camera) Render(models ...*Model) {
 			// add triangle clipping so any triangles that are too long get clipped.
 			if v0[3] > 0 || v1[3] > 0 || v2[3] > 0 {
 				continue
-			}
-
-			if !model.FrustumCulling {
-				fmt.Println(v0[3], v1[3], v2[3])
 			}
 
 			// Backface Culling
@@ -316,8 +312,8 @@ func (camera *Camera) Render(models ...*Model) {
 		if camera.DebugDrawBoundingSphere {
 
 			sphere := model.Mesh.BoundingSphere
-			transformedCenter := camera.viewPointToScreen(model.Transform().Mult(viewMatrix).MultVecW(model.Position.Add(sphere.Position)))
-			transformedRadius := camera.viewPointToScreen(model.Transform().Mult(viewMatrix).MultVecW(model.Position.Add(sphere.Position.Add(vector.Vector{sphere.Radius, 0, 0}))))
+			transformedCenter := camera.WorldToScreen(model.Position.Add(sphere.Position))
+			transformedRadius := camera.WorldToScreen(model.Position.Add(sphere.Position).Add(vector.Vector{sphere.Radius, 0, 0}))
 			radius := transformedRadius.Sub(transformedCenter).Magnitude()
 
 			stepCount := float64(32)

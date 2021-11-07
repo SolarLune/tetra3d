@@ -15,6 +15,7 @@ import (
 	"github.com/solarlune/jank3d"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
@@ -47,20 +48,27 @@ func (g *Game) Init() {
 	mesh := meshes["Suzanne"]
 	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
 	model := jank3d.NewModel(mesh)
-	// model.Mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
 	g.Models = append(g.Models, model)
 
-	// mesh = meshes["Suzanne"]
-	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	// model = jank3d.NewModel(mesh)
-	// model.Position[0] += 4
-	// g.Models = append(g.Models, model)
+	mesh = meshes["Crates"]
+	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	model = jank3d.NewModel(mesh)
+	model.Position[0] += 4
+	g.Models = append(g.Models, model)
 
-	// mesh = meshes["Sphere"]
-	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	// model = jank3d.NewModel(mesh)
-	// model.Position[0] += 8
-	// g.Models = append(g.Models, model)
+	mesh = meshes["Sphere"]
+	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	model = jank3d.NewModel(mesh)
+	model.Position[0] += 8
+	g.Models = append(g.Models, model)
+
+	mesh = meshes["Hallway"]
+	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	model = jank3d.NewModel(mesh)
+	model.Position[0] += 12
+	g.Models = append(g.Models, model)
 
 	g.Camera = jank3d.NewCamera(g.Width, g.Height)
 	g.Camera.Position[1] = 5
