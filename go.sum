@@ -19,6 +19,8 @@ github.com/jfreymuth/vorbis v1.0.2/go.mod h1:DoftRo4AznKnShRl1GxiTFCseHr4zR9BN3T
 github.com/kvartborg/vector v0.0.0-20210122071920-91df40ba4054 h1:qp+eSkHJ1gdPN6JIhnRWSPtF1nxasSfIL5l4wlcLik0=
 github.com/kvartborg/vector v0.0.0-20210122071920-91df40ba4054/go.mod h1:GAX7tMJqXx9fB1BrsTWPOXy6IBRX+J461BffVPAdpwo=
 github.com/pkg/browser v0.0.0-20180916011732-0a3d74bf9ce4/go.mod h1:4OwLy04Bl9Ef3GJJCoec+30X3LQs/0/m4HFRt/2LUSA=
+github.com/takeyourhatoff/bitset v1.0.0 h1:XYneiGZNdru0g3KRZUJgik/k1H99F6Un3HJUqaJ6daU=
+github.com/takeyourhatoff/bitset v1.0.0/go.mod h1:lZ+7WLf/JS1GV8YJM9D1j1ec1GtpnMM4QJT8X78Fxis=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/yuin/goldmark v1.4.0/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

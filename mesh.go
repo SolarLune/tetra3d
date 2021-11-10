@@ -25,12 +25,12 @@ func NewMesh(name string, verts ...*Vertex) *Mesh {
 		FilterMode:     ebiten.FilterNearest,
 		BoundingSphere: NewSphere(vector.Vector{0, 0, 0}, 0),
 	}
-	for i := 0; i < len(verts); i += 3 {
-		if len(verts) < i {
-			panic("error: NewMesh() did not receive enough vertices")
-		}
-		mesh.AddTriangles(verts[i], verts[i+1], verts[i+2])
+
+	if len(verts) == 0 || len(verts)%3 != 0 {
+		panic("Error: NewMesh() has not been given a correct number of vertices to constitute triangles (it needs to be greater than 0 and divisible by 3).")
 	}
+
+	mesh.AddTriangles(verts...)
 	mesh.UpdateBounds()
 	return mesh
 
@@ -47,13 +47,19 @@ func (mesh *Mesh) Clone() *Mesh {
 }
 
 func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
+	index := 1
+
 	for i := 0; i < len(verts); i += 3 {
+
 		tri := NewTriangle(mesh)
+		tri.ID = index
 		mesh.Triangles = append(mesh.Triangles, tri)
-		mesh.Vertices = append(mesh.Vertices, verts...)
-		mesh.sortedVertices = append(mesh.sortedVertices, verts...)
+		mesh.Vertices = append(mesh.Vertices, verts[i], verts[i+1], verts[i+2])
+		mesh.sortedVertices = append(mesh.sortedVertices, verts[i], verts[i+1], verts[i+2])
 		tri.SetVertices(verts[i], verts[i+1], verts[i+2])
+		index++
 	}
+
 }
 
 func (mesh *Mesh) SetVertexColor(r, g, b, a float32) {
@@ -235,6 +241,7 @@ type Triangle struct {
 	Normal   vector.Vector
 	Mesh     *Mesh
 	Center   vector.Vector
+	ID       int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
 }
 
 func NewTriangle(mesh *Mesh) *Triangle {

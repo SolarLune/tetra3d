@@ -5,8 +5,8 @@
       <author>Blender User</author>
       <authoring_tool>Blender 2.93.5 commit date:2021-10-05, commit time:12:04, hash:a791bdabd0b2</authoring_tool>
     </contributor>
-    <created>2021-11-07T09:58:27</created>
-    <modified>2021-11-07T09:58:27</modified>
+    <created>2021-11-09T01:37:45</created>
+    <modified>2021-11-09T01:37:45</modified>
     <unit name="meter" meter="1"/>
     <up_axis>Z_UP</up_axis>
   </asset>
@@ -76,7 +76,7 @@
     </light>
   </library_lights>
   <library_effects>
-    <effect id="VertexPainting-effect">
+    <effect id="OutdoorStuff-effect">
       <profile_COMMON>
         <technique sid="common">
           <lambert>
@@ -93,7 +93,7 @@
         </technique>
       </profile_COMMON>
     </effect>
-    <effect id="OutdoorStuff-effect">
+    <effect id="VertexPainting-effect">
       <profile_COMMON>
         <technique sid="common">
           <lambert>
@@ -113,14 +113,68 @@
   </library_effects>
   <library_images/>
   <library_materials>
-    <material id="VertexPainting-material" name="VertexPainting">
-      <instance_effect url="#VertexPainting-effect"/>
-    </material>
     <material id="OutdoorStuff-material" name="OutdoorStuff">
       <instance_effect url="#OutdoorStuff-effect"/>
     </material>
+    <material id="VertexPainting-material" name="VertexPainting">
+      <instance_effect url="#VertexPainting-effect"/>
+    </material>
   </library_materials>
   <library_geometries>
+    <geometry id="Cone-mesh" name="Cone">
+      <mesh>
+        <source id="Cone-mesh-positions">
+          <float_array id="Cone-mesh-positions-array" count="48">0 1 -1 0.7071068 0.7071068 -1 1 0 -1 0.7071068 -0.7071068 -1 0 -1 -1 -0.7071067 -0.7071068 -1 -1 0 -1 -0.7071069 0.7071067 -1 0 1 -0.6632353 0.7071068 0.7071068 -0.6632353 1 0 -0.6632353 0.7071068 -0.7071068 -0.6632353 0 -1 -0.6632353 -0.7071067 -0.7071068 -0.6632353 -1 0 -0.6632353 -0.7071069 0.7071067 -0.6632353</float_array>
+          <technique_common>
+            <accessor source="#Cone-mesh-positions-array" count="16" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <source id="Cone-mesh-normals">
+          <float_array id="Cone-mesh-normals-array" count="48">0.9238796 0.3826835 0 0.9238795 -0.3826835 0 0.3826835 -0.9238796 0 -0.3826835 -0.9238796 0 0.3826835 0.9238796 0 -0.9238796 -0.3826835 0 -0.3826836 0.9238795 0 -0.9238795 0.3826835 0 0.9238795 0.3826835 0 0.9238795 -0.3826835 0 0.3826835 -0.9238795 0 -0.3826833 -0.9238796 0 0.3826836 0.9238796 0 -0.9238795 -0.3826835 0 -0.3826835 0.9238795 0 -0.9238796 0.3826833 0</float_array>
+          <technique_common>
+            <accessor source="#Cone-mesh-normals-array" count="16" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <source id="Cone-mesh-map-0">
+          <float_array id="Cone-mesh-map-0-array" count="96">0.2098528 0.9598528 0.245 0.875 0.2098528 0.9598528 0.245 0.875 0.2098528 0.7901472 0.245 0.875 0.2098528 0.7901472 0.125 0.755 0.2098528 0.7901472 0.125 0.755 0.04014718 0.7901472 0.125 0.755 0.125 0.995 0.2098528 0.9598528 0.125 0.995 0.04014718 0.7901472 0.004999995 0.875 0.04014718 0.7901472 0.04014718 0.9598528 0.125 0.995 0.04014718 0.9598528 0.004999995 0.875 0.04014718 0.9598528 0.004999995 0.875 0.2098528 0.9598528 0.245 0.875 0.245 0.875 0.245 0.875 0.2098528 0.7901472 0.2098528 0.7901472 0.2098528 0.7901472 0.125 0.755 0.125 0.755 0.125 0.755 0.04014718 0.7901472 0.04014718 0.7901472 0.125 0.995 0.2098528 0.9598528 0.2098528 0.9598528 0.04014718 0.7901472 0.004999995 0.875 0.004999995 0.875 0.04014718 0.9598528 0.125 0.995 0.125 0.995 0.004999995 0.875 0.04014718 0.9598528 0.04014718 0.9598528</float_array>
+          <technique_common>
+            <accessor source="#Cone-mesh-map-0-array" count="48" stride="2">
+              <param name="S" type="float"/>
+              <param name="T" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <source id="Cone-mesh-colors-Col" name="Col">
+          <float_array id="Cone-mesh-colors-Col-array" count="192">0.4313725 0.6117647 1 1 0.4313725 0.6117647 1 1 0.4313725 0.6117647 1 1 0.4313725 0.6117647 1 1 1 0 0.2509804 1 0.4313725 0.6117647 1 1 1 0 0.2509804 1 1 0 0.2509804 1 1 0 0.2509804 1 1 0 0.2509804 1 1 0.003921568 0.2509804 1 1 0 0.2509804 1 0 1 0.003921568 1 0.4313725 0.6117647 1 1 0 1 0.003921568 1 1 0.003921568 0.2509804 1 0.5647059 0.5764706 0.9294118 1 1 0.003921568 0.2509804 1 0.4313725 0.6117647 1 1 0 1 0.003921568 1 0.4313725 0.6117647 1 1 0.5647059 0.5764706 0.9294118 1 0.4313725 0.6117647 1 1 0.5647059 0.5764706 0.9294118 1 0.4313725 0.6117647 1 1 0.4313725 0.6117647 1 1 0.4313725 0.6117647 1 1 0.4313725 0.6117647 1 1 1 0 0.2509804 1 1 0 0.2509804 1 1 0 0.2509804 1 1 0 0.2509804 1 1 0 0.2509804 1 1 0 0.2509804 1 1 0.003921568 0.2509804 1 1 0.003921568 0.2509804 1 0 1 0.003921568 1 0.4313725 0.6117647 1 1 0.4313725 0.6117647 1 1 1 0.003921568 0.2509804 1 0.5647059 0.5764706 0.9294118 1 0.5647059 0.5764706 0.9294118 1 0.4313725 0.6117647 1 1 0 1 0.003921568 1 0 1 0.003921568 1 0.5647059 0.5764706 0.9294118 1 0.4313725 0.6117647 1 1 0.4313725 0.6117647 1 1</float_array>
+          <technique_common>
+            <accessor source="#Cone-mesh-colors-Col-array" count="48" stride="4">
+              <param name="R" type="float"/>
+              <param name="G" type="float"/>
+              <param name="B" type="float"/>
+              <param name="A" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <vertices id="Cone-mesh-vertices">
+          <input semantic="POSITION" source="#Cone-mesh-positions"/>
+        </vertices>
+        <triangles material="OutdoorStuff-material" count="16">
+          <input semantic="VERTEX" source="#Cone-mesh-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#Cone-mesh-normals" offset="1"/>
+          <input semantic="TEXCOORD" source="#Cone-mesh-map-0" offset="2" set="0"/>
+          <input semantic="COLOR" source="#Cone-mesh-colors-Col" offset="3" set="0"/>
+          <p>9 0 0 0 2 0 1 1 1 0 2 2 10 1 3 3 3 1 4 4 2 1 5 5 11 2 6 6 4 2 7 7 3 2 8 8 12 3 9 9 5 3 10 10 4 3 11 11 8 4 12 12 1 4 13 13 0 4 14 14 13 5 15 15 6 5 16 16 5 5 17 17 15 6 18 18 0 6 19 19 7 6 20 20 14 7 21 21 7 7 22 22 6 7 23 23 9 8 24 24 10 8 25 25 2 8 26 26 10 9 27 27 11 9 28 28 3 9 29 29 11 10 30 30 12 10 31 31 4 10 32 32 12 11 33 33 13 11 34 34 5 11 35 35 8 12 36 36 9 12 37 37 1 12 38 38 13 13 39 39 14 13 40 40 6 13 41 41 15 14 42 42 8 14 43 43 0 14 44 44 14 15 45 45 15 15 46 46 7 15 47 47</p>
+        </triangles>
+      </mesh>
+    </geometry>
     <geometry id="Plane-mesh" name="Plane">
       <mesh>
         <source id="Plane-mesh-positions">
@@ -502,6 +556,18 @@
   </library_geometries>
   <library_visual_scenes>
     <visual_scene id="Scene" name="Scene">
+      <node id="Cone" name="Cone" type="NODE">
+        <matrix sid="transform">1 0 0 -3 0 1 0 0 0 0 1 0 0 0 0 1</matrix>
+        <instance_geometry url="#Cone-mesh" name="Cone">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="OutdoorStuff-material" target="#OutdoorStuff-material">
+                <bind_vertex_input semantic="UVMap" input_semantic="TEXCOORD" input_set="0"/>
+              </instance_material>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
       <node id="Plane" name="Plane" type="NODE">
         <matrix sid="transform">1 0 0 -12 0 1 0 0 0 0 1 0 0 0 0 1</matrix>
         <instance_geometry url="#Plane-mesh" name="Plane">
@@ -575,7 +641,7 @@
         </instance_geometry>
       </node>
       <node id="Cube" name="Cube" type="NODE">
-        <matrix sid="transform">1 0 0 -5 0 1 0 0 0 0 1 0 0 0 0 1</matrix>
+        <matrix sid="transform">1 0 0 -6 0 1 0 0 0 0 1 0 0 0 0 1</matrix>
         <instance_geometry url="#Cube-mesh" name="Cube">
           <bind_material>
             <technique_common>

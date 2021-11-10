@@ -14,16 +14,16 @@ import (
 	"github.com/solarlune/jank3d"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type Game struct {
-	Width, Height int
-	Models        []*jank3d.Model
-	Camera        *jank3d.Camera
-	Time          float64
-	DrawDebugText bool
+	Width, Height  int
+	Models         []*jank3d.Model
+	Camera         *jank3d.Camera
+	Time           float64
+	DrawDebugText  bool
+	DrawDebugDepth bool
 }
 
 func NewGame() *Game {
@@ -44,35 +44,57 @@ func (g *Game) Init() {
 
 	meshes, _ := jank3d.LoadMeshesFromDAEFile("examples.dae")
 
-	mesh := meshes["Triangle"]
+	// vvvvv Stress Test vvvvv
+
+	for i := 0; i < 5; i++ {
+		for j := 0; j < 5; j++ {
+
+			mesh := meshes["Suzanne"]
+			mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+			model := jank3d.NewModel(mesh)
+			model.Position[0] = float64(i) * 2
+			model.Position[2] = float64(j) * 2
+			g.Models = append(g.Models, model)
+
+		}
+	}
+
+	mesh := meshes["Plane"]
 	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
 	model := jank3d.NewModel(mesh)
-	// model.Scale = model.Scale.Scale(4)
+	model.Scale = model.Scale.Scale(20)
+	model.Position[1] = -2
 	g.Models = append(g.Models, model)
 
-	mesh = meshes["Crates"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
-	model = jank3d.NewModel(mesh)
-	model.Position[0] += 4
-	g.Models = append(g.Models, model)
+	// mesh := meshes["Suzanne"]
+	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	// model := jank3d.NewModel(mesh)
+	// g.Models = append(g.Models, model)
 
-	mesh = meshes["Sphere"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	model = jank3d.NewModel(mesh)
-	model.Position[0] += 8
-	g.Models = append(g.Models, model)
+	// mesh = meshes["Crates"]
+	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	// mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	// model = jank3d.NewModel(mesh)
+	// model.Position[0] += 4
+	// g.Models = append(g.Models, model)
 
-	mesh = meshes["Hallway"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
-	model = jank3d.NewModel(mesh)
-	model.Position[0] += 12
-	g.Models = append(g.Models, model)
+	// mesh = meshes["Sphere"]
+	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	// model = jank3d.NewModel(mesh)
+	// model.Position[0] += 8
+	// g.Models = append(g.Models, model)
+
+	// mesh = meshes["Hallway"]
+	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	// mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	// model = jank3d.NewModel(mesh)
+	// model.Position[0] += 12
+	// g.Models = append(g.Models, model)
 
 	g.Camera = jank3d.NewCamera(g.Width, g.Height)
-	g.Camera.Position[1] = 1
-	g.Camera.Position[2] = 5
+	g.Camera.Position[0] = 5
+	g.Camera.Position[2] = 20
+	// g.Camera.RenderDepth = false
 	// g.Camera.Rotation.Axis = vector.Vector{1, 0, 0}
 	// g.Camera.Rotation.Angle = -math.Pi / 4
 
@@ -160,6 +182,10 @@ func (g *Game) Update() error {
 		g.Camera.DebugDrawBoundingSphere = !g.Camera.DebugDrawBoundingSphere
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		g.DrawDebugDepth = !g.DrawDebugDepth
+	}
+
 	return err
 }
 
@@ -172,7 +198,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.Camera.Render(g.Models...)
 
-	screen.DrawImage(g.Camera.ColorTexture, nil)
+	if g.DrawDebugDepth {
+		screen.DrawImage(g.Camera.DepthTexture, nil)
+	} else {
+		screen.DrawImage(g.Camera.ColorTexture, nil)
+	}
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)

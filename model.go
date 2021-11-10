@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/kvartborg/vector"
+	"github.com/takeyourhatoff/bitset"
 )
 
 // Model represents a singular visual instantiation of a Mesh. A Mesh contains the vertex information (what to draw); a Model references the Mesh to draw it with a specific
@@ -23,7 +24,7 @@ type Model struct {
 // NewModel creates a new Model (or instance) of the Mesh provided.
 func NewModel(mesh *Mesh) *Model {
 
-	return &Model{
+	model := &Model{
 		Mesh:            mesh,
 		Position:        UnitVector(0),
 		Rotation:        NewQuaternion(vector.Vector{0, 1, 0}, 0),
@@ -33,6 +34,8 @@ func NewModel(mesh *Mesh) *Model {
 		BackfaceCulling: true,
 		Color:           NewColor(1, 1, 1, 1),
 	}
+
+	return model
 
 }
 
@@ -60,21 +63,10 @@ func (model *Model) BoundingSphereRadius() float64 {
 
 }
 
-func (model *Model) triangleInList(tri *Triangle, triList []*Triangle) bool {
-
-	for _, t := range triList {
-		if tri == t {
-			return true
-		}
-	}
-	return false
-
-}
-
 // TransformedVertices returns the vertices of the Model, as transformed by the Camera's view matrix, sorted by distance to the Camera's position.
-func (model *Model) TransformedVertices(viewMatrix Matrix4, cameraPosition vector.Vector) []*Triangle {
+func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector) []*Triangle {
 
-	mvp := model.Transform().Mult(viewMatrix)
+	mvp := model.Transform().Mult(vpMatrix)
 
 	for _, vert := range model.Mesh.sortedVertices {
 		vert.transformed = mvp.MultVecW(vert.Position)
@@ -83,13 +75,20 @@ func (model *Model) TransformedVertices(viewMatrix Matrix4, cameraPosition vecto
 	model.closestTris = model.closestTris[:0]
 
 	sort.SliceStable(model.Mesh.sortedVertices, func(i, j int) bool {
-		return fastSub(cameraPosition, model.Mesh.sortedVertices[i].transformed).Magnitude() > fastSub(cameraPosition, model.Mesh.sortedVertices[j].transformed).Magnitude()
+		return fastSub(model.Mesh.sortedVertices[i].transformed, viewPos).Magnitude() > fastSub(model.Mesh.sortedVertices[j].transformed, viewPos).Magnitude()
 	})
 
+	// By using a bitset.Set, we can avoid putting triangles in the closestTris slice multiple times and avoid the time cost by looping over the slice / checking
+	// a map to see if the triangle's been added.
+	set := bitset.Set{}
+
 	for _, v := range model.Mesh.sortedVertices {
-		if !model.triangleInList(v.triangle, model.closestTris) {
+
+		if !set.Test(v.triangle.ID) {
 			model.closestTris = append(model.closestTris, v.triangle)
+			set.Add(v.triangle.ID)
 		}
+
 	}
 
 	return model.closestTris

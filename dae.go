@@ -68,7 +68,8 @@ func parseDAESourceName(sourceName string) string {
 }
 
 // LoadMeshesFromDAEFile takes a filepath to a .dae model file, and returns a map consisting of *Mesh objects, keyed by their names.
-// If the call couldn't complete for any reason, like due to a malformed DAE file, it will return an error.
+// If the call couldn't complete for any reason, like due to a malformed DAE file, it will return an error. Note that this calls os.ReadFile(),
+// and so requires Go v1.16 or above.
 func LoadMeshesFromDAEFile(path string) (map[string]*Mesh, error) {
 
 	if fileData, err := os.ReadFile(path); err != nil {
