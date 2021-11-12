@@ -1,70 +1,77 @@
-# Jank3D
+# Tetra3D
 
-## What is Jank3D?
+[Tetra Docs](HERE)
 
-Jank3D is a 3D software renderer written in Go with [Ebiten](https://ebiten.org/), primarily for video games. It's relatively slow and buggy, but it's also janky, and I love it for that.
+## What is Tetra?
 
-It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Jank3D is drawing some 3D elements for your primarily 2D game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Jank3D.
+Tetra is a 3D software renderer written in Go with [Ebiten](https://ebiten.org/), primarily for video games. It's relatively slow and buggy, but _it's also janky_, and I love it for that.
+
+It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
 ## Why did you make it?
 
-Because there's not really too much of an ability to do 3D for gamedev in Go apart from [g3n](http://g3n.rocks) or [go-gl](https://github.com/go-gl/gl). I like Go, and so, here we are. 
+Because there's not really too much of an ability to do 3D for gamedev in Go apart from [g3n](http://g3n.rocks), [go-gl](https://github.com/go-gl/gl) and [Raylib-go](https://github.com/gen2brain/raylib-go). I like Go, I like janky 3D, and so, here we are. 
 
-It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game in Ebiten but wanted to display something in 3D, Jank3D should work well for you.
+It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebiten but wanted to display something in 3D, Tetra should work well for you.
 
-Finally, while a software renderer is not by any means fast, it doesn't require any special drivers or OpenGL support, so any platforms that Ebiten supports should also work for Jank3D automatically.
+Finally, while a software renderer is not by any means fast, it doesn't require anything more than Ebiten requires. So, any platforms that Ebiten supports should also work for Tetra automatically (hopefully!).
 
-## Why Jank? Why is it named that?
+## Why Tetra? Why is it named that?
 
-Because a homemade 3D software renderer's kinda janky. For those who are unfamiliar with the slang, Jank3D is pronounced the same as "rank" or "bank" and is the noun form of "janky", which basically means "rough".
+Because it's like a tetrahedron, a relatively primitive (but visually interesting) 3D shape made of 4 triangles. 
+
+Otherwise, I had other names, but I didn't really like them very much. "Jank3D" was one, haha.
 
 ## What's missing?
 
-The following is a rough to-do list (tasks with checks have been implented):
+The following is a rough to-do list (tasks with checks have been implemented):
 
 - [x] 3D rendering
 - [x] -- Perspective projection
 - [ ] -- Orthographic projection
+- [ ] -- Billboards
+- [ ] -- Some additional way to draw 2D stuff with no perspective changes (if desired) in 3D space
 - [x] Culling
 - [x] -- Backface culling
-- [ ] -- Near / Far culling
 - [x] -- Frustum culling
-- [ ] -- Triangle clipping to view
+- [ ] -- Near / Far culling
+- [ ] -- Triangle clipping to view (this isn't implemented, but not having it doesn't seem to be too much of a problem for now)
 - [x] Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
-- [ ] -- More advanced depth sorting (of each triangle of all models rendered at a given time).
-- [ ] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) (currently triangles are just rendered in order of their distance to the camera, and objects are similarly sorted)
+- [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [x] Debug
 - [x] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
-- [x] -- Wireframe rendering
-- [x] -- Normal rendering
-- [x] Basic Texturing
+- [x] -- Wireframe debug rendering
+- [x] -- Normal debug rendering
+- [x] Basic Single Image Texturing
 - [ ] -- Multitexturing?
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
 - [x] DAE model loading
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
 - [x] -- Normal loading
-- [ ] -- Transform loading (for loading what are essentially full scenes)
+- [ ] -- Transform / full scene loading
 - [ ] -- Bones / Armatures / Animations
-- [ ] Billboarding
-- [ ] -- Some additional way to draw 2D stuff with no perspective changes (if desired) in 3D space
 - [ ] A scenegraph for parenting / relative object positioning (not sure if I'll implement this, but I could definitely see the utility)
-- [ ] Batching (the ability to merge Models together)
+- [ ] Scenes
+- [ ] -- Fog
+- [ ] -- Ambient vertex coloring
 - [ ] Lighting?
 - [ ] Shaders
-- [ ] Raycasting
-- [ ] Multithreading (particularly on vertex transformations)
-- [ ] Render batching (Ebiten should do this partially already as long as we adhere to the [efficiency guidelines](https://ebiten.org/documents/performancetips.html#Make_similar_draw_function_calls_successive))
-- [ ] AABB collision testing / sphere collision testing?
+- [ ] -- Normal rendering (useful for, say, screen-space reflection shaders)
+- [ ] Basic Collisions
+- [ ] -- AABB collision testing / sphere collision testing?
+- [ ] -- Raycasting
+- [ ] Multithreading (particularly for vertex transformations)
+- [ ] Model Batching (Ebiten should batch render calls together automatically, at least partially, as long as we adhere to the [efficiency guidelines](https://ebiten.org/documents/performancetips.html#Make_similar_draw_function_calls_successive))
 - [ ] [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!
 
 ## How do I use it?
 
-Make a camera, load a mesh, place them somewhere, render it. A simple renderer gets a simple API.
+Make a camera, load a mesh, place them somewhere, render your thing. A simple renderer gets a simple API.
 
-Here's an example that uses Ebiten:
+Here's an example:
 
 ```go
 
@@ -81,7 +88,7 @@ import (
 
 	_ "image/png"
 
-	"github.com/solarlune/jank"
+	"github.com/solarlune/tetra"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -90,39 +97,39 @@ const ScreenWidth = 320
 const ScreenHeight = 180
 
 type Game struct {
-	Models        []*jank3d.Model
-	Camera        *jank3d.Camera
+	Models        []*tetra.Model
+	Camera        *tetra.Camera
 }
 
 func NewGame() *Game {
 
 	game := &Game{
-		Models: []*jank3d.Model{},
+		Models: []*tetra.Model{},
 	}
 
 	// Load meshes from a .dae file. The file can contain multiple meshes, so the LoadMeshes functions return maps of mesh name to *jank.Mesh.
-	meshes, _ := jank3d.LoadMeshesFromDAEFile("examples.dae") 
+	meshes, _ := tetra.LoadMeshesFromDAEFile("examples.dae") 
 
 	// Get the mesh by its name in the DAE file.
 	sphereMesh := meshes["Sphere"]
 
 	// Make a Model (an individual instance) of it.
-	sphere := jank3d.NewModel(sphereMesh) 
+	sphere := tetra.NewModel(sphereMesh) 
 
-	// If you need to rotate the model because the 3D modeler you're using doesn't use the same axes as Jank3D (like Blender),
+	// If you need to rotate the model because the 3D modeler you're using doesn't use the same axes as Tetra (like Blender),
 	// you can call Mesh.ApplyMatrix() to apply a rotation matrix (or any other kind) to the vertices, thereby rotating 
 	// them and their triangles' normals.
 
-	// Jank3D uses OpenGL's coordinate system. (+X = Right, +Y = Up, +Z = Back)
+	// Tetra uses OpenGL's coordinate system. (+X = Right, +Y = Up, +Z = Back)
 
-	sphereMesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	sphereMesh.ApplyMatrix(tetra.Rotate(1, 0, 0, -math.Pi/2))
 
 	// Add the model to the models slice.
 	g.Models = append(g.Models, sphere)
 
 	// Create a new Camera. We pass the size of the screen so it can
 	// create its own backing texture. Internally, this is an *ebiten.Image.
-	g.Camera = jank3d.NewCamera(360, 180)
+	g.Camera = tetra.NewCamera(360, 180)
 
 	// Place it using the Position property (which is a 3D Vector).
 	// Cameras look forward down the -Z axis.
@@ -146,7 +153,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// of each other; pass them all in at the same time to get some actual depth.
 	g.Camera.Render(g.Models...) 
 
-	// Draw the resulting texture to the screen, and you're done!
+	// Draw the resulting texture to the screen, and you're done! You can also visualize
+	// the depth texture with g.Camera.DepthTexture.
 	screen.DrawImage(g.Camera.ColorTexture, nil) 
 
 }
@@ -174,7 +182,7 @@ func main() {
 
 Huge shout-out to the open-source community (i.e. StackOverflow, [fauxgl](https://github.com/fogleman/fauxgl), [tinyrenderer](https://github.com/ssloy/tinyrenderer), [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems), etc) at large for sharing the information and code to make this possible; I would definitely have never made this happen otherwise.
 
-Jank3D depends on kvartborg's [Vector](https://github.com/kvartborg/vector) package and [Ebiten](https://ebiten.org/) itself for rendering.
+Tetra depends on kvartborg's [Vector](https://github.com/kvartborg/vector) package, takeyourhatoff's [bitset](https://github.com/takeyourhatoff/bitset) package, and [Ebiten](https://ebiten.org/) itself for rendering. It also requires Go v1.16 or above.
 
 ## Support
 

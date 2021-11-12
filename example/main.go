@@ -14,6 +14,7 @@ import (
 	"github.com/solarlune/jank3d"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
@@ -46,57 +47,50 @@ func (g *Game) Init() {
 
 	// vvvvv Stress Test vvvvv
 
-	for i := 0; i < 5; i++ {
-		for j := 0; j < 5; j++ {
+	// for i := 0; i < 5; i++ {
+	// 	for j := 0; j < 5; j++ {
 
-			mesh := meshes["Suzanne"]
-			mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-			model := jank3d.NewModel(mesh)
-			model.Position[0] = float64(i) * 2
-			model.Position[2] = float64(j) * 2
-			g.Models = append(g.Models, model)
+	// 		mesh := meshes["Suzanne"]
+	// 		mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	// 		model := jank3d.NewModel(mesh)
+	// 		model.Position[0] = float64(i) * 2
+	// 		model.Position[2] = float64(j) * 2
+	// 		g.Models = append(g.Models, model)
 
-		}
-	}
+	// 	}
+	// }
 
-	mesh := meshes["Plane"]
+	mesh := meshes["Suzanne"]
 	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
 	model := jank3d.NewModel(mesh)
-	model.Scale = model.Scale.Scale(20)
-	model.Position[1] = -2
 	g.Models = append(g.Models, model)
 
-	// mesh := meshes["Suzanne"]
-	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	// model := jank3d.NewModel(mesh)
-	// g.Models = append(g.Models, model)
+	mesh = meshes["Crates"]
+	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	model = jank3d.NewModel(mesh)
+	model.Position[0] += 4
+	g.Models = append(g.Models, model)
 
-	// mesh = meshes["Crates"]
-	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	// mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
-	// model = jank3d.NewModel(mesh)
-	// model.Position[0] += 4
-	// g.Models = append(g.Models, model)
+	mesh = meshes["Sphere"]
+	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	model = jank3d.NewModel(mesh)
+	model.Position[0] += 8
+	g.Models = append(g.Models, model)
 
-	// mesh = meshes["Sphere"]
-	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	// model = jank3d.NewModel(mesh)
-	// model.Position[0] += 8
-	// g.Models = append(g.Models, model)
-
-	// mesh = meshes["Hallway"]
-	// mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	// mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
-	// model = jank3d.NewModel(mesh)
-	// model.Position[0] += 12
-	// g.Models = append(g.Models, model)
+	mesh = meshes["Hallway"]
+	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
+	mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	model = jank3d.NewModel(mesh)
+	model.Position[0] += 12
+	g.Models = append(g.Models, model)
 
 	g.Camera = jank3d.NewCamera(g.Width, g.Height)
 	g.Camera.Position[0] = 5
 	g.Camera.Position[2] = 20
-	// g.Camera.RenderDepth = false
 	// g.Camera.Rotation.Axis = vector.Vector{1, 0, 0}
 	// g.Camera.Rotation.Angle = -math.Pi / 4
+	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers
 
 }
 
@@ -176,10 +170,6 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
 		g.Camera.DebugDrawNormals = !g.Camera.DebugDrawNormals
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		g.Camera.DebugDrawBoundingSphere = !g.Camera.DebugDrawBoundingSphere
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {

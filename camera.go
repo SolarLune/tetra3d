@@ -44,6 +44,8 @@ type Camera struct {
 	DebugDrawWireframe      bool
 	DebugDrawNormals        bool
 	DebugDrawBoundingSphere bool
+
+	FrustumSphere *BoundingSphere
 }
 
 func NewCamera(w, h int) *Camera {
@@ -57,8 +59,9 @@ func NewCamera(w, h int) *Camera {
 		Near:              0.1,
 		Far:               100,
 
-		Position: UnitVector(0),
-		Rotation: NewQuaternion(vector.Vector{0, 1, 0}, 0),
+		Position:      UnitVector(0),
+		Rotation:      NewQuaternion(vector.Vector{0, 1, 0}, 0),
+		FrustumSphere: NewBoundingSphere(nil, vector.Vector{0, 0, 0}, 0),
 	}
 
 	depthShaderText := []byte(
@@ -147,8 +150,8 @@ func (camera *Camera) SetPerspective(fovY float64) {
 	camera.Perspective = true
 }
 
-// viewPointToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
-func (camera *Camera) viewPointToScreen(vert vector.Vector) vector.Vector {
+// ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
+func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
 
 	w, h := camera.ColorTexture.Size()
 	width, height := float64(w), float64(h)
@@ -168,6 +171,8 @@ func (camera *Camera) viewPointToScreen(vert vector.Vector) vector.Vector {
 	vect := vector.Vector{
 		vx*width + (width / 2),
 		vy*height + (height / 2),
+		vert[2],
+		vert[3],
 	}
 
 	return vect
@@ -177,11 +182,11 @@ func (camera *Camera) viewPointToScreen(vert vector.Vector) vector.Vector {
 // WorldToScreen transforms a 3D position in the world to screen coordinates.
 func (camera *Camera) WorldToScreen(vert vector.Vector) vector.Vector {
 	v := Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
-	return camera.viewPointToScreen(v.MultVecW(vector.Vector{0, 0, 0}))
+	return camera.ClipToScreen(v.MultVecW(vector.Vector{0, 0, 0}))
 }
 
-// worldToView transforms a 3D position in the world to view coordinates (i.e. this type of coordinate needs to be mapped to the screen still).
-func (camera *Camera) worldToView(vert vector.Vector) vector.Vector {
+// WorldToClip transforms a 3D position in the world to clip coordinates (before screen normalization).
+func (camera *Camera) WorldToClip(vert vector.Vector) vector.Vector {
 	v := Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 	return v.MultVecW(vector.Vector{0, 0, 0})
 }
@@ -212,6 +217,12 @@ func (camera *Camera) Render(models ...*Model) {
 	viewPos := camera.ViewMatrix().MultVec(camera.Position)
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
+	// Update the camera's frustum sphere
+	forward := camera.ViewMatrix().Forward()
+	dist := camera.Far - camera.Near
+	camera.FrustumSphere.LocalPosition = camera.Position.Add(forward.Scale(camera.Near + (dist / 2)))
+	camera.FrustumSphere.LocalRadius = dist / 2
+
 	frametimeStart := time.Now()
 
 	camera.DebugInfo.TotalObjects += len(models)
@@ -226,28 +237,51 @@ func (camera *Camera) Render(models ...*Model) {
 
 		if model.FrustumCulling {
 
-			screenPos := camera.WorldToScreen(model.Position)
-			capped := screenPos.Clone()
-			r := camera.WorldToScreen(model.Position.Add(vector.Vector{model.BoundingSphereRadius() + model.Mesh.BoundingSphere.Position.Magnitude(), 0, 0}))
-			radius := r.Sub(screenPos).Magnitude()
+			// This is the simplest method of simple frustum culling where we simply test the distances between objects.
 
-			w, h := camera.ColorTexture.Size()
-
-			if capped[0] > float64(w) {
-				capped[0] = float64(w)
-			} else if capped[0] < 0 {
-				capped[0] = 0
-			}
-
-			if capped[1] > float64(h) {
-				capped[1] = float64(h)
-			} else if capped[1] < 0 {
-				capped[1] = 0
-			}
-
-			if capped.Sub(screenPos).Magnitude() > radius {
+			if model.Position.Sub(camera.FrustumSphere.Position()).Magnitude() > model.BoundingSphere.Radius()+camera.FrustumSphere.Radius() {
 				continue
 			}
+
+			// screenPos := camera.WorldToScreen(model.Position)
+
+			// maxScale := math.Max(math.Max(math.Abs(model.Scale[0]), math.Abs(model.Scale[1])), math.Abs(model.Scale[2]))
+			// m := model.Mesh.Dimensions.Max() * maxScale
+
+			// vm := camera.ViewMatrix()
+			// r := vm.Right()
+			// u := vm.Up()
+
+			// points := []vector.Vector{
+			// 	{0, 0, 0},
+			// 	r.Add(u).Unit().Scale(m),
+			// 	r.Invert().Add(u).Unit().Scale(m),
+			// 	r.Add(u.Invert()).Unit().Scale(m),
+			// 	r.Add(u).Unit().Scale(m).Invert(),
+			// }
+
+			// w, h := camera.ColorTexture.Size()
+			// screenWidth := float64(w)
+			// screenHeight := float64(h)
+
+			// visible := false
+
+			// for _, p := range points {
+
+			// 	scr := camera.WorldToScreen(model.Position.Add(p))
+			// 	if model.Mesh.Name == "Suzanne" {
+			// 		fmt.Println(model.Mesh.Dimensions.Max())
+			// 	}
+			// 	if (scr[0] >= 0 && scr[0] <= screenWidth) && (scr[1] >= 0 && scr[1] <= screenHeight) {
+			// 		visible = true
+			// 		break
+			// 	}
+
+			// }
+
+			// if !visible {
+			// 	continue
+			// }
 
 		}
 
@@ -288,9 +322,9 @@ func (camera *Camera) Render(models ...*Model) {
 
 			}
 
-			p0 := camera.viewPointToScreen(v0)
-			p1 := camera.viewPointToScreen(v1)
-			p2 := camera.viewPointToScreen(v2)
+			p0 := camera.ClipToScreen(v0)
+			p1 := camera.ClipToScreen(v1)
+			p2 := camera.ClipToScreen(v2)
 
 			triList[vertexListIndex/3] = tri
 
@@ -433,29 +467,29 @@ func (camera *Camera) Render(models ...*Model) {
 
 		}
 
-		if camera.DebugDrawBoundingSphere {
+		// if camera.DebugDrawBoundingSphere {
 
-			sphere := model.Mesh.BoundingSphere
+		// 	sphere := model.Mesh.BoundingSphere
 
-			transformedCenter := camera.WorldToScreen(model.Position.Add(sphere.Position))
-			transformedRadius := camera.WorldToScreen(model.Position.Add(sphere.Position).Add(vector.Vector{model.BoundingSphereRadius(), 0, 0}))
-			radius := transformedRadius.Sub(transformedCenter).Magnitude()
+		// 	transformedCenter := camera.WorldToScreen(model.Position.Add(sphere.Position))
+		// 	transformedRadius := camera.WorldToScreen(model.Position.Add(sphere.Position).Add(vector.Vector{model.BoundingSphereRadius(), 0, 0}))
+		// 	radius := transformedRadius.Sub(transformedCenter).Magnitude()
 
-			stepCount := float64(32)
+		// 	stepCount := float64(32)
 
-			for i := 0; i < int(stepCount); i++ {
+		// 	for i := 0; i < int(stepCount); i++ {
 
-				x := (math.Sin(math.Pi*2*float64(i)/stepCount) * radius)
-				y := (math.Cos(math.Pi*2*float64(i)/stepCount) * radius)
+		// 		x := (math.Sin(math.Pi*2*float64(i)/stepCount) * radius)
+		// 		y := (math.Cos(math.Pi*2*float64(i)/stepCount) * radius)
 
-				x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
-				y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
+		// 		x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
+		// 		y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
 
-				ebitenutil.DrawLine(camera.ColorTexture, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, color.White)
+		// 		ebitenutil.DrawLine(camera.ColorTexture, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, color.White)
 
-			}
+		// 	}
 
-		}
+		// }
 
 	}
 

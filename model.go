@@ -19,6 +19,7 @@ type Model struct {
 	closestTris     []*Triangle
 	Visible         bool
 	Color           Color
+	BoundingSphere  *BoundingSphere
 }
 
 // NewModel creates a new Model (or instance) of the Mesh provided.
@@ -35,6 +36,8 @@ func NewModel(mesh *Mesh) *Model {
 		Color:           NewColor(1, 1, 1, 1),
 	}
 
+	model.BoundingSphere = NewBoundingSphere(model, UnitVector(0), model.Mesh.Dimensions.Max())
+
 	return model
 
 }
@@ -48,18 +51,6 @@ func (model *Model) Transform() Matrix4 {
 	transform = transform.Mult(Rotate(model.Rotation.Axis[0], model.Rotation.Axis[1], model.Rotation.Axis[2], model.Rotation.Angle))
 	transform = transform.Mult(Translate(model.Position[0], model.Position[1], model.Position[2]))
 	return transform
-
-}
-
-func (model *Model) BoundingSphereRadius() float64 {
-
-	m := 0.0
-	for _, v := range model.Scale {
-		if m < v {
-			m = v
-		}
-	}
-	return model.Mesh.BoundingSphere.Radius * m
 
 }
 
