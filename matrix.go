@@ -1,6 +1,7 @@
-package jank3d
+package tetra3d
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 
@@ -85,6 +86,96 @@ func (matrix Matrix4) Forward() vector.Vector {
 	}.Unit()
 }
 
+// Decompose decomposes the Matrix4 and returns three components - the position (a 3D vector.Vector), scale (another 3D vector.Vector), and rotation (an AxisAngle)
+// indicated by the Matrix4. Note that this is mainly used when loading a mesh from a 3D modeler - this being the case, it may not be the most precise, and negative
+// scales are not supported.
+func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, AxisAngle) {
+
+	position := vector.Vector{matrix[3][0], matrix[3][1], matrix[3][2]}
+
+	angle := math.Acos((matrix[0][0] + matrix[1][1] + matrix[2][2] - 1) / 2)
+
+	if math.IsNaN(angle) {
+		angle = 0.0
+	}
+
+	s := math.Sqrt(math.Pow(matrix[2][1]-matrix[1][2], 2) + math.Pow(matrix[0][2]-matrix[2][0], 2) + math.Pow(matrix[1][0]-matrix[0][1], 2))
+
+	if math.Abs(s) <= 0.0001 {
+		s = 1
+	}
+
+	axis := vector.Vector{
+		(matrix[1][2] - matrix[2][1]) / s,
+		(matrix[2][0] - matrix[0][2]) / s,
+		(matrix[0][1] - matrix[1][0]) / s,
+	}.Unit()
+
+	// Default to rotating horizontally
+	if axis.Magnitude() == 0 {
+		axis[1] = 1
+	}
+
+	in := Rotate(axis[0], axis[1], axis[2], angle).Mult(matrix)
+
+	scale := vector.Vector{in.Row(0).Magnitude(), in.Row(1).Magnitude(), in.Row(2).Magnitude()}
+
+	fmt.Println("in:", in)
+
+	return position, scale, NewAxisAngle(axis, angle)
+
+}
+
+// Transposing a Matrix4 switches the Matrix from being Row Major to being Column Major. For orthonormalized Matrices (matrices
+// that have rows that are normalized, having a length of 1, like rotation matrices), this is equivalent to inverting it.
+func (matrix Matrix4) Transposed() Matrix4 {
+
+	new := NewMatrix4()
+
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 4; j++ {
+			new[i][j] = matrix[j][i]
+		}
+	}
+
+	return new
+
+}
+
+// Row returns the indiced row from the Matrix4 as a Vector.
+func (matrix Matrix4) Row(rowIndex int) vector.Vector {
+	vec := vector.Vector{0, 0, 0, 0}
+	for i := range matrix[rowIndex] {
+		vec[i] = matrix[rowIndex][i]
+	}
+	return vec
+}
+
+// Column returns the indiced column from the Matrix4 as a Vector.
+func (matrix Matrix4) Column(columnIndex int) vector.Vector {
+	vec := vector.Vector{0, 0, 0, 0}
+	for i := range matrix {
+		vec[i] = matrix[i][columnIndex]
+	}
+	return vec
+}
+
+func (matrix Matrix4) SetRow(rowIndex int, rowData vector.Vector) Matrix4 {
+	for i := range matrix[rowIndex] {
+		matrix[rowIndex][i] = rowData[i]
+	}
+	return matrix
+}
+
+func (matrix Matrix4) SetColumn(columnIndex int, columnData vector.Vector) Matrix4 {
+	for i := range matrix {
+		matrix[i][columnIndex] = columnData[i]
+	}
+	return matrix
+}
+
+// Perspective generates a perspective frustum Matrix4. fovy is the vertical field of view in degrees, near and far are the near and far clipping plane,
+// while viewWidth and viewHeight is the width and height of the backing texture / camera.
 func Perspective(fovy, near, far, viewWidth, viewHeight float64) Matrix4 {
 
 	aspect := viewWidth / viewHeight

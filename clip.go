@@ -1,4 +1,4 @@
-package jank3d
+package tetra3d
 
 // type clipPlane struct {
 // 	Depth, Normal vector.Vector

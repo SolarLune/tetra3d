@@ -1,7 +1,6 @@
-package jank3d
+package tetra3d
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -36,7 +35,8 @@ type Mesh struct {
 	Vertices       []*Vertex
 	sortedVertices []*Vertex
 	Triangles      []*Triangle
-	Image          *ebiten.Image
+	Image          *ebiten.Image // What Image to use when rendering the triangles that define this Mesh
+	MaterialName   string        // The name of any material assigned to the Mesh from the 3D modeler
 	FilterMode     ebiten.Filter
 	Dimensions     Dimensions
 }
@@ -100,8 +100,8 @@ func (mesh *Mesh) SetVertexColor(r, g, b, a float32) {
 }
 
 // Repositions all vertices to take effect of the given Matrix. You can use this to, for example, translate (move) all vertices
-// of a Mesh to the right by 5 units ( mesh.ApplyMatrix(jank3d.Translate(5, 0, 0)) ), or rotate all vertices around the center by
-// 90 degrees on the Y axis ( mesh.ApplyMatrix(jank3d.Rotate(0, 1, 0, math.Pi/2) ) ) .
+// of a Mesh to the right by 5 units ( mesh.ApplyMatrix(tetra3d.Translate(5, 0, 0)) ), or rotate all vertices around the center by
+// 90 degrees on the Y axis ( mesh.ApplyMatrix(tetra3d.Rotate(0, 1, 0, math.Pi/2) ) ) .
 func (mesh *Mesh) ApplyMatrix(matrix Matrix4) {
 
 	for _, tri := range mesh.Triangles {
@@ -142,8 +142,6 @@ func (mesh *Mesh) UpdateBounds() {
 		}
 
 	}
-
-	fmt.Println(mesh.Name, mesh.Dimensions)
 
 }
 

@@ -1,10 +1,10 @@
 # Tetra3D
 
-[Tetra Docs](HERE)
+[Tetra3D Docs](HERE)
 
-## What is Tetra?
+## What is Tetra3D?
 
-Tetra is a 3D software renderer written in Go with [Ebiten](https://ebiten.org/), primarily for video games. It's relatively slow and buggy, but _it's also janky_, and I love it for that.
+Tetra3D is a 3D software renderer written in Go with [Ebiten](https://ebiten.org/), primarily for video games. It's relatively slow and buggy, but _it's also janky_, and I love it for that.
 
 It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
@@ -12,11 +12,11 @@ It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or 
 
 Because there's not really too much of an ability to do 3D for gamedev in Go apart from [g3n](http://g3n.rocks), [go-gl](https://github.com/go-gl/gl) and [Raylib-go](https://github.com/gen2brain/raylib-go). I like Go, I like janky 3D, and so, here we are. 
 
-It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebiten but wanted to display something in 3D, Tetra should work well for you.
+It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebiten but wanted to display something in 3D, Tetra3D should work well for you.
 
-Finally, while a software renderer is not by any means fast, it doesn't require anything more than Ebiten requires. So, any platforms that Ebiten supports should also work for Tetra automatically (hopefully!).
+Finally, while a software renderer is not by any means fast, it doesn't require anything more than Ebiten requires. So, any platforms that Ebiten supports should also work for Tetra3D automatically (hopefully!).
 
-## Why Tetra? Why is it named that?
+## Why Tetra3D? Why is it named that?
 
 Because it's like a tetrahedron, a relatively primitive (but visually interesting) 3D shape made of 4 triangles. 
 
@@ -53,7 +53,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Bones / Armatures / Animations
 - [ ] A scenegraph for parenting / relative object positioning (not sure if I'll implement this, but I could definitely see the utility)
 - [ ] Scenes
-- [ ] -- Fog
+- [x] -- Fog
 - [ ] -- Ambient vertex coloring
 - [ ] Lighting?
 - [ ] Shaders
@@ -88,7 +88,7 @@ import (
 
 	_ "image/png"
 
-	"github.com/solarlune/tetra"
+	"github.com/solarlune/tetra3d"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -97,39 +97,38 @@ const ScreenWidth = 320
 const ScreenHeight = 180
 
 type Game struct {
-	Models        []*tetra.Model
-	Camera        *tetra.Camera
+	Scene        *tetra3d.Scene
+	Camera        *tetra3d.Camera
 }
 
 func NewGame() *Game {
 
-	game := &Game{
-		Models: []*tetra.Model{},
+	g := &Game{
+		Models: []*tetra3d.Model{},
 	}
 
-	// Load meshes from a .dae file. The file can contain multiple meshes, so the LoadMeshes functions return maps of mesh name to *jank.Mesh.
-	meshes, _ := tetra.LoadMeshesFromDAEFile("examples.dae") 
+	// Load a scene from a .dae file - returns a *Scene and error, if the call was unsuccessful. The scene will contain all 
+	// objects exported along with their meshes, handily converted to *tetra3d.Model and *tetra3d.Mesh instances.
+	scene, err := tetra3d.LoadDAEFile("examples.dae") 
 
-	// Get the mesh by its name in the DAE file.
-	sphereMesh := meshes["Sphere"]
+	// Something went wrong with the loading process.
+	if err != nil {
+		panic(err)
+	}
 
-	// Make a Model (an individual instance) of it.
-	sphere := tetra.NewModel(sphereMesh) 
+	g.Scene = scene
 
 	// If you need to rotate the model because the 3D modeler you're using doesn't use the same axes as Tetra (like Blender),
 	// you can call Mesh.ApplyMatrix() to apply a rotation matrix (or any other kind) to the vertices, thereby rotating 
-	// them and their triangles' normals.
+	// them and their triangles' normals. Tetra uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), in
+	// comparison to Blender's coordinate system (+X = Right, +Y = Forward, +Z = Up). 
 
-	// Tetra uses OpenGL's coordinate system. (+X = Right, +Y = Up, +Z = Back)
-
-	sphereMesh.ApplyMatrix(tetra.Rotate(1, 0, 0, -math.Pi/2))
-
-	// Add the model to the models slice.
-	g.Models = append(g.Models, sphere)
+	// By default (if you're using Blender), this conversion is done for you; you can change this by passing a different
+	// DaeLoadOptions parameter when calling tetra3d.LoadDAEFile().
 
 	// Create a new Camera. We pass the size of the screen so it can
 	// create its own backing texture. Internally, this is an *ebiten.Image.
-	g.Camera = tetra.NewCamera(360, 180)
+	g.Camera = tetra3d.NewCamera(360, 180)
 
 	// Place it using the Position property (which is a 3D Vector).
 	// Cameras look forward down the -Z axis.
@@ -142,16 +141,16 @@ func (g *Game) Update() error { return nil }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
-	// Clear the screen first.
-	screen.Fill(color.RGBA{20, 30, 40, 255})
+	// Call Camera.Clear() to clear its internal backing texture. This should be called once before drawing your set of objects.
+	g.Camera.Clear()
 
-	// Call Camera.Begin() to clear its internal backing texture.
-	g.Camera.Begin()
-
-	// Render your models list from the camera. The Camera's ColorTexture will then 
+	// Render your scene from the camera. The Camera's ColorTexture will then 
 	// hold the result. If you call Render multiple times, the models will draw on top
-	// of each other; pass them all in at the same time to get some actual depth.
-	g.Camera.Render(g.Models...) 
+	// of each other; pass them all in at the same time to get actual depth.
+	g.Camera.Render(g.Scene) 
+
+	// Before drawing the result, clear the screen first.
+	screen.Fill(color.RGBA{20, 30, 40, 255})
 
 	// Draw the resulting texture to the screen, and you're done! You can also visualize
 	// the depth texture with g.Camera.DepthTexture.

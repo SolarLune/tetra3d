@@ -1,4 +1,4 @@
-module github.com/solarlune/jank3d
+module github.com/solarlune/tetra3d
 
 go 1.14
 

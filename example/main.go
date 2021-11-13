@@ -4,14 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
-	"math"
 	"os"
 	"runtime/pprof"
+	"strings"
 	"time"
 
 	_ "image/png"
 
-	"github.com/solarlune/jank3d"
+	"github.com/kvartborg/vector"
+	"github.com/solarlune/tetra3d"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -19,19 +20,24 @@ import (
 )
 
 type Game struct {
-	Width, Height  int
-	Models         []*jank3d.Model
-	Camera         *jank3d.Camera
-	Time           float64
-	DrawDebugText  bool
-	DrawDebugDepth bool
+	Width, Height int
+	// Models         []*tetra3d.Model
+	Scene *tetra3d.Scene
+
+	Camera *tetra3d.Camera
+
+	Time              float64
+	DrawDebugText     bool
+	DrawDebugDepth    bool
+	PrevMousePosition vector.Vector
 }
 
 func NewGame() *Game {
 
 	game := &Game{
-		Width:  320,
-		Height: 180,
+		Width:             320,
+		Height:            180,
+		PrevMousePosition: vector.Vector{},
 	}
 
 	game.Init()
@@ -41,9 +47,19 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	g.Models = []*jank3d.Model{}
+	dae, _ := tetra3d.LoadDAEFile("examples.dae", nil)
 
-	meshes, _ := jank3d.LoadMeshesFromDAEFile("examples.dae")
+	g.Scene = dae
+
+	for _, m := range g.Scene.Meshes {
+		if strings.HasSuffix(m.MaterialName, ".png") {
+			m.Image, _, _ = ebitenutil.NewImageFromFile(m.MaterialName)
+		}
+	}
+
+	// fmt.Println(g.Scene.Meshes["Crates"])
+
+	// g.Scene.Meshes
 
 	// vvvvv Stress Test vvvvv
 
@@ -51,8 +67,8 @@ func (g *Game) Init() {
 	// 	for j := 0; j < 5; j++ {
 
 	// 		mesh := meshes["Suzanne"]
-	// 		mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	// 		model := jank3d.NewModel(mesh)
+	// 		mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
+	// 		model := tetra3d.NewModel(mesh)
 	// 		model.Position[0] = float64(i) * 2
 	// 		model.Position[2] = float64(j) * 2
 	// 		g.Models = append(g.Models, model)
@@ -60,37 +76,41 @@ func (g *Game) Init() {
 	// 	}
 	// }
 
-	mesh := meshes["Suzanne"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	model := jank3d.NewModel(mesh)
-	g.Models = append(g.Models, model)
+	// mesh := dae.Meshes["Suzanne"]
+	// mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
+	// model := tetra3d.NewModel(mesh, "Suzanne")
+	// g.Models = append(g.Models, model)
 
-	mesh = meshes["Crates"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
-	model = jank3d.NewModel(mesh)
-	model.Position[0] += 4
-	g.Models = append(g.Models, model)
+	// mesh = dae.Meshes["Crates"]
+	// mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
+	// mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	// model = tetra3d.NewModel(mesh, "Suzanne")
+	// model.Position[0] += 4
+	// g.Models = append(g.Models, model)
 
-	mesh = meshes["Sphere"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	model = jank3d.NewModel(mesh)
-	model.Position[0] += 8
-	g.Models = append(g.Models, model)
+	// mesh = dae.Meshes["Sphere"]
+	// mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
+	// model = tetra3d.NewModel(mesh, "Suzanne")
+	// model.Position[0] += 8
+	// g.Models = append(g.Models, model)
 
-	mesh = meshes["Hallway"]
-	mesh.ApplyMatrix(jank3d.Rotate(1, 0, 0, -math.Pi/2))
-	mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
-	model = jank3d.NewModel(mesh)
-	model.Position[0] += 12
-	g.Models = append(g.Models, model)
+	// mesh = dae.Meshes["Hallway"]
+	// mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
+	// mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
+	// model = tetra3d.NewModel(mesh, "Suzanne")
+	// model.Position[0] += 12
+	// g.Models = append(g.Models, model)
 
-	g.Camera = jank3d.NewCamera(g.Width, g.Height)
-	g.Camera.Position[0] = 5
+	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
+	// g.Camera.Position[0] = 5
 	g.Camera.Position[2] = 20
+	// g.Camera.Far = 60
 	// g.Camera.Rotation.Axis = vector.Vector{1, 0, 0}
 	// g.Camera.Rotation.Angle = -math.Pi / 4
-	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers
+	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
+	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
+
+	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
 
@@ -108,19 +128,46 @@ func (g *Game) Update() error {
 
 	// Movement is global; you could use Camera.Forward(), Camera.Right(), and Camera.Up() for local axis movement.
 
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		g.Camera.Position[0] += moveSpd
+	if ebiten.IsKeyPressed(ebiten.KeyW) {
+		g.Camera.Position = g.Camera.Position.Add(g.Camera.Forward().Scale(moveSpd))
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		g.Camera.Position[0] -= moveSpd
+	if ebiten.IsKeyPressed(ebiten.KeyD) {
+		g.Camera.Position = g.Camera.Position.Add(g.Camera.Right().Scale(moveSpd))
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		g.Camera.Position[2] -= moveSpd
+	if ebiten.IsKeyPressed(ebiten.KeyS) {
+		g.Camera.Position = g.Camera.Position.Add(g.Camera.Forward().Scale(-moveSpd))
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		g.Camera.Position[2] += moveSpd
+	if ebiten.IsKeyPressed(ebiten.KeyA) {
+		g.Camera.Position = g.Camera.Position.Add(g.Camera.Right().Scale(-moveSpd))
 	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
+		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+	}
+
+	if ebiten.IsKeyPressed(ebiten.KeyE) {
+		g.Camera.Rotation.Angle -= 0.025
+	}
+
+	if ebiten.IsKeyPressed(ebiten.KeyQ) {
+		g.Camera.Rotation.Angle += 0.025
+	}
+
+	// mx, my := ebiten.CursorPosition()
+
+	// mv := vector.Vector{float64(mx), float64(my)}
+
+	// diff := mv.Sub(g.PrevMousePosition)
+
+	// g.CameraRot.Angle -= diff[0] * 0.01
+
+	// g.CameraTilt.Axis = g.Camera.Right()
+	// g.CameraTilt.Angle -= diff[1] * 0.01
+
+	// g.Camera.Rotation = g.CameraTilt.Add(g.CameraTilt)
+
+	// g.PrevMousePosition = mv.Clone()
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
 		g.Camera.Position[1] += moveSpd
@@ -129,28 +176,19 @@ func (g *Game) Update() error {
 		g.Camera.Position[1] -= moveSpd
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		g.Camera.Rotation.Angle -= 0.01
+	if ebiten.IsKeyPressed(ebiten.Key1) {
+		g.Scene.SetFog(1, 0, 0, tetra3d.FogAdd)
+	} else if ebiten.IsKeyPressed(ebiten.Key2) {
+		g.Scene.SetFog(0, 0, 0, tetra3d.FogMultiply)
+	} else if ebiten.IsKeyPressed(ebiten.Key3) {
+		g.Scene.SetFog(0, 0, 0, tetra3d.FogOff)
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyE) {
-		g.Camera.Rotation.Angle += 0.01
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		for _, m := range g.Models {
-			m.Rotation.Angle += 0.025
+	if ebiten.IsKeyPressed(ebiten.KeyZ) {
+		if sphere := g.Scene.FindModel("Sphere"); sphere != nil {
+			g.Scene.RemoveModels(sphere)
 		}
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		for _, m := range g.Models {
-			m.Rotation.Angle -= 0.025
-		}
-	}
-
-	// for _, m := range g.Models {
-	// 	m.Position[1] = math.Sin((((m.Position[0] + m.Position[2]) * 0.01) + g.Time) * math.Pi)
-	// }
 
 	if ebiten.IsKeyPressed(ebiten.KeyR) {
 		g.Init()
@@ -177,16 +215,17 @@ func (g *Game) Update() error {
 	}
 
 	return err
+
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Clear, but with a color
-	screen.Fill(color.RGBA{20, 30, 40, 255})
+	screen.Fill(color.Black)
 
 	g.Camera.Clear()
 
-	g.Camera.Render(g.Models...)
+	g.Camera.Render(g.Scene)
 
 	if g.DrawDebugDepth {
 		screen.DrawImage(g.Camera.DepthTexture, nil)
@@ -225,7 +264,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 
 func main() {
 
-	ebiten.SetWindowTitle("jank3d Test")
+	ebiten.SetWindowTitle("tetra3d Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()

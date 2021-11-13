@@ -1,4 +1,4 @@
-package jank3d
+package tetra3d
 
 type Color struct {
 	R, G, B, A float32

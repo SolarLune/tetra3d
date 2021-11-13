@@ -1,4 +1,4 @@
-package jank3d
+package tetra3d
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ type Camera struct {
 	fieldOfView float64
 
 	Position vector.Vector
-	Rotation Quaternion
+	Rotation AxisAngle
 
 	DebugInfo               DebugInfo
 	DebugDrawWireframe      bool
@@ -60,7 +60,7 @@ func NewCamera(w, h int) *Camera {
 		Far:               100,
 
 		Position:      UnitVector(0),
-		Rotation:      NewQuaternion(vector.Vector{0, 1, 0}, 0),
+		Rotation:      NewAxisAngle(vector.Vector{0, 1, 0}, 0),
 		FrustumSphere: NewBoundingSphere(nil, vector.Vector{0, 0, 0}, 0),
 	}
 
@@ -95,14 +95,24 @@ func NewCamera(w, h int) *Camera {
 	colorShaderText := []byte(
 		`package main
 
+		var Fog vec4
+
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
 			// texSize := imageSrcTextureSize()
 
-			intermediateValue := imageSrc1At(texCoord)
+			depth := imageSrc1At(texCoord)
 			
-			if intermediateValue.a > 0 {
-				return imageSrc0At(texCoord)
+			if depth.a > 0 {
+				color := imageSrc0At(texCoord)
+				
+				if Fog.a == 1 {
+					color.rgb += Fog.rgb * depth.r
+				} else if Fog.a == 2 {
+					color.rgb -= Fog.rgb * depth.r
+				}
+
+				return color
 			}
 
 		}
@@ -126,13 +136,30 @@ func (camera *Camera) ViewMatrix() Matrix4 {
 	transform := Translate(-camera.Position[0], -camera.Position[1], -camera.Position[2])
 	rotate := Rotate(camera.Rotation.Axis[0], camera.Rotation.Axis[1], camera.Rotation.Axis[2], camera.Rotation.Angle)
 	// We invert the Z portion of the rotation because the Camera is looking down -Z
-	rotate[2][0] *= -1
-	rotate[2][1] *= -1
-	rotate[2][2] *= -1
-	transform = transform.Mult(rotate)
+	transform = transform.Mult(rotate.Transposed())
 
 	return transform
 
+}
+
+// Forward returns the forward direction that the camera is looking down.
+func (camera *Camera) Forward() vector.Vector {
+	// Internally, Forward is backwards because the camera looks down -Z, so we invert it.
+	forward := camera.ViewMatrix().Forward()
+	forward[2] *= -1
+	return forward
+}
+
+func (camera *Camera) Right() vector.Vector {
+	right := camera.ViewMatrix().Right()
+	right[2] *= -1
+	return right
+}
+
+func (camera *Camera) Up() vector.Vector {
+	up := camera.ViewMatrix().Up()
+	up[2] *= -1
+	return up
 }
 
 func (camera *Camera) Projection() Matrix4 {
@@ -160,13 +187,13 @@ func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
 
 	// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
 	// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
-	if v3 > 0 {
-		v3 = -0.000001
+	if v3 < 0 {
+		v3 = 0.000001
 	}
 
 	// Again, this function should only be called with pre-transformed 4D vertex arguments.
-	vx := vert[0] / v3 * -1
-	vy := vert[1] / v3
+	vx := vert[0] / v3
+	vy := vert[1] / v3 * -1
 
 	vect := vector.Vector{
 		vx*width + (width / 2),
@@ -174,6 +201,8 @@ func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
 		vert[2],
 		vert[3],
 	}
+
+	// fmt.Println(vect)
 
 	return vect
 
@@ -204,30 +233,36 @@ func (camera *Camera) Clear() {
 
 // Render renders the models passed - note that models rendered one after another in multiple Render() calls will be rendered on top of each other.
 // Models need to be passed into the same Render() call to be sorted in depth.
-func (camera *Camera) Render(models ...*Model) {
+func (camera *Camera) Render(scene *Scene) {
 
 	if !camera.RenderDepth {
 
-		sort.SliceStable(models, func(i, j int) bool {
-			return models[i].Position.Sub(camera.Position).Magnitude() > models[j].Position.Sub(camera.Position).Magnitude()
+		sort.SliceStable(scene.Models, func(i, j int) bool {
+			return scene.Models[i].Position.Sub(camera.Position).Magnitude() > scene.Models[j].Position.Sub(camera.Position).Magnitude()
 		})
 
 	}
 
-	viewPos := camera.ViewMatrix().MultVec(camera.Position)
+	// By multiplying the camera's position against the view matrix (which contains the negated camera position), we're left with just the rotation
+	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
+	pureViewRot := camera.ViewMatrix().MultVec(camera.Position)
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
 	// Update the camera's frustum sphere
-	forward := camera.ViewMatrix().Forward()
 	dist := camera.Far - camera.Near
-	camera.FrustumSphere.LocalPosition = camera.Position.Add(forward.Scale(camera.Near + (dist / 2)))
+	camera.FrustumSphere.LocalPosition = camera.Position.Add(camera.Forward().Scale(camera.Near + (dist / 2)))
 	camera.FrustumSphere.LocalRadius = dist / 2
 
 	frametimeStart := time.Now()
 
-	camera.DebugInfo.TotalObjects += len(models)
+	for _, model := range scene.Models {
 
-	for _, model := range models {
+		// Objects without Meshes are essentially nodes that just have a position. They aren't counted for rendering.
+		if model.Mesh == nil {
+			continue
+		}
+
+		camera.DebugInfo.TotalObjects++
 
 		camera.DebugInfo.TotalTris += len(model.Mesh.Triangles)
 
@@ -285,12 +320,11 @@ func (camera *Camera) Render(models ...*Model) {
 
 		}
 
-		model.TransformedVertices(vpMatrix, viewPos)
+		tris := model.TransformedVertices(vpMatrix, pureViewRot)
 
 		vertexListIndex := 0
 
-		// model.closestTris is set within TransformedVertices().
-		for _, tri := range model.closestTris {
+		for _, tri := range tris {
 
 			v0 := tri.Vertices[0].transformed
 			v1 := tri.Vertices[1].transformed
@@ -300,7 +334,7 @@ func (camera *Camera) Render(models ...*Model) {
 			// to draw triangles that are stretch on behind the camera (think the flooring and walls in a hallway that goes ahead of and behind the camera).
 			// A workaround is to segment the hallway and not allow the camera to get overly close, but the only real solution is to TODO: get rid of this and
 			// add triangle clipping so any triangles that are too long get clipped.
-			if v0[3] > 0 && v1[3] > 0 && v2[3] > 0 {
+			if v0[3] < 0 && v1[3] < 0 && v2[3] < 0 {
 				continue
 			}
 
@@ -316,7 +350,8 @@ func (camera *Camera) Render(models ...*Model) {
 
 				dot := normal.Dot(tri.Vertices[0].transformed[:3])
 
-				if dot > 0 {
+				// A little extra to make sure we draw walls if you're peeking around them with a higher FOV
+				if dot < -0.1 {
 					continue
 				}
 
@@ -360,7 +395,7 @@ func (camera *Camera) Render(models ...*Model) {
 
 					// Vertex colors
 
-					depth := (math.Max(-vert.transformed[2]-camera.Near, 0) / camera.Far)
+					depth := (math.Max(vert.transformed[2]-camera.Near, 0) / camera.Far)
 					vertexList[index].ColorR = float32(depth)
 					vertexList[index].ColorG = float32(depth)
 					vertexList[index].ColorB = float32(depth)
@@ -432,6 +467,10 @@ func (camera *Camera) Render(models ...*Model) {
 			opt := &ebiten.DrawRectShaderOptions{}
 			opt.Images[0] = camera.ColorIntermediate
 			opt.Images[1] = camera.DepthIntermediate
+
+			opt.Uniforms = map[string]interface{}{
+				"Fog": scene.fogAsFloatSlice(),
+			}
 
 			camera.ColorTexture.DrawRectShader(w, h, camera.ColorShader, opt)
 
