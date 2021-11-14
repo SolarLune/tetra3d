@@ -12,13 +12,16 @@ func (color Color) Clone() Color {
 	return NewColor(color.R, color.G, color.B, color.A)
 }
 
-func (color Color) AddRGB(value float32) Color {
-	c := color
-	c.R += value
-	c.G += value
-	c.B += value
-	// c.A += value
-	return c
+func (color *Color) SetRGB(r, g, b float32) {
+	color.R = r
+	color.G = g
+	color.B = b
+}
+
+func (color *Color) AddRGB(value float32) {
+	color.R += value
+	color.G += value
+	color.B += value
 }
 
 func (color Color) RGBA64() (float64, float64, float64, float64) {

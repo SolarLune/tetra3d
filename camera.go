@@ -38,7 +38,7 @@ type Camera struct {
 	fieldOfView float64
 
 	Position vector.Vector
-	Rotation AxisAngle
+	Rotation Matrix4
 
 	DebugInfo               DebugInfo
 	DebugDrawWireframe      bool
@@ -60,7 +60,7 @@ func NewCamera(w, h int) *Camera {
 		Far:               100,
 
 		Position:      UnitVector(0),
-		Rotation:      NewAxisAngle(vector.Vector{0, 1, 0}, 0),
+		Rotation:      NewMatrix4(),
 		FrustumSphere: NewBoundingSphere(nil, vector.Vector{0, 0, 0}, 0),
 	}
 
@@ -71,7 +71,7 @@ func NewCamera(w, h int) *Camera {
 
 			depthValue := imageSrc0At(position.xy / imageSrcTextureSize())
 
-			if depthValue.a == 0 || depthValue.r > color.r {
+			if depthValue.a == 0 || depthValue.r >= color.r {
 				return color
 			}
 
@@ -96,6 +96,7 @@ func NewCamera(w, h int) *Camera {
 		`package main
 
 		var Fog vec4
+		var FogRange [2]float
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
@@ -106,10 +107,14 @@ func NewCamera(w, h int) *Camera {
 			if depth.a > 0 {
 				color := imageSrc0At(texCoord)
 				
+				d := smoothstep(FogRange[0], FogRange[1], depth.r)
+
 				if Fog.a == 1 {
-					color.rgb += Fog.rgb * depth.r
+					color.rgb += Fog.rgb * d
 				} else if Fog.a == 2 {
-					color.rgb -= Fog.rgb * depth.r
+					color.rgb -= Fog.rgb * d
+				} else if Fog.a == 3 {
+					color.rgb = mix(color.rgb, Fog.rgb, d)
 				}
 
 				return color
@@ -133,37 +138,17 @@ func NewCamera(w, h int) *Camera {
 
 func (camera *Camera) ViewMatrix() Matrix4 {
 
-	transform := Translate(-camera.Position[0], -camera.Position[1], -camera.Position[2])
-	rotate := Rotate(camera.Rotation.Axis[0], camera.Rotation.Axis[1], camera.Rotation.Axis[2], camera.Rotation.Angle)
-	// We invert the Z portion of the rotation because the Camera is looking down -Z
-	transform = transform.Mult(rotate.Transposed())
+	transform := NewMatrix4Translate(-camera.Position[0], -camera.Position[1], -camera.Position[2])
+
+	// We invert the rotation because the Camera is looking down -Z
+	transform = transform.Mult(camera.Rotation.Transposed())
 
 	return transform
 
 }
 
-// Forward returns the forward direction that the camera is looking down.
-func (camera *Camera) Forward() vector.Vector {
-	// Internally, Forward is backwards because the camera looks down -Z, so we invert it.
-	forward := camera.ViewMatrix().Forward()
-	forward[2] *= -1
-	return forward
-}
-
-func (camera *Camera) Right() vector.Vector {
-	right := camera.ViewMatrix().Right()
-	right[2] *= -1
-	return right
-}
-
-func (camera *Camera) Up() vector.Vector {
-	up := camera.ViewMatrix().Up()
-	up[2] *= -1
-	return up
-}
-
 func (camera *Camera) Projection() Matrix4 {
-	return Perspective(camera.fieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy()))
+	return NewProjectionPerspective(camera.fieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy()))
 }
 
 // TODO: Implement some kind of LookAt functionality.
@@ -210,13 +195,13 @@ func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
 
 // WorldToScreen transforms a 3D position in the world to screen coordinates.
 func (camera *Camera) WorldToScreen(vert vector.Vector) vector.Vector {
-	v := Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
+	v := NewMatrix4Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 	return camera.ClipToScreen(v.MultVecW(vector.Vector{0, 0, 0}))
 }
 
 // WorldToClip transforms a 3D position in the world to clip coordinates (before screen normalization).
 func (camera *Camera) WorldToClip(vert vector.Vector) vector.Vector {
-	v := Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
+	v := NewMatrix4Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 	return v.MultVecW(vector.Vector{0, 0, 0})
 }
 
@@ -231,8 +216,8 @@ func (camera *Camera) Clear() {
 	camera.DebugInfo.DrawnTris = 0
 }
 
-// Render renders the models passed - note that models rendered one after another in multiple Render() calls will be rendered on top of each other.
-// Models need to be passed into the same Render() call to be sorted in depth.
+// Render renders all of the models present in the passed Scene. Note that scenes rendered one after another in multiple
+// Render() calls will be rendered on top of each other in the Camera's texture buffers.
 func (camera *Camera) Render(scene *Scene) {
 
 	if !camera.RenderDepth {
@@ -250,14 +235,15 @@ func (camera *Camera) Render(scene *Scene) {
 
 	// Update the camera's frustum sphere
 	dist := camera.Far - camera.Near
-	camera.FrustumSphere.LocalPosition = camera.Position.Add(camera.Forward().Scale(camera.Near + (dist / 2)))
+	forward := camera.Rotation.Forward().Invert()
+	camera.FrustumSphere.LocalPosition = camera.Position.Add(forward.Scale(camera.Near + (dist / 2)))
 	camera.FrustumSphere.LocalRadius = dist / 2
 
 	frametimeStart := time.Now()
 
 	for _, model := range scene.Models {
 
-		// Objects without Meshes are essentially nodes that just have a position. They aren't counted for rendering.
+		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
 		if model.Mesh == nil {
 			continue
 		}
@@ -340,37 +326,55 @@ func (camera *Camera) Render(scene *Scene) {
 
 			// Backface Culling
 
-			if model.BackfaceCulling {
+			// if model.BackfaceCulling {
 
-				// SHOUTOUTS TO MOD DB FOR POINTING ME IN THE RIGHT DIRECTION FOR THIS BECAUSE GOOD LORDT:
-				// https://moddb.fandom.com/wiki/Backface_culling#Polygons_in_object_space_are_transformed_into_world_space
+			// 	// SHOUTOUTS TO MOD DB FOR POINTING ME IN THE RIGHT DIRECTION FOR THIS BECAUSE GOOD LORDT:
+			// 	// https://moddb.fandom.com/wiki/Backface_culling#Polygons_in_object_space_are_transformed_into_world_space
 
-				// We use Vertex.transformed[:3] here because the fourth W component messes up normal calculation otherwise
-				normal := calculateNormal(tri.Vertices[0].transformed[:3], tri.Vertices[1].transformed[:3], tri.Vertices[2].transformed[:3])
+			// 	// We use Vertex.transformed[:3] here because the fourth W component messes up normal calculation otherwise
+			// 	normal := calculateNormal(tri.Vertices[0].transformed[:3], tri.Vertices[1].transformed[:3], tri.Vertices[2].transformed[:3])
 
-				dot := normal.Dot(tri.Vertices[0].transformed[:3])
+			// 	dot := normal.Dot(tri.Vertices[0].transformed[:3])
 
-				// A little extra to make sure we draw walls if you're peeking around them with a higher FOV
-				if dot < -0.1 {
-					continue
-				}
+			// 	// A little extra to make sure we draw walls if you're peeking around them with a higher FOV
+			// 	if dot < -0.1 {
+			// 		continue
+			// 	}
 
-			}
+			// }
 
 			p0 := camera.ClipToScreen(v0)
 			p1 := camera.ClipToScreen(v1)
 			p2 := camera.ClipToScreen(v2)
 
+			// This is a bit of a hacky way to do backface culling; it works, but it uses
+			// the screen positions of the vertices to determine if the triangle should be culled.
+			// In truth, it would be better to use the above approach, but that gives us visual
+			// errors when faces are behind the camera unless we clip triangles. I don't really
+			// feel like doing that right now, so here we are.
+
+			if model.BackfaceCulling {
+
+				n0 := p0[:3].Sub(p1[:3]).Unit()
+				n1 := p1[:3].Sub(p2[:3]).Unit()
+				nor, _ := n0.Cross(n1)
+
+				if nor[2] > 0 {
+					continue // Backface?
+				}
+
+			}
+
 			triList[vertexListIndex/3] = tri
 
-			vertexList[vertexListIndex].DstX = float32(int(p0[0]))
-			vertexList[vertexListIndex].DstY = float32(int(p0[1]))
+			vertexList[vertexListIndex].DstX = float32(math.Round(p0[0]))
+			vertexList[vertexListIndex].DstY = float32(math.Round(p0[1]))
 
-			vertexList[vertexListIndex+1].DstX = float32(int(p1[0]))
-			vertexList[vertexListIndex+1].DstY = float32(int(p1[1]))
+			vertexList[vertexListIndex+1].DstX = float32(math.Round(p1[0]))
+			vertexList[vertexListIndex+1].DstY = float32(math.Round(p1[1]))
 
-			vertexList[vertexListIndex+2].DstX = float32(int(p2[0]))
-			vertexList[vertexListIndex+2].DstY = float32(int(p2[1]))
+			vertexList[vertexListIndex+2].DstX = float32(math.Round(p2[0]))
+			vertexList[vertexListIndex+2].DstY = float32(math.Round(p2[1]))
 
 			vertexListIndex += 3
 
@@ -454,7 +458,7 @@ func (camera *Camera) Render(scene *Scene) {
 		}
 
 		t := &ebiten.DrawTrianglesOptions{}
-		t.ColorM.Scale(model.Color.RGBA64())
+		t.ColorM.Scale(model.Color.RGBA64()) // Mix in the Model's color
 		t.Filter = model.Mesh.FilterMode
 
 		if camera.RenderDepth {
@@ -469,7 +473,8 @@ func (camera *Camera) Render(scene *Scene) {
 			opt.Images[1] = camera.DepthIntermediate
 
 			opt.Uniforms = map[string]interface{}{
-				"Fog": scene.fogAsFloatSlice(),
+				"Fog":      scene.fogAsFloatSlice(),
+				"FogRange": scene.FogRange,
 			}
 
 			camera.ColorTexture.DrawRectShader(w, h, camera.ColorShader, opt)

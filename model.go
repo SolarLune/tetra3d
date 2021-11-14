@@ -12,16 +12,16 @@ import (
 type Model struct {
 	Name                string
 	Mesh                *Mesh
-	FrustumCulling      bool // Whether the model is culled when it leaves the frustum.
-	BackfaceCulling     bool // Whether the model's backfaces are culled.
+	FrustumCulling      bool // Whether the Model is culled when it leaves the frustum.
+	BackfaceCulling     bool // Whether the Model's backfaces are culled.
 	Position            vector.Vector
 	Scale               vector.Vector
-	Rotation            AxisAngle
+	Rotation            Matrix4
 	closestTris         []*Triangle
-	Visible             bool
-	Color               Color
+	Visible             bool  // Whether the Model is rendered or not.
+	Color               Color // The overall color of the Model.
 	BoundingSphere      *BoundingSphere
-	SortTrisBackToFront bool
+	SortTrisBackToFront bool // Whether the Model's triangles are sorted back-to-front or not.
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided.
@@ -31,7 +31,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 		Name:                name,
 		Mesh:                mesh,
 		Position:            UnitVector(0),
-		Rotation:            NewAxisAngle(vector.Vector{0, 1, 0}, 0),
+		Rotation:            NewMatrix4(),
 		Scale:               UnitVector(1),
 		Visible:             true,
 		FrustumCulling:      true,
@@ -54,9 +54,9 @@ func (model *Model) Transform() Matrix4 {
 
 	// T * R * S * O
 
-	transform := Scale(model.Scale[0], model.Scale[1], model.Scale[2])
-	transform = transform.Mult(Rotate(model.Rotation.Axis[0], model.Rotation.Axis[1], model.Rotation.Axis[2], model.Rotation.Angle))
-	transform = transform.Mult(Translate(model.Position[0], model.Position[1], model.Position[2]))
+	transform := NewMatrix4Scale(model.Scale[0], model.Scale[1], model.Scale[2])
+	transform = transform.Mult(model.Rotation)
+	transform = transform.Mult(NewMatrix4Translate(model.Position[0], model.Position[1], model.Position[2]))
 	return transform
 
 }

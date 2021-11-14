@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
+	"image/png"
+	"math"
 	"os"
 	"runtime/pprof"
 	"strings"
@@ -24,7 +26,9 @@ type Game struct {
 	// Models         []*tetra3d.Model
 	Scene *tetra3d.Scene
 
-	Camera *tetra3d.Camera
+	Camera       *tetra3d.Camera
+	CameraTilt   float64
+	CameraRotate float64
 
 	Time              float64
 	DrawDebugText     bool
@@ -35,8 +39,8 @@ type Game struct {
 func NewGame() *Game {
 
 	game := &Game{
-		Width:             320,
-		Height:            180,
+		Width:             398,
+		Height:            224,
 		PrevMousePosition: vector.Vector{},
 	}
 
@@ -53,13 +57,10 @@ func (g *Game) Init() {
 
 	for _, m := range g.Scene.Meshes {
 		if strings.HasSuffix(m.MaterialName, ".png") {
+			// Put images on meshes that have material names that end with ".png"
 			m.Image, _, _ = ebitenutil.NewImageFromFile(m.MaterialName)
 		}
 	}
-
-	// fmt.Println(g.Scene.Meshes["Crates"])
-
-	// g.Scene.Meshes
 
 	// vvvvv Stress Test vvvvv
 
@@ -76,41 +77,16 @@ func (g *Game) Init() {
 	// 	}
 	// }
 
-	// mesh := dae.Meshes["Suzanne"]
-	// mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
-	// model := tetra3d.NewModel(mesh, "Suzanne")
-	// g.Models = append(g.Models, model)
-
-	// mesh = dae.Meshes["Crates"]
-	// mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
-	// mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
-	// model = tetra3d.NewModel(mesh, "Suzanne")
-	// model.Position[0] += 4
-	// g.Models = append(g.Models, model)
-
-	// mesh = dae.Meshes["Sphere"]
-	// mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
-	// model = tetra3d.NewModel(mesh, "Suzanne")
-	// model.Position[0] += 8
-	// g.Models = append(g.Models, model)
-
-	// mesh = dae.Meshes["Hallway"]
-	// mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
-	// mesh.Image, _, _ = ebitenutil.NewImageFromFile("outdoorstuff.png")
-	// model = tetra3d.NewModel(mesh, "Suzanne")
-	// model.Position[0] += 12
-	// g.Models = append(g.Models, model)
-
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	// g.Camera.Position[0] = 5
 	g.Camera.Position[2] = 20
-	// g.Camera.Far = 60
-	// g.Camera.Rotation.Axis = vector.Vector{1, 0, 0}
-	// g.Camera.Rotation.Angle = -math.Pi / 4
+	g.Camera.Far = 20
 	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
 	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+
+	g.Scene.FogRange[0] = 0.1
+	g.Scene.FogRange[1] = 1
 
 }
 
@@ -118,7 +94,7 @@ func (g *Game) Update() error {
 
 	var err error
 
-	moveSpd := 0.2
+	moveSpd := 0.1
 
 	g.Time += 1.0 / 60
 
@@ -126,48 +102,47 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	// Movement is global; you could use Camera.Forward(), Camera.Right(), and Camera.Up() for local axis movement.
+	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
+	forward := g.Camera.Rotation.Forward().Invert()
+	right := g.Camera.Rotation.Right()
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.Camera.Position = g.Camera.Position.Add(g.Camera.Forward().Scale(moveSpd))
+		g.Camera.Position = g.Camera.Position.Add(forward.Scale(moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.Camera.Position = g.Camera.Position.Add(g.Camera.Right().Scale(moveSpd))
+		g.Camera.Position = g.Camera.Position.Add(right.Scale(moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.Camera.Position = g.Camera.Position.Add(g.Camera.Forward().Scale(-moveSpd))
+		g.Camera.Position = g.Camera.Position.Add(forward.Scale(-moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.Camera.Position = g.Camera.Position.Add(g.Camera.Right().Scale(-moveSpd))
+		g.Camera.Position = g.Camera.Position.Add(right.Scale(-moveSpd))
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyE) {
-		g.Camera.Rotation.Angle -= 0.025
-	}
+	// Rotate and tilt the camera according to mouse movements
+	mx, my := ebiten.CursorPosition()
 
-	if ebiten.IsKeyPressed(ebiten.KeyQ) {
-		g.Camera.Rotation.Angle += 0.025
-	}
+	mv := vector.Vector{float64(mx), float64(my)}
 
-	// mx, my := ebiten.CursorPosition()
+	diff := mv.Sub(g.PrevMousePosition)
 
-	// mv := vector.Vector{float64(mx), float64(my)}
+	g.CameraTilt -= diff[1] * 0.01
+	g.CameraRotate -= diff[0] * 0.01
 
-	// diff := mv.Sub(g.PrevMousePosition)
+	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
 
-	// g.CameraRot.Angle -= diff[0] * 0.01
+	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
+	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
 
-	// g.CameraTilt.Axis = g.Camera.Right()
-	// g.CameraTilt.Angle -= diff[1] * 0.01
+	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
+	g.Camera.Rotation = tilt.Mult(rotate)
 
-	// g.Camera.Rotation = g.CameraTilt.Add(g.CameraTilt)
-
-	// g.PrevMousePosition = mv.Clone()
+	g.PrevMousePosition = mv.Clone()
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
 		g.Camera.Position[1] += moveSpd
@@ -177,11 +152,25 @@ func (g *Game) Update() error {
 	}
 
 	if ebiten.IsKeyPressed(ebiten.Key1) {
-		g.Scene.SetFog(1, 0, 0, tetra3d.FogAdd)
+		g.Scene.FogColor.SetRGB(1, 0, 0)
+		g.Scene.FogMode = tetra3d.FogAdd
 	} else if ebiten.IsKeyPressed(ebiten.Key2) {
-		g.Scene.SetFog(0, 0, 0, tetra3d.FogMultiply)
+		g.Scene.FogColor.SetRGB(0, 0, 0)
+		g.Scene.FogMode = tetra3d.FogMultiply
 	} else if ebiten.IsKeyPressed(ebiten.Key3) {
-		g.Scene.SetFog(0, 0, 0, tetra3d.FogOff)
+		g.Scene.FogColor.SetRGB(0, 0, 0)
+		g.Scene.FogMode = tetra3d.FogOverwrite
+	} else if ebiten.IsKeyPressed(ebiten.Key4) {
+		g.Scene.FogMode = tetra3d.FogOff
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
+		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer f.Close()
+		png.Encode(f, g.Camera.ColorTexture)
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyZ) {
@@ -227,10 +216,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.Camera.Render(g.Scene)
 
+	opt := &ebiten.DrawImageOptions{}
+	w, h := g.Camera.ColorTexture.Size()
+	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
+	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture, nil)
+		screen.DrawImage(g.Camera.DepthTexture, opt)
 	} else {
-		screen.DrawImage(g.Camera.ColorTexture, nil)
+		screen.DrawImage(g.Camera.ColorTexture, opt)
 	}
 
 	if g.DrawDebugText {

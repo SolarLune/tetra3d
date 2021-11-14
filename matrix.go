@@ -1,7 +1,6 @@
 package tetra3d
 
 import (
-	"fmt"
 	"math"
 	"strconv"
 
@@ -22,7 +21,7 @@ func NewMatrix4() Matrix4 {
 
 }
 
-func Translate(x, y, z float64) Matrix4 {
+func NewMatrix4Translate(x, y, z float64) Matrix4 {
 	mat := NewMatrix4()
 	mat[3][0] = x
 	mat[3][1] = y
@@ -30,7 +29,7 @@ func Translate(x, y, z float64) Matrix4 {
 	return mat
 }
 
-func Scale(x, y, z float64) Matrix4 {
+func NewMatrix4Scale(x, y, z float64) Matrix4 {
 	mat := NewMatrix4()
 	mat[0][0] = x
 	mat[1][1] = y
@@ -38,7 +37,7 @@ func Scale(x, y, z float64) Matrix4 {
 	return mat
 }
 
-func Rotate(x, y, z float64, angle float64) Matrix4 {
+func NewMatrix4Rotate(x, y, z float64, angle float64) Matrix4 {
 
 	mat := NewMatrix4()
 	vector := vector.Vector{x, y, z}.Unit()
@@ -62,6 +61,7 @@ func Rotate(x, y, z float64, angle float64) Matrix4 {
 
 }
 
+// Right returns the right-facing rotational component of the Matrix4. For an identity matrix, this would be [1, 0, 0], or +X.
 func (matrix Matrix4) Right() vector.Vector {
 	return vector.Vector{
 		matrix[0][0],
@@ -70,6 +70,7 @@ func (matrix Matrix4) Right() vector.Vector {
 	}.Unit()
 }
 
+// Up returns the upward rotational component of the Matrix4. For an identity matrix, this would be [0, 1, 0], or +Y.
 func (matrix Matrix4) Up() vector.Vector {
 	return vector.Vector{
 		matrix[1][0],
@@ -78,6 +79,7 @@ func (matrix Matrix4) Up() vector.Vector {
 	}.Unit()
 }
 
+// Forward returns the forward rotational component of the Matrix4. For an identity matrix, this would be [0, 0, 1], or +Z (towards camera).
 func (matrix Matrix4) Forward() vector.Vector {
 	return vector.Vector{
 		matrix[2][0],
@@ -89,40 +91,43 @@ func (matrix Matrix4) Forward() vector.Vector {
 // Decompose decomposes the Matrix4 and returns three components - the position (a 3D vector.Vector), scale (another 3D vector.Vector), and rotation (an AxisAngle)
 // indicated by the Matrix4. Note that this is mainly used when loading a mesh from a 3D modeler - this being the case, it may not be the most precise, and negative
 // scales are not supported.
-func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, AxisAngle) {
+func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, Matrix4) {
 
 	position := vector.Vector{matrix[3][0], matrix[3][1], matrix[3][2]}
 
-	angle := math.Acos((matrix[0][0] + matrix[1][1] + matrix[2][2] - 1) / 2)
+	// angle := math.Acos((matrix[0][0] + matrix[1][1] + matrix[2][2] - 1) / 2)
 
-	if math.IsNaN(angle) {
-		angle = 0.0
-	}
+	// if math.IsNaN(angle) {
+	// 	angle = 0.0
+	// }
 
-	s := math.Sqrt(math.Pow(matrix[2][1]-matrix[1][2], 2) + math.Pow(matrix[0][2]-matrix[2][0], 2) + math.Pow(matrix[1][0]-matrix[0][1], 2))
+	// s := math.Sqrt(math.Pow(matrix[2][1]-matrix[1][2], 2) + math.Pow(matrix[0][2]-matrix[2][0], 2) + math.Pow(matrix[1][0]-matrix[0][1], 2))
 
-	if math.Abs(s) <= 0.0001 {
-		s = 1
-	}
+	// if math.Abs(s) <= 0.0001 {
+	// 	s = 1
+	// }
 
-	axis := vector.Vector{
-		(matrix[1][2] - matrix[2][1]) / s,
-		(matrix[2][0] - matrix[0][2]) / s,
-		(matrix[0][1] - matrix[1][0]) / s,
-	}.Unit()
+	// axis := vector.Vector{
+	// 	(matrix[1][2] - matrix[2][1]) / s,
+	// 	(matrix[2][0] - matrix[0][2]) / s,
+	// 	(matrix[0][1] - matrix[1][0]) / s,
+	// }.Unit()
 
-	// Default to rotating horizontally
-	if axis.Magnitude() == 0 {
-		axis[1] = 1
-	}
+	// // Default to rotating horizontally
+	// if axis.Magnitude() == 0 {
+	// 	axis[1] = 1
+	// }
 
-	in := Rotate(axis[0], axis[1], axis[2], angle).Mult(matrix)
+	rotation := NewMatrix4()
+	rotation.SetRow(0, matrix.Row(0).Unit())
+	rotation.SetRow(1, matrix.Row(1).Unit())
+	rotation.SetRow(2, matrix.Row(2).Unit())
+
+	in := matrix.Mult(rotation.Transposed())
 
 	scale := vector.Vector{in.Row(0).Magnitude(), in.Row(1).Magnitude(), in.Row(2).Magnitude()}
 
-	fmt.Println("in:", in)
-
-	return position, scale, NewAxisAngle(axis, angle)
+	return position, scale, rotation
 
 }
 
@@ -160,13 +165,15 @@ func (matrix Matrix4) Column(columnIndex int) vector.Vector {
 	return vec
 }
 
-func (matrix Matrix4) SetRow(rowIndex int, rowData vector.Vector) Matrix4 {
+// SetRow returns a clone of the Matrix4 with the row in rowIndex set to the 4D vector passed.
+func (matrix Matrix4) SetRow(rowIndex int, vec vector.Vector) Matrix4 {
 	for i := range matrix[rowIndex] {
-		matrix[rowIndex][i] = rowData[i]
+		matrix[rowIndex][i] = vec[i]
 	}
 	return matrix
 }
 
+// SetColumn returns a clone of the Matrix4 with the column in columnIndex set to the 4D vector passed.
 func (matrix Matrix4) SetColumn(columnIndex int, columnData vector.Vector) Matrix4 {
 	for i := range matrix {
 		matrix[i][columnIndex] = columnData[i]
@@ -174,9 +181,16 @@ func (matrix Matrix4) SetColumn(columnIndex int, columnData vector.Vector) Matri
 	return matrix
 }
 
-// Perspective generates a perspective frustum Matrix4. fovy is the vertical field of view in degrees, near and far are the near and far clipping plane,
+// Rotated returns a clone of the Matrix4 rotated along the axis by the angle given (in radians). This rotation works as though
+// you pierced the object utilizing the matrix through by the axis, and then rotated it counter-clockwise by the angle
+// in radians.
+func (matrix Matrix4) Rotated(x, y, z, angle float64) Matrix4 {
+	return NewMatrix4Rotate(x, y, z, angle).Mult(matrix)
+}
+
+// NewProjectionPerspective generates a perspective frustum Matrix4. fovy is the vertical field of view in degrees, near and far are the near and far clipping plane,
 // while viewWidth and viewHeight is the width and height of the backing texture / camera.
-func Perspective(fovy, near, far, viewWidth, viewHeight float64) Matrix4 {
+func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float64) Matrix4 {
 
 	aspect := viewWidth / viewHeight
 
@@ -199,81 +213,7 @@ func Perspective(fovy, near, far, viewWidth, viewHeight float64) Matrix4 {
 
 }
 
-// vvv WORKING, but not using fovy
-
-// func Perspective(fovy, near, far, viewWidth, viewHeight float64) Matrix4 {
-
-// 	l := -viewWidth / 2
-// 	r := viewWidth / 2
-// 	t := -viewHeight / 2
-// 	b := viewHeight / 2
-
-// 	return Matrix4{
-// 		{2 * near / (r - l), 0, (r + l) / (r - l), 0},
-// 		{0, (2 * near) / (t - b), (t + b) / (t - b), 0},
-// 		{0, 0, (-far - near) / (far - near), (-2 * near) / (far - near)},
-// 		{0, 0, -1, 0},
-// 	}
-
-// }
-
-// func Perspective(fovy, near, far, viewWidth, viewHeight float64) Matrix4 {
-// 	tan := math.Tan(fovy / 2)
-
-// 	return Matrix4{
-// 		{1.0 / (viewWidth / viewHeight * tan), 0, 0, 0},
-// 		{0, 1.0 / tan, 0, 0},
-// 		{0, 0, -((far + near) / (far - near)), -((2 * far * near) / (far - near))},
-// 		{0, 0, -1, 0},
-// 	}
-// }
-
-// Cribbed from https://github.com/fogleman/fauxgl vvvvvv
-
-// func frustum(l, r, b, t, n, f float64) Matrix4 {
-// 	t1 := 2 * n
-// 	t2 := r - l
-// 	t3 := t - b
-// 	t4 := f - n
-// 	return Matrix4{
-// 		// {t1 / t2, 0, (r + l) / t2, 0},
-// 		// {0, t1 / t3, (t + b) / t3, 0},
-// 		// {0, 0, (-f - n) / t4, (-t1 * f) / t4},
-// 		// {0, 0, -1, 0},
-
-// 		{t1 / t2, 0, (r + l) / t2, 0},
-// 		{0, t1 / t3, (t + b) / t3, 0},
-// 		{0, 0, (-f - n) / t4, (-t1 * f) / t4},
-// 		{0, 0, -1, 0},
-// 	}
-// }
-
-// func (camera *Camera) SetOrthographicView() {
-
-// 	w, h := camera.ColorTexture.Size()
-
-// 	width := float64(w)
-// 	height := float64(h)
-
-// 	l, t := -width/2, -height/2
-// 	r, b := width/2, height/2
-// 	n, f := camera.Near, camera.Far
-
-// 	camera.Projection = Matrix4{
-// 		{2 / (r - l), 0, 0, -(r + l) / (r - l)},
-// 		{0, 2 / (t - b), 0, -(t + b) / (t - b)},
-// 		{0, 0, -2 / (f - n), -(f + n) / (f - n)},
-// 		{0, 0, 0, 1}}
-// }
-
-//Cribbed from https://github.com/fogleman/fauxgl ^^^^^^^
-
-func (matrix Matrix4) Rotate(v vector.Vector, angle float64) Matrix4 {
-	mat := matrix.Clone()
-	mat.MultVec(v)
-	return mat
-}
-
+// Clone clones the Matrix4, returning a new copy.
 func (matrix Matrix4) Clone() Matrix4 {
 	newMat := NewMatrix4()
 	for y := 0; y < len(matrix); y++ {
@@ -284,6 +224,7 @@ func (matrix Matrix4) Clone() Matrix4 {
 	return newMat
 }
 
+// MultVec multiplies the vector provided by the Matrix4, giving a vector that has been rotated, scaled, or translated as desired.
 func (matrix Matrix4) MultVec(vect vector.Vector) vector.Vector {
 
 	return vector.Vector{
@@ -298,6 +239,7 @@ func (matrix Matrix4) MultVec(vect vector.Vector) vector.Vector {
 
 }
 
+// MultVecW multiplies the vector provided by the Matrix4, including the fourth (W) component, giving a vector that has been rotated, scaled, or translated as desired.
 func (matrix Matrix4) MultVecW(vect vector.Vector) vector.Vector {
 
 	return vector.Vector{
@@ -309,6 +251,7 @@ func (matrix Matrix4) MultVecW(vect vector.Vector) vector.Vector {
 
 }
 
+// Mult multiplies a Matrix4 by another provided Matrix4 - this effectively combines them.
 func (matrix Matrix4) Mult(other Matrix4) Matrix4 {
 
 	newMat := NewMatrix4()
@@ -337,6 +280,7 @@ func (matrix Matrix4) Mult(other Matrix4) Matrix4 {
 
 }
 
+// Columns returns the Matrix4 as a slice of []float64, in column-major order (so it's transposed from the row-major default).
 func (matrix Matrix4) Columns() [][]float64 {
 
 	columns := [][]float64{
@@ -355,32 +299,6 @@ func (matrix Matrix4) Columns() [][]float64 {
 	return columns
 }
 
-// func (matrix Matrix4) RowSums() []float64 {
-// 	rowSums := []float64{}
-// 	for _, row := range matrix {
-// 		s := 0.0
-// 		for _, c := range row {
-// 			s += c
-// 		}
-// 		rowSums = append(rowSums, s)
-// 	}
-// 	return rowSums
-// }
-
-// func (matrix Matrix4) ColumnSums() []float64 {
-
-// 	columnSums := []float64{}
-// 	for x := 0; x < 4; x++ {
-// 		s := 0.0
-// 		for rowIndex := range matrix {
-// 			s += matrix[x][rowIndex]
-// 		}
-// 		columnSums = append(columnSums, s)
-// 	}
-// 	return columnSums
-
-// }
-
 func (matrix Matrix4) String() string {
 	s := "{"
 	for i, y := range matrix {
@@ -395,30 +313,17 @@ func (matrix Matrix4) String() string {
 	return s
 }
 
-func LookAt(eye, center, up vector.Vector) Matrix4 {
-	z := eye.Sub(center).Unit()
+// NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. target is the target's world position,
+// center is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
+func NewLookAtMatrix(target, center, up vector.Vector) Matrix4 {
+	z := target.Sub(center).Unit()
 	x, _ := up.Cross(z)
 	x = x.Unit()
 	y, _ := z.Cross(x)
 	return Matrix4{
-		{x[0], x[1], x[2], -x.Dot(eye)},
-		{y[0], y[1], y[2], -y.Dot(eye)},
-		{z[0], z[1], z[2], -z.Dot(eye)},
+		{x[0], x[1], x[2], -x.Dot(target)},
+		{y[0], y[1], y[2], -y.Dot(target)},
+		{z[0], z[1], z[2], -z.Dot(target)},
 		{0, 0, 0, 1},
 	}
 }
-
-// func LookAt(target, center, up vector.Vector) Matrix4 {
-// 	z := target.Sub(center).Unit()
-// 	x, _ := up.Cross(z)
-// 	x = x.Unit()
-// 	y, _ := z.Cross(x)
-
-// 	return Matrix4{
-// 		{x[0], x[1], x[2], -x.Dot(center)},
-// 		{y[0], y[1], y[2], -y.Dot(center)},
-// 		{z[0], z[1], z[2], -z.Dot(center)},
-// 		{0, 0, 0, 1},
-// 	}
-
-// }

@@ -177,7 +177,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 
 	scene := NewScene(daeScene.LibraryScene.Name)
 
-	toYUp := Rotate(1, 0, 0, math.Pi/2)
+	toYUp := NewMatrix4Rotate(1, 0, 0, math.Pi/2)
 
 	daeURLsToMeshes := map[string]*Mesh{}
 	daeURLsToMaterialNames := map[string]string{}
@@ -300,7 +300,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 		}
 
 		if options.CorrectYUp {
-			mesh.ApplyMatrix(Rotate(1, 0, 0, -math.Pi/2))
+			mesh.ApplyMatrix(NewMatrix4Rotate(1, 0, 0, -math.Pi/2))
 		}
 
 		mesh.MaterialName = daeURLsToMaterialNames[geo.Triangles.MaterialName]
