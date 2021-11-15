@@ -24,15 +24,15 @@ type Model struct {
 	SortTrisBackToFront bool // Whether the Model's triangles are sorted back-to-front or not.
 }
 
-// NewModel creates a new Model (or instance) of the Mesh and Name provided.
+// NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
 func NewModel(mesh *Mesh, name string) *Model {
 
 	model := &Model{
 		Name:                name,
 		Mesh:                mesh,
-		Position:            UnitVector(0),
+		Position:            vector.Vector{0, 0, 0},
 		Rotation:            NewMatrix4(),
-		Scale:               UnitVector(1),
+		Scale:               vector.Vector{1, 1, 1},
 		Visible:             true,
 		FrustumCulling:      true,
 		BackfaceCulling:     true,
@@ -44,12 +44,13 @@ func NewModel(mesh *Mesh, name string) *Model {
 	if mesh != nil {
 		dimensions = mesh.Dimensions.Max()
 	}
-	model.BoundingSphere = NewBoundingSphere(model, UnitVector(0), dimensions)
+	model.BoundingSphere = NewBoundingSphere(model, vector.Vector{0, 0, 0}, dimensions)
 
 	return model
 
 }
 
+// Transform returns a Matrix4 indicating the position, rotation, and scale of the Model.
 func (model *Model) Transform() Matrix4 {
 
 	// T * R * S * O

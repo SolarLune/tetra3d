@@ -2,7 +2,7 @@ package tetra3d
 
 import "github.com/kvartborg/vector"
 
-// The goal of fastmath.go is to provide vector operations that don't clone the vector to use. Be careful with it!
+// The goal of fastmath.go is to provide vector operations that don't clone the vector to use. Be careful with it, me!
 
 var standin = vector.Vector{0, 0, 0}
 

@@ -1,11 +1,12 @@
 package tetra3d
 
+// tetra3d is a 3D software renderer written for video games by usage of Ebiten. It's kinda jank, but it's pretty fun. Check it out!
+
 import (
 	"image/color"
 
 	"github.com/golang/freetype/truetype"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/gomono"
 )
@@ -39,8 +40,4 @@ func init() {
 
 	debugFontFace = truetype.NewFace(tt, &truetype.Options{Size: 16, DPI: 72, Hinting: font.HintingFull})
 
-}
-
-func UnitVector(value float64) vector.Vector {
-	return vector.Vector{value, value, value}
 }

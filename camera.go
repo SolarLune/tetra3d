@@ -49,6 +49,7 @@ type Camera struct {
 	FrustumSphere *BoundingSphere
 }
 
+// NewCamera creates a new Camera with the specified width and height.
 func NewCamera(w, h int) *Camera {
 
 	cam := &Camera{
@@ -60,7 +61,7 @@ func NewCamera(w, h int) *Camera {
 		Near:              0.1,
 		Far:               100,
 
-		Position:      UnitVector(0),
+		Position:      vector.Vector{0, 0, 0},
 		Rotation:      NewMatrix4(),
 		FrustumSphere: NewBoundingSphere(nil, vector.Vector{0, 0, 0}, 0),
 	}
@@ -137,6 +138,7 @@ func NewCamera(w, h int) *Camera {
 	return cam
 }
 
+// ViewMatrix returns the Camera's view matrix.
 func (camera *Camera) ViewMatrix() Matrix4 {
 
 	transform := NewMatrix4Translate(-camera.Position[0], -camera.Position[1], -camera.Position[2])
@@ -148,16 +150,15 @@ func (camera *Camera) ViewMatrix() Matrix4 {
 
 }
 
+// Projection returns the Camera's projection matrix.
 func (camera *Camera) Projection() Matrix4 {
 	return NewProjectionPerspective(camera.fieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy()))
 }
 
-// TODO: Implement some kind of LookAt functionality.
-// func (camera *Camera) LookAt(target, up vector.Vector) { }
-
 // TODO: Implement orthographic perspective.
 // func (camera *Camera) SetOrthographic() { }
 
+// SetPerspective sets the Camera's projection to be a perspective projection. fovY indicates the vertical field of view (in degrees) for the camera's aperture.
 func (camera *Camera) SetPerspective(fovY float64) {
 	camera.fieldOfView = fovY
 	camera.Perspective = true
@@ -204,10 +205,12 @@ func (camera *Camera) WorldToClip(vert vector.Vector) vector.Vector {
 	return v.MultVecW(vector.Vector{0, 0, 0})
 }
 
-// Clear is called at the beginning of a single rendered frame; it clears the backing textures before rendering.
+// Clear should be called at the beginning of a single rendered frame. It clears the backing textures before rendering.
 func (camera *Camera) Clear() {
+
 	camera.ColorTexture.Clear()
 	camera.DepthTexture.Clear()
+
 	if camera.DebugInfo.tickTime.IsZero() || time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 		camera.DebugInfo.tickTime = time.Now()
 		camera.DebugInfo.AvgFrameTime = camera.DebugInfo.frameTime
@@ -217,6 +220,7 @@ func (camera *Camera) Clear() {
 	camera.DebugInfo.TotalObjects = 0
 	camera.DebugInfo.TotalTris = 0
 	camera.DebugInfo.DrawnTris = 0
+
 }
 
 // Render renders all of the models present in the passed Scene. Note that scenes rendered one after another in multiple
@@ -557,6 +561,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 }
 
+// DrawDebugText draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
+// at the top-left of the provided screen *ebiten.Image.
 func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 	dr := &ebiten.DrawImageOptions{}
 	dr.GeoM.Translate(0, textScale*16)

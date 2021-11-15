@@ -188,7 +188,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Offscreen.DrawImage(g.Camera.ColorTexture, nil)
 
 	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
-	// g.Camera.Render(g.Scene, g.Scene.FilterModels(func(model *tetra3d.Model) bool { return strings.Contains(model.Name, "Screen") })...)
+	g.Camera.Render(g.Scene, g.Scene.FilterModels(func(model *tetra3d.Model) bool { return strings.Contains(model.Name, "Screen") })...)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.

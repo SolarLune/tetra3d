@@ -1,14 +1,15 @@
 package tetra3d
 
 const (
-	FogOff = iota
-	FogAdd
-	FogMultiply
-	FogOverwrite
+	FogOff       = iota // No fog
+	FogAdd              // Additive blended fog
+	FogMultiply         // Multiplicative blended fog
+	FogOverwrite        // Color overwriting fog (mixing base with fog color over depth distance)
 )
 
 type FogMode int
 
+// Scene represents a world of sorts, and can contain a variety of Models and Meshes.
 type Scene struct {
 	Name     string
 	Models   []*Model
@@ -21,6 +22,7 @@ type Scene struct {
 	FogRange []float32
 }
 
+// NewScene creates a new Scene by the name given.
 func NewScene(name string) *Scene {
 	scene := &Scene{
 		Name:     name,
@@ -33,6 +35,7 @@ func NewScene(name string) *Scene {
 	return scene
 }
 
+// Clone clones the Scene, returning a copy. Models and Meshes are shared between them.
 func (scene *Scene) Clone() *Scene {
 
 	newScene := NewScene(scene.Name)
@@ -51,10 +54,12 @@ func (scene *Scene) Clone() *Scene {
 
 }
 
+// AddModels adds the specified models to the Scene's models list.
 func (scene *Scene) AddModels(models ...*Model) {
 	scene.Models = append(scene.Models, models...)
 }
 
+// RemoveModels removes the specified models from the Scene's models list.
 func (scene *Scene) RemoveModels(models ...*Model) {
 
 	for _, model := range models {

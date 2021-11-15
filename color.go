@@ -1,9 +1,11 @@
 package tetra3d
 
+// A Color represents a color, containing R, G, B, and A components, each expected to range from 0 to 1.
 type Color struct {
 	R, G, B, A float32
 }
 
+// NewColor returns a new Color.
 func NewColor(r, g, b, a float32) Color {
 	return Color{r, g, b, a}
 }

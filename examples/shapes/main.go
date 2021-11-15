@@ -13,12 +13,15 @@ import (
 
 	_ "image/png"
 
+	"github.com/golang/freetype/truetype"
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
+	"golang.org/x/image/font"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 type Game struct {
@@ -33,6 +36,8 @@ type Game struct {
 	DrawDebugText     bool
 	DrawDebugDepth    bool
 	PrevMousePosition vector.Vector
+
+	Font font.Face
 }
 
 func NewGame() *Game {
@@ -41,7 +46,20 @@ func NewGame() *Game {
 		Width:             398,
 		Height:            224,
 		PrevMousePosition: vector.Vector{},
+		DrawDebugText:     true,
 	}
+
+	fontData, err := os.ReadFile("excel.ttf")
+	if err != nil {
+		panic(err)
+	}
+
+	tt, err := truetype.Parse(fontData)
+	if err != nil {
+		panic(err)
+	}
+
+	game.Font = truetype.NewFace(tt, &truetype.Options{Size: 12, DPI: 72})
 
 	game.Init()
 
@@ -87,7 +105,7 @@ func (g *Game) Init() {
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Position[2] = 5
-	g.Camera.Far = 40
+	g.Camera.Far = 20
 	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
 	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
 
@@ -99,7 +117,7 @@ func (g *Game) Update() error {
 
 	var err error
 
-	moveSpd := 0.05
+	moveSpd := 0.1
 
 	g.Time += 1.0 / 60
 
@@ -156,6 +174,7 @@ func (g *Game) Update() error {
 		g.Camera.Position[1] -= moveSpd
 	}
 
+	// Fog controls
 	if ebiten.IsKeyPressed(ebiten.Key1) {
 		g.Scene.FogColor.SetRGB(1, 0, 0)
 		g.Scene.FogMode = tetra3d.FogAdd
@@ -209,7 +228,8 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Clear, but with a color
-	screen.Fill(color.RGBA{20, 25, 30, 255})
+	// screen.Fill(color.RGBA{20, 25, 30, 255})
+	screen.Fill(color.Black)
 
 	g.Camera.Clear()
 
@@ -228,6 +248,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1, 2, 3, 4: Change fog\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, g.Font, 248, 128, color.RGBA{255, 0, 0, 255})
 	}
 
 }

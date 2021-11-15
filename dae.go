@@ -122,17 +122,19 @@ func parseDAESourceName(sourceName string) string {
 
 }
 
+// DaeLoadOptions represents options one can use to tweak how .dae files are loaded into Tetra3D.
 type DaeLoadOptions struct {
-	CorrectYUp bool
+	CorrectYUp bool // Whether to correct Z being up for Blender importing.
 }
 
+// DefaultDaeLoadOptions returns a default instance of DaeLoadOptions.
 func DefaultDaeLoadOptions() *DaeLoadOptions {
 	return &DaeLoadOptions{
 		CorrectYUp: true,
 	}
 }
 
-// LoadDAEFile takes a filepath to a .dae model file, and returns a *Scene contained in the .dae file.
+// LoadDAEFile takes a filepath to a .dae model file, and returns a *Scene populated with the .dae file's objects and meshes.
 // If the call couldn't complete for any reason, like due to a malformed DAE file, it will return an error.
 // Note that this calls os.ReadFile(), and so requires Go v1.16 or above.
 func LoadDAEFile(path string, options *DaeLoadOptions) (*Scene, error) {
@@ -145,7 +147,7 @@ func LoadDAEFile(path string, options *DaeLoadOptions) (*Scene, error) {
 
 }
 
-// LoadDAEData takes a []byte consisting of the contents of a DAE file, and returns a *Scene contained in the .dae file.
+// LoadDAEData takes a []byte consisting of the contents of a DAE file, and returns a *Scene populated with the .dae file's objects and meshes.
 // If the call couldn't complete for any reason, like due to a malformed DAE file, it will return an error.
 func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 

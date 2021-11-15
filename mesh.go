@@ -36,11 +36,13 @@ type Mesh struct {
 	sortedVertices []*Vertex
 	Triangles      []*Triangle
 	Image          *ebiten.Image // What Image to use when rendering the triangles that define this Mesh
-	MaterialName   string        // The name of any material assigned to the Mesh from the 3D modeler
+	MaterialName   string        // The name of any material assigned to the Mesh from the 3D modeling program
 	FilterMode     ebiten.Filter
 	Dimensions     Dimensions
 }
 
+// NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. You must provide a number of *Vertex instances divisible by 3,
+// or NewMesh will panic.
 func NewMesh(name string, verts ...*Vertex) *Mesh {
 
 	mesh := &Mesh{
@@ -62,6 +64,7 @@ func NewMesh(name string, verts ...*Vertex) *Mesh {
 
 }
 
+// Clone clones the Mesh, creating a new
 func (mesh *Mesh) Clone() *Mesh {
 	newMesh := NewMesh(mesh.Name)
 	for _, t := range mesh.Triangles {
@@ -72,8 +75,13 @@ func (mesh *Mesh) Clone() *Mesh {
 	return newMesh
 }
 
+// AddTriangles adds triangles consisting of vertices to the Mesh. You must provide a number of *Vertex instances divisible by 3.
 func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
 	index := 1
+
+	if len(verts) == 0 || len(verts)%3 != 0 {
+		panic("Error: AddTriangles() has not been given a correct number of vertices to constitute triangles (it needs to be greater than 0 and divisible by 3).")
+	}
 
 	for i := 0; i < len(verts); i += 3 {
 
@@ -88,18 +96,19 @@ func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
 
 }
 
-func (mesh *Mesh) SetVertexColor(r, g, b, a float32) {
+// SetVertexColor sets the vertex color of all vertices in the Mesh to the color values provided.
+func (mesh *Mesh) SetVertexColor(color Color) {
 	for _, t := range mesh.Triangles {
 		for _, v := range t.Vertices {
-			v.Color.R = r
-			v.Color.G = g
-			v.Color.B = b
-			v.Color.A = a
+			v.Color.R = color.R
+			v.Color.G = color.G
+			v.Color.B = color.B
+			v.Color.A = color.A
 		}
 	}
 }
 
-// Repositions all vertices to take effect of the given Matrix. You can use this to, for example, translate (move) all vertices
+// ApplyMatrix applies the Matrix provided to all vertices on the Mesh. You can use this to, for example, translate (move) all vertices
 // of a Mesh to the right by 5 units ( mesh.ApplyMatrix(tetra3d.Translate(5, 0, 0)) ), or rotate all vertices around the center by
 // 90 degrees on the Y axis ( mesh.ApplyMatrix(tetra3d.Rotate(0, 1, 0, math.Pi/2) ) ) .
 func (mesh *Mesh) ApplyMatrix(matrix Matrix4) {
@@ -115,7 +124,7 @@ func (mesh *Mesh) ApplyMatrix(matrix Matrix4) {
 
 }
 
-// UpdateBounds updates the mesh's bounding sphere, which is used for frustum culling checks; call this after manually changing vertex positions.
+// UpdateBounds updates the mesh's dimensions; call this after manually changing vertex positions.
 func (mesh *Mesh) UpdateBounds() {
 
 	for _, v := range mesh.Vertices {
@@ -145,6 +154,7 @@ func (mesh *Mesh) UpdateBounds() {
 
 }
 
+// NewCube creates a new Cube Mesh.
 func NewCube() *Mesh {
 
 	mesh := NewMesh("Cube",
@@ -214,6 +224,7 @@ func NewCube() *Mesh {
 
 }
 
+// NewPlane creates a new plane Mesh.
 func NewPlane() *Mesh {
 
 	mesh := NewMesh("Plane",
@@ -259,6 +270,7 @@ func NewPlane() *Mesh {
 
 // }
 
+// A Triangle represents the smallest renderable object in Tetra3D.
 type Triangle struct {
 	Vertices []*Vertex
 	Normal   vector.Vector
@@ -267,6 +279,7 @@ type Triangle struct {
 	ID       int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
 }
 
+// NewTriangle creates a new Triangle, and requires a reference to its owning Mesh.
 func NewTriangle(mesh *Mesh) *Triangle {
 	tri := &Triangle{
 		Vertices: []*Vertex{},
@@ -276,6 +289,7 @@ func NewTriangle(mesh *Mesh) *Triangle {
 	return tri
 }
 
+// SetVertices sets the vertices on the Triangle given; if the Triangle receives fewer than 3 vertices, it will panic.
 func (tri *Triangle) SetVertices(verts ...*Vertex) {
 
 	if len(verts) < 3 {
@@ -292,6 +306,7 @@ func (tri *Triangle) SetVertices(verts ...*Vertex) {
 
 }
 
+// Clone clones the Triangle.
 func (tri *Triangle) Clone() *Triangle {
 	newTri := NewTriangle(tri.Mesh)
 	for _, vertex := range tri.Vertices {
@@ -319,6 +334,7 @@ func (tri *Triangle) RecalculateNormal() {
 	tri.Normal = calculateNormal(tri.Vertices[0].Position, tri.Vertices[1].Position, tri.Vertices[2].Position)
 }
 
+// Vertex represents a vertex. Vertices are not shared between Triangles.
 type Vertex struct {
 	Position    vector.Vector
 	Color       Color
@@ -327,6 +343,7 @@ type Vertex struct {
 	triangle    *Triangle
 }
 
+// NewVertex creates a new Vertex with the provided position (x, y, z) and UV values (u, v).
 func NewVertex(x, y, z, u, v float64) *Vertex {
 	return &Vertex{
 		Position:    vector.Vector{x, y, z},
@@ -336,6 +353,7 @@ func NewVertex(x, y, z, u, v float64) *Vertex {
 	}
 }
 
+// Clone clones the Vertex.
 func (vertex *Vertex) Clone() *Vertex {
 	newVert := NewVertex(vertex.Position[0], vertex.Position[1], vertex.Position[2], vertex.UV[0], vertex.UV[1])
 	newVert.Color = vertex.Color.Clone()

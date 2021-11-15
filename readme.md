@@ -1,6 +1,7 @@
 # Tetra3D
 
 ![Tetra3D Logo](https://thumbs.gfycat.com/DifferentZealousFowl-size_restricted.gif)
+![Dark exploration](https://thumbs.gfycat.com/ScalySlimCrayfish-size_restricted.gif)
 
 [Tetra3D Docs](https://pkg.go.dev/github.com/solarlune/tetra3d)
 
@@ -9,7 +10,7 @@
 If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune). Thanks~!
 ## What is Tetra3D?
 
-Tetra3D is a 3D software renderer written in Go with [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering systems like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that.
+Tetra3D is a 3D software renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering systems like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that.
 
 It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 

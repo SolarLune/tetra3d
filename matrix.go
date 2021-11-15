@@ -7,8 +7,10 @@ import (
 	"github.com/kvartborg/vector"
 )
 
+// Matrix4 represents a 4x4 matrix for translation, scale, and rotation. A Matrix4 in Tetra3D is row-major (i.e. the X axis is matrix[0]).
 type Matrix4 [4][4]float64
 
+// NewMatrix4 returns a new identity Matrix4. A Matrix4 in Tetra3D is row-major (i.e. the X axis for a rotation Matrix4 is matrix[0][0], matrix[0][1], matrix[0][2]).
 func NewMatrix4() Matrix4 {
 
 	mat := Matrix4{
@@ -21,6 +23,18 @@ func NewMatrix4() Matrix4 {
 
 }
 
+// Clone clones the Matrix4, returning a new copy.
+func (matrix Matrix4) Clone() Matrix4 {
+	newMat := NewMatrix4()
+	for y := 0; y < len(matrix); y++ {
+		for x := 0; x < len(matrix[y]); x++ {
+			newMat[y][x] = matrix[y][x]
+		}
+	}
+	return newMat
+}
+
+// NewMatrix4Scale returns a new identity Matrix4, but with the x, y, and z translation components set as provided.
 func NewMatrix4Translate(x, y, z float64) Matrix4 {
 	mat := NewMatrix4()
 	mat[3][0] = x
@@ -29,6 +43,7 @@ func NewMatrix4Translate(x, y, z float64) Matrix4 {
 	return mat
 }
 
+// NewMatrix4Scale returns a new identity Matrix4, but with the scale components set as provided. 1, 1, 1 is the default.
 func NewMatrix4Scale(x, y, z float64) Matrix4 {
 	mat := NewMatrix4()
 	mat[0][0] = x
@@ -37,7 +52,10 @@ func NewMatrix4Scale(x, y, z float64) Matrix4 {
 	return mat
 }
 
-func NewMatrix4Rotate(x, y, z float64, angle float64) Matrix4 {
+// NewMatrix4Rotate returns a new Matrix4 designed to rotate by the angle given (in radians) along the axis given [x, y, z].
+// This rotation works as though you pierced the object utilizing the matrix through by the axis, and then rotated it
+// counter-clockwise by the angle in radians.
+func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
 
 	mat := NewMatrix4()
 	vector := vector.Vector{x, y, z}.Unit()
@@ -108,8 +126,8 @@ func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, Matrix4) {
 
 }
 
-// Transposing a Matrix4 switches the Matrix from being Row Major to being Column Major. For orthonormalized Matrices (matrices
-// that have rows that are normalized, having a length of 1, like rotation matrices), this is equivalent to inverting it.
+// Transposed transposes a Matrix4, switching the Matrix from being Row Major to being Column Major. For orthonormalized Matrices (matrices
+// that have rows that are normalized (having a length of 1), like rotation matrices), this is equivalent to inverting it.
 func (matrix Matrix4) Transposed() Matrix4 {
 
 	new := NewMatrix4()
@@ -166,7 +184,7 @@ func (matrix Matrix4) Rotated(x, y, z, angle float64) Matrix4 {
 }
 
 // NewProjectionPerspective generates a perspective frustum Matrix4. fovy is the vertical field of view in degrees, near and far are the near and far clipping plane,
-// while viewWidth and viewHeight is the width and height of the backing texture / camera.
+// while viewWidth and viewHeight is the width and height of the backing texture / camera. Generally, you won't need to use this directly.
 func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float64) Matrix4 {
 
 	aspect := viewWidth / viewHeight
@@ -188,17 +206,6 @@ func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float64) Ma
 		{0, 0, -1, 0},
 	}
 
-}
-
-// Clone clones the Matrix4, returning a new copy.
-func (matrix Matrix4) Clone() Matrix4 {
-	newMat := NewMatrix4()
-	for y := 0; y < len(matrix); y++ {
-		for x := 0; x < len(matrix[y]); x++ {
-			newMat[y][x] = matrix[y][x]
-		}
-	}
-	return newMat
 }
 
 // MultVec multiplies the vector provided by the Matrix4, giving a vector that has been rotated, scaled, or translated as desired.
