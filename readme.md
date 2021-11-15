@@ -20,17 +20,21 @@ Because there's not really too much of an ability to do 3D for gamedev in Go apa
 
 It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebiten but wanted to display just a few things in 3D, Tetra3D should work well for you.
 
-Finally, while a software renderer is not by any means fast, it doesn't require anything more than Ebiten requires. So, any platforms that Ebiten supports should also work for Tetra3D automatically (hopefully!).
+Finally, while a software renderer is not by any means fast, it is relatively simple and easy to use. Any platforms that Ebiten supports should also work for Tetra3D automatically (hopefully!).
 
 ## Why Tetra3D? Why is it named that?
 
-Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a relatively primitive (but visually interesting) 3D shape made of 4 triangles. 
+Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a relatively primitive (but visually interesting) 3D shape made of 4 triangles. Otherwise, I had other names, but I didn't really like them very much. "Jank3D" was the second-best one, haha.
 
-Otherwise, I had other names, but I didn't really like them very much. "Jank3D" was the second-best one, haha.
+## How do you get it?
+
+`go get github.com/solarlune/tetra3d`
+
+Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, takeyourhatoff's [bitset](https://github.com/takeyourhatoff/bitset) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above.
 
 ## How do you use it?
 
-Make a camera, load a scene, render it. A simple 3D framework gets a simple 3D API.
+Make a camera, load a scene, render it. A simple 3D framework means a simple 3D API.
 
 Here's an example:
 
@@ -67,9 +71,7 @@ func NewGame() *Game {
 	g := &Game{}
 
 	// First, we load a scene from a .dae file. LoadDAEFile returns a *Scene 
-	// and an error if the call was unsuccessful. The scene will contain 
-	// all objects exported along with their meshes, handily converted
-	// to *tetra3d.Model and *tetra3d.Mesh instances.
+	// and an error if it was unsuccessful. 
 	scene, err := tetra3d.LoadDAEFile("examples.dae") 
 
 	if err != nil {
@@ -83,14 +85,14 @@ func NewGame() *Game {
 	// you can call Mesh.ApplyMatrix() to apply a rotation matrix 
 	// (or any other kind of matrix) to the vertices, thereby rotating 
 	// them and their triangles' normals. 
-	
-	// Tetra uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
-	// in comparison to Blender's coordinate system (+X = Right, +Y = Forward, 
-	// +Z = Up). 
 
 	// By default (if you're using Blender), this conversion is 
 	// done for you; you can change this by passing a different
 	// DaeLoadOptions parameter when calling tetra3d.LoadDAEFile().
+
+	// Tetra uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
+	// in comparison to Blender's coordinate system (+X = Right, +Y = Forward, 
+	// +Z = Up). 
 
 	// Create a new Camera. We pass the size of the screen to the Camera so
 	// it can create its own buffer textures (which are *ebiten.Images).
@@ -112,12 +114,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// should be called once per frame before drawing your *Scene.
 	g.Camera.Clear()
 
-	// Render your Scene from the camera. The Camera's ColorTexture will then 
+	// Now we'll render the Scene from the camera. The Camera's ColorTexture will then 
 	// hold the result. 
 	
 	// We pass both the Scene and the Models because 1) the Scene influences
 	// how Models draw (fog, for example), and 2) we may not want to render
-	// all Models. We might want to filter out some Models. You can do this with
+	// all Models. We might want to filter out some Models, which you can do with
 	// g.Scene.FilterModels().
 	g.Camera.Render(g.Scene, g.Scene.Models) 
 
@@ -133,7 +135,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 func (g *Game) Layout(w, h int) (int, int) {
 	// This is the size of the window; note that a larger (or smaller) 
 	// layout doesn't seem to impact performance very much.
-	return 360, 180
+	return ScreenWidth, ScreenHeight
 }
 
 func main() {
@@ -149,7 +151,7 @@ func main() {
 
 ```
 
-That's basically it. Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well and feels pretty solid to work with as is. So, yeah.
+That's basically it. Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well and feels pretty solid to work with as is. Feel free to examine the examples folder for a couple of examples showing how Tetra3D works - simply change to their directory and calling `go run .` should work.
 
 ## What's missing?
 
@@ -164,6 +166,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [ ] -- A more advanced depth buffer - currently, the depth is written using vertex colors.
 - [x] -- Offscreen Rendering
+- [ ] -- Model Batching / Combination (Ebiten should batch render calls together automatically, at least partially, as long as we adhere to the [efficiency guidelines](https://ebiten.org/documents/performancetips.html#Make_similar_draw_function_calls_successive))
 - [x] Culling
 - [x] -- Backface culling
 - [x] -- Frustum culling
@@ -175,28 +178,27 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Normal debug rendering
 - [x] Basic Single Image Texturing
 - [ ] -- Multitexturing?
+- [ ] -- Materials / Per-triangle images
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
+- [ ] Animations
+- [ ] -- Armature-based animations
+- [ ] -- Object transform-based animations
+- [x] Scenes
+- [x] -- Fog
+- [ ] -- Ambient vertex coloring
+- [ ] -- A node or scenegraph for parenting and simple visibility culling
 - [x] DAE model loading
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
 - [x] -- Normal loading
 - [x] -- Transform / full scene loading
-- [ ] Animations
-- [ ] -- Armature-based animations
-- [ ] -- Object transform-based animations
-- [ ] A node / scenegraph for parenting / relative object positioning / simple visibility culling
-- [x] Scenes
-- [x] -- Fog
-- [ ] -- Ambient vertex coloring
 - [ ] Lighting?
 - [ ] Shaders
-- [ ] -- Normal rendering (useful for, say, screen-space reflection shaders)
+- [ ] -- Normal rendering (useful for, say, screen-space shaders)
 - [ ] Basic Collisions
 - [ ] -- AABB collision testing / sphere collision testing?
 - [ ] -- Raycasting
 - [ ] Multithreading (particularly for vertex transformations)
-- [ ] Model Batching / Combination (Ebiten should batch render calls together automatically, at least partially, as long as we adhere to the [efficiency guidelines](https://ebiten.org/documents/performancetips.html#Make_similar_draw_function_calls_successive))
-- [ ] Materials / Per-triangle images
 - [ ] [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!
@@ -204,5 +206,3 @@ Again, it's incomplete and jank. However, it's also pretty cool!
 ## Shout-out time~
 
 Huge shout-out to the open-source community (i.e. StackOverflow, [fauxgl](https://github.com/fogleman/fauxgl), [tinyrenderer](https://github.com/ssloy/tinyrenderer), [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems), etc) at large for sharing the information and code to make this possible; I would definitely have never made this happen otherwise.
-
-Tetra depends on kvartborg's [Vector](https://github.com/kvartborg/vector) package, takeyourhatoff's [bitset](https://github.com/takeyourhatoff/bitset) package, and [Ebiten](https://ebiten.org/) itself for rendering. It also requires Go v1.16 or above.
