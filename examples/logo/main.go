@@ -17,18 +17,17 @@ import (
 	"github.com/solarlune/tetra3d"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type Game struct {
 	Width, Height int
-	// Models         []*tetra3d.Model
-	Scene *tetra3d.Scene
+	Scene         *tetra3d.Scene
 
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
 	CameraRotate float64
+	Offscreen    *ebiten.Image
 
 	Time              float64
 	DrawDebugText     bool
@@ -43,6 +42,7 @@ func NewGame() *Game {
 		Height:            224,
 		PrevMousePosition: vector.Vector{},
 	}
+	game.Offscreen = ebiten.NewImage(game.Width, game.Height)
 
 	game.Init()
 
@@ -51,42 +51,18 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	dae, _ := tetra3d.LoadDAEFile("examples.dae", nil)
+	dae, _ := tetra3d.LoadDAEFile("tetra3d.dae", nil)
 
 	g.Scene = dae
 
-	for _, m := range g.Scene.Meshes {
-		if strings.HasSuffix(m.MaterialName, ".png") {
-			// Put images on meshes that have material names that end with ".png"
-			m.Image, _, _ = ebitenutil.NewImageFromFile(m.MaterialName)
-		}
-	}
+	screen := g.Scene.FindModel("Screen")
 
-	// vvvvv Stress Test vvvvv
-
-	// for i := 0; i < 5; i++ {
-	// 	for j := 0; j < 5; j++ {
-
-	// 		mesh := meshes["Suzanne"]
-	// 		mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
-	// 		model := tetra3d.NewModel(mesh)
-	// 		model.Position[0] = float64(i) * 2
-	// 		model.Position[2] = float64(j) * 2
-	// 		g.Models = append(g.Models, model)
-
-	// 	}
-	// }
+	screen.Mesh.Image = g.Offscreen
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.Position[2] = 20
-	g.Camera.Far = 20
-	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
-	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
+	g.Camera.Position[2] = 5
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	g.Scene.FogRange[0] = 0.1
-	g.Scene.FogRange[1] = 1
 
 }
 
@@ -94,13 +70,15 @@ func (g *Game) Update() error {
 
 	var err error
 
-	moveSpd := 0.1
+	moveSpd := 0.05
 
 	g.Time += 1.0 / 60
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
+
+	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
 	forward := g.Camera.Rotation.Forward().Invert()
@@ -120,9 +98,18 @@ func (g *Game) Update() error {
 		g.Camera.Position = g.Camera.Position.Add(right.Scale(-moveSpd))
 	}
 
+	if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		g.Camera.Position[1] += moveSpd
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyControl) {
+		g.Camera.Position[1] -= moveSpd
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
+
+	// Rotating the camera with the mouse
 
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
@@ -131,8 +118,8 @@ func (g *Game) Update() error {
 
 	diff := mv.Sub(g.PrevMousePosition)
 
-	g.CameraTilt -= diff[1] * 0.01
-	g.CameraRotate -= diff[0] * 0.01
+	g.CameraTilt -= diff[1] * 0.005
+	g.CameraRotate -= diff[0] * 0.005
 
 	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
 
@@ -142,27 +129,11 @@ func (g *Game) Update() error {
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
 	g.Camera.Rotation = tilt.Mult(rotate)
 
+	// Spinning the tetrahedron in the logo
+	tetra := g.Scene.FindModel("Tetra")
+	tetra.Rotation = tetra.Rotation.Rotated(0, 1, 0, 0.05)
+
 	g.PrevMousePosition = mv.Clone()
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		g.Camera.Position[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		g.Camera.Position[1] -= moveSpd
-	}
-
-	if ebiten.IsKeyPressed(ebiten.Key1) {
-		g.Scene.FogColor.SetRGB(1, 0, 0)
-		g.Scene.FogMode = tetra3d.FogAdd
-	} else if ebiten.IsKeyPressed(ebiten.Key2) {
-		g.Scene.FogColor.SetRGB(0, 0, 0)
-		g.Scene.FogMode = tetra3d.FogMultiply
-	} else if ebiten.IsKeyPressed(ebiten.Key3) {
-		g.Scene.FogColor.SetRGB(0, 0, 0)
-		g.Scene.FogMode = tetra3d.FogOverwrite
-	} else if ebiten.IsKeyPressed(ebiten.Key4) {
-		g.Scene.FogMode = tetra3d.FogOff
-	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
@@ -171,12 +142,6 @@ func (g *Game) Update() error {
 		}
 		defer f.Close()
 		png.Encode(f, g.Camera.ColorTexture)
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyZ) {
-		if sphere := g.Scene.FindModel("Sphere"); sphere != nil {
-			g.Scene.RemoveModels(sphere)
-		}
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyR) {
@@ -210,15 +175,25 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Clear, but with a color
-	screen.Fill(color.Black)
+	screen.Fill(color.RGBA{60, 70, 80, 255})
 
+	// Clear the Camera
 	g.Camera.Clear()
 
-	g.Camera.Render(g.Scene)
+	// Render the non-screen Models
+	g.Camera.Render(g.Scene, g.Scene.FilterModels(func(model *tetra3d.Model) bool { return !strings.Contains(model.Name, "Screen") })...)
 
+	// Clear the Offscreen, then draw the camera's color texture output to it as well.
+	g.Offscreen.Fill(color.Black)
+	g.Offscreen.DrawImage(g.Camera.ColorTexture, nil)
+
+	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
+	// g.Camera.Render(g.Scene, g.Scene.FilterModels(func(model *tetra3d.Model) bool { return strings.Contains(model.Name, "Screen") })...)
+
+	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
+	// we could just draw the images straight.
 	opt := &ebiten.DrawImageOptions{}
 	w, h := g.Camera.ColorTexture.Size()
-	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
 	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
 		screen.DrawImage(g.Camera.DepthTexture, opt)
@@ -257,7 +232,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 
 func main() {
 
-	ebiten.SetWindowTitle("tetra3d Test")
+	ebiten.SetWindowTitle("Tetra3d Test - Logo")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()

@@ -95,33 +95,10 @@ func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, Matrix4) {
 
 	position := vector.Vector{matrix[3][0], matrix[3][1], matrix[3][2]}
 
-	// angle := math.Acos((matrix[0][0] + matrix[1][1] + matrix[2][2] - 1) / 2)
-
-	// if math.IsNaN(angle) {
-	// 	angle = 0.0
-	// }
-
-	// s := math.Sqrt(math.Pow(matrix[2][1]-matrix[1][2], 2) + math.Pow(matrix[0][2]-matrix[2][0], 2) + math.Pow(matrix[1][0]-matrix[0][1], 2))
-
-	// if math.Abs(s) <= 0.0001 {
-	// 	s = 1
-	// }
-
-	// axis := vector.Vector{
-	// 	(matrix[1][2] - matrix[2][1]) / s,
-	// 	(matrix[2][0] - matrix[0][2]) / s,
-	// 	(matrix[0][1] - matrix[1][0]) / s,
-	// }.Unit()
-
-	// // Default to rotating horizontally
-	// if axis.Magnitude() == 0 {
-	// 	axis[1] = 1
-	// }
-
 	rotation := NewMatrix4()
-	rotation.SetRow(0, matrix.Row(0).Unit())
-	rotation.SetRow(1, matrix.Row(1).Unit())
-	rotation.SetRow(2, matrix.Row(2).Unit())
+	rotation = rotation.SetRow(0, matrix.Row(0).Unit())
+	rotation = rotation.SetRow(1, matrix.Row(1).Unit())
+	rotation = rotation.SetRow(2, matrix.Row(2).Unit())
 
 	in := matrix.Mult(rotation.Transposed())
 

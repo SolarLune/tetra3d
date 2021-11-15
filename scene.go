@@ -33,13 +33,22 @@ func NewScene(name string) *Scene {
 	return scene
 }
 
-func (scene *Scene) FindModel(modelName string) *Model {
-	for _, model := range scene.Models {
-		if model.Name == modelName {
-			return model
-		}
+func (scene *Scene) Clone() *Scene {
+
+	newScene := NewScene(scene.Name)
+
+	for name, mesh := range scene.Meshes {
+		newScene.Meshes[name] = mesh
 	}
-	return nil
+
+	newScene.Models = append(newScene.Models, scene.Models...)
+
+	newScene.FogColor = scene.FogColor.Clone()
+	newScene.FogMode = scene.FogMode
+	newScene.FogRange[0] = scene.FogRange[0]
+	newScene.FogRange[1] = scene.FogRange[1]
+	return newScene
+
 }
 
 func (scene *Scene) AddModels(models ...*Model) {
@@ -59,6 +68,30 @@ func (scene *Scene) RemoveModels(models ...*Model) {
 		}
 	}
 
+}
+
+// FindModel allows you to search for a Model by the provided name. If a Model
+// with the name provided isn't found,
+func (scene *Scene) FindModel(modelName string) *Model {
+	for _, m := range scene.Models {
+		if m.Name == modelName {
+			return m
+		}
+	}
+	return nil
+}
+
+// FilterModels filters out the Scene's Models list to return just the Models
+// that satisfy the function passed. You can use this to, for example, find
+// Models that have a specific name, or render a Scene in stages.
+func (scene *Scene) FilterModels(filterFunc func(model *Model) bool) []*Model {
+	newMS := []*Model{}
+	for _, m := range scene.Models {
+		if filterFunc(m) {
+			newMS = append(newMS, m)
+		}
+	}
+	return newMS
 }
 
 func (scene *Scene) fogAsFloatSlice() []float32 {

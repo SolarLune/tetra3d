@@ -14,8 +14,9 @@ import (
 )
 
 type DebugInfo struct {
-	VertexTime   time.Duration
-	RenderTime   time.Duration
+	AvgFrameTime time.Duration
+	frameTime    time.Duration
+	tickTime     time.Time
 	DrawnObjects int
 	TotalObjects int
 	DrawnTris    int
@@ -187,8 +188,6 @@ func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
 		vert[3],
 	}
 
-	// fmt.Println(vect)
-
 	return vect
 
 }
@@ -209,7 +208,11 @@ func (camera *Camera) WorldToClip(vert vector.Vector) vector.Vector {
 func (camera *Camera) Clear() {
 	camera.ColorTexture.Clear()
 	camera.DepthTexture.Clear()
-	camera.DebugInfo.VertexTime = 0
+	if camera.DebugInfo.tickTime.IsZero() || time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
+		camera.DebugInfo.tickTime = time.Now()
+		camera.DebugInfo.AvgFrameTime = camera.DebugInfo.frameTime
+	}
+	camera.DebugInfo.frameTime = 0
 	camera.DebugInfo.DrawnObjects = 0
 	camera.DebugInfo.TotalObjects = 0
 	camera.DebugInfo.TotalTris = 0
@@ -218,12 +221,12 @@ func (camera *Camera) Clear() {
 
 // Render renders all of the models present in the passed Scene. Note that scenes rendered one after another in multiple
 // Render() calls will be rendered on top of each other in the Camera's texture buffers.
-func (camera *Camera) Render(scene *Scene) {
+func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	if !camera.RenderDepth {
 
-		sort.SliceStable(scene.Models, func(i, j int) bool {
-			return scene.Models[i].Position.Sub(camera.Position).Magnitude() > scene.Models[j].Position.Sub(camera.Position).Magnitude()
+		sort.SliceStable(models, func(i, j int) bool {
+			return models[i].Position.Sub(camera.Position).Magnitude() > models[j].Position.Sub(camera.Position).Magnitude()
 		})
 
 	}
@@ -236,12 +239,32 @@ func (camera *Camera) Render(scene *Scene) {
 	// Update the camera's frustum sphere
 	dist := camera.Far - camera.Near
 	forward := camera.Rotation.Forward().Invert()
-	camera.FrustumSphere.LocalPosition = camera.Position.Add(forward.Scale(camera.Near + (dist / 2)))
+	camera.FrustumSphere.LocalPosition = camera.Position.Add(forward.Scale(dist / 2))
 	camera.FrustumSphere.LocalRadius = dist / 2
 
 	frametimeStart := time.Now()
 
-	for _, model := range scene.Models {
+	rectShaderOptions := &ebiten.DrawRectShaderOptions{}
+	rectShaderOptions.Images[0] = camera.ColorIntermediate
+	rectShaderOptions.Images[1] = camera.DepthIntermediate
+
+	if scene != nil {
+
+		rectShaderOptions.Uniforms = map[string]interface{}{
+			"Fog":      scene.fogAsFloatSlice(),
+			"FogRange": scene.FogRange,
+		}
+
+	} else {
+
+		rectShaderOptions.Uniforms = map[string]interface{}{
+			"Fog":      []float32{0, 0, 0, 0},
+			"FogRange": []float32{0, 1},
+		}
+
+	}
+
+	for _, model := range models {
 
 		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
 		if model.Mesh == nil {
@@ -316,11 +339,12 @@ func (camera *Camera) Render(scene *Scene) {
 			v1 := tri.Vertices[1].transformed
 			v2 := tri.Vertices[2].transformed
 
-			// Skip if all vertices are behind the camera; this fixes triangles drawing inverted when they move behind the camera, but it conversely makes it impossible
-			// to draw triangles that are stretch on behind the camera (think the flooring and walls in a hallway that goes ahead of and behind the camera).
-			// A workaround is to segment the hallway and not allow the camera to get overly close, but the only real solution is to TODO: get rid of this and
-			// add triangle clipping so any triangles that are too long get clipped.
+			// Near-ish clipping (basically clip triangles that are wholly behind the camera)
 			if v0[3] < 0 && v1[3] < 0 && v2[3] < 0 {
+				continue
+			}
+
+			if v0[2] > camera.Far && v1[2] > camera.Far && v2[2] > camera.Far {
 				continue
 			}
 
@@ -360,7 +384,7 @@ func (camera *Camera) Render(scene *Scene) {
 				nor, _ := n0.Cross(n1)
 
 				if nor[2] > 0 {
-					continue // Backface?
+					continue
 				}
 
 			}
@@ -399,7 +423,7 @@ func (camera *Camera) Render(scene *Scene) {
 
 					// Vertex colors
 
-					depth := (math.Max(vert.transformed[2]-camera.Near, 0) / camera.Far)
+					depth := (math.Max(vert.transformed[2], 0) / camera.Far)
 					vertexList[index].ColorR = float32(depth)
 					vertexList[index].ColorG = float32(depth)
 					vertexList[index].ColorB = float32(depth)
@@ -468,16 +492,8 @@ func (camera *Camera) Render(scene *Scene) {
 			camera.ColorIntermediate.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
 
 			w, h := camera.ColorTexture.Size()
-			opt := &ebiten.DrawRectShaderOptions{}
-			opt.Images[0] = camera.ColorIntermediate
-			opt.Images[1] = camera.DepthIntermediate
 
-			opt.Uniforms = map[string]interface{}{
-				"Fog":      scene.fogAsFloatSlice(),
-				"FogRange": scene.FogRange,
-			}
-
-			camera.ColorTexture.DrawRectShader(w, h, camera.ColorShader, opt)
+			camera.ColorTexture.DrawRectShader(w, h, camera.ColorShader, rectShaderOptions)
 
 		} else {
 			camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
@@ -537,7 +553,7 @@ func (camera *Camera) Render(scene *Scene) {
 
 	}
 
-	camera.DebugInfo.VertexTime += time.Since(frametimeStart)
+	camera.DebugInfo.frameTime += time.Since(frametimeStart)
 
 }
 
@@ -545,10 +561,11 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 	dr := &ebiten.DrawImageOptions{}
 	dr.GeoM.Translate(0, textScale*16)
 	dr.GeoM.Scale(textScale, textScale)
+
 	text.DrawWithOptions(screen, fmt.Sprintf(
-		"FPS: %f\nFrame time: %fms\nRendered Objects:%d/%d\nRendered Triangles: %d/%d",
+		"FPS: %f\nFrame time: %s\nRendered Objects:%d/%d\nRendered Triangles: %d/%d",
 		ebiten.CurrentFPS(),
-		camera.DebugInfo.VertexTime.Seconds()*1000,
+		camera.DebugInfo.AvgFrameTime.Round(time.Millisecond/10).String(),
 		camera.DebugInfo.DrawnObjects,
 		camera.DebugInfo.TotalObjects,
 		camera.DebugInfo.DrawnTris,
