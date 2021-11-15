@@ -7,7 +7,7 @@
 
 ## Support
 
-If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune). Thanks~!
+If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune). I also have a [Discord server here](https://discord.gg/cepcpfV). Thanks~!
 ## What is Tetra3D?
 
 Tetra3D is a 3D software renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering systems like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that.
