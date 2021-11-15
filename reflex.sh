@@ -1,1 +1,0 @@
-reflex -r '.go' -s -- sh -c "cd example; go run ./"
