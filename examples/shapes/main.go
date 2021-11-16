@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	_ "embed"
 	_ "image/png"
 
 	"github.com/golang/freetype/truetype"
@@ -24,12 +23,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
-
-//go:embed excel.ttf
-var fontData []byte
-
-//go:embed shapes.dae
-var shapesDAE []byte
 
 type Game struct {
 	Width, Height int
@@ -48,11 +41,17 @@ type Game struct {
 }
 
 func NewGame() *Game {
+
 	game := &Game{
 		Width:             398,
 		Height:            224,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
+	}
+
+	fontData, err := os.ReadFile("excel.ttf")
+	if err != nil {
+		panic(err)
 	}
 
 	tt, err := truetype.Parse(fontData)
@@ -68,10 +67,12 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
+
 	// Load the DAE file and turn it into a scene. Note that we could also pass options to change how the file
 	// is loaded (specifically, which way is up), but we don't have to do that because it will do this by default if
 	// nil is passed as the second argument.
-	dae, err := tetra3d.LoadDAEData(shapesDAE, nil)
+	dae, err := tetra3d.LoadDAEFile("shapes.dae", nil)
+
 	if err != nil {
 		panic(err)
 	}
@@ -109,9 +110,11 @@ func (g *Game) Init() {
 	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+
 }
 
 func (g *Game) Update() error {
+
 	var err error
 
 	moveSpd := 0.1
@@ -219,9 +222,11 @@ func (g *Game) Update() error {
 	}
 
 	return err
+
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+
 	// Clear, but with a color
 	// screen.Fill(color.RGBA{20, 25, 30, 255})
 	screen.Fill(color.Black)
@@ -246,10 +251,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1, 2, 3, 4: Change fog\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, g.Font, 248, 128, color.RGBA{255, 0, 0, 255})
 	}
+
 }
 
 func (g *Game) StartProfiling() {
+
 	outFile, err := os.Create("./cpu.pprof")
+
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -262,6 +270,7 @@ func (g *Game) StartProfiling() {
 		pprof.StopCPUProfile()
 		fmt.Println("CPU profiling finished.")
 	}()
+
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
@@ -269,6 +278,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
+
 	ebiten.SetWindowTitle("Tetra3d Test - Shapes")
 	ebiten.SetWindowResizable(true)
 
@@ -277,4 +287,5 @@ func main() {
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}
+
 }
