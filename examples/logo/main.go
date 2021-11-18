@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	_ "embed"
 	_ "image/png"
 
 	"github.com/kvartborg/vector"
@@ -35,8 +36,10 @@ type Game struct {
 	PrevMousePosition vector.Vector
 }
 
-func NewGame() *Game {
+//go:embed tetra3d.dae
+var logoModel []byte
 
+func NewGame() *Game {
 	game := &Game{
 		Width:             398,
 		Height:            224,
@@ -50,8 +53,10 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
-
-	dae, _ := tetra3d.LoadDAEFile("tetra3d.dae", nil)
+	dae, err := tetra3d.LoadDAEData(logoModel, nil)
+	if err != nil {
+		panic(err)
+	}
 
 	g.Scene = dae
 
@@ -63,11 +68,9 @@ func (g *Game) Init() {
 	g.Camera.Position[2] = 5
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
 }
 
 func (g *Game) Update() error {
-
 	var err error
 
 	moveSpd := 0.05
@@ -169,11 +172,9 @@ func (g *Game) Update() error {
 	}
 
 	return err
-
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-
 	// Clear, but with a color
 	screen.Fill(color.RGBA{60, 70, 80, 255})
 
@@ -204,13 +205,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
 	}
-
 }
 
 func (g *Game) StartProfiling() {
-
 	outFile, err := os.Create("./cpu.pprof")
-
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -223,7 +221,6 @@ func (g *Game) StartProfiling() {
 		pprof.StopCPUProfile()
 		fmt.Println("CPU profiling finished.")
 	}()
-
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
@@ -231,7 +228,6 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-
 	ebiten.SetWindowTitle("Tetra3d Test - Logo")
 	ebiten.SetWindowResizable(true)
 
@@ -240,5 +236,4 @@ func main() {
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}
-
 }
