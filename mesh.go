@@ -161,23 +161,23 @@ func NewCube() *Mesh {
 
 		// Top
 
+		NewVertex(-1, 1, -1, 0, 0),
+		NewVertex(1, 1, 1, 1, 1),
 		NewVertex(1, 1, -1, 1, 0),
-		NewVertex(1, 1, 1, 1, 1),
-		NewVertex(-1, 1, -1, 0, 0),
 
-		NewVertex(-1, 1, -1, 0, 0),
-		NewVertex(1, 1, 1, 1, 1),
 		NewVertex(-1, 1, 1, 0, 1),
+		NewVertex(1, 1, 1, 1, 1),
+		NewVertex(-1, 1, -1, 0, 0),
 
 		// Bottom
 
-		NewVertex(-1, -1, -1, 0, 0),
-		NewVertex(1, -1, 1, 1, 1),
 		NewVertex(1, -1, -1, 1, 0),
-
-		NewVertex(-1, -1, 1, 0, 1),
 		NewVertex(1, -1, 1, 1, 1),
 		NewVertex(-1, -1, -1, 0, 0),
+
+		NewVertex(-1, -1, -1, 0, 0),
+		NewVertex(1, -1, 1, 1, 1),
+		NewVertex(-1, -1, 1, 0, 1),
 
 		// Front
 

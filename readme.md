@@ -151,7 +151,7 @@ func main() {
 
 ```
 
-That's basically it. Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well and feels pretty solid to work with as is. Feel free to examine the examples folder for a couple of examples showing how Tetra3D works - simply change to their directory and calling `go run .` should work.
+That's basically it. Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well and feels pretty solid to work with as is. Feel free to examine the examples folder for a couple of examples showing how Tetra3D works - calling `go run .` from within their directories should work.
 
 ## What's missing?
 
@@ -160,13 +160,14 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] 3D rendering
 - [x] -- Perspective projection
 - [ ] -- Orthographic projection
-- [ ] -- Billboards
+- [ ] -- Billboarding
 - [ ] -- Some additional way to draw 2D stuff with no perspective changes (if desired) in 3D space
 - [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [ ] -- A more advanced depth buffer - currently, the depth is written using vertex colors.
 - [x] -- Offscreen Rendering
-- [ ] -- Model Batching / Combination (Ebiten should batch render calls together automatically, at least partially, as long as we adhere to the [efficiency guidelines](https://ebiten.org/documents/performancetips.html#Make_similar_draw_function_calls_successive))
+- [ ] -- Model Batching / Combination - We can lessen Image.DrawTriangles() calls by grouping our triangles by image. Multiply or add vertex color by object color.
+- [ ] -- Render Grouping - Similar to the above idea, we can batch objects together by tags, allowing for even more control over render calls.
 - [x] Culling
 - [x] -- Backface culling
 - [x] -- Frustum culling
@@ -178,15 +179,15 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Normal debug rendering
 - [x] Basic Single Image Texturing
 - [ ] -- Multitexturing?
-- [ ] -- Materials / Per-triangle images
+- [ ] -- Per-triangle images
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
 - [ ] Animations
 - [ ] -- Armature-based animations
 - [ ] -- Object transform-based animations
 - [x] Scenes
 - [x] -- Fog
-- [ ] -- Ambient vertex coloring
 - [ ] -- A node or scenegraph for parenting and simple visibility culling
+- [ ] -- Ambient vertex coloring
 - [x] DAE model loading
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
@@ -198,6 +199,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] Basic Collisions
 - [ ] -- AABB collision testing / sphere collision testing?
 - [ ] -- Raycasting
+- [ ] 3D Sound (just adjusting panning of sound sources based on 3D location, or something like that)
 - [ ] Multithreading (particularly for vertex transformations)
 - [ ] [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 

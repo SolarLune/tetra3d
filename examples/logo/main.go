@@ -131,7 +131,7 @@ func (g *Game) Update() error {
 
 	// Spinning the tetrahedron in the logo
 	tetra := g.Scene.FindModel("Tetra")
-	tetra.Rotation = tetra.Rotation.Rotated(0, 1, 0, 0.05)
+	tetra.LocalRotation = tetra.LocalRotation.Rotated(0, 1, 0, 0.05)
 
 	g.PrevMousePosition = mv.Clone()
 

@@ -11,8 +11,9 @@ type FogMode int
 
 // Scene represents a world of sorts, and can contain a variety of Models and Meshes.
 type Scene struct {
-	Name     string
-	Models   []*Model
+	Name string
+	// Models   []*Model
+	Root     *Node
 	Meshes   map[string]*Mesh
 	FogColor Color   // The Color of any fog present in the Scene.
 	FogMode  FogMode // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
@@ -25,8 +26,9 @@ type Scene struct {
 // NewScene creates a new Scene by the name given.
 func NewScene(name string) *Scene {
 	scene := &Scene{
-		Name:     name,
-		Models:   []*Model{},
+		Name: name,
+		// Models:   []*Model{},
+		Root:     NewNode("root"),
 		Meshes:   map[string]*Mesh{},
 		FogColor: NewColor(0, 0, 0, 0),
 		FogRange: []float32{0, 1},
@@ -44,7 +46,8 @@ func (scene *Scene) Clone() *Scene {
 		newScene.Meshes[name] = mesh
 	}
 
-	newScene.Models = append(newScene.Models, scene.Models...)
+	// newScene.Models = append(newScene.Models, scene.Models...)
+	newScene.Root = scene.Root.Clone()
 
 	newScene.FogColor = scene.FogColor.Clone()
 	newScene.FogMode = scene.FogMode
@@ -55,32 +58,32 @@ func (scene *Scene) Clone() *Scene {
 }
 
 // AddModels adds the specified models to the Scene's models list.
-func (scene *Scene) AddModels(models ...*Model) {
-	scene.Models = append(scene.Models, models...)
-}
+// func (scene *Scene) AddModels(models ...*Model) {
+// 	scene.Models = append(scene.Models, models...)
+// }
 
 // RemoveModels removes the specified models from the Scene's models list.
-func (scene *Scene) RemoveModels(models ...*Model) {
+// func (scene *Scene) RemoveModels(models ...*Model) {
 
-	for _, model := range models {
+// 	for _, model := range models {
 
-		for i := 0; i < len(scene.Models); i++ {
-			if scene.Models[i] == model {
-				scene.Models[i] = nil
-				scene.Models = append(scene.Models[:i], scene.Models[i+1:]...)
-				break
-			}
-		}
-	}
+// 		for i := 0; i < len(scene.Models); i++ {
+// 			if scene.Models[i] == model {
+// 				scene.Models[i] = nil
+// 				scene.Models = append(scene.Models[:i], scene.Models[i+1:]...)
+// 				break
+// 			}
+// 		}
+// 	}
 
-}
+// }
 
-// FindModel allows you to search for a Model by the provided name. If a Model
-// with the name provided isn't found,
-func (scene *Scene) FindModel(modelName string) *Model {
-	for _, m := range scene.Models {
-		if m.Name == modelName {
-			return m
+// FindNode allows you to search for a Node by the provided name. If a Node
+// with the name provided isn't found, FindNode returns nil.
+func (scene *Scene) FindNode(name string) *Node {
+	for _, node := range scene.Root.ChildrenRecursive(false) {
+		if node.Name == name {
+			return node
 		}
 	}
 	return nil
@@ -89,9 +92,9 @@ func (scene *Scene) FindModel(modelName string) *Model {
 // FilterModels filters out the Scene's Models list to return just the Models
 // that satisfy the function passed. You can use this to, for example, find
 // Models that have a specific name, or render a Scene in stages.
-func (scene *Scene) FilterModels(filterFunc func(model *Model) bool) []*Model {
-	newMS := []*Model{}
-	for _, m := range scene.Models {
+func (scene *Scene) FilterNodes(filterFunc func(node *Node) bool) []*Node {
+	newMS := []*Node{}
+	for _, m := range scene.Root.ChildrenRecursive(false) {
 		if filterFunc(m) {
 			newMS = append(newMS, m)
 		}

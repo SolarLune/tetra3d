@@ -23,7 +23,9 @@ type DebugInfo struct {
 	TotalTris    int
 }
 
+// Camera represents a camera (where you look from) in Tetra3D.
 type Camera struct {
+	*Node
 	ColorTexture      *ebiten.Image
 	DepthTexture      *ebiten.Image
 	ColorIntermediate *ebiten.Image
@@ -38,9 +40,6 @@ type Camera struct {
 	Perspective bool
 	fieldOfView float64
 
-	Position vector.Vector
-	Rotation Matrix4
-
 	DebugInfo               DebugInfo
 	DebugDrawWireframe      bool
 	DebugDrawNormals        bool
@@ -53,6 +52,7 @@ type Camera struct {
 func NewCamera(w, h int) *Camera {
 
 	cam := &Camera{
+		Node:              NewNode("Camera"),
 		ColorTexture:      ebiten.NewImage(w, h),
 		DepthTexture:      ebiten.NewImage(w, h),
 		ColorIntermediate: ebiten.NewImage(w, h),
@@ -61,8 +61,6 @@ func NewCamera(w, h int) *Camera {
 		Near:              0.1,
 		Far:               100,
 
-		Position:      vector.Vector{0, 0, 0},
-		Rotation:      NewMatrix4(),
 		FrustumSphere: NewBoundingSphere(nil, vector.Vector{0, 0, 0}, 0),
 	}
 
@@ -138,13 +136,17 @@ func NewCamera(w, h int) *Camera {
 	return cam
 }
 
+func (camera *Camera) getNode() *Node {
+	return camera.Node
+}
+
 // ViewMatrix returns the Camera's view matrix.
 func (camera *Camera) ViewMatrix() Matrix4 {
 
-	transform := NewMatrix4Translate(-camera.Position[0], -camera.Position[1], -camera.Position[2])
+	transform := NewMatrix4Translate(-camera.WorldPosition()[0], -camera.WorldPosition()[1], -camera.WorldPosition()[2])
 
 	// We invert the rotation because the Camera is looking down -Z
-	transform = transform.Mult(camera.Rotation.Transposed())
+	transform = transform.Mult(camera.WorldRotation().Transposed())
 
 	return transform
 
@@ -223,6 +225,20 @@ func (camera *Camera) Clear() {
 
 }
 
+func (camera *Camera) RenderNodes(scene *Scene, rootNode *Node) {
+
+	meshes := []*Model{}
+	for _, node := range rootNode.ChildrenRecursive(true) {
+		model := node.AsModel()
+		if model != nil {
+			meshes = append(meshes, model)
+		}
+	}
+
+	camera.Render(scene, meshes...)
+
+}
+
 // Render renders all of the models present in the passed Scene. Note that scenes rendered one after another in multiple
 // Render() calls will be rendered on top of each other in the Camera's texture buffers.
 func (camera *Camera) Render(scene *Scene, models ...*Model) {
@@ -230,20 +246,20 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	if !camera.RenderDepth {
 
 		sort.SliceStable(models, func(i, j int) bool {
-			return models[i].Position.Sub(camera.Position).Magnitude() > models[j].Position.Sub(camera.Position).Magnitude()
+			return models[i].WorldPosition().Sub(camera.WorldPosition()).Magnitude() > models[j].LocalPosition.Sub(camera.WorldPosition()).Magnitude()
 		})
 
 	}
 
 	// By multiplying the camera's position against the view matrix (which contains the negated camera position), we're left with just the rotation
 	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
-	pureViewRot := camera.ViewMatrix().MultVec(camera.Position)
+	pureViewRot := camera.ViewMatrix().MultVec(camera.WorldPosition())
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
 	// Update the camera's frustum sphere
 	dist := camera.Far - camera.Near
-	forward := camera.Rotation.Forward().Invert()
-	camera.FrustumSphere.LocalPosition = camera.Position.Add(forward.Scale(dist / 2))
+	forward := camera.WorldRotation().Forward().Invert()
+	camera.FrustumSphere.LocalPosition = camera.WorldPosition().Add(forward.Scale(dist / 2))
 	camera.FrustumSphere.LocalRadius = dist / 2
 
 	frametimeStart := time.Now()
@@ -287,7 +303,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			// This is the simplest method of simple frustum culling where we simply test the distances between objects.
 
-			if model.Position.Sub(camera.FrustumSphere.Position()).Magnitude() > model.BoundingSphere.Radius()+camera.FrustumSphere.Radius() {
+			modelPos, _, _ := model.Transform().Decompose()
+
+			if modelPos.Sub(camera.FrustumSphere.Position()).Magnitude() > model.BoundingSphere.Radius()+camera.FrustumSphere.Radius() {
 				continue
 			}
 

@@ -90,22 +90,20 @@ func (g *Game) Init() {
 
 	// vvvvv Stress Test vvvvv
 
-	// for i := 0; i < 5; i++ {
-	// 	for j := 0; j < 5; j++ {
+	// for i := 0; i < 3; i++ {
+	// 	for j := 0; j < 2; j++ {
 
-	// 		mesh := meshes["Suzanne"]
-	// 		mesh.ApplyMatrix(tetra3d.Rotate(1, 0, 0, -math.Pi/2))
-	// 		model := tetra3d.NewModel(mesh)
-	// 		model.Position[0] = float64(i) * 2
-	// 		model.Position[2] = float64(j) * 2
-	// 		g.Models = append(g.Models, model)
+	// 		model := g.Scene.FindModel("Suzanne").Clone()
+	// 		model.LocalPosition[0] = float64(i) * 2
+	// 		model.LocalPosition[2] = float64(j) * 2
+	// 		g.Scene.AddModels(model)
 
 	// 	}
 	// }
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Position[2] = 5
-	g.Camera.Far = 20
+	g.Camera.Far = 100
 	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
 	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
 

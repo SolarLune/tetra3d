@@ -350,11 +350,12 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 
 		p, s, r := mat.Decompose()
 
-		model.Position = p
-		model.Scale = s
-		model.Rotation = r
+		model.LocalPosition = p
+		model.LocalScale = s
+		model.LocalRotation = r
 
-		scene.Models = append(scene.Models, model)
+		// scene.Models = append(scene.Models, model)
+		scene.Root.AddChildren(model.Node)
 	}
 
 	return scene, nil
