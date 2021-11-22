@@ -66,6 +66,7 @@ type daeNode struct {
 	Name      string              `xml:"name,attr"`
 	Mesh      daeInstanceGeometry `xml:"instance_geometry"`
 	Transform string              `xml:"matrix"`
+	Children  []daeNode           `xml:"node"`
 }
 
 func (daeNode daeNode) ParseTransform() Matrix4 {
@@ -311,7 +312,9 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 
 	}
 
-	for _, node := range daeScene.LibraryScene.Nodes {
+	var parseDAENode func(node daeNode) Node
+
+	parseDAENode = func(node daeNode) Node {
 
 		var mesh *Mesh
 
@@ -327,7 +330,14 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 
 		}
 
-		model := NewModel(mesh, node.Name)
+		var model Node
+
+		if mesh != nil {
+			model = NewModel(mesh, node.Name)
+		} else {
+			model = NewNodeBase(node.Name)
+		}
+
 		mat := node.ParseTransform()
 
 		// Correct transform matrix
@@ -348,14 +358,26 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 
 		}
 
+		// We parse and parent children before setting position, scale, and rotation because by doing it in this order,
+		// we get the child being in its final transform as a result of the parent, rather than parenting leaving the child
+		// at its original position. In other words, in the 3D modeler, the transform of children is the result of transforms
+		// having been set AFTER parenting.
+		for _, child := range node.Children {
+			model.AddChildren(parseDAENode(child))
+		}
+
 		p, s, r := mat.Decompose()
 
-		model.LocalPosition = p
-		model.LocalScale = s
-		model.LocalRotation = r
+		model.SetLocalPosition(p)
+		model.SetLocalScale(s)
+		model.SetLocalRotation(r)
 
-		// scene.Models = append(scene.Models, model)
-		scene.Root.AddChildren(model.Node)
+		return model
+
+	}
+
+	for _, node := range daeScene.LibraryScene.Nodes {
+		scene.Root.AddChildren(parseDAENode(node))
 	}
 
 	return scene, nil

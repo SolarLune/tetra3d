@@ -30,6 +30,15 @@ func (dim Dimensions) Max() float64 {
 	return math.Abs(max)
 }
 
+// Center returns the center point inbetween the two corners of the dimension set.
+func (dim Dimensions) Center() vector.Vector {
+	return vector.Vector{
+		dim[1][0] - dim[0][0],
+		dim[1][1] - dim[0][1],
+		dim[1][2] - dim[0][2],
+	}
+}
+
 type Mesh struct {
 	Name           string
 	Vertices       []*Vertex
@@ -39,6 +48,7 @@ type Mesh struct {
 	MaterialName   string        // The name of any material assigned to the Mesh from the 3D modeling program
 	FilterMode     ebiten.Filter
 	Dimensions     Dimensions
+	triIndex       int
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. You must provide a number of *Vertex instances divisible by 3,
@@ -52,14 +62,18 @@ func NewMesh(name string, verts ...*Vertex) *Mesh {
 		Triangles:      []*Triangle{},
 		FilterMode:     ebiten.FilterNearest,
 		Dimensions:     Dimensions{{0, 0, 0}, {0, 0, 0}},
+		triIndex:       1,
 	}
 
-	if len(verts) == 0 || len(verts)%3 != 0 {
+	if len(verts)%3 != 0 {
 		panic("Error: NewMesh() has not been given a correct number of vertices to constitute triangles (it needs to be greater than 0 and divisible by 3).")
 	}
 
-	mesh.AddTriangles(verts...)
-	mesh.UpdateBounds()
+	if len(verts) > 0 {
+		mesh.AddTriangles(verts...)
+		mesh.UpdateBounds()
+	}
+
 	return mesh
 
 }
@@ -77,7 +91,6 @@ func (mesh *Mesh) Clone() *Mesh {
 
 // AddTriangles adds triangles consisting of vertices to the Mesh. You must provide a number of *Vertex instances divisible by 3.
 func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
-	index := 1
 
 	if len(verts) == 0 || len(verts)%3 != 0 {
 		panic("Error: AddTriangles() has not been given a correct number of vertices to constitute triangles (it needs to be greater than 0 and divisible by 3).")
@@ -86,12 +99,13 @@ func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
 	for i := 0; i < len(verts); i += 3 {
 
 		tri := NewTriangle(mesh)
-		tri.ID = index
+		tri.ID = mesh.triIndex
 		mesh.Triangles = append(mesh.Triangles, tri)
 		mesh.Vertices = append(mesh.Vertices, verts[i], verts[i+1], verts[i+2])
 		mesh.sortedVertices = append(mesh.sortedVertices, verts[i], verts[i+1], verts[i+2])
 		tri.SetVertices(verts[i], verts[i+1], verts[i+2])
-		index++
+		mesh.triIndex++
+
 	}
 
 }

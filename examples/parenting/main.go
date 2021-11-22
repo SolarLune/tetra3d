@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"image/color"
@@ -9,14 +10,17 @@ import (
 	"os"
 	"time"
 
+	_ "embed"
 	_ "image/png"
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
+	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 type Game struct {
@@ -39,6 +43,7 @@ func NewGame() *Game {
 		Width:             398,
 		Height:            224,
 		PrevMousePosition: vector.Vector{},
+		DrawDebugText:     true,
 	}
 
 	game.Init()
@@ -46,33 +51,35 @@ func NewGame() *Game {
 	return game
 }
 
+//go:embed testimage.png
+var testImageData []byte
+
+func loadImage(data []byte) *ebiten.Image {
+	reader := bytes.NewReader(data)
+	img, _, err := ebitenutil.NewImageFromReader(reader)
+	if err != nil {
+		panic(err)
+	}
+	return img
+}
+
 func (g *Game) Init() {
 
 	g.Scene = tetra3d.NewScene("Test Scene")
 
 	cubeMesh := tetra3d.NewCube()
-	cubeMesh.Image, _, _ = ebitenutil.NewImageFromFile("testimage.png")
+	cubeMesh.Image = loadImage(testImageData)
 
-	parentA := tetra3d.NewModel(cubeMesh, "parentA")
+	parent := tetra3d.NewModel(cubeMesh, "parent")
+	parent.SetLocalPosition(vector.Vector{0, -3, 0})
+
 	child := tetra3d.NewModel(cubeMesh, "child")
-	parentA.LocalScale[0] = 1
-	parentA.LocalScale[1] = 1
-	parentA.LocalScale[2] = 1
-	child.LocalPosition[0] += 10
-	child.LocalPosition[1] += 2
-	// child.LocalScale[0] = 2
-	// child.LocalScale[2] = 2
-	// child.Rotation = tetra3d.NewMatrix4Rotate(1, 1, 1, math.Pi/2)
-	parentA.LocalPosition[0] = -3
+	child.SetLocalPosition(vector.Vector{10, 2, 0})
 
-	parentB := tetra3d.NewModel(cubeMesh, "parentB")
-	parentB.LocalPosition[0] = -10
-
-	// g.Scene.AddModels(parentA, parentB, child)
-	g.Scene.Root.AddChildren(parentA.Node, parentB.Node, child.Node)
+	g.Scene.Root.AddChildren(parent, child)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.LocalPosition[2] = 15
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -90,75 +97,80 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	parentA := g.Scene.FindNode("parentA")
+	parent := g.Scene.FindNodeByName("parent")
+	parent.SetLocalRotation(parent.LocalRotation().Rotated(0, 1, 0, 0.05))
 
-	parentA.LocalRotation = parentA.LocalRotation.Rotated(0, 1, 0, 0.05)
-
-	child := g.Scene.FindNode("child")
+	child := g.Scene.FindNodeByName("child")
 
 	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation.Forward().Invert()
-	right := g.Camera.LocalRotation.Right()
+	forward := g.Camera.LocalRotation().Forward().Invert()
+	right := g.Camera.LocalRotation().Right()
+
+	position := parent.LocalPosition()
 
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		parentA.LocalPosition[0] -= 0.1
+		position[0] -= 0.1
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		parentA.LocalPosition[0] += 0.1
+		position[0] += 0.1
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		parentA.LocalPosition[2] -= 0.1
+		position[2] -= 0.1
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		parentA.LocalPosition[2] += 0.1
+		position[2] += 0.1
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyI) {
-		// child.SetWorldScale(vector.Vector{1, 1, 1})
-		child.SetWorldPosition(vector.Vector{4, 0, 0})
+	parent.SetLocalPosition(position)
+
+	if ebiten.IsKeyPressed(ebiten.KeyG) {
+		child.SetWorldPosition(vector.Vector{10, 2, 0})
 		child.SetWorldRotation(tetra3d.NewMatrix4Rotate(0, 1, 0, 0))
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
-		parentA.Visible = !parentA.Visible
+	if inpututil.IsKeyJustPressed(ebiten.KeyI) {
+		parent.SetVisible(!parent.Visible())
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyU) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
 
-		if child.Parent == g.Scene.Root {
-			parentA.AddChildren(child)
-			parentA.SetWorldScale(vector.Vector{2, 2, 2})
-		} else {
+		if child.Parent() == parent {
 			g.Scene.Root.AddChildren(child)
+		} else {
+			parent.AddChildren(child)
 		}
 
 	}
 
+	pos := g.Camera.LocalPosition()
+
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.Camera.LocalPosition = g.Camera.LocalPosition.Add(forward.Scale(moveSpd))
+		pos = pos.Add(forward.Scale(moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.Camera.LocalPosition = g.Camera.LocalPosition.Add(right.Scale(moveSpd))
+		pos = pos.Add(right.Scale(moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.Camera.LocalPosition = g.Camera.LocalPosition.Add(forward.Scale(-moveSpd))
+		pos = pos.Add(forward.Scale(-moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.Camera.LocalPosition = g.Camera.LocalPosition.Add(right.Scale(-moveSpd))
+		pos = pos.Add(right.Scale(-moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		g.Camera.LocalPosition[1] += moveSpd
+		pos[1] += moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		g.Camera.LocalPosition[1] -= moveSpd
+		pos[1] -= moveSpd
 	}
+
+	g.Camera.SetLocalPosition(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
@@ -182,7 +194,7 @@ func (g *Game) Update() error {
 	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
 
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.LocalRotation = tilt.Mult(rotate)
+	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
 	g.PrevMousePosition = mv.Clone()
 
@@ -245,6 +257,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
+	}
+
+	if g.DrawDebugText {
+		g.Camera.DrawDebugText(screen, 1)
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nArrow Keys:Move parent\nP: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
 	}
 
 }

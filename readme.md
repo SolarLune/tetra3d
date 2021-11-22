@@ -54,7 +54,7 @@ import (
 	_ "image/png"
 
 	"github.com/solarlune/tetra3d"
-
+	"github.com/kvartborg/vector"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -70,9 +70,10 @@ func NewGame() *Game {
 
 	g := &Game{}
 
-	// First, we load a scene from a .dae file. LoadDAEFile returns a *Scene 
+	// First, we load a scene from a .dae file. LoadDAEFile takes a filepath and
+	// any loading options (nil is taken as a default), and returns a *Scene 
 	// and an error if it was unsuccessful. 
-	scene, err := tetra3d.LoadDAEFile("examples.dae") 
+	scene, err := tetra3d.LoadDAEFile("example.dae", nil) 
 
 	if err != nil {
 		panic(err)
@@ -80,14 +81,14 @@ func NewGame() *Game {
 
 	g.Scene = scene
 
-	// If you need to rotate the model because the 3D modeler you're 
+	// NOTE: If you need to rotate the model because the 3D modeler you're 
 	// using doesn't use the same axes as Tetra (like Blender),
 	// you can call Mesh.ApplyMatrix() to apply a rotation matrix 
 	// (or any other kind of matrix) to the vertices, thereby rotating 
 	// them and their triangles' normals. 
 
-	// By default (if you're using Blender), this conversion is 
-	// done for you; you can change this by passing a different
+	// With Blender and the default DAE exporter, this conversion is 
+	// handled for you; you can change this by passing a different
 	// DaeLoadOptions parameter when calling tetra3d.LoadDAEFile().
 
 	// Tetra uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
@@ -96,12 +97,30 @@ func NewGame() *Game {
 
 	// Create a new Camera. We pass the size of the screen to the Camera so
 	// it can create its own buffer textures (which are *ebiten.Images).
+
 	g.Camera = tetra3d.NewCamera(ScreenWidth, ScreenHeight)
 
-	// Place Models or Cameras using their Position properties (which is a 
-	// 3D Vector from kvartborg's vector package). Cameras look forward 
-	// down the -Z axis.
-	g.Camera.Position[2] = 12
+	// A Camera implements the tetra3d.Node interface, which means it can be placed
+	// in 3D space and can be parented to another Node-implementing object somewhere
+	// in the scene tree. Models and NodeBases (which are essentially "empties" one can
+	// use for positioning and parenting) can, as well.
+
+	// Each Scene has a tree that starts with the root Node. To add Nodes to the Scene, 
+	// parent them to the Scene's base.
+	g.Scene.Root.AddChildren(g.Camera)
+
+	// For Cameras, we don't actually need to have them in the scene to view it, since
+	// the presence of the Camera in the Scene node tree doesn't impact what it would see.
+
+	// Place Models or Cameras with SetWorldPosition() or SetLocalPosition(). 
+	// Both functions take a 3D vector.Vector from kvartborg's vector package. 
+	
+	// The *World variants position Nodes in absolute space; the Local variants
+	// position Nodes relative to their parents' positioning and transforms.
+	
+	// Cameras look forward down the -Z axis, so we'll move the Camera back 12 units to look
+	// towards [0, 0, 0].
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 12})
 
 	return game
 }
@@ -111,7 +130,7 @@ func (g *Game) Update() error { return nil }
 func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Call Camera.Clear() to clear its internal backing texture. This
-	// should be called once per frame before drawing your *Scene.
+	// should be called once per frame before drawing your Scene.
 	g.Camera.Clear()
 
 	// Now we'll render the Scene from the camera. The Camera's ColorTexture will then 
@@ -119,9 +138,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	
 	// We pass both the Scene and the Models because 1) the Scene influences
 	// how Models draw (fog, for example), and 2) we may not want to render
-	// all Models. We might want to filter out some Models, which you can do with
-	// g.Scene.FilterModels().
-	g.Camera.Render(g.Scene, g.Scene.Models) 
+	// all Models. Camera.RenderNodes() renders all Nodes in a tree, starting with the 
+	// Node specified. You can also use Camera.Render() to simply render a selection of
+	// Models.
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root) 
 
 	// Before drawing the result, clear the screen first.
 	screen.Fill(color.RGBA{20, 30, 40, 255})
@@ -166,8 +186,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [ ] -- A more advanced depth buffer - currently, the depth is written using vertex colors.
 - [x] -- Offscreen Rendering
-- [ ] -- Model Batching / Combination - We can lessen Image.DrawTriangles() calls by grouping our triangles by image. Multiply or add vertex color by object color.
-- [ ] -- Render Grouping - Similar to the above idea, we can batch objects together by tags, allowing for even more control over render calls.
+- [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
+- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (image, mainly).
 - [x] Culling
 - [x] -- Backface culling
 - [x] -- Frustum culling
@@ -186,7 +206,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Object transform-based animations
 - [x] Scenes
 - [x] -- Fog
-- [ ] -- A node or scenegraph for parenting and simple visibility culling
+- [x] -- A node or scenegraph for parenting and simple visibility culling
 - [ ] -- Ambient vertex coloring
 - [x] DAE model loading
 - [x] -- Vertex colors loading

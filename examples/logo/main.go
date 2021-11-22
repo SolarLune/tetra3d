@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"runtime/pprof"
-	"strings"
 	"time"
 
 	_ "embed"
@@ -16,9 +15,11 @@ import (
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
+	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 type Game struct {
@@ -44,6 +45,7 @@ func NewGame() *Game {
 		Width:             398,
 		Height:            224,
 		PrevMousePosition: vector.Vector{},
+		DrawDebugText:     true,
 	}
 	game.Offscreen = ebiten.NewImage(game.Width, game.Height)
 
@@ -60,12 +62,15 @@ func (g *Game) Init() {
 
 	g.Scene = dae
 
-	screen := g.Scene.FindModel("Screen")
+	// Get the ScreenTexture node, which is a model
+	screen := g.Scene.FindNodeByName("ScreenTexture")
 
-	screen.Mesh.Image = g.Offscreen
+	// And set its image
+	screen.(*tetra3d.Model).Mesh.Image = g.Offscreen
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.Position[2] = 5
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
+	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 }
@@ -84,29 +89,33 @@ func (g *Game) Update() error {
 	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.Rotation.Forward().Invert()
-	right := g.Camera.Rotation.Right()
+	forward := g.Camera.LocalRotation().Forward().Invert()
+	right := g.Camera.LocalRotation().Right()
+
+	pos := g.Camera.LocalPosition()
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.Camera.Position = g.Camera.Position.Add(forward.Scale(moveSpd))
+		pos = pos.Add(forward.Scale(moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.Camera.Position = g.Camera.Position.Add(right.Scale(moveSpd))
+		pos = pos.Add(right.Scale(moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.Camera.Position = g.Camera.Position.Add(forward.Scale(-moveSpd))
+		pos = pos.Add(forward.Scale(-moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.Camera.Position = g.Camera.Position.Add(right.Scale(-moveSpd))
+		pos = pos.Add(right.Scale(-moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		g.Camera.Position[1] += moveSpd
+		pos[1] += moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		g.Camera.Position[1] -= moveSpd
+		pos[1] -= moveSpd
 	}
+
+	g.Camera.SetLocalPosition(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
@@ -130,11 +139,11 @@ func (g *Game) Update() error {
 	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
 
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.Rotation = tilt.Mult(rotate)
+	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
 	// Spinning the tetrahedron in the logo
-	tetra := g.Scene.FindModel("Tetra")
-	tetra.LocalRotation = tetra.LocalRotation.Rotated(0, 1, 0, 0.05)
+	tetra := g.Scene.FindNodeByName("Tetra")
+	tetra.SetLocalRotation(tetra.LocalRotation().Rotated(0, 1, 0, 0.05))
 
 	g.PrevMousePosition = mv.Clone()
 
@@ -181,15 +190,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the non-screen Models
-	g.Camera.Render(g.Scene, g.Scene.FilterModels(func(model *tetra3d.Model) bool { return !strings.Contains(model.Name, "Screen") })...)
+	// Render the logo first
+	g.Camera.RenderNodes(g.Scene, g.Scene.FindNodeByName("LogoGroup"))
 
 	// Clear the Offscreen, then draw the camera's color texture output to it as well.
 	g.Offscreen.Fill(color.Black)
 	g.Offscreen.DrawImage(g.Camera.ColorTexture, nil)
 
 	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
-	g.Camera.Render(g.Scene, g.Scene.FilterModels(func(model *tetra3d.Model) bool { return strings.Contains(model.Name, "Screen") })...)
+	g.Camera.RenderNodes(g.Scene, g.Scene.FindNodeByName("ScreenBorder"))
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
@@ -204,6 +213,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe screen object shows what the\ncamera is looking at.\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
 	}
 }
 

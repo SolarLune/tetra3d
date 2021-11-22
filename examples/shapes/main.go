@@ -14,19 +14,15 @@ import (
 	_ "embed"
 	_ "image/png"
 
-	"github.com/golang/freetype/truetype"
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
-	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
-
-//go:embed excel.ttf
-var fontData []byte
 
 //go:embed shapes.dae
 var shapesDAE []byte
@@ -43,8 +39,6 @@ type Game struct {
 	DrawDebugText     bool
 	DrawDebugDepth    bool
 	PrevMousePosition vector.Vector
-
-	Font font.Face
 }
 
 func NewGame() *Game {
@@ -54,13 +48,6 @@ func NewGame() *Game {
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
-
-	tt, err := truetype.Parse(fontData)
-	if err != nil {
-		panic(err)
-	}
-
-	game.Font = truetype.NewFace(tt, &truetype.Options{Size: 12, DPI: 72})
 
 	game.Init()
 
@@ -101,8 +88,8 @@ func (g *Game) Init() {
 	// }
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.Position[2] = 5
-	g.Camera.Far = 100
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
+	g.Camera.Far = 20
 	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
 	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
 
@@ -121,22 +108,33 @@ func (g *Game) Update() error {
 	}
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.Rotation.Forward().Invert()
-	right := g.Camera.Rotation.Right()
+	forward := g.Camera.LocalRotation().Forward().Invert()
+	right := g.Camera.LocalRotation().Right()
+
+	pos := g.Camera.LocalPosition()
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.Camera.Position = g.Camera.Position.Add(forward.Scale(moveSpd))
+		pos = pos.Add(forward.Scale(moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.Camera.Position = g.Camera.Position.Add(right.Scale(moveSpd))
+		pos = pos.Add(right.Scale(moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.Camera.Position = g.Camera.Position.Add(forward.Scale(-moveSpd))
+		pos = pos.Add(forward.Scale(-moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.Camera.Position = g.Camera.Position.Add(right.Scale(-moveSpd))
+		pos = pos.Add(right.Scale(-moveSpd))
 	}
+
+	if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		pos[1] += moveSpd
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyControl) {
+		pos[1] -= moveSpd
+	}
+
+	g.Camera.SetLocalPosition(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
@@ -158,16 +156,9 @@ func (g *Game) Update() error {
 	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
 
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.Rotation = tilt.Mult(rotate)
+	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
 	g.PrevMousePosition = mv.Clone()
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		g.Camera.Position[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		g.Camera.Position[1] -= moveSpd
-	}
 
 	// Fog controls
 	if ebiten.IsKeyPressed(ebiten.Key1) {
@@ -226,7 +217,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.Camera.Clear()
 
-	g.Camera.Render(g.Scene, g.Scene.Models...)
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	opt := &ebiten.DrawImageOptions{}
 	w, h := g.Camera.ColorTexture.Size()
@@ -242,7 +233,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1, 2, 3, 4: Change fog\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, g.Font, 248, 128, color.RGBA{255, 0, 0, 255})
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{255, 0, 0, 255})
 	}
 }
 

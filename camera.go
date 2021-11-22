@@ -11,26 +11,27 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/kvartborg/vector"
+	"golang.org/x/image/font/basicfont"
 )
 
+// DebugInfo is a struct that holds debugging information for a Camera's render pass. These values are reset when Camera.Clear() is called.
 type DebugInfo struct {
-	AvgFrameTime time.Duration
+	AvgFrameTime time.Duration // Amount of CPU frame time spent transforming vertices. Doesn't necessarily include CPU time spent sending data to the GPU.
 	frameTime    time.Duration
 	tickTime     time.Time
-	DrawnObjects int
-	TotalObjects int
-	DrawnTris    int
-	TotalTris    int
+	DrawnObjects int // Number of rendered objects, excluding those invisible or culled based on distance
+	TotalObjects int // Total number of objects
+	DrawnTris    int // Number of drawn triangles, excluding those hidden from backface culling
+	TotalTris    int // Total number of triangles
 }
 
 // Camera represents a camera (where you look from) in Tetra3D.
 type Camera struct {
-	*Node
+	*NodeBase
 	ColorTexture      *ebiten.Image
 	DepthTexture      *ebiten.Image
 	ColorIntermediate *ebiten.Image
 	DepthIntermediate *ebiten.Image
-	Texture           *ebiten.Image
 
 	RenderDepth bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture will hold the depth texture render results.
 
@@ -52,7 +53,7 @@ type Camera struct {
 func NewCamera(w, h int) *Camera {
 
 	cam := &Camera{
-		Node:              NewNode("Camera"),
+		NodeBase:          NewNodeBase("Camera"),
 		ColorTexture:      ebiten.NewImage(w, h),
 		DepthTexture:      ebiten.NewImage(w, h),
 		ColorIntermediate: ebiten.NewImage(w, h),
@@ -134,10 +135,6 @@ func NewCamera(w, h int) *Camera {
 	cam.SetPerspective(60)
 
 	return cam
-}
-
-func (camera *Camera) getNode() *Node {
-	return camera.Node
 }
 
 // ViewMatrix returns the Camera's view matrix.
@@ -225,12 +222,17 @@ func (camera *Camera) Clear() {
 
 }
 
-func (camera *Camera) RenderNodes(scene *Scene, rootNode *Node) {
+// RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example).
+func (camera *Camera) RenderNodes(scene *Scene, rootNode Node) {
 
 	meshes := []*Model{}
+
+	if model, isModel := rootNode.(*Model); isModel {
+		meshes = append(meshes, model)
+	}
+
 	for _, node := range rootNode.ChildrenRecursive(true) {
-		model := node.AsModel()
-		if model != nil {
+		if model, ok := node.(*Model); ok {
 			meshes = append(meshes, model)
 		}
 	}
@@ -239,14 +241,30 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode *Node) {
 
 }
 
-// Render renders all of the models present in the passed Scene. Note that scenes rendered one after another in multiple
-// Render() calls will be rendered on top of each other in the Camera's texture buffers.
+// func (camera *Camera) RenderNodes(scene *Scene, nodes ...Node) {
+
+// 	meshes := []*Model{}
+
+// 	for _, node := range nodes {
+
+// 		if model, isModel := node.(*Model); isModel {
+// 			meshes = append(meshes, model)
+// 		}
+
+// 	}
+
+// 	camera.Render(scene, meshes...)
+
+// }
+
+// Render renders all of the models passed using the provided Scene's properties (fog, for example). Note that if Camera.RenderDepth
+// is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	if !camera.RenderDepth {
 
 		sort.SliceStable(models, func(i, j int) bool {
-			return models[i].WorldPosition().Sub(camera.WorldPosition()).Magnitude() > models[j].LocalPosition.Sub(camera.WorldPosition()).Magnitude()
+			return models[i].WorldPosition().Sub(camera.WorldPosition()).Magnitude() > models[j].LocalPosition().Sub(camera.WorldPosition()).Magnitude()
 		})
 
 	}
@@ -295,7 +313,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		camera.DebugInfo.TotalTris += len(model.Mesh.Triangles)
 
-		if !model.Visible {
+		if !model.visible {
 			continue
 		}
 
@@ -308,46 +326,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			if modelPos.Sub(camera.FrustumSphere.Position()).Magnitude() > model.BoundingSphere.Radius()+camera.FrustumSphere.Radius() {
 				continue
 			}
-
-			// screenPos := camera.WorldToScreen(model.Position)
-
-			// maxScale := math.Max(math.Max(math.Abs(model.Scale[0]), math.Abs(model.Scale[1])), math.Abs(model.Scale[2]))
-			// m := model.Mesh.Dimensions.Max() * maxScale
-
-			// vm := camera.ViewMatrix()
-			// r := vm.Right()
-			// u := vm.Up()
-
-			// points := []vector.Vector{
-			// 	{0, 0, 0},
-			// 	r.Add(u).Unit().Scale(m),
-			// 	r.Invert().Add(u).Unit().Scale(m),
-			// 	r.Add(u.Invert()).Unit().Scale(m),
-			// 	r.Add(u).Unit().Scale(m).Invert(),
-			// }
-
-			// w, h := camera.ColorTexture.Size()
-			// screenWidth := float64(w)
-			// screenHeight := float64(h)
-
-			// visible := false
-
-			// for _, p := range points {
-
-			// 	scr := camera.WorldToScreen(model.Position.Add(p))
-			// 	if model.Mesh.Name == "Suzanne" {
-			// 		fmt.Println(model.Mesh.Dimensions.Max())
-			// 	}
-			// 	if (scr[0] >= 0 && scr[0] <= screenWidth) && (scr[1] >= 0 && scr[1] <= screenHeight) {
-			// 		visible = true
-			// 		break
-			// 	}
-
-			// }
-
-			// if !visible {
-			// 	continue
-			// }
 
 		}
 
@@ -586,109 +564,24 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 	dr.GeoM.Translate(0, textScale*16)
 	dr.GeoM.Scale(textScale, textScale)
 
+	m := camera.DebugInfo.AvgFrameTime.Round(time.Microsecond).Microseconds()
+
+	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
+
 	text.DrawWithOptions(screen, fmt.Sprintf(
 		"FPS: %f\nFrame time: %s\nRendered Objects:%d/%d\nRendered Triangles: %d/%d",
 		ebiten.CurrentFPS(),
-		camera.DebugInfo.AvgFrameTime.Round(time.Millisecond/10).String(),
+		ft,
 		camera.DebugInfo.DrawnObjects,
 		camera.DebugInfo.TotalObjects,
 		camera.DebugInfo.DrawnTris,
 		camera.DebugInfo.TotalTris),
-		debugFontFace, dr)
+		basicfont.Face7x13, dr)
 
 }
 
-// func (camera *Camera) clipEdge(start, end vector.Vector) []vector.Vector {
-
-// 	startIn := start[3] < 0
-// 	endIn := end[3] < 0
-
-// 	newStart := start
-// 	newEnd := end
-
-// 	if (startIn && !endIn) || (endIn && !startIn) {
-
-// 		d0 := start[3]
-// 		d1 := end[3]
-// 		factor := 1.0 / (d0 - d1)
-
-// 		// factor*(d1 * v0.p - d0 * v1.p)
-// 		v := start.Sub(end).Scale(factor).Scale(factor)
-// 		fmt.Println(v)
-
-// 		// v[3] *= -1
-
-// 		if startIn {
-// 			newEnd = v
-// 		} else {
-// 			newStart = v
-// 		}
-
-// 		fmt.Println("old start, end", start, end)
-// 		if startIn {
-// 			fmt.Println("new end", newEnd)
-// 		} else {
-// 			fmt.Println("new start", newStart)
-// 		}
-
-// 	}
-
-// 	return []vector.Vector{newStart, newEnd}
-
-// }
-
-// func (camera *Camera) clipTriangle(verts ...vector.Vector) []vector.Vector {
-
-// 	out := []vector.Vector{}
-
-// 	if verts[0][3] > 0 && verts[1][3] > 0 && verts[2][3] > 0 {
-// 		return out
-// 	} else if verts[0][3] < 0 && verts[1][3] < 0 && verts[2][3] < 0 {
-// 		return verts
-// 	}
-
-// 	newVerts := append([]vector.Vector{}, camera.clipEdge(verts[0], verts[1])...)
-// 	newVerts = append(newVerts, camera.clipEdge(verts[1], verts[2])...)
-// 	newVerts = append(newVerts, camera.clipEdge(verts[2], verts[0])...)
-
-// 	added := func(vert vector.Vector) bool {
-// 		for _, v := range out {
-// 			if vert[0] == v[0] && vert[1] == v[1] && vert[2] == v[2] && vert[3] == v[3] {
-// 				return true
-// 			}
-// 		}
-// 		return false
-// 	}
-
-// 	for _, v := range newVerts {
-// 		if !added(v) {
-// 			out = append(out, v)
-// 		}
-// 	}
-
-// 	fmt.Println("clipped: ", out)
-
-// 	// for i := 0; i < len(verts); i++ {
-
-// 	// 	vert := verts[i]
-// 	// 	var prevVertex vector.Vector
-// 	// 	if i == 0 {
-// 	// 		prevVertex = verts[len(verts)-1]
-// 	// 	} else {
-// 	// 		prevVertex = verts[i-1]
-// 	// 	}
-
-// 	// 	if clip.PointInFront(vert) {
-// 	// 		fmt.Println("intersection")
-// 	// 		out = append(out, clip.Intersection(prevVertex, vert))
-// 	// 	} else {
-// 	// 		out = append(out, verts[i])
-// 	// 	}
-
-// 	// }
-
-// 	fmt.Println(out)
-
-// 	return out
-
-// }
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (camera *Camera) AddChildren(children ...Node) {
+	camera.addChildren(camera, children...)
+}

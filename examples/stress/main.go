@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"image"
 	"image/color"
 	"image/png"
 	"math"
@@ -10,6 +12,7 @@ import (
 	"runtime/pprof"
 	"time"
 
+	_ "embed"
 	_ "image/png"
 
 	"github.com/kvartborg/vector"
@@ -18,6 +21,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
+
+//go:embed testimage.png
+var testImage []byte
 
 type Game struct {
 	Width, Height int
@@ -50,30 +56,35 @@ func (g *Game) Init() {
 
 	g.Scene = tetra3d.NewScene("Test Scene")
 
-	loaded, err := tetra3d.LoadDAEFile("../shapes/shapes.dae", nil)
-	fmt.Println(err)
+	img, _, err := image.Decode(bytes.NewReader(testImage))
+	if err != nil {
+		panic(err)
+	}
 
-	// cubeMesh := tetra3d.NewCube()
-	// cubeMesh.Image, _, _ = ebitenutil.NewImageFromFile("testimage.png")
+	merged := tetra3d.NewModel(tetra3d.NewMesh("merged"), "merged cubes")
+	merged.Mesh.Image = ebiten.NewImageFromImage(img)
 
-	cube := loaded.FindNode("hpcube").Clone()
-	g.Scene.Root.AddChildren(cube)
+	cubes := []*tetra3d.Model{}
 
-	// for i := 0; i < 10; i++ {
-	// 	for j := 0; j < 3; j++ {
-	// 		// cube := tetra3d.NewModel(cubeMesh, "Cube")
-	// 		cube := loaded.FindNode("hpcube").Clone()
-	// 		fmt.Println(cube)
-	// 		cube.LocalPosition[0] = float64(i * 3)
-	// 		cube.LocalPosition[2] = float64(j * 3)
-	// 		g.Scene.Root.AddChildren(cube)
-	// 	}
+	for i := 0; i < 30; i++ {
+		for j := 0; j < 30; j++ {
+			cubeMesh := tetra3d.NewCube()
+			cube := tetra3d.NewModel(cubeMesh, "Cube")
+			cube.SetLocalPosition(vector.Vector{float64(i * 3), 0, float64(-j * 3)})
+			cubes = append(cubes, cube)
+		}
+	}
+
+	merged.Merge(cubes...)
+
+	g.Scene.Root.AddChildren(merged)
+
+	// for _, c := range cubes {
+	// 	g.Scene.Root.AddChildren(c)
 	// }
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.LocalPosition[2] = 15
-	// g.Camera.Far = 20
-	// g.Camera.RenderDepth = false
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -94,29 +105,33 @@ func (g *Game) Update() error {
 	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation.Forward().Invert()
-	right := g.Camera.LocalRotation.Right()
+	forward := g.Camera.LocalRotation().Forward().Invert()
+	right := g.Camera.LocalRotation().Right()
+
+	pos := g.Camera.LocalPosition()
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		g.Camera.LocalPosition = g.Camera.LocalPosition.Add(forward.Scale(moveSpd))
+		pos = pos.Add(forward.Scale(moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		g.Camera.LocalPosition = g.Camera.LocalPosition.Add(right.Scale(moveSpd))
+		pos = pos.Add(right.Scale(moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		g.Camera.LocalPosition = g.Camera.LocalPosition.Add(forward.Scale(-moveSpd))
+		pos = pos.Add(forward.Scale(-moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		g.Camera.LocalPosition = g.Camera.LocalPosition.Add(right.Scale(-moveSpd))
+		pos = pos.Add(right.Scale(-moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		g.Camera.LocalPosition[1] += moveSpd
+		pos[1] += moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		g.Camera.LocalPosition[1] -= moveSpd
+		pos[1] -= moveSpd
 	}
+
+	g.Camera.SetLocalPosition(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
@@ -140,7 +155,7 @@ func (g *Game) Update() error {
 	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
 
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.LocalRotation = tilt.Mult(rotate)
+	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
 	g.PrevMousePosition = mv.Clone()
 

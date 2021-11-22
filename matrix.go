@@ -176,9 +176,9 @@ func (matrix Matrix4) SetColumn(columnIndex int, columnData vector.Vector) Matri
 	return matrix
 }
 
-// Rotated returns a clone of the Matrix4 rotated along the axis by the angle given (in radians). This rotation works as though
-// you pierced the object utilizing the matrix through by the axis, and then rotated it counter-clockwise by the angle
-// in radians.
+// Rotated returns a clone of the Matrix4 rotated along the local axis by the angle given (in radians). This rotation works as though
+// you pierced the object through by the axis, and then rotated it counter-clockwise by the angle
+// in radians. The axis is relative to any existing rotation contained in the matrix.
 func (matrix Matrix4) Rotated(x, y, z, angle float64) Matrix4 {
 	return NewMatrix4Rotate(x, y, z, angle).Mult(matrix)
 }
