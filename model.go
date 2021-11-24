@@ -15,7 +15,7 @@ type Model struct {
 	FrustumCulling      bool // Whether the Model is culled when it leaves the frustum.
 	BackfaceCulling     bool // Whether the Model's backfaces are culled.
 	closestTris         []*Triangle
-	Color               Color // The overall color of the Model.
+	Color               *Color // The overall color of the Model.
 	BoundingSphere      *BoundingSphere
 	SortTrisBackToFront bool // Whether the Model's triangles are sorted back-to-front or not.
 }
@@ -52,7 +52,14 @@ func (model *Model) Clone() Node {
 	newModel.visible = model.visible
 	newModel.Color = model.Color.Clone()
 	newModel.SortTrisBackToFront = model.SortTrisBackToFront
+
+	newModel.NodeBase = model.NodeBase.Clone().(*NodeBase)
+	for _, child := range newModel.children {
+		child.setParent(newModel)
+	}
+
 	return newModel
+
 }
 
 // Merge merges the provided models into the calling Model. You can use this to merge several objects initially dynamically placed into the calling Model's mesh,

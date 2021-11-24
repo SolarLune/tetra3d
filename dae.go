@@ -136,9 +136,12 @@ func DefaultDaeLoadOptions() *DaeLoadOptions {
 }
 
 // LoadDAEFile takes a filepath to a .dae model file, and returns a *Scene populated with the .dae file's objects and meshes.
-// If the call couldn't complete for any reason, like due to a malformed DAE file, it will return an error.
+// Animations will not be loaded from DAE files, as DAE exports through Blender only support one animation per object (so it's generally
+// advised to use the GLTF or GLB format instead). Cameras exported in the DAE file will be turned into simple NodeBase in Tetra3D, as
+// there's not enough information to instantiate a tetra3d.Camera. If the call couldn't complete for any reason, like due to a malformed DAE file,
+// it will return an error.
 // Note that this calls os.ReadFile(), and so requires Go v1.16 or above.
-func LoadDAEFile(path string, options *DaeLoadOptions) (*Scene, error) {
+func LoadDAEFile(path string, options *DaeLoadOptions) (*SceneCollection, error) {
 
 	if fileData, err := os.ReadFile(path); err != nil {
 		return nil, err
@@ -149,8 +152,11 @@ func LoadDAEFile(path string, options *DaeLoadOptions) (*Scene, error) {
 }
 
 // LoadDAEData takes a []byte consisting of the contents of a DAE file, and returns a *Scene populated with the .dae file's objects and meshes.
-// If the call couldn't complete for any reason, like due to a malformed DAE file, it will return an error.
-func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
+// Animations will not be loaded from DAE files, as DAE exports through Blender only support one animation per object (so it's generally
+// advised to use the GLTF or GLB format instead). Cameras exported in the DAE file will be turned into simple NodeBase in Tetra3D, as
+// there's not enough information to instantiate a tetra3d.Camera. If the call couldn't complete for any reason, like due to a malformed DAE file,
+// it will return an error. If the call couldn't complete for any reason, like due to a malformed DAE file, it will return an error.
+func LoadDAEData(data []byte, options *DaeLoadOptions) (*SceneCollection, error) {
 
 	if options == nil {
 		options = DefaultDaeLoadOptions()
@@ -178,7 +184,8 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 		return nil, err
 	}
 
-	scene := NewScene(daeScene.LibraryScene.Name)
+	scenes := NewSceneCollection()
+	scene := scenes.AddScene(daeScene.LibraryScene.Name)
 
 	toYUp := NewMatrix4Rotate(1, 0, 0, math.Pi/2)
 
@@ -307,7 +314,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 		}
 
 		mesh.MaterialName = daeURLsToMaterialNames[geo.Triangles.MaterialName]
-		scene.Meshes[geo.Name] = mesh
+		scenes.Meshes[geo.Name] = mesh
 		daeURLsToMeshes[geo.URL] = mesh
 
 	}
@@ -380,6 +387,6 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Scene, error) {
 		scene.Root.AddChildren(parseDAENode(node))
 	}
 
-	return scene, nil
+	return scenes, nil
 
 }

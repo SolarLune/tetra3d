@@ -5,12 +5,12 @@ type Color struct {
 	R, G, B, A float32
 }
 
-// NewColor returns a new Color.
-func NewColor(r, g, b, a float32) Color {
-	return Color{r, g, b, a}
+// NewColor returns a new Color, with the provided R, G, B, and A components expected to range from 0 to 1.
+func NewColor(r, g, b, a float32) *Color {
+	return &Color{r, g, b, a}
 }
 
-func (color Color) Clone() Color {
+func (color *Color) Clone() *Color {
 	return NewColor(color.R, color.G, color.B, color.A)
 }
 

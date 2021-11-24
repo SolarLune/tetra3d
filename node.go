@@ -1,6 +1,8 @@
 package tetra3d
 
 import (
+	"strings"
+
 	"github.com/kvartborg/vector"
 )
 
@@ -42,6 +44,9 @@ type Node interface {
 	Visible() bool
 	SetVisible(visible bool)
 
+	FindByPath(path string) Node
+	FindByName(name string) Node
+	FindByTags(tags ...string) Node
 	TreeToString() string
 
 	Tags() *Tags
@@ -99,11 +104,13 @@ type NodeBase struct {
 	children         []Node
 	visible          bool
 	tags             *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
+	AnimationPlayer  *AnimationPlayer
 }
 
 // NewNodeBase returns a new NodeBase. You generally shouldn't need to call this.
 func NewNodeBase(name string) *NodeBase {
-	return &NodeBase{
+
+	nb := &NodeBase{
 		name:             name,
 		position:         vector.Vector{0, 0, 0},
 		scale:            vector.Vector{1, 1, 1},
@@ -113,6 +120,10 @@ func NewNodeBase(name string) *NodeBase {
 		isTransformDirty: true,
 		tags:             NewTags(),
 	}
+
+	nb.AnimationPlayer = NewAnimationPlayer(nb)
+
+	return nb
 }
 
 // Name returns the object's name.
@@ -132,8 +143,11 @@ func (nodeBase *NodeBase) Clone() Node {
 	newNode.scale = nodeBase.scale.Clone()
 	newNode.rotation = nodeBase.rotation.Clone()
 	newNode.parent = nodeBase.parent
+	newNode.AnimationPlayer = nodeBase.AnimationPlayer.Clone()
 	for _, child := range nodeBase.children {
-		newNode.children = append(newNode.children, child.Clone())
+		childClone := child.Clone()
+		childClone.setParent(newNode)
+		newNode.children = append(newNode.children, childClone)
 	}
 	return newNode
 }
@@ -168,7 +182,7 @@ func (nodeBase *NodeBase) Transform() Matrix4 {
 // rebuilt. This should be called when modifying the transformation properties (position, scale, rotation) of the NodeBase.
 func (nodeBase *NodeBase) dirtyTransform() {
 
-	if nodeBase.isTransformDirty {
+	if !nodeBase.isTransformDirty {
 
 		for _, child := range nodeBase.ChildrenRecursive(false) {
 			child.dirtyTransform()
@@ -446,4 +460,59 @@ func (nodeBase *NodeBase) TreeToString() string {
 	}
 
 	return printNode(nodeBase, 0)
+}
+
+func (nodeBase *NodeBase) FindByPath(path string) Node {
+
+	split := strings.Split(path, `/`)
+
+	var search func(node Node) Node
+
+	search = func(root Node) Node {
+
+		for _, child := range root.Children() {
+
+			if child.Name() == split[0] {
+
+				if len(split) == 1 {
+					return child
+				} else {
+					split = split[1:]
+					search(child)
+				}
+
+			}
+
+		}
+
+		return nil
+
+	}
+
+	return search(nodeBase)
+
+}
+
+// FindNodeByName allows you to search the Scene's node tree for a Node with the provided name. If a Node
+// with the name provided isn't found, FindNodeByName returns nil. After finding a Node, you can
+// convert it to a more specific type as necessary via type assertion.
+func (nodeBase *NodeBase) FindByName(name string) Node {
+	for _, node := range nodeBase.ChildrenRecursive(false) {
+		if node.Name() == name {
+			return node
+		}
+	}
+	return nil
+}
+
+// FindNodeByTag allows you to search the Scene's node tree for a Node with the provided tag. If a Node
+// with the tag provided isn't found, FindNodeByTag returns nil. After finding a Node, you can
+// convert it to a more specific type as necessary via type assertion.
+func (nodeBase *NodeBase) FindByTags(tagNames ...string) Node {
+	for _, node := range nodeBase.ChildrenRecursive(false) {
+		if node.Tags().Has(tagNames...) {
+			return node
+		}
+	}
+	return nil
 }

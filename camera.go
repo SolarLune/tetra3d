@@ -41,10 +41,11 @@ type Camera struct {
 	Perspective bool
 	fieldOfView float64
 
-	DebugInfo               DebugInfo
-	DebugDrawWireframe      bool
-	DebugDrawNormals        bool
-	DebugDrawBoundingSphere bool
+	DebugInfo          DebugInfo
+	DebugDrawWireframe bool
+	DebugDrawNormals   bool
+	DebugDrawNodes     bool
+	// DebugDrawBoundingSphere bool
 
 	FrustumSphere *BoundingSphere
 }
@@ -231,13 +232,35 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode Node) {
 		meshes = append(meshes, model)
 	}
 
-	for _, node := range rootNode.ChildrenRecursive(true) {
+	nodes := rootNode.ChildrenRecursive(true)
+
+	for _, node := range nodes {
 		if model, ok := node.(*Model); ok {
 			meshes = append(meshes, model)
 		}
 	}
 
 	camera.Render(scene, meshes...)
+
+	if camera.DebugDrawNodes {
+
+		for _, node := range nodes {
+
+			if node == camera {
+				continue
+			}
+
+			camera.drawCircle(node.WorldPosition(), 8, color.RGBA{0, 127, 255, 255})
+
+			if node.Parent() != nil && node.Parent() != scene.Root {
+				parentPos := camera.WorldToScreen(node.Parent().WorldPosition())
+				pos := camera.WorldToScreen(node.WorldPosition())
+				ebitenutil.DrawLine(camera.ColorTexture, pos[0], pos[1], parentPos[0], parentPos[1], color.RGBA{0, 192, 255, 255})
+			}
+
+		}
+
+	}
 
 }
 
@@ -557,6 +580,25 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 }
 
+func (camera *Camera) drawCircle(position vector.Vector, radius float64, drawColor color.RGBA) {
+
+	transformedCenter := camera.WorldToScreen(position)
+
+	stepCount := float64(32)
+
+	for i := 0; i < int(stepCount); i++ {
+
+		x := (math.Sin(math.Pi*2*float64(i)/stepCount) * radius)
+		y := (math.Cos(math.Pi*2*float64(i)/stepCount) * radius)
+
+		x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
+		y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
+
+		ebitenutil.DrawLine(camera.ColorTexture, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, drawColor)
+	}
+
+}
+
 // DrawDebugText draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
 // at the top-left of the provided screen *ebiten.Image.
 func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
@@ -577,6 +619,26 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 		camera.DebugInfo.DrawnTris,
 		camera.DebugInfo.TotalTris),
 		basicfont.Face7x13, dr)
+
+}
+
+func (camera *Camera) Clone() Node {
+
+	w, h := camera.ColorTexture.Size()
+	clone := NewCamera(w, h)
+
+	clone.RenderDepth = camera.RenderDepth
+	clone.Near = camera.Near
+	clone.Far = camera.Far
+	clone.Perspective = camera.Perspective
+	clone.fieldOfView = camera.fieldOfView
+
+	clone.NodeBase = camera.NodeBase.Clone().(*NodeBase)
+	for _, child := range camera.children {
+		child.setParent(camera)
+	}
+
+	return clone
 
 }
 

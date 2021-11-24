@@ -57,6 +57,11 @@ func NewMatrix4Scale(x, y, z float64) Matrix4 {
 // counter-clockwise by the angle in radians.
 func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
 
+	// Default to spinning on +Y axis if there is no valid axis
+	if x == 0 && y == 0 && z == 0 {
+		y = 1
+	}
+
 	mat := NewMatrix4()
 	vector := vector.Vector{x, y, z}.Unit()
 	s := math.Sin(angle)
@@ -77,6 +82,57 @@ func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
 
 	return mat
 
+}
+
+// NewMatrix4RotateFromQuaternion, as might be expected, creates a rotation matrix from this Quaternion.
+func NewMatrix4RotateFromQuaternion(quat *Quaternion) Matrix4 {
+
+	// See this page for where this formula comes from: https://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToMatrix/jay.htm
+
+	m1 := NewMatrix4()
+	m1[0][0] = quat.W
+	m1[0][1] = quat.Z
+	m1[0][2] = -quat.Y
+	m1[0][3] = quat.X
+
+	m1[1][0] = -quat.Z
+	m1[1][1] = quat.W
+	m1[1][2] = quat.X
+	m1[1][3] = quat.Y
+
+	m1[2][0] = quat.Y
+	m1[2][1] = -quat.X
+	m1[2][2] = quat.W
+	m1[2][3] = quat.Z
+
+	m1[3][0] = -quat.X
+	m1[3][1] = -quat.Y
+	m1[3][2] = -quat.Z
+	m1[3][3] = quat.W
+
+	m2 := NewMatrix4()
+
+	m2[0][0] = quat.W
+	m2[0][1] = quat.Z
+	m2[0][2] = -quat.Y
+	m2[0][3] = -quat.X
+
+	m2[1][0] = -quat.Z
+	m2[1][1] = quat.W
+	m2[1][2] = quat.X
+	m2[1][3] = -quat.Y
+
+	m2[2][0] = quat.Y
+	m2[2][1] = -quat.X
+	m2[2][2] = quat.W
+	m2[2][3] = -quat.Z
+
+	m2[3][0] = quat.X
+	m2[3][1] = quat.Y
+	m2[3][2] = quat.Z
+	m2[3][3] = quat.W
+
+	return m1.Mult(m2)
 }
 
 // Right returns the right-facing rotational component of the Matrix4. For an identity matrix, this would be [1, 0, 0], or +X.
@@ -140,6 +196,23 @@ func (matrix Matrix4) Transposed() Matrix4 {
 
 	return new
 
+}
+
+// Equals returns true if the matrix equals the same values in the provided Other Matrix4.
+func (matrix Matrix4) Equals(other Matrix4) bool {
+	for i := 0; i < len(matrix); i++ {
+		for j := 0; j < len(matrix[i]); j++ {
+			if matrix[i][j] != other[i][j] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// IsIdentity returns true if the matrix is an unmodified identity matrix.
+func (matrix Matrix4) IsIdentity() bool {
+	return matrix.Equals(NewMatrix4())
 }
 
 // Row returns the indiced row from the Matrix4 as a Vector.

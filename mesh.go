@@ -351,7 +351,7 @@ func (tri *Triangle) RecalculateNormal() {
 // Vertex represents a vertex. Vertices are not shared between Triangles.
 type Vertex struct {
 	Position    vector.Vector
-	Color       Color
+	Color       *Color
 	UV          vector.Vector
 	transformed vector.Vector
 	triangle    *Triangle

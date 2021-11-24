@@ -9,6 +9,36 @@ const (
 
 type FogMode int
 
+// SceneCollection represents a collection of Scenes, Meshes, and Animations, as loaded from an intermediary file format (.dae or .gltf / .glb).
+type SceneCollection struct {
+	Scenes     []*Scene
+	Meshes     map[string]*Mesh
+	Animations map[string]*Animation
+}
+
+func NewSceneCollection() *SceneCollection {
+	return &SceneCollection{
+		Scenes:     []*Scene{},
+		Meshes:     map[string]*Mesh{},
+		Animations: map[string]*Animation{},
+	}
+}
+
+func (sc *SceneCollection) FindScene(name string) *Scene {
+	for _, scene := range sc.Scenes {
+		if scene.Name == name {
+			return scene
+		}
+	}
+	return nil
+}
+
+func (sc *SceneCollection) AddScene(sceneName string) *Scene {
+	newScene := NewScene(sceneName)
+	sc.Scenes = append(sc.Scenes, newScene)
+	return newScene
+}
+
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
 // graph of parents and children. Models (visual instances of Meshes), Cameras, and "empty" NodeBases all are kinds of Nodes.
 type Scene struct {
@@ -18,9 +48,8 @@ type Scene struct {
 	// they simply need to be removed from the tree.
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
 	Root     Node
-	Meshes   map[string]*Mesh // A map of Mesh names to Mesh resources.
-	FogColor Color            // The Color of any fog present in the Scene.
-	FogMode  FogMode          // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
+	FogColor *Color  // The Color of any fog present in the Scene.
+	FogMode  FogMode // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
 	// the first indicating the start of the fog, and the second the end, in terms of total depth
 	// of the near / far clipping plane.
@@ -33,7 +62,6 @@ func NewScene(name string) *Scene {
 		Name: name,
 		// Models:   []*Model{},
 		Root:     NewNodeBase("root"),
-		Meshes:   map[string]*Mesh{},
 		FogColor: NewColor(0, 0, 0, 0),
 		FogRange: []float32{0, 1},
 	}
@@ -46,10 +74,6 @@ func (scene *Scene) Clone() *Scene {
 
 	newScene := NewScene(scene.Name)
 
-	for name, mesh := range scene.Meshes {
-		newScene.Meshes[name] = mesh
-	}
-
 	// newScene.Models = append(newScene.Models, scene.Models...)
 	newScene.Root = scene.Root.Clone()
 
@@ -61,31 +85,7 @@ func (scene *Scene) Clone() *Scene {
 
 }
 
-// FindNodeByName allows you to search the Scene's node tree for a Node with the provided name. If a Node
-// with the name provided isn't found, FindNodeByName returns nil. After finding a Node, you can
-// convert it to a more specific type as necessary via type assertion.
-func (scene *Scene) FindNodeByName(name string) Node {
-	for _, node := range scene.Root.ChildrenRecursive(false) {
-		if node.Name() == name {
-			return node
-		}
-	}
-	return nil
-}
-
-// FindNodeByTag allows you to search the Scene's node tree for a Node with the provided tag. If a Node
-// with the tag provided isn't found, FindNodeByTag returns nil. After finding a Node, you can
-// convert it to a more specific type as necessary via type assertion.
-func (scene *Scene) FindNodeByTag(tagName string) Node {
-	for _, node := range scene.Root.ChildrenRecursive(false) {
-		if node.Tags().Has(tagName) {
-			return node
-		}
-	}
-	return nil
-}
-
-// FilterModels filters out the Scene's Node tree to return just the Nodes
+// FilterNodes filters out the Scene's Node tree to return just the Nodes
 // that satisfy the function passed. You can use this to, for example, find
 // Nodes that have a specific name, or render a Scene in stages.
 func (scene *Scene) FilterNodes(filterFunc func(node Node) bool) []Node {

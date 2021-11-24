@@ -60,7 +60,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	g.Scene = dae
+	g.Scene = dae.Scenes[0]
 
 	// Get the ScreenTexture node, which is a model
 	screen := g.Scene.FindNodeByName("ScreenTexture")
@@ -73,6 +73,7 @@ func (g *Game) Init() {
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+
 }
 
 func (g *Game) Update() error {

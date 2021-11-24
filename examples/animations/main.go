@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"runtime/pprof"
-	"strings"
 	"time"
 
 	_ "embed"
@@ -19,17 +18,13 @@ import (
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-//go:embed shapes.dae
-var shapesDAE []byte
-
 type Game struct {
 	Width, Height int
-	Scene         *tetra3d.Scene
+	Collection    *tetra3d.SceneCollection
 
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
@@ -41,7 +36,11 @@ type Game struct {
 	PrevMousePosition vector.Vector
 }
 
+//go:embed test.gltf
+var testGLTF []byte
+
 func NewGame() *Game {
+
 	game := &Game{
 		Width:             398,
 		Height:            224,
@@ -55,47 +54,36 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
-	// Load the DAE file and turn it into a scene. Note that we could also pass options to change how the file
-	// is loaded (specifically, which way is up), but we don't have to do that because it will do this by default if
-	// nil is passed as the second argument.
-	dae, err := tetra3d.LoadDAEData(shapesDAE, nil)
+
+	scenes, err := tetra3d.LoadGLTFData(testGLTF, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	g.Scene = dae.Scenes[0]
-
-	// Unfortunately, we have to manually load images and apply them to Meshes; the easiest way to do this for now
-	// seems to simply be to give Meshes a Material with the name of their image file.
-	for _, m := range dae.Meshes {
-		if strings.HasSuffix(m.MaterialName, ".png") {
-			// Put images on meshes that have material names that end with ".png"
-			m.Image, _, _ = ebitenutil.NewImageFromFile(m.MaterialName)
-		}
-	}
+	g.Collection = scenes
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
-	g.Camera.Far = 20
-	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
-	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 10})
+	g.Collection.Scenes[0].Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
-	fmt.Println(g.Scene.Root.TreeToString())
+	fmt.Println(g.Collection.Scenes[0].Root.TreeToString())
 
 }
 
 func (g *Game) Update() error {
 	var err error
 
-	moveSpd := 0.1
+	moveSpd := 0.05
 
 	g.Time += 1.0 / 60
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
+
+	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
 	forward := g.Camera.LocalRotation().Forward().Invert()
@@ -130,6 +118,8 @@ func (g *Game) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
+	// Rotating the camera with the mouse
+
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
@@ -149,20 +139,6 @@ func (g *Game) Update() error {
 	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
 	g.PrevMousePosition = mv.Clone()
-
-	// Fog controls
-	if ebiten.IsKeyPressed(ebiten.Key1) {
-		g.Scene.FogColor.SetRGB(1, 0, 0)
-		g.Scene.FogMode = tetra3d.FogAdd
-	} else if ebiten.IsKeyPressed(ebiten.Key2) {
-		g.Scene.FogColor.SetRGB(0, 0, 0)
-		g.Scene.FogMode = tetra3d.FogMultiply
-	} else if ebiten.IsKeyPressed(ebiten.Key3) {
-		g.Scene.FogColor.SetRGB(0, 0, 0)
-		g.Scene.FogMode = tetra3d.FogOverwrite
-	} else if ebiten.IsKeyPressed(ebiten.Key4) {
-		g.Scene.FogMode = tetra3d.FogOff
-	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
@@ -193,26 +169,51 @@ func (g *Game) Update() error {
 		g.Camera.DebugDrawNormals = !g.Camera.DebugDrawNormals
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
+		g.Camera.DebugDrawNodes = !g.Camera.DebugDrawNodes
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
+
+	scene := g.Collection.Scenes[0]
+
+	// pyramid := scene.Root.FindByName("Pyramid").(*tetra3d.Model)
+
+	// if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+	// 	pyramid.AnimationPlayer.Play(g.Collection.Animations["Roll"])
+	// }
+
+	// pyramid.AnimationPlayer.Update(1.0 / 60)
+
+	anim := scene.Root.FindByName("Armature").(*tetra3d.NodeBase)
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+		anim.AnimationPlayer.Play(g.Collection.Animations["ArmatureAction"])
+	}
+
+	anim.AnimationPlayer.Update(1.0 / 60)
 
 	return err
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	// Clear, but with a color
-	// screen.Fill(color.RGBA{20, 25, 30, 255})
-	screen.Fill(color.Black)
 
+	// Clear, but with a color
+	screen.Fill(color.RGBA{60, 70, 80, 255})
+
+	// Clear the Camera
 	g.Camera.Clear()
 
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	// Render the logo first
+	scene := g.Collection.Scenes[0]
+	g.Camera.RenderNodes(scene, scene.Root)
 
+	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
+	// we could just draw the images straight.
 	opt := &ebiten.DrawImageOptions{}
 	w, h := g.Camera.ColorTexture.Size()
-
-	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
 	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
 		screen.DrawImage(g.Camera.DepthTexture, opt)
@@ -222,8 +223,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1, 2, 3, 4: Change fog\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{255, 0, 0, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe screen object shows what the\ncamera is looking at.\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
 	}
 }
 
@@ -248,7 +249,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d Test - Shapes")
+	ebiten.SetWindowTitle("Tetra3d Test - Logo")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()
