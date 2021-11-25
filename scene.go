@@ -58,10 +58,11 @@ type Scene struct {
 
 // NewScene creates a new Scene by the name given.
 func NewScene(name string) *Scene {
+
 	scene := &Scene{
 		Name: name,
 		// Models:   []*Model{},
-		Root:     NewNodeBase("root"),
+		Root:     NewNodeBase("Root"),
 		FogColor: NewColor(0, 0, 0, 0),
 		FogRange: []float32{0, 1},
 	}

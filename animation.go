@@ -219,7 +219,6 @@ func (ap *AnimationPlayer) Clone() *AnimationPlayer {
 	newAP.ChannelsUpdated = ap.ChannelsUpdated
 
 	newAP.Animation = ap.Animation
-	newAP.ChannelsUpdated = false
 	newAP.Playhead = ap.Playhead
 	newAP.PlaySpeed = ap.PlaySpeed
 	newAP.FinishMode = ap.FinishMode

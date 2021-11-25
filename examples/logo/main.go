@@ -63,7 +63,7 @@ func (g *Game) Init() {
 	g.Scene = dae.Scenes[0]
 
 	// Get the ScreenTexture node, which is a model
-	screen := g.Scene.FindNodeByName("ScreenTexture")
+	screen := g.Scene.Root.Get("ScreenBorder/ScreenTexture")
 
 	// And set its image
 	screen.(*tetra3d.Model).Mesh.Image = g.Offscreen
@@ -143,7 +143,7 @@ func (g *Game) Update() error {
 	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
 	// Spinning the tetrahedron in the logo
-	tetra := g.Scene.FindNodeByName("Tetra")
+	tetra := g.Scene.Root.Get("LogoGroup/Tetra")
 	tetra.SetLocalRotation(tetra.LocalRotation().Rotated(0, 1, 0, 0.05))
 
 	g.PrevMousePosition = mv.Clone()
@@ -192,14 +192,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the logo first
-	g.Camera.RenderNodes(g.Scene, g.Scene.FindNodeByName("LogoGroup"))
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("LogoGroup"))
 
 	// Clear the Offscreen, then draw the camera's color texture output to it as well.
 	g.Offscreen.Fill(color.Black)
 	g.Offscreen.DrawImage(g.Camera.ColorTexture, nil)
 
 	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
-	g.Camera.RenderNodes(g.Scene, g.Scene.FindNodeByName("ScreenBorder"))
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("ScreenBorder"))
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.

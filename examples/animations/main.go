@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"image/color"
@@ -36,8 +37,11 @@ type Game struct {
 	PrevMousePosition vector.Vector
 }
 
-//go:embed test.gltf
+//go:embed test.glb
 var testGLTF []byte
+
+//go:embed testimage.png
+var testImage []byte
 
 func NewGame() *Game {
 
@@ -55,20 +59,29 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	scenes, err := tetra3d.LoadGLTFData(testGLTF, nil)
+	scenes, err := tetra3d.LoadGLTFData(testGLTF)
 	if err != nil {
 		panic(err)
 	}
 
 	g.Collection = scenes
 
+	pngFile, err := png.Decode(bytes.NewReader(testImage))
+	if err != nil {
+		panic(err)
+	}
+
+	img := ebiten.NewImageFromImage(pngFile)
+
+	fmt.Println(g.Collection.Meshes)
+
+	g.Collection.Meshes["SkinnedMesh"].Image = img
+
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 10})
 	g.Collection.Scenes[0].Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	fmt.Println(g.Collection.Scenes[0].Root.TreeToString())
 
 }
 
@@ -179,21 +192,32 @@ func (g *Game) Update() error {
 
 	scene := g.Collection.Scenes[0]
 
-	// pyramid := scene.Root.FindByName("Pyramid").(*tetra3d.Model)
-
-	// if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-	// 	pyramid.AnimationPlayer.Play(g.Collection.Animations["Roll"])
-	// }
-
-	// pyramid.AnimationPlayer.Update(1.0 / 60)
-
-	anim := scene.Root.FindByName("Armature").(*tetra3d.NodeBase)
+	armature := scene.Root.Get("Armature").(*tetra3d.NodeBase)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-		anim.AnimationPlayer.Play(g.Collection.Animations["ArmatureAction"])
+		armature.AnimationPlayer.PlaySpeed = 0.5
+		armature.AnimationPlayer.Play(g.Collection.Animations["ArmatureAction"])
 	}
 
-	anim.AnimationPlayer.Update(1.0 / 60)
+	skin := scene.Root.Get("Armature/SkinnedMesh").(*tetra3d.Model)
+
+	pos = armature.LocalPosition()
+	pos[0] = 10
+	armature.SetLocalPosition(pos)
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyG) {
+		skin.Skinned = !skin.Skinned
+	}
+
+	armature.AnimationPlayer.Update(1.0 / 60)
+
+	pyramid := scene.Root.Get("Pyramid").(*tetra3d.Model)
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyV) {
+		pyramid.AnimationPlayer.Play(g.Collection.Animations["Roll"])
+	}
+
+	pyramid.AnimationPlayer.Update(1.0 / 60)
 
 	return err
 }

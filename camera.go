@@ -16,13 +16,15 @@ import (
 
 // DebugInfo is a struct that holds debugging information for a Camera's render pass. These values are reset when Camera.Clear() is called.
 type DebugInfo struct {
-	AvgFrameTime time.Duration // Amount of CPU frame time spent transforming vertices. Doesn't necessarily include CPU time spent sending data to the GPU.
-	frameTime    time.Duration
-	tickTime     time.Time
-	DrawnObjects int // Number of rendered objects, excluding those invisible or culled based on distance
-	TotalObjects int // Total number of objects
-	DrawnTris    int // Number of drawn triangles, excluding those hidden from backface culling
-	TotalTris    int // Total number of triangles
+	AvgFrameTime     time.Duration // Amount of CPU frame time spent transforming vertices. Doesn't necessarily include CPU time spent sending data to the GPU.
+	AvgAnimationTime time.Duration // Amount of CPU frame time spent animating vertices.
+	animationTime    time.Duration
+	frameTime        time.Duration
+	tickTime         time.Time
+	DrawnObjects     int // Number of rendered objects, excluding those invisible or culled based on distance
+	TotalObjects     int // Total number of objects
+	DrawnTris        int // Number of drawn triangles, excluding those hidden from backface culling
+	TotalTris        int // Total number of triangles
 }
 
 // Camera represents a camera (where you look from) in Tetra3D.
@@ -214,8 +216,10 @@ func (camera *Camera) Clear() {
 	if camera.DebugInfo.tickTime.IsZero() || time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 		camera.DebugInfo.tickTime = time.Now()
 		camera.DebugInfo.AvgFrameTime = camera.DebugInfo.frameTime
+		camera.DebugInfo.AvgAnimationTime = camera.DebugInfo.animationTime
 	}
 	camera.DebugInfo.frameTime = 0
+	camera.DebugInfo.animationTime = 0
 	camera.DebugInfo.DrawnObjects = 0
 	camera.DebugInfo.TotalObjects = 0
 	camera.DebugInfo.TotalTris = 0
@@ -352,7 +356,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		}
 
-		tris := model.TransformedVertices(vpMatrix, pureViewRot)
+		tris := model.TransformedVertices(vpMatrix, pureViewRot, camera)
 
 		vertexListIndex := 0
 
@@ -607,13 +611,16 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 	dr.GeoM.Scale(textScale, textScale)
 
 	m := camera.DebugInfo.AvgFrameTime.Round(time.Microsecond).Microseconds()
-
 	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
 
+	m = camera.DebugInfo.AvgAnimationTime.Round(time.Microsecond).Microseconds()
+	at := fmt.Sprintf("%.2fms", float32(m)/1000)
+
 	text.DrawWithOptions(screen, fmt.Sprintf(
-		"FPS: %f\nFrame time: %s\nRendered Objects:%d/%d\nRendered Triangles: %d/%d",
+		"FPS: %f\nFrame time: %s\nSkinned mesh animation time: %s\nRendered objects:%d/%d\nRendered triangles: %d/%d",
 		ebiten.CurrentFPS(),
 		ft,
+		at,
 		camera.DebugInfo.DrawnObjects,
 		camera.DebugInfo.TotalObjects,
 		camera.DebugInfo.DrawnTris,

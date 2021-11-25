@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"sort"
+	"time"
 
 	"github.com/kvartborg/vector"
 	"github.com/takeyourhatoff/bitset"
@@ -18,6 +19,10 @@ type Model struct {
 	Color               *Color // The overall color of the Model.
 	BoundingSphere      *BoundingSphere
 	SortTrisBackToFront bool // Whether the Model's triangles are sorted back-to-front or not.
+
+	Skinned             bool // If the model is skinned and this is enabled, the model will tranform its vertices to match its target armature
+	skinMatrix          Matrix4
+	invertedModelMatrix Matrix4
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -30,6 +35,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 		BackfaceCulling:     true,
 		Color:               NewColor(1, 1, 1, 1),
 		SortTrisBackToFront: true,
+		skinMatrix:          NewMatrix4(),
 	}
 
 	dimensions := 0.0
@@ -107,24 +113,66 @@ func (model *Model) Merge(models ...*Model) {
 
 }
 
+func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
+
+	// Avoid reallocating a new matrix for every vertex; that's wasteful
+	model.skinMatrix.Clear()
+
+	for boneIndex, bone := range vertex.Bones {
+
+		weightPerc := float64(vertex.Weights[boneIndex])
+
+		influence := fastMatrixMult(fastMatrixMult(bone.inverseBindMatrix, bone.Transform()), model.invertedModelMatrix)
+
+		if weightPerc == 1 {
+			model.skinMatrix = influence
+		} else {
+			model.skinMatrix = model.skinMatrix.Add(influence.ScaleByScalar(weightPerc))
+		}
+
+	}
+
+	vertOut := model.skinMatrix.MultVecW(vertex.Position)
+
+	return vertOut
+
+}
+
 // TransformedVertices returns the vertices of the Model, as transformed by the (provided) Camera's view matrix, sorted by distance to the (provided) Camera's position.
-func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector) []*Triangle {
+func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector, camera *Camera) []*Triangle {
 
 	mvp := model.Transform().Mult(vpMatrix)
 
-	for _, vert := range model.Mesh.sortedVertices {
-		vert.transformed = mvp.MultVecW(vert.Position)
+	if model.Skinned {
+
+		model.invertedModelMatrix = model.Transform().Inverted()
+
+		t := time.Now()
+
+		for _, vert := range model.Mesh.sortedVertices {
+			vert.transformed = mvp.MultVecW(model.skinVertex(vert))
+		}
+
+		camera.DebugInfo.animationTime += time.Since(t)
+
+	} else {
+
+		for _, vert := range model.Mesh.sortedVertices {
+			vert.transformed = mvp.MultVecW(vert.Position)
+		}
+
 	}
 
+	// Avoid reallocating the backing array by just slicing to 0 length.
 	model.closestTris = model.closestTris[:0]
 
 	if model.SortTrisBackToFront {
 		sort.SliceStable(model.Mesh.sortedVertices, func(i, j int) bool {
-			return fastSub(model.Mesh.sortedVertices[i].transformed, viewPos).Magnitude() > fastSub(model.Mesh.sortedVertices[j].transformed, viewPos).Magnitude()
+			return fastVectorSub(model.Mesh.sortedVertices[i].transformed, viewPos).Magnitude() > fastVectorSub(model.Mesh.sortedVertices[j].transformed, viewPos).Magnitude()
 		})
 	} else {
 		sort.SliceStable(model.Mesh.sortedVertices, func(i, j int) bool {
-			return fastSub(model.Mesh.sortedVertices[i].transformed, viewPos).Magnitude() < fastSub(model.Mesh.sortedVertices[j].transformed, viewPos).Magnitude()
+			return fastVectorSub(model.Mesh.sortedVertices[i].transformed, viewPos).Magnitude() < fastVectorSub(model.Mesh.sortedVertices[j].transformed, viewPos).Magnitude()
 		})
 	}
 

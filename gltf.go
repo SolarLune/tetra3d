@@ -2,7 +2,6 @@ package tetra3d
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"os"
 
@@ -11,13 +10,9 @@ import (
 	"github.com/qmuntal/gltf/modeler"
 )
 
-type GLTFLoadOptions struct{}
-
-func DefaultGLTFLoadOptions() *GLTFLoadOptions {
-	return &GLTFLoadOptions{}
-}
-
-func LoadGLTFFile(path string, options *GLTFLoadOptions) (*SceneCollection, error) {
+// LoadGLTFFile loads a .gltf or .glb file from the path given. It will return a SceneCollection and an error if the process fails. Animations (including armature-based animations)
+// will be parsed properly, but skinned meshes should be at origin (0, 0, 0) to be properly loaded.
+func LoadGLTFFile(path string) (*SceneCollection, error) {
 
 	fileData, err := os.ReadFile(path)
 
@@ -25,11 +20,13 @@ func LoadGLTFFile(path string, options *GLTFLoadOptions) (*SceneCollection, erro
 		return nil, err
 	}
 
-	return LoadGLTFData(fileData, options)
+	return LoadGLTFData(fileData)
 
 }
 
-func LoadGLTFData(data []byte, options *GLTFLoadOptions) (*SceneCollection, error) {
+// LoadGLTFData loads a .gltf or .glb file loaded in as a sequence of bytes, returning a SceneCollection and error if the process fails. Animations (including armature-based animations)
+// will be parsed properly, but skinned meshes should be at origin (0, 0, 0) to be properly loaded.
+func LoadGLTFData(data []byte) (*SceneCollection, error) {
 
 	decoder := gltf.NewDecoder(bytes.NewReader(data))
 
@@ -44,11 +41,15 @@ func LoadGLTFData(data []byte, options *GLTFLoadOptions) (*SceneCollection, erro
 	collection := NewSceneCollection()
 
 	type VertexData struct {
-		Pos    vector.Vector
-		UV     vector.Vector
-		Normal vector.Vector
-		Color  *Color
+		Pos        vector.Vector
+		UV         vector.Vector
+		Normal     vector.Vector
+		Color      *Color
+		WeightData []float32
+		Bones      []uint16
 	}
+
+	verticesToVertexData := map[*Vertex]VertexData{}
 
 	for _, mesh := range doc.Meshes {
 
@@ -128,6 +129,35 @@ func LoadGLTFData(data []byte, options *GLTFLoadOptions) (*SceneCollection, erro
 
 			}
 
+			if weightAccessor, weightExists := v.Attributes[gltf.WEIGHTS_0]; weightExists {
+
+				weightBuffer := [][4]float32{}
+				weights, err := modeler.ReadWeights(doc, doc.Accessors[weightAccessor], weightBuffer)
+
+				if err != nil {
+					return nil, err
+				}
+
+				boneBuffer := [][4]uint16{}
+				bones, err := modeler.ReadJoints(doc, doc.Accessors[v.Attributes[gltf.JOINTS_0]], boneBuffer)
+
+				if err != nil {
+					return nil, err
+				}
+
+				// Store weights and bones; we don't want to waste space and speed storing bones if their weights are 0
+				for w := range weights {
+					vWeights := weights[w]
+					for i := range vWeights {
+						if vWeights[i] > 0 {
+							vertexData[w].WeightData = append(vertexData[w].WeightData, vWeights[i])
+							vertexData[w].Bones = append(vertexData[w].Bones, bones[w][i])
+						}
+					}
+				}
+
+			}
+
 			indexBuffer := []uint32{}
 
 			indices, err := modeler.ReadIndices(doc, doc.Accessors[*v.Indices], indexBuffer)
@@ -142,7 +172,9 @@ func LoadGLTFData(data []byte, options *GLTFLoadOptions) (*SceneCollection, erro
 				vd := vertexData[indices[i]]
 				newVert := NewVertex(vd.Pos[0], vd.Pos[1], vd.Pos[2], vd.UV[0], vd.UV[1])
 				newVert.Color = vd.Color.Clone()
+				newVert.Weights = append(newVert.Weights, vd.WeightData...)
 				newVerts = append(newVerts, newVert)
+				verticesToVertexData[newVert] = vd
 			}
 
 			newMesh.AddTriangles(newVerts...)
@@ -279,14 +311,17 @@ func LoadGLTFData(data []byte, options *GLTFLoadOptions) (*SceneCollection, erro
 
 		}
 
-		fmt.Println("anim, channels", anim, anim.Channels)
-		if channel, exists := anim.Channels["ArmL"]; exists {
-			fmt.Println(channel)
-		}
-
 		anim.Length = animLength
 
 	}
+
+	// skins := []*Skin{}
+
+	// for _, skin := range doc.Skins {
+
+	// 	skins = append(skins, skin.)
+
+	// }
 
 	objects := []Node{}
 
@@ -332,10 +367,60 @@ func LoadGLTFData(data []byte, options *GLTFLoadOptions) (*SceneCollection, erro
 
 	}
 
+	// Do this twice so we can be sure that all of the nodes can be created first
 	for i, node := range doc.Nodes {
 
-		for _, child := range node.Children {
-			objects[i].AddChildren(objects[int(child)])
+		// Set up skin for skinning animations
+		if node.Skin != nil {
+
+			model := objects[i].(*Model)
+
+			skin := doc.Skins[*node.Skin]
+
+			// Unsure of if this is necessary.
+			if skin.Skeleton != nil {
+				skeletonRoot := objects[*skin.Skeleton]
+				model.SetWorldPosition(skeletonRoot.WorldPosition())
+				model.SetWorldScale(skeletonRoot.WorldScale())
+				model.SetWorldRotation(skeletonRoot.WorldRotation())
+			}
+
+			model.Skinned = true
+
+			allBones := []*NodeBase{}
+
+			for _, b := range skin.Joints {
+				allBones = append(allBones, objects[b].(*NodeBase))
+			}
+
+			matrices, err := modeler.ReadAccessor(doc, doc.Accessors[*skin.InverseBindMatrices], nil)
+			if err != nil {
+				return nil, err
+			}
+
+			for matIndex, matrix := range matrices.([][4][4]float32) {
+
+				newMat := NewMatrix4()
+				for rowIndex, row := range matrix {
+					newMat = newMat.SetColumn(rowIndex, vector.Vector{float64(row[0]), float64(row[1]), float64(row[2]), float64(row[3])})
+				}
+
+				allBones[matIndex].inverseBindMatrix = newMat
+
+			}
+
+			for _, vertex := range model.Mesh.Vertices {
+
+				for _, boneID := range verticesToVertexData[vertex].Bones {
+					vertex.Bones = append(vertex.Bones, allBones[boneID])
+				}
+
+			}
+
+		}
+
+		for _, childIndex := range node.Children {
+			objects[i].AddChildren(objects[int(childIndex)])
 		}
 
 	}

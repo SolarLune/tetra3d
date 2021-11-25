@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/kvartborg/vector"
@@ -15,9 +16,11 @@ type Node interface {
 	Name() string
 	SetName(name string)
 	Clone() Node
+	Data() interface{}
 
 	setParent(Node)
 	Parent() Node
+	Root() Node
 	Children() []Node
 	ChildrenRecursive(onlyVisible bool) []Node
 	AddChildren(...Node)
@@ -44,10 +47,11 @@ type Node interface {
 	Visible() bool
 	SetVisible(visible bool)
 
-	FindByPath(path string) Node
-	FindByName(name string) Node
-	FindByTags(tags ...string) Node
+	Get(path string) Node
+	GetByName(name string) Node
+	GetByTags(tags ...string) Node
 	TreeToString() string
+	Path() string
 
 	Tags() *Tags
 }
@@ -94,17 +98,19 @@ func (tags *Tags) Has(nodeTags ...string) bool {
 // NodeBase represents a minimal struct that fully implements the Node interface. Model and Camera embed NodeBase
 // into their structs to automatically easily implement Node.
 type NodeBase struct {
-	name             string
-	parent           Node
-	position         vector.Vector
-	scale            vector.Vector
-	rotation         Matrix4
-	cachedTransform  Matrix4
-	isTransformDirty bool
-	children         []Node
-	visible          bool
-	tags             *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
-	AnimationPlayer  *AnimationPlayer
+	name              string
+	parent            Node
+	position          vector.Vector
+	scale             vector.Vector
+	rotation          Matrix4
+	data              interface{} // A place to store a pointer to something if you need it
+	cachedTransform   Matrix4
+	isTransformDirty  bool
+	children          []Node
+	visible           bool
+	tags              *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
+	AnimationPlayer   *AnimationPlayer
+	inverseBindMatrix Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 }
 
 // NewNodeBase returns a new NodeBase. You generally shouldn't need to call this.
@@ -152,7 +158,17 @@ func (nodeBase *NodeBase) Clone() Node {
 	return newNode
 }
 
-// Transform returns a Matrix4 indicating the position, rotation, and scale of the object, transforming it by any parent's.
+// SetData sets user-customizeable data that could be usefully stored on this node.
+func (nodeBase *NodeBase) SetData(data interface{}) {
+	nodeBase.data = data
+}
+
+// Data returns a pointer to user-customizeable data that could be usefully stored on this node.
+func (nodeBase *NodeBase) Data() interface{} {
+	return nodeBase.data
+}
+
+// Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
 // If there's no change between the previous Transform() call and this one, Transform() will return a cached version of the
 // transform for efficiency.
 func (nodeBase *NodeBase) Transform() Matrix4 {
@@ -449,7 +465,10 @@ func (nodeBase *NodeBase) TreeToString() string {
 				str += "    "
 			}
 
-			str += "\\-: " + node.Name() + "\n"
+			wp := node.LocalPosition()
+			wpStr := "[" + strconv.FormatFloat(wp[0], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[1], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[2], 'f', -1, 64) + "]"
+
+			str += "\\-: " + node.Name() + " : " + wpStr + "\n"
 		}
 
 		for _, child := range node.Children() {
@@ -462,23 +481,39 @@ func (nodeBase *NodeBase) TreeToString() string {
 	return printNode(nodeBase, 0)
 }
 
-func (nodeBase *NodeBase) FindByPath(path string) Node {
-
-	split := strings.Split(path, `/`)
+// Get searches a node's hierarchy using a string to find a specified node. The path is in the format of names of nodes, separated by forward
+// slashes ('/'), and is relative to the node you use to call Get. As an example of Get, if you had a cup parented to a desk, which was
+// parented to a room, that was finally parented to the root of the scene, it would be found at "Room/Desk/Cup". Note also that you can use "../" to
+// "go up one" in the hierarchy (so cup.Get("../") would return the Desk node).
+// Since Get uses forward slashes as path separation, it would be good to avoid using forward slashes in your object names.
+func (nodeBase *NodeBase) Get(path string) Node {
 
 	var search func(node Node) Node
 
-	search = func(root Node) Node {
+	split := strings.Split(path, `/`)
 
-		for _, child := range root.Children() {
+	search = func(node Node) Node {
+
+		if node == nil {
+			return nil
+		} else if len(split) == 0 {
+			return node
+		}
+
+		if split[0] == ".." {
+			split = split[1:]
+			return search(node.Parent())
+		}
+
+		for _, child := range node.Children() {
 
 			if child.Name() == split[0] {
 
-				if len(split) == 1 {
+				if len(split) <= 1 {
 					return child
 				} else {
 					split = split[1:]
-					search(child)
+					return search(child)
 				}
 
 			}
@@ -493,10 +528,32 @@ func (nodeBase *NodeBase) FindByPath(path string) Node {
 
 }
 
-// FindNodeByName allows you to search the Scene's node tree for a Node with the provided name. If a Node
+// Path returns a string indicating the hierarchical path to get this Node from the root. The path returned will be absolute, such that
+// passing it to Get() called on the scene root node will return this node. The path returned will not contain the root node's name ("Root").
+func (nodeBase *NodeBase) Path() string {
+
+	root := nodeBase.Root()
+
+	if root == nil {
+		return ""
+	}
+
+	parent := nodeBase.Parent()
+	path := nodeBase.Name()
+
+	for parent != nil && parent != root {
+		path = parent.Name() + "/" + path
+		parent = parent.Parent()
+	}
+
+	return path
+
+}
+
+// GetByName allows you to search the node's tree for a Node with the provided name. If a Node
 // with the name provided isn't found, FindNodeByName returns nil. After finding a Node, you can
 // convert it to a more specific type as necessary via type assertion.
-func (nodeBase *NodeBase) FindByName(name string) Node {
+func (nodeBase *NodeBase) GetByName(name string) Node {
 	for _, node := range nodeBase.ChildrenRecursive(false) {
 		if node.Name() == name {
 			return node
@@ -505,14 +562,48 @@ func (nodeBase *NodeBase) FindByName(name string) Node {
 	return nil
 }
 
-// FindNodeByTag allows you to search the Scene's node tree for a Node with the provided tag. If a Node
+// GetByTags allows you to search the node's tree for a Node with the provided tag. If a Node
 // with the tag provided isn't found, FindNodeByTag returns nil. After finding a Node, you can
 // convert it to a more specific type as necessary via type assertion.
-func (nodeBase *NodeBase) FindByTags(tagNames ...string) Node {
+func (nodeBase *NodeBase) GetByTags(tagNames ...string) Node {
 	for _, node := range nodeBase.ChildrenRecursive(false) {
 		if node.Tags().Has(tagNames...) {
 			return node
 		}
 	}
 	return nil
+}
+
+// GetMultipleByTags allows you to search the node's tree for multiple Nodes with the provided tag.
+// After finding Nodes, you can convert it to a more specific type as necessary via type assertion.
+func (nodeBase *NodeBase) GetMultipleByTags(tagNames ...string) []Node {
+	out := []Node{}
+	for _, node := range nodeBase.ChildrenRecursive(false) {
+		if node.Tags().Has(tagNames...) {
+			out = append(out, node)
+		}
+	}
+	return out
+}
+
+// Root returns the root node in this tree by recursively traversing this node's hierarchy of
+// parents upwards.
+func (nodeBase *NodeBase) Root() Node {
+
+	if nodeBase.parent == nil {
+		return nodeBase
+	}
+
+	parent := nodeBase.Parent()
+
+	for parent != nil {
+		next := parent.Parent()
+		if next == nil {
+			break
+		}
+		parent = next
+	}
+
+	return parent
+
 }

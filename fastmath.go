@@ -2,15 +2,44 @@ package tetra3d
 
 import "github.com/kvartborg/vector"
 
-// The goal of fastmath.go is to provide vector operations that don't clone the vector to use. Be careful with it, me!
+// The goal of fastmath.go is to provide vector operations that don't clone the vector to use. This means the main usage is not to use the results
+// directly, but rather as intermediary steps (i.e. use fastVectorSub to compare distances, or fastMatrixMult to multiply a vector by that final matrix).
+// Be careful with it, me!
 
-var standin = vector.Vector{0, 0, 0}
+var standinVector = vector.Vector{0, 0, 0}
+var standinMatrix = NewEmptyMatrix4()
 
-func fastSub(a, b vector.Vector) vector.Vector {
+func fastVectorSub(a, b vector.Vector) vector.Vector {
 
-	standin[0] = a[0] - b[0]
-	standin[1] = a[1] - b[1]
-	standin[2] = a[2] - b[2]
-	return standin
+	standinVector[0] = a[0] - b[0]
+	standinVector[1] = a[1] - b[1]
+	standinVector[2] = a[2] - b[2]
+	return standinVector
+
+}
+
+func fastMatrixMult(matrix, other Matrix4) Matrix4 {
+
+	standinMatrix[0][0] = matrix[0][0]*other[0][0] + matrix[0][1]*other[1][0] + matrix[0][2]*other[2][0] + matrix[0][3]*other[3][0]
+	standinMatrix[1][0] = matrix[1][0]*other[0][0] + matrix[1][1]*other[1][0] + matrix[1][2]*other[2][0] + matrix[1][3]*other[3][0]
+	standinMatrix[2][0] = matrix[2][0]*other[0][0] + matrix[2][1]*other[1][0] + matrix[2][2]*other[2][0] + matrix[2][3]*other[3][0]
+	standinMatrix[3][0] = matrix[3][0]*other[0][0] + matrix[3][1]*other[1][0] + matrix[3][2]*other[2][0] + matrix[3][3]*other[3][0]
+
+	standinMatrix[0][1] = matrix[0][0]*other[0][1] + matrix[0][1]*other[1][1] + matrix[0][2]*other[2][1] + matrix[0][3]*other[3][1]
+	standinMatrix[1][1] = matrix[1][0]*other[0][1] + matrix[1][1]*other[1][1] + matrix[1][2]*other[2][1] + matrix[1][3]*other[3][1]
+	standinMatrix[2][1] = matrix[2][0]*other[0][1] + matrix[2][1]*other[1][1] + matrix[2][2]*other[2][1] + matrix[2][3]*other[3][1]
+	standinMatrix[3][1] = matrix[3][0]*other[0][1] + matrix[3][1]*other[1][1] + matrix[3][2]*other[2][1] + matrix[3][3]*other[3][1]
+
+	standinMatrix[0][2] = matrix[0][0]*other[0][2] + matrix[0][1]*other[1][2] + matrix[0][2]*other[2][2] + matrix[0][3]*other[3][2]
+	standinMatrix[1][2] = matrix[1][0]*other[0][2] + matrix[1][1]*other[1][2] + matrix[1][2]*other[2][2] + matrix[1][3]*other[3][2]
+	standinMatrix[2][2] = matrix[2][0]*other[0][2] + matrix[2][1]*other[1][2] + matrix[2][2]*other[2][2] + matrix[2][3]*other[3][2]
+	standinMatrix[3][2] = matrix[3][0]*other[0][2] + matrix[3][1]*other[1][2] + matrix[3][2]*other[2][2] + matrix[3][3]*other[3][2]
+
+	standinMatrix[0][3] = matrix[0][0]*other[0][3] + matrix[0][1]*other[1][3] + matrix[0][2]*other[2][3] + matrix[0][3]*other[3][3]
+	standinMatrix[1][3] = matrix[1][0]*other[0][3] + matrix[1][1]*other[1][3] + matrix[1][2]*other[2][3] + matrix[1][3]*other[3][3]
+	standinMatrix[2][3] = matrix[2][0]*other[0][3] + matrix[2][1]*other[1][3] + matrix[2][2]*other[2][3] + matrix[2][3]*other[3][3]
+	standinMatrix[3][3] = matrix[3][0]*other[0][3] + matrix[3][1]*other[1][3] + matrix[3][2]*other[2][3] + matrix[3][3]*other[3][3]
+
+	return standinMatrix
 
 }

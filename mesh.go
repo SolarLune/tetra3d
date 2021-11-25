@@ -355,6 +355,8 @@ type Vertex struct {
 	UV          vector.Vector
 	transformed vector.Vector
 	triangle    *Triangle
+	Weights     []float32
+	Bones       []*NodeBase
 }
 
 // NewVertex creates a new Vertex with the provided position (x, y, z) and UV values (u, v).
@@ -363,6 +365,8 @@ func NewVertex(x, y, z, u, v float64) *Vertex {
 		Position:    vector.Vector{x, y, z},
 		Color:       NewColor(1, 1, 1, 1),
 		UV:          vector.Vector{u, v},
+		Weights:     make([]float32, 0, 4),
+		Bones:       make([]*NodeBase, 0, 4),
 		transformed: vector.Vector{0, 0, 0},
 	}
 }
@@ -371,6 +375,15 @@ func NewVertex(x, y, z, u, v float64) *Vertex {
 func (vertex *Vertex) Clone() *Vertex {
 	newVert := NewVertex(vertex.Position[0], vertex.Position[1], vertex.Position[2], vertex.UV[0], vertex.UV[1])
 	newVert.Color = vertex.Color.Clone()
+
+	for i := range vertex.Weights {
+		newVert.Weights = append(newVert.Weights, vertex.Weights[i])
+	}
+
+	for i := range vertex.Bones {
+		newVert.Bones = append(newVert.Bones, vertex.Bones[i])
+	}
+
 	return newVert
 }
 

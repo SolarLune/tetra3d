@@ -23,6 +23,26 @@ func NewMatrix4() Matrix4 {
 
 }
 
+func NewEmptyMatrix4() Matrix4 {
+
+	mat := Matrix4{
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+		{0, 0, 0, 0},
+	}
+	return mat
+
+}
+
+func (matrix *Matrix4) Clear() {
+	for y := 0; y < len(matrix); y++ {
+		for x := 0; x < len(matrix[y]); x++ {
+			matrix[y][x] = 0
+		}
+	}
+}
+
 // Clone clones the Matrix4, returning a new copy.
 func (matrix Matrix4) Clone() Matrix4 {
 	newMat := NewMatrix4()
@@ -198,6 +218,20 @@ func (matrix Matrix4) Transposed() Matrix4 {
 
 }
 
+func (matrix Matrix4) Inverted() Matrix4 {
+
+	p, s, r := matrix.Decompose()
+
+	newMat := NewMatrix4()
+	newMat = newMat.SetRow(0, r.Row(0).Invert().Scale(-s[0]))
+	newMat = newMat.SetRow(1, r.Row(1).Invert().Scale(-s[0]))
+	newMat = newMat.SetRow(2, r.Row(2).Invert().Scale(-s[0]))
+	newMat = newMat.SetRow(3, vector.Vector{-p[0], -p[1], -p[2], 1})
+
+	return newMat
+
+}
+
 // Equals returns true if the matrix equals the same values in the provided Other Matrix4.
 func (matrix Matrix4) Equals(other Matrix4) bool {
 	for i := 0; i < len(matrix); i++ {
@@ -332,6 +366,34 @@ func (matrix Matrix4) Mult(other Matrix4) Matrix4 {
 	newMat[1][3] = matrix[1][0]*other[0][3] + matrix[1][1]*other[1][3] + matrix[1][2]*other[2][3] + matrix[1][3]*other[3][3]
 	newMat[2][3] = matrix[2][0]*other[0][3] + matrix[2][1]*other[1][3] + matrix[2][2]*other[2][3] + matrix[2][3]*other[3][3]
 	newMat[3][3] = matrix[3][0]*other[0][3] + matrix[3][1]*other[1][3] + matrix[3][2]*other[2][3] + matrix[3][3]*other[3][3]
+
+	return newMat
+
+}
+
+func (matrix Matrix4) Add(other Matrix4) Matrix4 {
+
+	newMat := matrix.Clone()
+
+	for i := 0; i < len(matrix); i++ {
+		for j := 0; j < len(matrix[i]); j++ {
+			newMat[i][j] += other[i][j]
+		}
+	}
+
+	return newMat
+
+}
+
+func (matrix Matrix4) ScaleByScalar(scalar float64) Matrix4 {
+
+	newMat := matrix.Clone()
+
+	for i := 0; i < len(matrix); i++ {
+		for j := 0; j < len(matrix[i]); j++ {
+			newMat[i][j] *= scalar
+		}
+	}
 
 	return newMat
 

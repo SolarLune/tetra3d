@@ -97,10 +97,10 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	parent := g.Scene.FindNodeByName("parent")
+	parent := g.Scene.Root.Get("parent")
 	parent.SetLocalRotation(parent.LocalRotation().Rotated(0, 1, 0, 0.05))
 
-	child := g.Scene.FindNodeByName("child")
+	child := g.Scene.Root.GetByName("child")
 
 	// Moving the Camera
 
