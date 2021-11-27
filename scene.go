@@ -9,23 +9,23 @@ const (
 
 type FogMode int
 
-// SceneCollection represents a collection of Scenes, Meshes, and Animations, as loaded from an intermediary file format (.dae or .gltf / .glb).
-type SceneCollection struct {
+// Library represents a collection of Scenes, Meshes, and Animations, as loaded from an intermediary file format (.dae or .gltf / .glb).
+type Library struct {
 	Scenes     []*Scene
 	Meshes     map[string]*Mesh
 	Animations map[string]*Animation
 }
 
-func NewSceneCollection() *SceneCollection {
-	return &SceneCollection{
+func NewLibrary() *Library {
+	return &Library{
 		Scenes:     []*Scene{},
 		Meshes:     map[string]*Mesh{},
 		Animations: map[string]*Animation{},
 	}
 }
 
-func (sc *SceneCollection) FindScene(name string) *Scene {
-	for _, scene := range sc.Scenes {
+func (lib *Library) FindScene(name string) *Scene {
+	for _, scene := range lib.Scenes {
 		if scene.Name == name {
 			return scene
 		}
@@ -33,9 +33,9 @@ func (sc *SceneCollection) FindScene(name string) *Scene {
 	return nil
 }
 
-func (sc *SceneCollection) AddScene(sceneName string) *Scene {
+func (lib *Library) AddScene(sceneName string) *Scene {
 	newScene := NewScene(sceneName)
-	sc.Scenes = append(sc.Scenes, newScene)
+	lib.Scenes = append(lib.Scenes, newScene)
 	return newScene
 }
 

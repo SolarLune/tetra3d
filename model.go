@@ -23,6 +23,7 @@ type Model struct {
 	Skinned             bool // If the model is skinned and this is enabled, the model will tranform its vertices to match its target armature
 	skinMatrix          Matrix4
 	invertedModelMatrix Matrix4
+	bones               [][]*NodeBase
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -113,12 +114,41 @@ func (model *Model) Merge(models ...*Model) {
 
 }
 
+// ReassignBones reassigns the model to point to a different armature.
+func (model *Model) ReassignBones(armatureNode Node) {
+
+	if len(model.bones) == 0 {
+		return
+	}
+
+	bones := armatureNode.ChildrenRecursive(false)
+
+	boneMap := map[string]*NodeBase{}
+
+	for _, b := range bones {
+		boneMap[b.Name()] = b.(*NodeBase)
+	}
+
+	for vertexIndex := range model.bones {
+
+		for i := range model.bones[vertexIndex] {
+			newBone := boneMap[model.bones[vertexIndex][i].name]
+			if newBone.inverseBindMatrix.IsZero() {
+				newBone.inverseBindMatrix = model.bones[vertexIndex][i].inverseBindMatrix.Clone()
+			}
+			model.bones[vertexIndex][i] = newBone
+		}
+
+	}
+
+}
+
 func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
 
 	// Avoid reallocating a new matrix for every vertex; that's wasteful
 	model.skinMatrix.Clear()
 
-	for boneIndex, bone := range vertex.Bones {
+	for boneIndex, bone := range model.bones[vertex.ID] {
 
 		weightPerc := float64(vertex.Weights[boneIndex])
 
@@ -198,4 +228,10 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector,
 func (model *Model) AddChildren(children ...Node) {
 	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
 	model.addChildren(model, children...)
+}
+
+func (model *Model) Unparent() {
+	if model.parent != nil {
+		model.parent.RemoveChildren(model)
+	}
 }

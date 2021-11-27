@@ -654,3 +654,9 @@ func (camera *Camera) Clone() Node {
 func (camera *Camera) AddChildren(children ...Node) {
 	camera.addChildren(camera, children...)
 }
+
+func (camera *Camera) Unparent() {
+	if camera.parent != nil {
+		camera.parent.RemoveChildren(camera)
+	}
+}

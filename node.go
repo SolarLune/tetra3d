@@ -20,6 +20,7 @@ type Node interface {
 
 	setParent(Node)
 	Parent() Node
+	Unparent()
 	Root() Node
 	Children() []Node
 	ChildrenRecursive(onlyVisible bool) []Node
@@ -409,10 +410,17 @@ func (nodeBase *NodeBase) RemoveChildren(children ...Node) {
 				child.setParent(nil)
 				nodeBase.children[i] = nil
 				nodeBase.children = append(nodeBase.children[:i], nodeBase.children[i+1:]...)
+				break
 			}
 		}
 	}
 
+}
+
+func (nodeBase *NodeBase) Unparent() {
+	if nodeBase.parent != nil {
+		nodeBase.parent.RemoveChildren(nodeBase)
+	}
 }
 
 // Children() returns the Node's children.

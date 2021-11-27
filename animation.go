@@ -227,6 +227,7 @@ func (ap *AnimationPlayer) Clone() *AnimationPlayer {
 	return newAP
 }
 
+// SetRoot sets the root node of the animation player to act on. Note that this should be the root node
 func (ap *AnimationPlayer) SetRoot(node Node) {
 	ap.RootNode = node
 	ap.ChannelsUpdated = false
@@ -242,7 +243,9 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 
 }
 
-func (ap *AnimationPlayer) AssignChannels() {
+// assignChannels assigns the player's root node's children to channels in the player. This is called when the channels need to be
+// updated after the root node changes.
+func (ap *AnimationPlayer) assignChannels() {
 
 	if ap.Animation != nil {
 
@@ -281,7 +284,7 @@ func (ap *AnimationPlayer) Update(dt float64) {
 		if ap.Animation != nil {
 
 			if !ap.ChannelsUpdated {
-				ap.AssignChannels()
+				ap.assignChannels()
 			}
 
 			for _, channel := range ap.Animation.Channels {

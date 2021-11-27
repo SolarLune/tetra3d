@@ -311,8 +311,9 @@ func (tri *Triangle) SetVertices(verts ...*Vertex) {
 	}
 
 	tri.Vertices = verts
-	for _, v := range verts {
+	for i, v := range verts {
 		v.triangle = tri
+		v.ID = ((tri.ID - 1) * 3) + i
 	}
 
 	tri.RecalculateCenter()
@@ -356,7 +357,7 @@ type Vertex struct {
 	transformed vector.Vector
 	triangle    *Triangle
 	Weights     []float32
-	Bones       []*NodeBase
+	ID          int
 }
 
 // NewVertex creates a new Vertex with the provided position (x, y, z) and UV values (u, v).
@@ -366,7 +367,6 @@ func NewVertex(x, y, z, u, v float64) *Vertex {
 		Color:       NewColor(1, 1, 1, 1),
 		UV:          vector.Vector{u, v},
 		Weights:     make([]float32, 0, 4),
-		Bones:       make([]*NodeBase, 0, 4),
 		transformed: vector.Vector{0, 0, 0},
 	}
 }
@@ -378,10 +378,6 @@ func (vertex *Vertex) Clone() *Vertex {
 
 	for i := range vertex.Weights {
 		newVert.Weights = append(newVert.Weights, vertex.Weights[i])
-	}
-
-	for i := range vertex.Bones {
-		newVert.Bones = append(newVert.Bones, vertex.Bones[i])
 	}
 
 	return newVert

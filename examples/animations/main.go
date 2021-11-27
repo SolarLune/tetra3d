@@ -25,7 +25,7 @@ import (
 
 type Game struct {
 	Width, Height int
-	Collection    *tetra3d.SceneCollection
+	Library       *tetra3d.Library
 
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
@@ -37,7 +37,7 @@ type Game struct {
 	PrevMousePosition vector.Vector
 }
 
-//go:embed test.glb
+//go:embed test.gltf
 var testGLTF []byte
 
 //go:embed testimage.png
@@ -59,12 +59,12 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	scenes, err := tetra3d.LoadGLTFData(testGLTF)
+	library, err := tetra3d.LoadGLTFData(testGLTF)
 	if err != nil {
 		panic(err)
 	}
 
-	g.Collection = scenes
+	g.Library = library
 
 	pngFile, err := png.Decode(bytes.NewReader(testImage))
 	if err != nil {
@@ -73,15 +73,17 @@ func (g *Game) Init() {
 
 	img := ebiten.NewImageFromImage(pngFile)
 
-	fmt.Println(g.Collection.Meshes)
-
-	g.Collection.Meshes["SkinnedMesh"].Image = img
+	g.Library.Meshes["SkinnedMesh"].Image = img
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 10})
-	g.Collection.Scenes[0].Root.AddChildren(g.Camera)
+	g.Library.Scenes[0].Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+
+	// newCube := scenes.Scenes[0].Root.Get("Cube.001").Clone()
+	// scenes.Scenes[0].Root.Get("Armature/Root/1/2/3/4/5").AddChildren(newCube)
+	// newCube.SetLocalPosition(vector.Vector{0, 2, 0})
 
 }
 
@@ -190,23 +192,22 @@ func (g *Game) Update() error {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
-	scene := g.Collection.Scenes[0]
+	scene := g.Library.Scenes[0]
 
 	armature := scene.Root.Get("Armature").(*tetra3d.NodeBase)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		armature.AnimationPlayer.PlaySpeed = 0.5
-		armature.AnimationPlayer.Play(g.Collection.Animations["ArmatureAction"])
+		armature.AnimationPlayer.Play(g.Library.Animations["ArmatureAction"])
 	}
-
-	skin := scene.Root.Get("Armature/SkinnedMesh").(*tetra3d.Model)
 
 	pos = armature.LocalPosition()
 	pos[0] = 10
 	armature.SetLocalPosition(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyG) {
-		skin.Skinned = !skin.Skinned
+		// skin.Skinned = !skin.Skinned
+		scene.Root.Get("SkinnedMesh2").(*tetra3d.Model).Skinned = !scene.Root.Get("SkinnedMesh2").(*tetra3d.Model).Skinned
 	}
 
 	armature.AnimationPlayer.Update(1.0 / 60)
@@ -214,7 +215,7 @@ func (g *Game) Update() error {
 	pyramid := scene.Root.Get("Pyramid").(*tetra3d.Model)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyV) {
-		pyramid.AnimationPlayer.Play(g.Collection.Animations["Roll"])
+		pyramid.AnimationPlayer.Play(g.Library.Animations["Roll"])
 	}
 
 	pyramid.AnimationPlayer.Update(1.0 / 60)
@@ -231,7 +232,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the logo first
-	scene := g.Collection.Scenes[0]
+	scene := g.Library.Scenes[0]
 	g.Camera.RenderNodes(scene, scene.Root)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,

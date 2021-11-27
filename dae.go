@@ -141,7 +141,7 @@ func DefaultDaeLoadOptions() *DaeLoadOptions {
 // there's not enough information to instantiate a tetra3d.Camera. If the call couldn't complete for any reason, like due to a malformed DAE file,
 // it will return an error.
 // Note that this calls os.ReadFile(), and so requires Go v1.16 or above.
-func LoadDAEFile(path string, options *DaeLoadOptions) (*SceneCollection, error) {
+func LoadDAEFile(path string, options *DaeLoadOptions) (*Library, error) {
 
 	if fileData, err := os.ReadFile(path); err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func LoadDAEFile(path string, options *DaeLoadOptions) (*SceneCollection, error)
 // advised to use the GLTF or GLB format instead). Cameras exported in the DAE file will be turned into simple NodeBase in Tetra3D, as
 // there's not enough information to instantiate a tetra3d.Camera. If the call couldn't complete for any reason, like due to a malformed DAE file,
 // it will return an error. If the call couldn't complete for any reason, like due to a malformed DAE file, it will return an error.
-func LoadDAEData(data []byte, options *DaeLoadOptions) (*SceneCollection, error) {
+func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 	if options == nil {
 		options = DefaultDaeLoadOptions()
@@ -184,7 +184,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*SceneCollection, error)
 		return nil, err
 	}
 
-	scenes := NewSceneCollection()
+	scenes := NewLibrary()
 	scene := scenes.AddScene(daeScene.LibraryScene.Name)
 
 	toYUp := NewMatrix4Rotate(1, 0, 0, math.Pi/2)

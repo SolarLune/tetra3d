@@ -204,6 +204,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] Animations
 - [ ] -- Armature-based animations
 - [ ] -- Object transform-based animations
+- [ ] -- Blending between animations
 - [x] Scenes
 - [x] -- Fog
 - [x] -- A node or scenegraph for parenting and simple visibility culling

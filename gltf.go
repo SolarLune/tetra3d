@@ -12,7 +12,7 @@ import (
 
 // LoadGLTFFile loads a .gltf or .glb file from the path given. It will return a SceneCollection and an error if the process fails. Animations (including armature-based animations)
 // will be parsed properly, but skinned meshes should be at origin (0, 0, 0) to be properly loaded.
-func LoadGLTFFile(path string) (*SceneCollection, error) {
+func LoadGLTFFile(path string) (*Library, error) {
 
 	fileData, err := os.ReadFile(path)
 
@@ -26,7 +26,7 @@ func LoadGLTFFile(path string) (*SceneCollection, error) {
 
 // LoadGLTFData loads a .gltf or .glb file loaded in as a sequence of bytes, returning a SceneCollection and error if the process fails. Animations (including armature-based animations)
 // will be parsed properly, but skinned meshes should be at origin (0, 0, 0) to be properly loaded.
-func LoadGLTFData(data []byte) (*SceneCollection, error) {
+func LoadGLTFData(data []byte) (*Library, error) {
 
 	decoder := gltf.NewDecoder(bytes.NewReader(data))
 
@@ -38,7 +38,7 @@ func LoadGLTFData(data []byte) (*SceneCollection, error) {
 		return nil, err
 	}
 
-	collection := NewSceneCollection()
+	collection := NewLibrary()
 
 	type VertexData struct {
 		Pos        vector.Vector
@@ -411,8 +411,10 @@ func LoadGLTFData(data []byte) (*SceneCollection, error) {
 
 			for _, vertex := range model.Mesh.Vertices {
 
+				model.bones = append(model.bones, []*NodeBase{})
+
 				for _, boneID := range verticesToVertexData[vertex].Bones {
-					vertex.Bones = append(vertex.Bones, allBones[boneID])
+					model.bones[vertex.ID] = append(model.bones[vertex.ID], allBones[boneID])
 				}
 
 			}

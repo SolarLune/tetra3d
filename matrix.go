@@ -218,6 +218,8 @@ func (matrix Matrix4) Transposed() Matrix4 {
 
 }
 
+// Inverted returns an inverted (reversed) clone of a Matrix4. An inverted matrix is defined here as a matrix
+// composed of a decomposed matrix's inverted rotation, scale, and position.
 func (matrix Matrix4) Inverted() Matrix4 {
 
 	p, s, r := matrix.Decompose()
@@ -416,6 +418,18 @@ func (matrix Matrix4) Columns() [][]float64 {
 	}
 
 	return columns
+}
+
+// IsZero returns true if the Matrix is zero'd out (all values are 0).
+func (matrix Matrix4) IsZero() bool {
+	for i := 0; i < len(matrix); i++ {
+		for j := 0; j < len(matrix[i]); j++ {
+			if matrix[i][j] != 0 {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (matrix Matrix4) String() string {
