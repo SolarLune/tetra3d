@@ -77,7 +77,9 @@ func (g *Game) Init() {
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 10})
-	g.Library.Scenes[0].Root.AddChildren(g.Camera)
+	scene := g.Library.Scenes[0]
+
+	scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -194,21 +196,19 @@ func (g *Game) Update() error {
 
 	scene := g.Library.Scenes[0]
 
-	armature := scene.Root.Get("Armature").(*tetra3d.NodeBase)
+	armature := scene.Root.GetByName("Armature").(*tetra3d.NodeBase)
+	skin := scene.Root.GetByName("SkinnedMesh").(*tetra3d.Model)
+
+	if armature.Parent() != skin {
+		armature.AddChildren(skin)
+	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		armature.AnimationPlayer.PlaySpeed = 0.5
 		armature.AnimationPlayer.Play(g.Library.Animations["ArmatureAction"])
 	}
 
-	pos = armature.LocalPosition()
-	pos[0] = 10
-	armature.SetLocalPosition(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyG) {
-		// skin.Skinned = !skin.Skinned
-		scene.Root.Get("SkinnedMesh2").(*tetra3d.Model).Skinned = !scene.Root.Get("SkinnedMesh2").(*tetra3d.Model).Skinned
-	}
+	armature.Rotate(0, 1, 0, 0.01)
 
 	armature.AnimationPlayer.Update(1.0 / 60)
 
@@ -219,6 +219,8 @@ func (g *Game) Update() error {
 	}
 
 	pyramid.AnimationPlayer.Update(1.0 / 60)
+
+	// fmt.Println(scene.Root.TreeToString())
 
 	return err
 }

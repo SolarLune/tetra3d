@@ -43,6 +43,10 @@ type Node interface {
 	WorldScale() vector.Vector
 	SetWorldScale(scale vector.Vector)
 
+	Move(x, y, z float64)
+	Rotate(x, y, z, angle float64)
+	Scale(x, y, z float64)
+
 	Transform() Matrix4
 
 	Visible() bool
@@ -369,6 +373,28 @@ func (nodeBase *NodeBase) SetWorldRotation(rotation Matrix4) {
 	}
 
 	nodeBase.dirtyTransform()
+}
+
+func (nodeBase *NodeBase) Move(x, y, z float64) {
+	localPos := nodeBase.LocalPosition()
+	localPos[0] += x
+	localPos[1] += y
+	localPos[2] += z
+	nodeBase.SetLocalPosition(localPos)
+}
+
+func (nodeBase *NodeBase) Rotate(x, y, z, angle float64) {
+	localRot := nodeBase.LocalRotation()
+	localRot = localRot.Rotated(x, y, z, angle)
+	nodeBase.SetLocalRotation(localRot)
+}
+
+func (nodeBase *NodeBase) Scale(x, y, z float64) {
+	scale := nodeBase.LocalScale()
+	scale[0] += x
+	scale[1] += y
+	scale[2] += z
+	nodeBase.SetLocalScale(scale)
 }
 
 // Parent returns the object's parent. If the object has no parent, this will return nil.

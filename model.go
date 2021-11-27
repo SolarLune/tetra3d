@@ -60,6 +60,11 @@ func (model *Model) Clone() Node {
 	newModel.Color = model.Color.Clone()
 	newModel.SortTrisBackToFront = model.SortTrisBackToFront
 
+	newModel.Skinned = model.Skinned
+	for i := range model.bones {
+		newModel.bones = append(newModel.bones, append([]*NodeBase{}, model.bones[i]...))
+	}
+
 	newModel.NodeBase = model.NodeBase.Clone().(*NodeBase)
 	for _, child := range newModel.children {
 		child.setParent(newModel)
@@ -115,7 +120,7 @@ func (model *Model) Merge(models ...*Model) {
 }
 
 // ReassignBones reassigns the model to point to a different armature.
-func (model *Model) ReassignBones(armatureNode Node) {
+func (model *Model) ReassignBones(armatureNode *NodeBase) {
 
 	if len(model.bones) == 0 {
 		return
@@ -152,7 +157,7 @@ func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
 
 		weightPerc := float64(vertex.Weights[boneIndex])
 
-		influence := fastMatrixMult(fastMatrixMult(bone.inverseBindMatrix, bone.Transform()), model.invertedModelMatrix)
+		influence := fastMatrixMult(bone.inverseBindMatrix, bone.Transform())
 
 		if weightPerc == 1 {
 			model.skinMatrix = influence
@@ -175,12 +180,11 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector,
 
 	if model.Skinned {
 
-		model.invertedModelMatrix = model.Transform().Inverted()
-
 		t := time.Now()
 
+		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
 		for _, vert := range model.Mesh.sortedVertices {
-			vert.transformed = mvp.MultVecW(model.skinVertex(vert))
+			vert.transformed = vpMatrix.MultVecW(model.skinVertex(vert))
 		}
 
 		camera.DebugInfo.animationTime += time.Since(t)
