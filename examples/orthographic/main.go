@@ -222,7 +222,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 
 func main() {
 
-	ebiten.SetWindowTitle("Tetra3d Test - Stress Test")
+	ebiten.SetWindowTitle("Tetra3d Test - Orthographic Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()
