@@ -323,17 +323,17 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 	// }
 
-	objects := []Node{}
+	objects := []INode{}
 
 	for _, node := range doc.Nodes {
 
-		var obj Node
+		var obj INode
 
 		if node.Mesh != nil {
 			mesh := collection.Meshes[doc.Meshes[*node.Mesh].Name]
 			obj = NewModel(mesh, node.Name)
 		} else {
-			obj = NewNodeBase(node.Name)
+			obj = NewNode(node.Name)
 		}
 
 		for _, child := range node.Children {
@@ -387,10 +387,10 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 			model.Skinned = true
 
-			allBones := []*NodeBase{}
+			allBones := []*Node{}
 
 			for _, b := range skin.Joints {
-				allBones = append(allBones, objects[b].(*NodeBase))
+				allBones = append(allBones, objects[b].(*Node))
 			}
 
 			matrices, err := modeler.ReadAccessor(doc, doc.Accessors[*skin.InverseBindMatrices], nil)
@@ -411,7 +411,7 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 			for _, vertex := range model.Mesh.Vertices {
 
-				model.bones = append(model.bones, []*NodeBase{})
+				model.bones = append(model.bones, []*Node{})
 
 				for _, boneID := range verticesToVertexData[vertex].Bones {
 					model.bones[vertex.ID] = append(model.bones[vertex.ID], allBones[boneID])

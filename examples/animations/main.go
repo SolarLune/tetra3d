@@ -37,8 +37,8 @@ type Game struct {
 	PrevMousePosition vector.Vector
 }
 
-//go:embed test.gltf
-var testGLTF []byte
+//go:embed animations.gltf
+var gltf []byte
 
 //go:embed testimage.png
 var testImage []byte
@@ -59,7 +59,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(testGLTF)
+	library, err := tetra3d.LoadGLTFData(gltf)
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +76,7 @@ func (g *Game) Init() {
 	g.Library.Meshes["SkinnedMesh"].Image = img
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 0, 10})
+	g.Camera.Move(0, 0, 10)
 	scene := g.Library.Scenes[0]
 
 	scene.Root.AddChildren(g.Camera)
@@ -196,7 +196,7 @@ func (g *Game) Update() error {
 
 	scene := g.Library.Scenes[0]
 
-	armature := scene.Root.GetByName("Armature").(*tetra3d.NodeBase)
+	armature := scene.Root.GetByName("Armature").(*tetra3d.Node)
 	skin := scene.Root.GetByName("SkinnedMesh").(*tetra3d.Model)
 
 	if armature.Parent() != skin {
@@ -204,7 +204,6 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-		armature.AnimationPlayer.PlaySpeed = 0.5
 		armature.AnimationPlayer.Play(g.Library.Animations["ArmatureAction"])
 	}
 
@@ -212,15 +211,16 @@ func (g *Game) Update() error {
 
 	armature.AnimationPlayer.Update(1.0 / 60)
 
-	pyramid := scene.Root.Get("Pyramid").(*tetra3d.Model)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyV) {
-		pyramid.AnimationPlayer.Play(g.Library.Animations["Roll"])
+	table := scene.Root.Get("Table").(*tetra3d.Model)
+	table.AnimationPlayer.BlendTime = 0.1
+	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+		table.AnimationPlayer.Play(g.Library.Animations["Roll"])
+	}
+	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+		table.AnimationPlayer.Play(g.Library.Animations["Roll2"])
 	}
 
-	pyramid.AnimationPlayer.Update(1.0 / 60)
-
-	// fmt.Println(scene.Root.TreeToString())
+	table.AnimationPlayer.Update(1.0 / 60)
 
 	return err
 }
@@ -250,7 +250,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe screen object shows what the\ncamera is looking at.\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1 Key: Play [Roll] Animation On Table\n2 Key: Play [Roll2] Animation on Table\nNote the animations can blend\nF Key: Play Animation on Skinned Mesh\nNote that the bones move as well\nF4: Toggle fullscreen\nF6: Node Debug View\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
 	}
 }

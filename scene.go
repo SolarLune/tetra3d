@@ -47,7 +47,7 @@ type Scene struct {
 	// scene graph by simply adding them into the tree via parenting anywhere under the Root. For them to be removed from rendering,
 	// they simply need to be removed from the tree.
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
-	Root     Node
+	Root     INode
 	FogColor *Color  // The Color of any fog present in the Scene.
 	FogMode  FogMode // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
@@ -62,7 +62,7 @@ func NewScene(name string) *Scene {
 	scene := &Scene{
 		Name: name,
 		// Models:   []*Model{},
-		Root:     NewNodeBase("Root"),
+		Root:     NewNode("Root"),
 		FogColor: NewColor(0, 0, 0, 0),
 		FogRange: []float32{0, 1},
 	}
@@ -89,8 +89,8 @@ func (scene *Scene) Clone() *Scene {
 // FilterNodes filters out the Scene's Node tree to return just the Nodes
 // that satisfy the function passed. You can use this to, for example, find
 // Nodes that have a specific name, or render a Scene in stages.
-func (scene *Scene) FilterNodes(filterFunc func(node Node) bool) []Node {
-	newMS := []Node{}
+func (scene *Scene) FilterNodes(filterFunc func(node INode) bool) []INode {
+	newMS := []INode{}
 	for _, m := range scene.Root.ChildrenRecursive(false) {
 		if filterFunc(m) {
 			newMS = append(newMS, m)

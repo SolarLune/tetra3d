@@ -201,10 +201,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Multitexturing?
 - [ ] -- Per-triangle images
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
-- [ ] Animations
-- [ ] -- Armature-based animations
-- [ ] -- Object transform-based animations
-- [ ] -- Blending between animations
+- [x] Animations
+- [x] -- Armature-based animations
+- [x] -- Object transform-based animations
+- [x] -- Blending between animations
+- [ ] -- Morph Animations
 - [x] Scenes
 - [x] -- Fog
 - [x] -- A node or scenegraph for parenting and simple visibility culling

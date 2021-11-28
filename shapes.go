@@ -8,13 +8,13 @@ import (
 
 // BoundingSphere represents a 3D Sphere.
 type BoundingSphere struct {
-	Node          Node
+	Node          INode
 	LocalPosition vector.Vector
 	LocalRadius   float64
 }
 
 // NewBoundingSphere returns a new BoundingSphere instance.
-func NewBoundingSphere(node Node, localPosition vector.Vector, radius float64) *BoundingSphere {
+func NewBoundingSphere(node INode, localPosition vector.Vector, radius float64) *BoundingSphere {
 	return &BoundingSphere{
 		Node:          node,
 		LocalPosition: localPosition,

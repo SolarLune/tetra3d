@@ -11,7 +11,7 @@ import (
 // Model represents a singular visual instantiation of a Mesh. A Mesh contains the vertex information (what to draw); a Model references the Mesh to draw it with a specific
 // Position, Rotation, and/or Scale (where and how to draw).
 type Model struct {
-	*NodeBase
+	*Node
 	Mesh                *Mesh
 	FrustumCulling      bool // Whether the Model is culled when it leaves the frustum.
 	BackfaceCulling     bool // Whether the Model's backfaces are culled.
@@ -20,17 +20,16 @@ type Model struct {
 	BoundingSphere      *BoundingSphere
 	SortTrisBackToFront bool // Whether the Model's triangles are sorted back-to-front or not.
 
-	Skinned             bool // If the model is skinned and this is enabled, the model will tranform its vertices to match its target armature
-	skinMatrix          Matrix4
-	invertedModelMatrix Matrix4
-	bones               [][]*NodeBase
+	Skinned    bool // If the model is skinned and this is enabled, the model will tranform its vertices to match its target armature
+	skinMatrix Matrix4
+	bones      [][]*Node
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
 func NewModel(mesh *Mesh, name string) *Model {
 
 	model := &Model{
-		NodeBase:            NewNodeBase(name),
+		Node:                NewNode(name),
 		Mesh:                mesh,
 		FrustumCulling:      true,
 		BackfaceCulling:     true,
@@ -50,7 +49,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 }
 
 // Clone creates a clone of the Model.
-func (model *Model) Clone() Node {
+func (model *Model) Clone() INode {
 	newModel := NewModel(model.Mesh, model.name)
 	newModel.BoundingSphere = model.BoundingSphere.Clone()
 	newModel.BoundingSphere.Node = newModel
@@ -62,10 +61,10 @@ func (model *Model) Clone() Node {
 
 	newModel.Skinned = model.Skinned
 	for i := range model.bones {
-		newModel.bones = append(newModel.bones, append([]*NodeBase{}, model.bones[i]...))
+		newModel.bones = append(newModel.bones, append([]*Node{}, model.bones[i]...))
 	}
 
-	newModel.NodeBase = model.NodeBase.Clone().(*NodeBase)
+	newModel.Node = model.Node.Clone().(*Node)
 	for _, child := range newModel.children {
 		child.setParent(newModel)
 	}
@@ -119,8 +118,9 @@ func (model *Model) Merge(models ...*Model) {
 
 }
 
-// ReassignBones reassigns the model to point to a different armature.
-func (model *Model) ReassignBones(armatureNode *NodeBase) {
+// ReassignBones reassigns the model to point to a different armature. armatureNode should be a pointer to the starting object Node of the
+// armature (not any of its bones).
+func (model *Model) ReassignBones(armatureNode *Node) {
 
 	if len(model.bones) == 0 {
 		return
@@ -128,10 +128,10 @@ func (model *Model) ReassignBones(armatureNode *NodeBase) {
 
 	bones := armatureNode.ChildrenRecursive(false)
 
-	boneMap := map[string]*NodeBase{}
+	boneMap := map[string]*Node{}
 
 	for _, b := range bones {
-		boneMap[b.Name()] = b.(*NodeBase)
+		boneMap[b.Name()] = b.(*Node)
 	}
 
 	for vertexIndex := range model.bones {
@@ -157,6 +157,8 @@ func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
 
 		weightPerc := float64(vertex.Weights[boneIndex])
 
+		// The correct way to do this according to GLTF is to multiply the bone by the inverse of the model matrix, but
+		// we don't have to because we simply don't multiply the vertex by the model matrix in the first place if it's skinned.
 		influence := fastMatrixMult(bone.inverseBindMatrix, bone.Transform())
 
 		if weightPerc == 1 {
@@ -229,11 +231,12 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector,
 
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 // hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (model *Model) AddChildren(children ...Node) {
+func (model *Model) AddChildren(children ...INode) {
 	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
 	model.addChildren(model, children...)
 }
 
+// Unparent unparents the Model from its parent, removing it from the scenegraph.
 func (model *Model) Unparent() {
 	if model.parent != nil {
 		model.parent.RemoveChildren(model)

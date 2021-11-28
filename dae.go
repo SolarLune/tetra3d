@@ -319,9 +319,9 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 	}
 
-	var parseDAENode func(node daeNode) Node
+	var parseDAENode func(node daeNode) INode
 
-	parseDAENode = func(node daeNode) Node {
+	parseDAENode = func(node daeNode) INode {
 
 		var mesh *Mesh
 
@@ -337,12 +337,12 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 		}
 
-		var model Node
+		var model INode
 
 		if mesh != nil {
 			model = NewModel(mesh, node.Name)
 		} else {
-			model = NewNodeBase(node.Name)
+			model = NewNode(node.Name)
 		}
 
 		mat := node.ParseTransform()

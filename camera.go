@@ -29,7 +29,7 @@ type DebugInfo struct {
 
 // Camera represents a camera (where you look from) in Tetra3D.
 type Camera struct {
-	*NodeBase
+	*Node
 	ColorTexture      *ebiten.Image
 	DepthTexture      *ebiten.Image
 	ColorIntermediate *ebiten.Image
@@ -56,14 +56,14 @@ type Camera struct {
 func NewCamera(w, h int) *Camera {
 
 	cam := &Camera{
-		NodeBase:          NewNodeBase("Camera"),
+		Node:              NewNode("Camera"),
 		ColorTexture:      ebiten.NewImage(w, h),
 		DepthTexture:      ebiten.NewImage(w, h),
 		ColorIntermediate: ebiten.NewImage(w, h),
 		DepthIntermediate: ebiten.NewImage(w, h),
 		RenderDepth:       true,
 		Near:              0.1,
-		Far:               100,
+		Far:               40,
 
 		FrustumSphere: NewBoundingSphere(nil, vector.Vector{0, 0, 0}, 0),
 	}
@@ -228,7 +228,7 @@ func (camera *Camera) Clear() {
 }
 
 // RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example).
-func (camera *Camera) RenderNodes(scene *Scene, rootNode Node) {
+func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	meshes := []*Model{}
 
@@ -629,7 +629,7 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 
 }
 
-func (camera *Camera) Clone() Node {
+func (camera *Camera) Clone() INode {
 
 	w, h := camera.ColorTexture.Size()
 	clone := NewCamera(w, h)
@@ -640,7 +640,7 @@ func (camera *Camera) Clone() Node {
 	clone.Perspective = camera.Perspective
 	clone.fieldOfView = camera.fieldOfView
 
-	clone.NodeBase = camera.NodeBase.Clone().(*NodeBase)
+	clone.Node = camera.Node.Clone().(*Node)
 	for _, child := range camera.children {
 		child.setParent(camera)
 	}
@@ -651,10 +651,11 @@ func (camera *Camera) Clone() Node {
 
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 // hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (camera *Camera) AddChildren(children ...Node) {
+func (camera *Camera) AddChildren(children ...INode) {
 	camera.addChildren(camera, children...)
 }
 
+// Unparent unparents the Camera from its parent, removing it from the scenegraph.
 func (camera *Camera) Unparent() {
 	if camera.parent != nil {
 		camera.parent.RemoveChildren(camera)
