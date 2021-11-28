@@ -2,17 +2,31 @@ package tetra3d
 
 import (
 	"bytes"
+	"image"
 	"math"
 	"os"
 
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
 	"github.com/qmuntal/gltf"
 	"github.com/qmuntal/gltf/modeler"
 )
 
-// LoadGLTFFile loads a .gltf or .glb file from the path given. It will return a SceneCollection and an error if the process fails. Animations (including armature-based animations)
-// will be parsed properly, but skinned meshes should be at origin (0, 0, 0) to be properly loaded.
-func LoadGLTFFile(path string) (*Library, error) {
+type GLTFLoadOptions struct {
+	LoadImages bool
+}
+
+func DefaultGLTFLoadOptions() *GLTFLoadOptions {
+	return &GLTFLoadOptions{
+		LoadImages: true,
+	}
+}
+
+// LoadGLTFFile loads a .gltf or .glb file from the filepath given, using a provided GLTFLoadOptions struct to alter how the file is loaded.
+// Passing nil for loadOptions will load the file using default load options. Unlike with DAE files, Animations (including armature-based
+// animations) will be parsed properly.
+// LoadGLTFFile will return a Library, and an error if the process fails.
+func LoadGLTFFile(path string, loadOptions *GLTFLoadOptions) (*Library, error) {
 
 	fileData, err := os.ReadFile(path)
 
@@ -20,13 +34,15 @@ func LoadGLTFFile(path string) (*Library, error) {
 		return nil, err
 	}
 
-	return LoadGLTFData(fileData)
+	return LoadGLTFData(fileData, loadOptions)
 
 }
 
-// LoadGLTFData loads a .gltf or .glb file loaded in as a sequence of bytes, returning a SceneCollection and error if the process fails. Animations (including armature-based animations)
-// will be parsed properly, but skinned meshes should be at origin (0, 0, 0) to be properly loaded.
-func LoadGLTFData(data []byte) (*Library, error) {
+// LoadGLTFData loads a .gltf or .glb file from the byte data given, using a provided GLTFLoadOptions struct to alter how the file is loaded.
+// Passing nil for loadOptions will load the file using default load options. Unlike with DAE files, Animations (including armature-based
+// animations) will be parsed properly.
+// LoadGLTFFile will return a Library, and an error if the process fails.
+func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
 
 	decoder := gltf.NewDecoder(bytes.NewReader(data))
 
@@ -38,7 +54,11 @@ func LoadGLTFData(data []byte) (*Library, error) {
 		return nil, err
 	}
 
-	collection := NewLibrary()
+	if gltfLoadOptions == nil {
+		gltfLoadOptions = DefaultGLTFLoadOptions()
+	}
+
+	library := NewLibrary()
 
 	type VertexData struct {
 		Pos        vector.Vector
@@ -51,10 +71,48 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 	verticesToVertexData := map[*Vertex]VertexData{}
 
+	images := []*ebiten.Image{}
+
+	if gltfLoadOptions.LoadImages {
+
+		for _, gltfImage := range doc.Images {
+
+			imageData, err := modeler.ReadBufferView(doc, doc.BufferViews[*gltfImage.BufferView])
+			if err != nil {
+				return nil, err
+			}
+
+			byteReader := bytes.NewReader(imageData)
+
+			img, _, err := image.Decode(byteReader)
+			if err != nil {
+				return nil, err
+			}
+
+			images = append(images, ebiten.NewImageFromImage(img))
+
+		}
+
+	}
+
+	for _, gltfMat := range doc.Materials {
+
+		newMat := NewMaterial(gltfMat.Name)
+
+		if gltfLoadOptions.LoadImages {
+			if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
+				newMat.Image = images[texture.Index]
+			}
+		}
+
+		library.Materials[gltfMat.Name] = newMat
+
+	}
+
 	for _, mesh := range doc.Meshes {
 
 		newMesh := NewMesh(mesh.Name)
-		collection.Meshes[mesh.Name] = newMesh
+		library.Meshes[mesh.Name] = newMesh
 
 		for _, v := range mesh.Primitives {
 
@@ -87,7 +145,7 @@ func LoadGLTFData(data []byte) (*Library, error) {
 				}
 
 				for i, v := range texCoords {
-					vertexData[i].UV = vector.Vector{float64(v[0]), float64(v[1])}
+					vertexData[i].UV = vector.Vector{float64(v[0]), -(float64(v[1]) - 1)}
 				}
 
 			}
@@ -120,10 +178,13 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 				for i, v := range colors {
 
+					// colors are exported from Blender as linear, but display as sRGB so we'll convert them here
+
 					vertexData[i].Color.R = float32(v[0]) / math.MaxUint16
 					vertexData[i].Color.G = float32(v[1]) / math.MaxUint16
 					vertexData[i].Color.B = float32(v[2]) / math.MaxUint16
 					vertexData[i].Color.A = float32(v[3]) / math.MaxUint16
+					vertexData[i].Color.ConvertTosRGB()
 
 				}
 
@@ -196,6 +257,11 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 			}
 
+			if v.Material != nil {
+				gltfMat := doc.Materials[*v.Material]
+				newMesh.Material = library.Materials[gltfMat.Name]
+			}
+
 			newMesh.UpdateBounds()
 
 		}
@@ -204,7 +270,7 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 	for _, gltfAnim := range doc.Animations {
 		anim := NewAnimation(gltfAnim.Name)
-		collection.Animations[gltfAnim.Name] = anim
+		library.Animations[gltfAnim.Name] = anim
 
 		animLength := 0.0
 
@@ -330,7 +396,7 @@ func LoadGLTFData(data []byte) (*Library, error) {
 		var obj INode
 
 		if node.Mesh != nil {
-			mesh := collection.Meshes[doc.Meshes[*node.Mesh].Name]
+			mesh := library.Meshes[doc.Meshes[*node.Mesh].Name]
 			obj = NewModel(mesh, node.Name)
 		} else {
 			obj = NewNode(node.Name)
@@ -429,7 +495,7 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 	for _, s := range doc.Scenes {
 
-		scene := collection.AddScene(s.Name)
+		scene := library.AddScene(s.Name)
 
 		for _, n := range s.Nodes {
 			scene.Root.AddChildren(objects[n])
@@ -437,6 +503,6 @@ func LoadGLTFData(data []byte) (*Library, error) {
 
 	}
 
-	return collection, nil
+	return library, nil
 
 }

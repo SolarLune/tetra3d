@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"image/color"
@@ -40,9 +39,6 @@ type Game struct {
 //go:embed animations.gltf
 var gltf []byte
 
-//go:embed testimage.png
-var testImage []byte
-
 func NewGame() *Game {
 
 	game := &Game{
@@ -59,21 +55,12 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(gltf)
+	library, err := tetra3d.LoadGLTFData(gltf, nil)
 	if err != nil {
 		panic(err)
 	}
 
 	g.Library = library
-
-	pngFile, err := png.Decode(bytes.NewReader(testImage))
-	if err != nil {
-		panic(err)
-	}
-
-	img := ebiten.NewImageFromImage(pngFile)
-
-	g.Library.Meshes["SkinnedMesh"].Image = img
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Move(0, 0, 10)

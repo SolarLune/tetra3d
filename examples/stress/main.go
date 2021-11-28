@@ -62,19 +62,25 @@ func (g *Game) Init() {
 	}
 
 	merged := tetra3d.NewModel(tetra3d.NewMesh("merged"), "merged cubes")
-	merged.Mesh.Image = ebiten.NewImageFromImage(img)
+	merged.Mesh.Material = tetra3d.NewMaterial("merged cubes")
+	merged.Mesh.Material.Image = ebiten.NewImageFromImage(img)
 
 	cubes := []*tetra3d.Model{}
 
-	for i := 0; i < 30; i++ {
-		for j := 0; j < 30; j++ {
-			cubeMesh := tetra3d.NewCube()
-			cube := tetra3d.NewModel(cubeMesh, "Cube")
-			cube.SetLocalPosition(vector.Vector{float64(i * 3), 0, float64(-j * 3)})
-			cubes = append(cubes, cube)
+	for k := 0; k < 3; k++ {
+		for i := 0; i < 30; i++ {
+			for j := 0; j < 30; j++ {
+				cubeMesh := tetra3d.NewCube()
+				cube := tetra3d.NewModel(cubeMesh, "Cube")
+				cube.SetLocalPosition(vector.Vector{float64(i * 3), float64(k * 3), float64(-j * 3)})
+				cubes = append(cubes, cube)
+			}
 		}
 	}
 
+	// Here, we merge all of the cubes into one mesh. This is good for when you have elements
+	// you want to freely position in your modeler, for example, before combining them for
+	// increased render speed in-game. Note that the maximum number of triangles is 32
 	merged.Merge(cubes...)
 
 	g.Scene.Root.AddChildren(merged)

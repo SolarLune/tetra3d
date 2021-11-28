@@ -44,8 +44,8 @@ type Mesh struct {
 	Vertices       []*Vertex
 	sortedVertices []*Vertex
 	Triangles      []*Triangle
-	Image          *ebiten.Image // What Image to use when rendering the triangles that define this Mesh
-	MaterialName   string        // The name of any material assigned to the Mesh from the 3D modeling program
+	Material       *Material // What Image to use when rendering the triangles that define this Mesh
+	MaterialName   string    // The name of any material assigned to the Mesh from the 3D modeling program
 	FilterMode     ebiten.Filter
 	Dimensions     Dimensions
 	triIndex       int
@@ -107,7 +107,6 @@ func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
 		mesh.triIndex++
 
 	}
-
 }
 
 // SetVertexColor sets the vertex color of all vertices in the Mesh to the color values provided.
@@ -234,6 +233,7 @@ func NewCube() *Mesh {
 		NewVertex(-1, -1, -1, 0, 0),
 	)
 
+	mesh.Material = NewMaterial("Cube")
 	return mesh
 
 }
@@ -250,6 +250,8 @@ func NewPlane() *Mesh {
 		NewVertex(1, 0, 1, 1, 1),
 		NewVertex(-1, 0, 1, 0, 1),
 	)
+
+	mesh.Material = NewMaterial("Plane")
 
 	return mesh
 

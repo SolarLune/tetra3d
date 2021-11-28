@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"runtime/pprof"
-	"strings"
 	"time"
 
 	_ "embed"
@@ -19,13 +18,12 @@ import (
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-//go:embed shapes.dae
-var shapesDAE []byte
+//go:embed shapes.gltf
+var shapes []byte
 
 type Game struct {
 	Width, Height int
@@ -58,21 +56,14 @@ func (g *Game) Init() {
 	// Load the DAE file and turn it into a scene. Note that we could also pass options to change how the file
 	// is loaded (specifically, which way is up), but we don't have to do that because it will do this by default if
 	// nil is passed as the second argument.
-	dae, err := tetra3d.LoadDAEData(shapesDAE, nil)
+	library, err := tetra3d.LoadGLTFData(shapes, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	g.Scene = dae.Scenes[0]
+	g.Scene = library.FindScene("Scene")
 
-	// Unfortunately, we have to manually load images and apply them to Meshes; the easiest way to do this for now
-	// seems to simply be to give Meshes a Material with the name of their image file.
-	for _, m := range dae.Meshes {
-		if strings.HasSuffix(m.MaterialName, ".png") {
-			// Put images on meshes that have material names that end with ".png"
-			m.Image, _, _ = ebitenutil.NewImageFromFile(m.MaterialName)
-		}
-	}
+	// While you have to manually load images for DAE files, you don't need to do that for GLTF files.
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
@@ -81,8 +72,6 @@ func (g *Game) Init() {
 	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	fmt.Println(g.Scene.Root.TreeToString())
 
 }
 
@@ -225,6 +214,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1, 2, 3, 4: Change fog\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{255, 0, 0, 255})
 	}
+
 }
 
 func (g *Game) StartProfiling() {

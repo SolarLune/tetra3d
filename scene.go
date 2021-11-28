@@ -14,6 +14,7 @@ type Library struct {
 	Scenes     []*Scene
 	Meshes     map[string]*Mesh
 	Animations map[string]*Animation
+	Materials  map[string]*Material
 }
 
 func NewLibrary() *Library {
@@ -21,6 +22,7 @@ func NewLibrary() *Library {
 		Scenes:     []*Scene{},
 		Meshes:     map[string]*Mesh{},
 		Animations: map[string]*Animation{},
+		Materials:  map[string]*Material{},
 	}
 }
 

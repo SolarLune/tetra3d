@@ -37,7 +37,7 @@ type Game struct {
 	PrevMousePosition vector.Vector
 }
 
-//go:embed tetra3d.dae
+//go:embed tetra3d.glb
 var logoModel []byte
 
 func NewGame() *Game {
@@ -55,7 +55,7 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
-	dae, err := tetra3d.LoadDAEData(logoModel, nil)
+	dae, err := tetra3d.LoadGLTFData(logoModel, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -66,7 +66,7 @@ func (g *Game) Init() {
 	screen := g.Scene.Root.Get("ScreenBorder/ScreenTexture")
 
 	// And set its image
-	screen.(*tetra3d.Model).Mesh.Image = g.Offscreen
+	screen.(*tetra3d.Model).Mesh.Material.Image = g.Offscreen
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})

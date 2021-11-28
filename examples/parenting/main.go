@@ -65,10 +65,11 @@ func loadImage(data []byte) *ebiten.Image {
 
 func (g *Game) Init() {
 
+	// In this example, we'll construct the scene ourselves by hand.
 	g.Scene = tetra3d.NewScene("Test Scene")
 
 	cubeMesh := tetra3d.NewCube()
-	cubeMesh.Image = loadImage(testImageData)
+	cubeMesh.Material.Image = loadImage(testImageData)
 
 	parent := tetra3d.NewModel(cubeMesh, "parent")
 	parent.SetLocalPosition(vector.Vector{0, -3, 0})
@@ -227,6 +228,10 @@ func (g *Game) Update() error {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
+		g.Camera.DebugDrawNodes = !g.Camera.DebugDrawNodes
+	}
+
 	return err
 
 }
@@ -261,7 +266,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nArrow Keys:Move parent\nP: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Space: Go Up, Ctrl: Go Down\nMouse: Look\nArrow Keys:Move parent\nP: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent\nF1, F2, F3, F5, F6: Debug views\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
 	}
 

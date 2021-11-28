@@ -248,7 +248,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	if camera.DebugDrawNodes {
 
-		for _, node := range nodes {
+		for _, node := range rootNode.ChildrenRecursive(false) {
 
 			if node == camera {
 				continue
@@ -473,9 +473,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		srcW := 0.0
 		srcH := 0.0
 
-		if model.Mesh.Image != nil {
-			srcW = float64(model.Mesh.Image.Bounds().Dx())
-			srcH = float64(model.Mesh.Image.Bounds().Dy())
+		if model.Mesh.Material != nil && model.Mesh.Material.Image != nil {
+			srcW = float64(model.Mesh.Material.Image.Bounds().Dx())
+			srcH = float64(model.Mesh.Material.Image.Bounds().Dy())
 		}
 
 		index = 0
@@ -503,7 +503,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		}
 
-		img := model.Mesh.Image
+		var img *ebiten.Image
+
+		if model.Mesh.Material != nil {
+			img = model.Mesh.Material.Image
+		}
+
 		if img == nil {
 			img = defaultImg
 		}
