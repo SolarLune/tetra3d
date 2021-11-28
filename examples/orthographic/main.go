@@ -75,8 +75,6 @@ func (g *Game) Init() {
 
 	placeholder.Unparent() // We don't need the placeholder to be there
 
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
 }
 
 func (g *Game) Update() error {
