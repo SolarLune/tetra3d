@@ -92,8 +92,6 @@ func (g *Game) Update() error {
 
 	moveSpd := 0.1
 
-	g.Time += 1.0 / 60
-
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}

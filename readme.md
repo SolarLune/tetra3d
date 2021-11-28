@@ -185,7 +185,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 - [x] 3D rendering
 - [x] -- Perspective projection
-- [ ] -- Orthographic projection
+- [x] -- Orthographic projection (it's kinda jank, but it works)
 - [ ] -- Billboarding
 - [ ] -- Some additional way to draw 2D stuff with no perspective changes (if desired) in 3D space
 - [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)

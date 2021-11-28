@@ -11,6 +11,10 @@ const (
 	TrackTypePosition = "Pos"
 	TrackTypeScale    = "Sca"
 	TrackTypeRotation = "Rot"
+
+	InterpolationLinear = iota
+	InterpolationConstant
+	InterpolationCubic // Unimplemented
 )
 
 type Data struct {
@@ -38,8 +42,9 @@ func newKeyframe(time float64, data Data) *Keyframe {
 }
 
 type AnimationTrack struct {
-	Type      string
-	Keyframes []*Keyframe
+	Type          string
+	Keyframes     []*Keyframe
+	Interpolation int
 }
 
 func (track *AnimationTrack) AddKeyframe(time float64, data interface{}) {
@@ -83,8 +88,13 @@ func (track *AnimationTrack) ValueAsVector(time float64) vector.Vector {
 
 			t := (time - first.Time) / (last.Time - first.Time)
 
-			if track.Type == TrackTypePosition || track.Type == TrackTypeScale {
-				return fd.Add(ld.Sub(fd).Scale(t))
+			if track.Interpolation == InterpolationConstant {
+				return fd
+			} else {
+				// We still need to implement InterpolationCubic
+				if track.Type == TrackTypePosition || track.Type == TrackTypeScale {
+					return fd.Add(ld.Sub(fd).Scale(t))
+				}
 			}
 
 		}

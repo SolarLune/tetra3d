@@ -167,7 +167,7 @@ func (mesh *Mesh) UpdateBounds() {
 
 }
 
-// NewCube creates a new Cube Mesh.
+// NewCube creates a new Cube Mesh and gives it a new material (suitably named "Cube").
 func NewCube() *Mesh {
 
 	mesh := NewMesh("Cube",
@@ -238,7 +238,7 @@ func NewCube() *Mesh {
 
 }
 
-// NewPlane creates a new plane Mesh.
+// NewPlane creates a new plane Mesh and gives it a new material (suitably named "Plane").
 func NewPlane() *Mesh {
 
 	mesh := NewMesh("Plane",

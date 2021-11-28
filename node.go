@@ -484,17 +484,26 @@ func (node *Node) Tags() *Tags {
 	return node.tags
 }
 
-// TreeToString returns a string displaying the hierarchy of this Node, and all recursive children. This is a useful
-// function to debug the layout of a node tree, for example.
+// TreeToString returns a string displaying the hierarchy of this Node, and all recursive children.
+// Nodes will have a "+" next to their name, Models an "M", and Cameras a "C".
+// This is a useful function to debug the layout of a node tree, for example.
 func (node *Node) TreeToString() string {
 
 	var printNode func(node INode, level int) string
 
 	printNode = func(node INode, level int) string {
 
+		nodeType := "+"
+
+		if _, isModel := node.(*Model); isModel {
+			nodeType = "M"
+		} else if _, isCamera := node.(*Camera); isCamera {
+			nodeType = "C"
+		}
+
 		str := ""
 		if level == 0 {
-			str = "+: " + node.Name() + "\n"
+			str = "-: [+] " + node.Name() + "\n"
 		} else {
 
 			for i := 0; i < level; i++ {
@@ -504,7 +513,7 @@ func (node *Node) TreeToString() string {
 			wp := node.LocalPosition()
 			wpStr := "[" + strconv.FormatFloat(wp[0], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[1], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[2], 'f', -1, 64) + "]"
 
-			str += "\\-: " + node.Name() + " : " + wpStr + "\n"
+			str += "\\-: [" + nodeType + "] " + node.Name() + " : " + wpStr + "\n"
 		}
 
 		for _, child := range node.Children() {

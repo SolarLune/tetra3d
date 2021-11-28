@@ -307,6 +307,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				outputData := od.([][3]float32)
 
 				track := animChannel.AddTrack(TrackTypePosition)
+				track.Interpolation = int(sampler.Interpolation)
 				for i := 0; i < len(inputData); i++ {
 					t := inputData[i]
 					p := outputData[i]
@@ -335,6 +336,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				outputData := od.([][3]float32)
 
 				track := animChannel.AddTrack(TrackTypeScale)
+				track.Interpolation = int(sampler.Interpolation)
 				for i := 0; i < len(inputData); i++ {
 					t := inputData[i]
 					p := outputData[i]
@@ -363,6 +365,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				outputData := od.([][4]float32)
 
 				track := animChannel.AddTrack(TrackTypeRotation)
+				track.Interpolation = int(sampler.Interpolation)
 
 				for i := 0; i < len(inputData); i++ {
 					t := inputData[i]
@@ -398,6 +401,30 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		if node.Mesh != nil {
 			mesh := library.Meshes[doc.Meshes[*node.Mesh].Name]
 			obj = NewModel(mesh, node.Name)
+			// } else if node.Camera != nil {
+
+			// 	// This doesn't quiiiiite work because Cameras in GLTF are children of their parent Nodes for some reason, so
+			// 	// I'll have to consider how to approach this
+
+			// 	newCam := NewCamera(0, 0)
+			// 	newCam.InitiallySized = false // We'll resize it later
+
+			// 	gltfCam := doc.Cameras[*node.Camera]
+
+			// 	if gltfCam.Perspective != nil {
+			// 		newCam.Near = float64(gltfCam.Perspective.Znear)
+			// 		newCam.Far = float64(*gltfCam.Perspective.Zfar)
+			// 		newCam.FieldOfView = float64(gltfCam.Perspective.Yfov) * (math.Pi * 2)
+			// 		newCam.Perspective = true
+			// 	} else if gltfCam.Orthographic != nil {
+			// 		newCam.Near = float64(gltfCam.Orthographic.Znear)
+			// 		newCam.Far = float64(gltfCam.Orthographic.Zfar)
+			// 		newCam.OrthoScale = float64(gltfCam.Orthographic.Xmag)
+			// 		newCam.Perspective = false
+			// 	}
+
+			// 	obj = newCam
+
 		} else {
 			obj = NewNode(node.Name)
 		}
@@ -425,8 +452,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		} else {
 			obj.SetLocalPosition(vector.Vector{float64(node.Translation[0]), float64(node.Translation[1]), float64(node.Translation[2])})
 			obj.SetLocalScale(vector.Vector{float64(node.Scale[0]), float64(node.Scale[1]), float64(node.Scale[2])})
-			rotMat := NewMatrix4RotateFromQuaternion(NewQuaternion(float64(node.Rotation[0]), float64(node.Rotation[1]), float64(node.Rotation[2]), float64(node.Rotation[3])))
-			obj.SetLocalRotation(rotMat)
+			obj.SetLocalRotation(NewMatrix4RotateFromQuaternion(NewQuaternion(float64(node.Rotation[0]), float64(node.Rotation[1]), float64(node.Rotation[2]), float64(node.Rotation[3]))))
 		}
 
 		objects = append(objects, obj)

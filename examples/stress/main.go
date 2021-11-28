@@ -67,14 +67,12 @@ func (g *Game) Init() {
 
 	cubes := []*tetra3d.Model{}
 
-	for k := 0; k < 3; k++ {
-		for i := 0; i < 30; i++ {
-			for j := 0; j < 30; j++ {
-				cubeMesh := tetra3d.NewCube()
-				cube := tetra3d.NewModel(cubeMesh, "Cube")
-				cube.SetLocalPosition(vector.Vector{float64(i * 3), float64(k * 3), float64(-j * 3)})
-				cubes = append(cubes, cube)
-			}
+	for i := 0; i < 30; i++ {
+		for j := 0; j < 30; j++ {
+			cubeMesh := tetra3d.NewCube()
+			cube := tetra3d.NewModel(cubeMesh, "Cube")
+			cube.SetLocalPosition(vector.Vector{float64(i * 3), 0, float64(-j * 3)})
+			cubes = append(cubes, cube)
 		}
 	}
 
@@ -101,8 +99,6 @@ func (g *Game) Update() error {
 	var err error
 
 	moveSpd := 0.1
-
-	g.Time += 1.0 / 60
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")

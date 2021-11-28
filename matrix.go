@@ -54,6 +54,14 @@ func (matrix Matrix4) Clone() Matrix4 {
 	return newMat
 }
 
+// BlenderToTetra returns a Matrix with the rows altered such that Blender's +Z is now Tetra's +Y and Blender's +Y is now Tetra's -Z.
+func (matrix Matrix4) BlenderToTetra() Matrix4 {
+	newMat := matrix.Clone()
+	newMat = newMat.SetRow(1, matrix.Row(2).Invert())
+	newMat = newMat.SetRow(2, matrix.Row(1))
+	return newMat
+}
+
 // NewMatrix4Scale returns a new identity Matrix4, but with the x, y, and z translation components set as provided.
 func NewMatrix4Translate(x, y, z float64) Matrix4 {
 	mat := NewMatrix4()
@@ -315,6 +323,18 @@ func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float64) Ma
 		{0, 0, -1, 0},
 	}
 
+}
+
+// NewProjectionOrthographic generates an orthographic frustum Matrix4. near and far are the near and far clipping plane. right, left, top, and bottom
+// are the right, left, top, and bottom planes (usually 1 and -1 for right and left, and the aspect ratio of the window and negative for top and bottom).
+// Generally, you won't need to use this directly.
+func NewProjectionOrthographic(near, far, right, left, top, bottom float64) Matrix4 {
+	return Matrix4{
+		{2 / (right - left), 0, 0, 0},
+		{0, 2 / (top - bottom), 0, 0},
+		{0, 0, -2 / (far - near), 0},
+		{0, 0, 0, 1},
+	}
 }
 
 // MultVec multiplies the vector provided by the Matrix4, giving a vector that has been rotated, scaled, or translated as desired.

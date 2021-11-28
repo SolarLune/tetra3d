@@ -41,7 +41,8 @@ type Camera struct {
 	ColorShader *ebiten.Shader
 	Near, Far   float64
 	Perspective bool
-	fieldOfView float64
+	FieldOfView float64 // Vertical field of view in degrees for a perspective projection camera
+	OrthoScale  float64 // Scale of the view for an orthographic projection camera in units horizontally
 
 	DebugInfo          DebugInfo
 	DebugDrawWireframe bool
@@ -56,14 +57,10 @@ type Camera struct {
 func NewCamera(w, h int) *Camera {
 
 	cam := &Camera{
-		Node:              NewNode("Camera"),
-		ColorTexture:      ebiten.NewImage(w, h),
-		DepthTexture:      ebiten.NewImage(w, h),
-		ColorIntermediate: ebiten.NewImage(w, h),
-		DepthIntermediate: ebiten.NewImage(w, h),
-		RenderDepth:       true,
-		Near:              0.1,
-		Far:               40,
+		Node:        NewNode("Camera"),
+		RenderDepth: true,
+		Near:        0.1,
+		Far:         100,
 
 		FrustumSphere: NewBoundingSphere(nil, vector.Vector{0, 0, 0}, 0),
 	}
@@ -135,9 +132,29 @@ func NewCamera(w, h int) *Camera {
 		panic(err)
 	}
 
+	if w != 0 && h != 0 {
+		cam.Resize(w, h)
+	}
+
 	cam.SetPerspective(60)
 
 	return cam
+}
+
+func (camera *Camera) Resize(w, h int) {
+
+	if camera.ColorTexture != nil {
+		camera.ColorTexture.Dispose()
+		camera.DepthTexture.Dispose()
+		camera.ColorIntermediate.Dispose()
+		camera.DepthIntermediate.Dispose()
+	}
+
+	camera.ColorTexture = ebiten.NewImage(w, h)
+	camera.DepthTexture = ebiten.NewImage(w, h)
+	camera.ColorIntermediate = ebiten.NewImage(w, h)
+	camera.DepthIntermediate = ebiten.NewImage(w, h)
+
 }
 
 // ViewMatrix returns the Camera's view matrix.
@@ -154,16 +171,26 @@ func (camera *Camera) ViewMatrix() Matrix4 {
 
 // Projection returns the Camera's projection matrix.
 func (camera *Camera) Projection() Matrix4 {
-	return NewProjectionPerspective(camera.fieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy()))
-}
+	if camera.Perspective {
+		return NewProjectionPerspective(camera.FieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy()))
+	}
+	w, h := camera.ColorTexture.Size()
+	asr := float64(h) / float64(w)
 
-// TODO: Implement orthographic perspective.
-// func (camera *Camera) SetOrthographic() { }
+	return NewProjectionOrthographic(camera.Near, camera.Far, 1*camera.OrthoScale, -1*camera.OrthoScale, asr*camera.OrthoScale, -asr*camera.OrthoScale)
+	// return NewProjectionOrthographic(camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx())*camera.OrthoScale, float64(camera.ColorTexture.Bounds().Dy())*camera.OrthoScale)
+}
 
 // SetPerspective sets the Camera's projection to be a perspective projection. fovY indicates the vertical field of view (in degrees) for the camera's aperture.
 func (camera *Camera) SetPerspective(fovY float64) {
-	camera.fieldOfView = fovY
+	camera.FieldOfView = fovY
 	camera.Perspective = true
+}
+
+// SetOrthographic sets the Camera's projection to be an orthographic projection. orthoScale indicates the scale of the camera in units horizontally.
+func (camera *Camera) SetOrthographic(orthoScale float64) {
+	camera.Perspective = false
+	camera.OrthoScale = orthoScale
 }
 
 // ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
@@ -173,6 +200,10 @@ func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
 	width, height := float64(w), float64(h)
 
 	v3 := vert[3]
+
+	if !camera.Perspective {
+		v3 = 1.0
+	}
 
 	// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
 	// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
@@ -288,6 +319,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
+	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something of the correct order
 	if !camera.RenderDepth {
 
 		sort.SliceStable(models, func(i, j int) bool {
@@ -444,13 +476,17 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		// Render the depth map here
 		if camera.RenderDepth {
 
+			far := camera.Far
+			if !camera.Perspective {
+				far = 2.0
+			}
+
 			for _, tri := range triList[:vertexListIndex/3] {
 
 				for _, vert := range tri.Vertices {
 
-					// Vertex colors
+					depth := (math.Max(vert.transformed[2], 0) / far)
 
-					depth := (math.Max(vert.transformed[2], 0) / camera.Far)
 					vertexList[index].ColorR = float32(depth)
 					vertexList[index].ColorG = float32(depth)
 					vertexList[index].ColorB = float32(depth)
@@ -643,7 +679,7 @@ func (camera *Camera) Clone() INode {
 	clone.Near = camera.Near
 	clone.Far = camera.Far
 	clone.Perspective = camera.Perspective
-	clone.fieldOfView = camera.fieldOfView
+	clone.FieldOfView = camera.FieldOfView
 
 	clone.Node = camera.Node.Clone().(*Node)
 	for _, child := range camera.children {
