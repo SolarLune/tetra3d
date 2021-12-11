@@ -16,7 +16,7 @@ Tetra3D is a 3D software renderer written in Go by means of [Ebiten](https://ebi
 
 It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
-In general, Tetra3D's just a basic software renderer, so you can target higher resolutions (1080p) or lower resolutions (as an example, 398x224 seems to be similar enough resolution to PS1 while maintaining a 16:9 resolution). Anything's fine as long as the target GPU can handle generating a render texture for the resolution (as that's how depth testing is done).
+In general, Tetra3D's just a basic software renderer, so you can target higher resolutions (1080p) or lower resolutions (as an example, 398x224 seems to be a similar enough resolution to PS1 while maintaining a 16:9 resolution). Anything's fine as long as the target GPU can handle generating a render texture for the resolution (if you have depth testing / depth texture rendering on, as that's how depth testing is done).
 
 ## Why did I make it?
 
@@ -174,6 +174,43 @@ func main() {
 
 }
 
+
+```
+
+You can also do intersection testing between BoundingObjects, a category of Nodes designed for collision / intersection testing. As a simplified example:
+
+```go
+
+type Game struct {
+
+	Cube *tetra3d.BoundingAABB
+	Capsule *tetra3d.BoundingCapsule
+
+}
+
+func NewGame() *Game {
+
+	g := &Game{}
+
+	// Create a new BoundingCapsule, 1 unit tall with a 0.25 unit radius for the caps at the ends.
+	g.Capsule = tetra3d.NewBoundingCapsule("player", 1, 0.25)
+
+	// Create a new BoundingAABB, of 0.25 width, height, and depth (in that order).
+	g.Cube = tetra3d.NewBoundingAABB("block", 0.5, 0.5, 0.5)
+	g.Cube.Move(4, 0, 0)
+
+	return g
+
+}
+
+func (g *Game) Update() {
+
+	g.Capsule.Move(0.2, 0, 0)
+
+	// Will print the result of the intersection (an IntersectionResult), or nil, if there was no intersection.
+	fmt.Println(g.Capsule.Intersection(g.Cube))
+
+}
 
 ```
 

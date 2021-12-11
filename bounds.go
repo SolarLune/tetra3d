@@ -6,9 +6,12 @@ import (
 	"github.com/kvartborg/vector"
 )
 
+// IntersectionResult represents the result of an intersection test.
 type IntersectionResult struct {
+	// The contact point between the two intersecting objects. Note that this may be the average
+	// between the two overlapping shapes, rather than the point of contact specifically.
 	ContactPoint vector.Vector
-	MTV          vector.Vector
+	MTV          vector.Vector // MTV represents the minimum translation vector to remove the calling object from the intersecting object.
 	// Normal       vector.Vector
 }
 
@@ -19,6 +22,7 @@ func NewIntersectionResult(contactPoint, mtv vector.Vector) *IntersectionResult 
 	}
 }
 
+// BoundingObject represents a Node type that can be tested for intersection.
 type BoundingObject interface {
 	Intersecting(other BoundingObject) bool
 	Intersection(other BoundingObject) *IntersectionResult
