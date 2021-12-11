@@ -243,7 +243,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Normal reporting
 - [x] -- Varying collision shapes
 
-| Collision Type | Sphere | AABB         | Triangle   | Capsule  | Ray |
+| Collision Type | Sphere | AABB         | Triangle   | Capsule  | Ray (not implemented yet) |
 | ------         | ----   | ----         | --------   | -------- | ---- |
 | Sphere         |  ✅    | ✅           |    ✅      |  ✅      |   ❌  |
 | AABB           | ✅     |  ✅          | ⛔ (buggy) |  ✅      |   ❌  |
