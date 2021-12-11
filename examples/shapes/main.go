@@ -33,9 +33,9 @@ type Game struct {
 	CameraTilt   float64
 	CameraRotate float64
 
-	Time              float64
 	DrawDebugText     bool
 	DrawDebugDepth    bool
+	DrawDebugBounds   bool
 	PrevMousePosition vector.Vector
 }
 
@@ -139,13 +139,13 @@ func (g *Game) Update() error {
 
 	// Fog controls
 	if ebiten.IsKeyPressed(ebiten.Key1) {
-		g.Scene.FogColor.SetRGB(1, 0, 0)
+		g.Scene.FogColor.SetRGBA(1, 0, 0, 1)
 		g.Scene.FogMode = tetra3d.FogAdd
 	} else if ebiten.IsKeyPressed(ebiten.Key2) {
-		g.Scene.FogColor.SetRGB(0, 0, 0)
+		g.Scene.FogColor.SetRGBA(0, 0, 0, 1)
 		g.Scene.FogMode = tetra3d.FogMultiply
 	} else if ebiten.IsKeyPressed(ebiten.Key3) {
-		g.Scene.FogColor.SetRGB(0, 0, 0)
+		g.Scene.FogColor.SetRGBA(0, 0, 0, 1)
 		g.Scene.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key4) {
 		g.Scene.FogMode = tetra3d.FogOff

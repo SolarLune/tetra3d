@@ -4,6 +4,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
 	"github.com/takeyourhatoff/bitset"
 )
@@ -14,15 +15,22 @@ type Model struct {
 	*Node
 	Mesh                *Mesh
 	FrustumCulling      bool // Whether the Model is culled when it leaves the frustum.
-	BackfaceCulling     bool // Whether the Model's backfaces are culled.
 	closestTris         []*Triangle
 	Color               *Color // The overall color of the Model.
+	ColorBlendingFunc   func(model *Model) ebiten.ColorM
 	BoundingSphere      *BoundingSphere
+	BoundingAABB        *BoundingAABB
 	SortTrisBackToFront bool // Whether the Model's triangles are sorted back-to-front or not.
 
 	Skinned    bool // If the model is skinned and this is enabled, the model will tranform its vertices to match its target armature
 	skinMatrix Matrix4
 	bones      [][]*Node
+}
+
+var defaultColorBlendingFunc = func(model *Model) ebiten.ColorM {
+	colorM := ebiten.ColorM{}
+	colorM.Scale(model.Color.RGBA64())
+	return colorM
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -32,17 +40,22 @@ func NewModel(mesh *Mesh, name string) *Model {
 		Node:                NewNode(name),
 		Mesh:                mesh,
 		FrustumCulling:      true,
-		BackfaceCulling:     true,
 		Color:               NewColor(1, 1, 1, 1),
+		ColorBlendingFunc:   defaultColorBlendingFunc,
 		SortTrisBackToFront: true,
 		skinMatrix:          NewMatrix4(),
 	}
 
-	dimensions := 0.0
-	if mesh != nil {
-		dimensions = mesh.Dimensions.Max()
+	model.onTransformUpdate = func() {
+		model.BoundingSphere.SetLocalPosition(model.WorldPosition().Add(model.Mesh.Dimensions.Center()))
+		model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
 	}
-	model.BoundingSphere = NewBoundingSphere(model, vector.Vector{0, 0, 0}, dimensions)
+
+	radius := 0.0
+	if mesh != nil {
+		radius = mesh.Dimensions.Max() / 2
+	}
+	model.BoundingSphere = NewBoundingSphere("bounding sphere", radius)
 
 	return model
 
@@ -51,10 +64,8 @@ func NewModel(mesh *Mesh, name string) *Model {
 // Clone creates a clone of the Model.
 func (model *Model) Clone() INode {
 	newModel := NewModel(model.Mesh, model.name)
-	newModel.BoundingSphere = model.BoundingSphere.Clone()
-	newModel.BoundingSphere.Node = newModel
+	newModel.BoundingSphere = model.BoundingSphere.Clone().(*BoundingSphere)
 	newModel.FrustumCulling = model.FrustumCulling
-	newModel.BackfaceCulling = model.BackfaceCulling
 	newModel.visible = model.visible
 	newModel.Color = model.Color.Clone()
 	newModel.SortTrisBackToFront = model.SortTrisBackToFront
@@ -113,8 +124,9 @@ func (model *Model) Merge(models ...*Model) {
 	}
 
 	model.Mesh.UpdateBounds()
-	model.BoundingSphere.LocalPosition = model.Mesh.Dimensions.Center()
-	model.BoundingSphere.LocalRadius = model.Mesh.Dimensions.Max()
+
+	model.BoundingSphere.SetLocalPosition(model.Mesh.Dimensions.Center())
+	model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
 
 }
 

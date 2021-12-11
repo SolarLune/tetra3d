@@ -7,36 +7,39 @@ import (
 	"github.com/kvartborg/vector"
 )
 
-// Dimensions represents the spatial dimensions of a Mesh (i.e. the minimum and maximum position of all vertices in the Mesh).
+// Dimensions represents the minimum and maximum spatial dimensions of a Mesh arranged in a 2-space Vector slice.
 type Dimensions []vector.Vector
 
-// Max returns the maximum number from the Dimensions (i.e. if the dimensions have a min of [-3, -1.5, -1], and a max of [3, 1.5, 1], Max()
-// will return 6, as it's the largest distance.
+// Max returns the maximum value from all of the axes in the Dimensions. For example, if the Dimensions have a min of [-1, -2, -2],
+// and a max of [6, 1.5, 1], Max() will return 7, as it's the largest distance between all axes.
 func (dim Dimensions) Max() float64 {
-	max := 0.0
-
-	if d := dim[1][0] - dim[0][0]; d > max {
-		max = d
-	}
-
-	if d := dim[1][1] - dim[0][1]; d > max {
-		max = d
-	}
-
-	if d := dim[1][2] - dim[0][2]; d > max {
-		max = d
-	}
-
-	return math.Abs(max)
+	return math.Max(math.Max(dim.Width(), dim.Height()), dim.Depth())
 }
 
 // Center returns the center point inbetween the two corners of the dimension set.
 func (dim Dimensions) Center() vector.Vector {
 	return vector.Vector{
-		dim[1][0] - dim[0][0],
-		dim[1][1] - dim[0][1],
-		dim[1][2] - dim[0][2],
+		(dim[1][0] + dim[0][0]) / 2,
+		(dim[1][1] + dim[0][1]) / 2,
+		(dim[1][2] + dim[0][2]) / 2,
 	}
+}
+
+func (dim Dimensions) Width() float64 {
+	return dim[1][0] - dim[0][0]
+}
+
+func (dim Dimensions) Height() float64 {
+	return dim[1][1] - dim[0][1]
+}
+
+func (dim Dimensions) Depth() float64 {
+	return dim[1][2] - dim[0][2]
+}
+
+// MaxSpan returns the maximum span out of width, height, and depth.
+func (dim Dimensions) MaxSpan() float64 {
+	return math.Max(math.Max(dim.Width(), dim.Height()), dim.Depth())
 }
 
 type Mesh struct {
@@ -49,6 +52,7 @@ type Mesh struct {
 	FilterMode     ebiten.Filter
 	Dimensions     Dimensions
 	triIndex       int
+	Tags           *Tags
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. You must provide a number of *Vertex instances divisible by 3,
@@ -63,6 +67,7 @@ func NewMesh(name string, verts ...*Vertex) *Mesh {
 		FilterMode:     ebiten.FilterNearest,
 		Dimensions:     Dimensions{{0, 0, 0}, {0, 0, 0}},
 		triIndex:       1,
+		Tags:           NewTags(),
 	}
 
 	if len(verts)%3 != 0 {
@@ -81,6 +86,7 @@ func NewMesh(name string, verts ...*Vertex) *Mesh {
 // Clone clones the Mesh, creating a new
 func (mesh *Mesh) Clone() *Mesh {
 	newMesh := NewMesh(mesh.Name)
+	newMesh.Tags = mesh.Tags.Clone()
 	for _, t := range mesh.Triangles {
 		newTri := t.Clone()
 		newMesh.Triangles = append(newMesh.Triangles, newTri)
@@ -140,26 +146,32 @@ func (mesh *Mesh) ApplyMatrix(matrix Matrix4) {
 // UpdateBounds updates the mesh's dimensions; call this after manually changing vertex positions.
 func (mesh *Mesh) UpdateBounds() {
 
+	mesh.Dimensions[1] = vector.Vector{-math.MaxFloat64, -math.MaxFloat64, -math.MaxFloat64}
+	mesh.Dimensions[0] = vector.Vector{math.MaxFloat64, math.MaxFloat64, math.MaxFloat64}
+
 	for _, v := range mesh.Vertices {
 
-		if v.Position[0] < mesh.Dimensions[0][0] {
+		if mesh.Dimensions[0][0] > v.Position[0] {
 			mesh.Dimensions[0][0] = v.Position[0]
 		}
-		if v.Position[0] > mesh.Dimensions[1][0] {
+
+		if mesh.Dimensions[0][1] > v.Position[1] {
+			mesh.Dimensions[0][1] = v.Position[1]
+		}
+
+		if mesh.Dimensions[0][2] > v.Position[2] {
+			mesh.Dimensions[0][2] = v.Position[2]
+		}
+
+		if mesh.Dimensions[1][0] < v.Position[0] {
 			mesh.Dimensions[1][0] = v.Position[0]
 		}
 
-		if v.Position[1] < mesh.Dimensions[0][1] {
-			mesh.Dimensions[0][1] = v.Position[1]
-		}
-		if v.Position[1] > mesh.Dimensions[1][1] {
+		if mesh.Dimensions[1][1] < v.Position[1] {
 			mesh.Dimensions[1][1] = v.Position[1]
 		}
 
-		if v.Position[2] < mesh.Dimensions[0][2] {
-			mesh.Dimensions[0][2] = v.Position[2]
-		}
-		if v.Position[2] > mesh.Dimensions[1][2] {
+		if mesh.Dimensions[1][2] < v.Position[2] {
 			mesh.Dimensions[1][2] = v.Position[2]
 		}
 

@@ -18,6 +18,11 @@ func fastVectorSub(a, b vector.Vector) vector.Vector {
 
 }
 
+func fastVectorDistanceSquared(a, b vector.Vector) float64 {
+	sub := fastVectorSub(a, b)
+	return sub[0]*sub[0] + sub[1]*sub[1] + sub[2]*sub[2]
+}
+
 func fastMatrixMult(matrix, other Matrix4) Matrix4 {
 
 	standinMatrix[0][0] = matrix[0][0]*other[0][0] + matrix[0][1]*other[1][0] + matrix[0][2]*other[2][0] + matrix[0][3]*other[3][0]
@@ -42,4 +47,19 @@ func fastMatrixMult(matrix, other Matrix4) Matrix4 {
 
 	return standinMatrix
 
+}
+
+func vectorCross(vecA, vecB, failsafeVec vector.Vector) vector.Vector {
+	cross, _ := vecA.Cross(vecB)
+
+	if cross.Magnitude() < 0.0001 {
+		cross, _ = vecA.Cross(failsafeVec)
+
+		// If it's still < 0, then it's not a separating axis
+		if cross.Magnitude() < 0.0001 {
+			return nil
+		}
+	}
+
+	return cross
 }

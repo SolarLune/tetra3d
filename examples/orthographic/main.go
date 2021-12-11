@@ -13,7 +13,6 @@ import (
 	_ "embed"
 	_ "image/png"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"golang.org/x/image/font/basicfont"
 
@@ -27,25 +26,20 @@ var sceneData []byte
 
 type Game struct {
 	Width, Height int
-	Scene         *tetra3d.Scene
 
-	CamHandle    tetra3d.INode
-	CameraTilt   float64
-	CameraRotate float64
+	Scene     *tetra3d.Scene
+	CamHandle tetra3d.INode
 
-	Time              float64
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	PrevMousePosition vector.Vector
+	DrawDebugText  bool
+	DrawDebugDepth bool
 }
 
 func NewGame() *Game {
 
 	game := &Game{
-		Width:             398,
-		Height:            224,
-		PrevMousePosition: vector.Vector{},
-		DrawDebugText:     true,
+		Width:         398,
+		Height:        224,
+		DrawDebugText: true,
 	}
 
 	game.Init()
@@ -67,6 +61,7 @@ func (g *Game) Init() {
 	camera.Far = 60
 
 	g.CamHandle = g.Scene.Root.Get("CameraHandle")
+
 	placeholder := g.CamHandle.Get("CameraPlaceholder")
 
 	g.CamHandle.AddChildren(camera)
@@ -104,6 +99,9 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
 		g.CamHandle.Move(-moveSpd, 0, 0)
 	}
+
+	// Note that adjusting the ortho scale makes it so you can see more or less, so the far clipping distance should also
+	// be adjusted to compensate. I'll forego that for now for simplicity.
 
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		camera.OrthoScale += 0.5

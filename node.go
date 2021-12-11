@@ -53,41 +53,45 @@ type INode interface {
 	SetVisible(visible bool)
 
 	Get(path string) INode
-	GetByName(name string) INode
-	GetByTags(tags ...string) INode
+	FindByName(name string) []INode
+	FindByTags(tags ...string) []INode
 	TreeToString() string
 	Path() string
 
 	Tags() *Tags
 }
 
-// Tags is an unordered set of string tags, representing a means of identifying Nodes.
+// Tags is an unordered set of string tags to values, representing a means of identifying Nodes or carrying data on Nodes.
 type Tags struct {
-	tags map[string]bool
+	tags map[string]interface{}
 }
 
 // NewTags returns a new Tags object.
 func NewTags() *Tags {
-	return &Tags{map[string]bool{}}
+	return &Tags{map[string]interface{}{}}
+}
+
+func (tags *Tags) Clone() *Tags {
+	newTags := NewTags()
+	for k, v := range tags.tags {
+		newTags.Set(k, v)
+	}
+	return newTags
 }
 
 // Clear clears the Tags object of all tags.
 func (tags *Tags) Clear() {
-	tags.tags = map[string]bool{}
+	tags.tags = map[string]interface{}{}
 }
 
-// Add adds all of the tags specified to the Tags object.
-func (tags *Tags) Add(nodeTags ...string) {
-	for _, t := range nodeTags {
-		tags.tags[t] = true
-	}
+// Set sets all the tag specified to the Tags object.
+func (tags *Tags) Set(tagName string, value interface{}) {
+	tags.tags[tagName] = value
 }
 
-// Remove removes all of the tags specified from the Tags object.
-func (tags *Tags) Remove(nodeTags ...string) {
-	for _, t := range nodeTags {
-		delete(tags.tags, t)
-	}
+// Remove removes the tag specified from the Tags object.
+func (tags *Tags) Remove(tag string) {
+	delete(tags.tags, tag)
 }
 
 // Has returns true if the Tags object has all of the tags specified, and false otherwise.
@@ -98,6 +102,41 @@ func (tags *Tags) Has(nodeTags ...string) bool {
 		}
 	}
 	return true
+}
+
+// Get returns the value associated with the specified tag (key).
+func (tags *Tags) Get(tagName string) interface{} {
+	return tags.tags[tagName]
+}
+
+// IsString returns true if the value associated with the specified tag is a string.
+func (tags *Tags) IsString(tagName string) bool {
+	if _, exists := tags.tags[tagName]; exists {
+		if _, ok := tags.tags[tagName].(string); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// GetAsString returns the value associated with the specified tag (key) as a string.
+func (tags *Tags) GetAsString(tagName string) string {
+	return tags.tags[tagName].(string)
+}
+
+// IsFloat returns true if the value associated with the specified tag is a float64.
+func (tags *Tags) IsFloat(tagName string) bool {
+	if _, exists := tags.tags[tagName]; exists {
+		if _, ok := tags.tags[tagName].(float64); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// GetAsFloat returns the value associated with the specified tag (key) as a float.
+func (tags *Tags) GetAsFloat(tagName string) float64 {
+	return tags.tags[tagName].(float64)
 }
 
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
@@ -111,6 +150,7 @@ type Node struct {
 	data              interface{} // A place to store a pointer to something if you need it
 	cachedTransform   Matrix4
 	isTransformDirty  bool
+	onTransformUpdate func()
 	children          []INode
 	visible           bool
 	tags              *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
@@ -194,6 +234,9 @@ func (node *Node) Transform() Matrix4 {
 
 	node.cachedTransform = transform
 	node.isTransformDirty = false
+	if node.onTransformUpdate != nil {
+		node.onTransformUpdate()
+	}
 
 	return transform
 
@@ -273,9 +316,24 @@ func (node *Node) SetLocalPosition(position vector.Vector) {
 	node.dirtyTransform()
 }
 
+// ResetLocalTransformProperties resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
+// by default, when you parent one Node to another, the local transform properties (position, scale, and rotation) are altered to keep the
+// object in the same absolute location, even though the origin changes.
+func (node *Node) ResetLocalTransformProperties() {
+	node.position[0] = 0
+	node.position[1] = 0
+	node.position[2] = 0
+	node.scale[0] = 1
+	node.scale[1] = 1
+	node.scale[2] = 1
+	node.rotation = NewMatrix4()
+	node.dirtyTransform()
+}
+
 // WorldPosition returns a 3D Vector consisting of the object's world position (position relative to the world origin point of {0, 0, 0}).
 func (node *Node) WorldPosition() vector.Vector {
-	position, _, _ := node.Transform().Decompose()
+	// position, _, _ := node.Transform().Decompose()
+	position := node.Transform().Row(3)[:3] // We don't want to have to decompose if we don't have to
 	return position
 }
 
@@ -495,10 +553,14 @@ func (node *Node) TreeToString() string {
 
 		nodeType := "+"
 
-		if _, isModel := node.(*Model); isModel {
+		if _, ok := node.(*Model); ok {
 			nodeType = "M"
-		} else if _, isCamera := node.(*Camera); isCamera {
+		} else if _, ok := node.(*Camera); ok {
 			nodeType = "C"
+		} else if _, ok := node.(*BoundingSphere); ok {
+			nodeType = "BS"
+		} else if _, ok := node.(*BoundingAABB); ok {
+			nodeType = "AABB"
 		}
 
 		str := ""
@@ -595,28 +657,30 @@ func (node *Node) Path() string {
 
 }
 
-// GetByName allows you to search the node's tree for a Node with the provided name. If a Node
-// with the name provided isn't found, FindNodeByName returns nil. After finding a Node, you can
-// convert it to a more specific type as necessary via type assertion.
-func (node *Node) GetByName(name string) INode {
+// FindByName allows you to search the node's tree for Nodes with the provided name, returning a slice
+// of Nodes with the name given. If none are found, an empty slice is returned.
+// After finding a Node, you can convert it to a more specific type as necessary via type assertion.
+func (node *Node) FindByName(name string) []INode {
+	out := []INode{}
 	for _, node := range node.ChildrenRecursive(false) {
 		if node.Name() == name {
-			return node
+			out = append(out, node)
 		}
 	}
-	return nil
+	return out
 }
 
-// GetByTags allows you to search the node's tree for a Node with the provided tag. If a Node
-// with the tag provided isn't found, FindNodeByTag returns nil. After finding a Node, you can
-// convert it to a more specific type as necessary via type assertion.
-func (node *Node) GetByTags(tagNames ...string) INode {
+// FindBytags allows you to search the node's tree for Nodes with the provided tags, returning a slice
+// of Nodes with the tags given. If none are found, an empty slice is returned.
+// After finding a Node, you can convert it to a more specific type as necessary via type assertion.
+func (node *Node) FindByTags(tagNames ...string) []INode {
+	out := []INode{}
 	for _, node := range node.ChildrenRecursive(false) {
 		if node.Tags().Has(tagNames...) {
-			return node
+			out = append(out, node)
 		}
 	}
-	return nil
+	return out
 }
 
 // GetMultipleByTags allows you to search the node's tree for multiple Nodes with the provided tag.

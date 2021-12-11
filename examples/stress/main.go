@@ -33,7 +33,6 @@ type Game struct {
 	CameraTilt   float64
 	CameraRotate float64
 
-	Time              float64
 	DrawDebugText     bool
 	DrawDebugDepth    bool
 	PrevMousePosition vector.Vector

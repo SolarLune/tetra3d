@@ -181,8 +181,8 @@ func (g *Game) Update() error {
 
 	scene := g.Library.Scenes[0]
 
-	armature := scene.Root.GetByName("Armature").(*tetra3d.Node)
-	skin := scene.Root.GetByName("SkinnedMesh").(*tetra3d.Model)
+	armature := scene.Root.FindByName("Armature")[0].(*tetra3d.Node)
+	skin := scene.Root.FindByName("SkinnedMesh")[0].(*tetra3d.Model)
 
 	if armature.Parent() != skin {
 		armature.AddChildren(skin)

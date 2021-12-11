@@ -98,10 +98,19 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	for _, gltfMat := range doc.Materials {
 
 		newMat := NewMaterial(gltfMat.Name)
+		newMat.BackfaceCulling = !gltfMat.DoubleSided
 
 		if gltfLoadOptions.LoadImages {
 			if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
 				newMat.Image = images[texture.Index]
+			}
+		}
+
+		if gltfMat.Extras != nil {
+			if dataMap, isMap := gltfMat.Extras.(map[string]interface{}); isMap {
+				for tagName, data := range dataMap {
+					newMat.Tags.Set(tagName, data)
+				}
 			}
 		}
 
@@ -113,6 +122,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		newMesh := NewMesh(mesh.Name)
 		library.Meshes[mesh.Name] = newMesh
+
+		if mesh.Extras != nil {
+			if dataMap, isMap := mesh.Extras.(map[string]interface{}); isMap {
+				for tagName, data := range dataMap {
+					newMesh.Tags.Set(tagName, data)
+				}
+			}
+
+		}
 
 		for _, v := range mesh.Primitives {
 
@@ -431,6 +449,14 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		for _, child := range node.Children {
 			obj.AddChildren(objects[int(child)])
+		}
+
+		if node.Extras != nil {
+			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
+				for tagName, data := range dataMap {
+					obj.Tags().Set(tagName, data)
+				}
+			}
 		}
 
 		mtData := node.Matrix

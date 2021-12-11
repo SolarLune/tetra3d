@@ -31,7 +31,6 @@ type Game struct {
 	CameraTilt   float64
 	CameraRotate float64
 
-	Time              float64
 	DrawDebugText     bool
 	DrawDebugDepth    bool
 	PrevMousePosition vector.Vector
@@ -99,7 +98,7 @@ func (g *Game) Update() error {
 	parent := g.Scene.Root.Get("parent")
 	parent.SetLocalRotation(parent.LocalRotation().Rotated(0, 1, 0, 0.05))
 
-	child := g.Scene.Root.GetByName("child")
+	child := g.Scene.Root.FindByName("child")[0]
 
 	// Moving the Camera
 

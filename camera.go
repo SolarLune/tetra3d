@@ -48,7 +48,6 @@ type Camera struct {
 	DebugDrawWireframe bool
 	DebugDrawNormals   bool
 	DebugDrawNodes     bool
-	// DebugDrawBoundingSphere bool
 
 	FrustumSphere *BoundingSphere
 }
@@ -62,7 +61,7 @@ func NewCamera(w, h int) *Camera {
 		Near:        0.1,
 		Far:         100,
 
-		FrustumSphere: NewBoundingSphere(nil, vector.Vector{0, 0, 0}, 0),
+		FrustumSphere: NewBoundingSphere("camera frustum sphere", 0),
 	}
 
 	depthShaderText := []byte(
@@ -334,10 +333,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
 	// Update the camera's frustum sphere
-	dist := camera.Far - camera.Near
-	forward := camera.WorldRotation().Forward().Invert()
-	camera.FrustumSphere.LocalPosition = camera.WorldPosition().Add(forward.Scale(dist / 2))
-	camera.FrustumSphere.LocalRadius = dist / 2
+	dist := (camera.Far - camera.Near) / 2
+	forward := camera.LocalRotation().Forward().Invert()
+
+	camera.FrustumSphere.SetWorldPosition(camera.WorldPosition().Add(forward.Scale(camera.Near + dist)))
+	camera.FrustumSphere.Radius = dist * 1.5
 
 	frametimeStart := time.Now()
 
@@ -378,11 +378,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		if model.FrustumCulling {
 
-			// This is the simplest method of simple frustum culling where we simply test the distances between objects.
-
-			modelPos, _, _ := model.Transform().Decompose()
-
-			if modelPos.Sub(camera.FrustumSphere.Position()).Magnitude() > model.BoundingSphere.Radius()+camera.FrustumSphere.Radius() {
+			if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
 				continue
 			}
 
@@ -391,6 +387,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		tris := model.TransformedVertices(vpMatrix, pureViewRot, camera)
 
 		vertexListIndex := 0
+
+		backfaceCulling := true
+		if model.Mesh.Material != nil {
+			backfaceCulling = model.Mesh.Material.BackfaceCulling
+		}
 
 		for _, tri := range tris {
 
@@ -436,7 +437,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			// errors when faces are behind the camera unless we clip triangles. I don't really
 			// feel like doing that right now, so here we are.
 
-			if model.BackfaceCulling {
+			if backfaceCulling {
 
 				n0 := p0[:3].Sub(p1[:3]).Unit()
 				n1 := p1[:3].Sub(p2[:3]).Unit()
@@ -550,7 +551,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		t := &ebiten.DrawTrianglesOptions{}
-		t.ColorM.Scale(model.Color.RGBA64()) // Mix in the Model's color
+		t.ColorM = model.ColorBlendingFunc(model) // Modify the model's appearance using its color blending function
 		t.Filter = model.Mesh.FilterMode
 
 		if camera.RenderDepth {
@@ -594,30 +595,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 
 		}
-
-		// if camera.DebugDrawBoundingSphere {
-
-		// 	sphere := model.Mesh.BoundingSphere
-
-		// 	transformedCenter := camera.WorldToScreen(model.Position.Add(sphere.Position))
-		// 	transformedRadius := camera.WorldToScreen(model.Position.Add(sphere.Position).Add(vector.Vector{model.BoundingSphereRadius(), 0, 0}))
-		// 	radius := transformedRadius.Sub(transformedCenter).Magnitude()
-
-		// 	stepCount := float64(32)
-
-		// 	for i := 0; i < int(stepCount); i++ {
-
-		// 		x := (math.Sin(math.Pi*2*float64(i)/stepCount) * radius)
-		// 		y := (math.Cos(math.Pi*2*float64(i)/stepCount) * radius)
-
-		// 		x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
-		// 		y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
-
-		// 		ebitenutil.DrawLine(camera.ColorTexture, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, color.White)
-
-		// 	}
-
-		// }
 
 	}
 
@@ -667,6 +644,180 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 		camera.DebugInfo.DrawnTris,
 		camera.DebugInfo.TotalTris),
 		basicfont.Face7x13, dr)
+
+}
+
+func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, nodeBase INode, color color.Color) {
+
+	for _, n := range nodeBase.ChildrenRecursive(false) {
+
+		if b, isBounds := n.(BoundingObject); isBounds {
+
+			switch bounds := b.(type) {
+
+			case *BoundingSphere:
+
+				pos := bounds.WorldPosition()
+				radius := bounds.WorldRadius()
+
+				u := camera.WorldToScreen(pos.Add(vector.Y.Scale(radius)))
+				d := camera.WorldToScreen(pos.Add(vector.Y.Scale(-radius)))
+				r := camera.WorldToScreen(pos.Add(vector.X.Scale(radius)))
+				l := camera.WorldToScreen(pos.Add(vector.X.Scale(-radius)))
+				f := camera.WorldToScreen(pos.Add(vector.Z.Scale(radius)))
+				b := camera.WorldToScreen(pos.Add(vector.Z.Scale(-radius)))
+
+				lines := []vector.Vector{
+					u, r, d, l,
+					u, f, d, b, u,
+					b, r, f, l, b,
+				}
+
+				for i := range lines {
+
+					if i >= len(lines)-1 {
+						break
+					}
+
+					start := lines[i]
+					end := lines[i+1]
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+
+				}
+
+				// transformedCenter := camera.WorldToScreen(bounds.WorldPosition())
+				// transformedRadius := camera.WorldToScreen(model.Position.Add(sphere.Position).Add(vector.Vector{model.BoundingSphereRadius(), 0, 0}))
+				// radius := transformedRadius.Sub(transformedCenter).Magnitude()
+
+				// fmt.Println(transformedCenter, radius)
+
+				// stepCount := float64(32)
+
+				// for i := 0; i < int(stepCount); i++ {
+
+				// 	x := (math.Sin(math.Pi*2*float64(i)/stepCount) * radius)
+				// 	y := (math.Cos(math.Pi*2*float64(i)/stepCount) * radius)
+
+				// 	x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
+				// 	y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
+
+				// 	ebitenutil.DrawLine(screen, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, color.White)
+
+				// }
+
+			case *BoundingCapsule:
+
+				pos := bounds.WorldPosition()
+				radius := bounds.WorldRadius()
+				height := bounds.Height
+
+				uv := bounds.WorldRotation().Up()
+				rv := bounds.WorldRotation().Right()
+				fv := bounds.WorldRotation().Forward()
+
+				u := camera.WorldToScreen(pos.Add(uv.Scale(height)))
+
+				ur := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(radius)))
+				ul := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(-radius)))
+				uf := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(radius)))
+				ub := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(-radius)))
+
+				d := camera.WorldToScreen(pos.Add(uv.Scale(-height)))
+
+				dr := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(radius)))
+				dl := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(-radius)))
+				df := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(radius)))
+				db := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(-radius)))
+
+				lines := []vector.Vector{
+					u, ur, dr, d, dl, ul,
+					u, uf, df, d, db, ub, u,
+					ul, uf, ur, ub, ul,
+					dl, db, dr, df, dl,
+				}
+
+				for i := range lines {
+
+					if i >= len(lines)-1 {
+						break
+					}
+
+					start := lines[i]
+					end := lines[i+1]
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+
+				}
+
+			case *BoundingAABB:
+
+				pos := bounds.WorldPosition()
+				size := bounds.Size.Scale(1.0 / 2.0)
+
+				ufr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], size[2]}))
+				ufl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], size[2]}))
+				ubr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], -size[2]}))
+				ubl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], -size[2]}))
+
+				dfr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], -size[1], size[2]}))
+				dfl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], -size[1], size[2]}))
+				dbr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], -size[1], -size[2]}))
+				dbl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], -size[1], -size[2]}))
+
+				lines := []vector.Vector{
+					ufr, ufl, ubl, ubr, ufr,
+					dfr, dfl, dbl, dbr, dfr,
+					ufr, ufl, dfl, dbl, ubl, ubr, dbr,
+				}
+
+				for i := range lines {
+
+					if i >= len(lines)-1 {
+						break
+					}
+
+					start := lines[i]
+					end := lines[i+1]
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+
+				}
+
+			case *BoundingTriangles:
+
+				lines := []vector.Vector{}
+
+				for _, t := range bounds.Mesh.Triangles {
+
+					lines = append(lines, camera.ClipToScreen(t.Vertices[0].transformed))
+					lines = append(lines, camera.ClipToScreen(t.Vertices[1].transformed))
+					lines = append(lines, camera.ClipToScreen(t.Vertices[2].transformed))
+
+				}
+
+				for i := 0; i < len(lines); i += 3 {
+
+					if i >= len(lines)-1 {
+						break
+					}
+
+					start := lines[i]
+					end := lines[i+1]
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+
+					start = lines[i+1]
+					end = lines[i+2]
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+
+					start = lines[i+2]
+					end = lines[i]
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+
+				}
+
+			}
+
+		}
+
+	}
 
 }
 

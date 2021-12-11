@@ -215,30 +215,42 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Object transform-based animations
 - [x] -- Blending between animations
 - [x] -- Linear keyframe interpolation
-- [ ] -- Constant keyframe interpolation
+- [x] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
-- [ ] -- Morph Animations
+- [ ] -- Morph (mesh-based) animations
 - [x] Scenes
 - [x] -- Fog
 - [x] -- A node or scenegraph for parenting and simple visibility culling
+- [x] - Vertex Coloring
 - [ ] -- Ambient vertex coloring
+- [ ] -- Multiple vertex color channels
 - [x] GLTF / GLB model loading
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
 - [x] -- Normal loading
 - [x] -- Transform / full scene loading
 - [x] -- Animation loading
+- [ ] -- Separate .bin loading
 - [x] DAE model loading
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
 - [x] -- Normal loading
 - [x] -- Transform / full scene loading
-- [ ] Lighting?
+- [ ] Lighting
 - [ ] Shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)
-- [ ] Basic Collisions
-- [ ] -- AABB collision testing / sphere collision testing?
-- [ ] -- Raycasting
+- [x] Intersection Testing:
+- [ ] -- Normal reporting
+- [x] -- Varying collision shapes
+
+| Collision Type | Sphere | AABB         | Triangle   | Capsule  | Ray |
+| ------         | ----   | ----         | --------   | -------- | ---- |
+| Sphere         |  ✅    | ✅           |    ✅      |  ✅      |   ❌  |
+| AABB           | ✅     |  ✅          | ⛔ (buggy) |  ✅      |   ❌  |
+| Triangle       | ✅     | ⛔ (buggy)   | ⛔ (buggy) | ✅       |   ❌  |
+| Capsule        | ✅     | ✅           | ✅         | ✅       |   ❌  |
+| Ray            | ❌     | ❌           | ❌         | ❌       |   ❌  |
+
 - [ ] 3D Sound (just adjusting panning of sound sources based on 3D location, or something like that)
 - [ ] Multithreading (particularly for vertex transformations)
 - [ ] [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards

@@ -16,10 +16,11 @@ func (color *Color) Clone() *Color {
 	return NewColor(color.R, color.G, color.B, color.A)
 }
 
-func (color *Color) SetRGB(r, g, b float32) {
+func (color *Color) SetRGBA(r, g, b, a float32) {
 	color.R = r
 	color.G = g
 	color.B = b
+	color.A = a
 }
 
 func (color *Color) AddRGB(value float32) {

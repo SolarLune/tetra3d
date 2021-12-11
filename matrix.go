@@ -227,15 +227,21 @@ func (matrix Matrix4) Transposed() Matrix4 {
 }
 
 // Inverted returns an inverted (reversed) clone of a Matrix4. An inverted matrix is defined here as a matrix
-// composed of a decomposed matrix's inverted rotation and position with the same scale (since scale is multiplicative).
+// composed of a decomposed matrix's transposed rotation, negated position, and the same scale (since scale is multiplicative).
 func (matrix Matrix4) Inverted() Matrix4 {
 
 	p, s, r := matrix.Decompose()
 
 	newMat := NewMatrix4()
-	newMat = newMat.SetRow(0, r.Row(0).Invert().Scale(s[0]))
-	newMat = newMat.SetRow(1, r.Row(1).Invert().Scale(s[0]))
-	newMat = newMat.SetRow(2, r.Row(2).Invert().Scale(s[0]))
+	newMat = newMat.SetRow(0, r.Row(0))
+	newMat = newMat.SetRow(1, r.Row(1))
+	newMat = newMat.SetRow(2, r.Row(2))
+	newMat = newMat.Transposed()
+
+	newMat[0][0] *= s[0]
+	newMat[1][1] *= s[1]
+	newMat[2][2] *= s[2]
+
 	newMat = newMat.SetRow(3, vector.Vector{-p[0], -p[1], -p[2], 1})
 
 	return newMat

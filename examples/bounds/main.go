@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"runtime/pprof"
+	"runtime/trace"
 	"time"
 
 	_ "embed"
@@ -22,22 +23,24 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
+//go:embed bounds.gltf
+var gltfData []byte
+
 type Game struct {
 	Width, Height int
 	Scene         *tetra3d.Scene
 
+	Controlling *tetra3d.Model
+
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
 	CameraRotate float64
-	Offscreen    *ebiten.Image
 
 	DrawDebugText     bool
 	DrawDebugDepth    bool
+	DrawDebugBounds   bool
 	PrevMousePosition vector.Vector
 }
-
-//go:embed tetra3d.glb
-var logoModel []byte
 
 func NewGame() *Game {
 	game := &Game{
@@ -46,7 +49,6 @@ func NewGame() *Game {
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
-	game.Offscreen = ebiten.NewImage(game.Width, game.Height)
 
 	game.Init()
 
@@ -54,37 +56,63 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
-	dae, err := tetra3d.LoadGLTFData(logoModel, nil)
+
+	library, err := tetra3d.LoadGLTFData(gltfData, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	g.Scene = dae.Scenes[0]
+	g.Scene = library.FindScene("Scene")
 
-	// Get the ScreenTexture node, which is a model
-	screen := g.Scene.Root.Get("ScreenBorder/ScreenTexture")
+	for _, object := range g.Scene.Root.ChildrenRecursive(false) {
 
-	// And set its image
-	screen.(*tetra3d.Model).Mesh.Material.Image = g.Offscreen
+		if object.Tags().Has("collision") {
+
+			model := object.(*tetra3d.Model)
+			colType := object.Tags().GetAsString("collision")
+
+			if colType == "sphere" {
+				col := tetra3d.NewBoundingSphere("bounds", model.Mesh.Dimensions.Max()/2)
+				object.AddChildren(col)
+				col.ResetLocalTransformProperties()
+			} else if colType == "aabb" {
+				dimensions := object.(*tetra3d.Model).Mesh.Dimensions
+				col := tetra3d.NewBoundingAABB("bounds", dimensions.Width(), dimensions.Height(), dimensions.Depth())
+				object.AddChildren(col)
+				col.ResetLocalTransformProperties()
+			} else if colType == "triangle" {
+				col := tetra3d.NewBoundingTriangles("bounds", model.Mesh)
+				object.AddChildren(col)
+				col.ResetLocalTransformProperties()
+			} else if colType == "capsule" {
+				dimensions := object.(*tetra3d.Model).Mesh.Dimensions
+				col := tetra3d.NewBoundingCapsule("bounds", dimensions.Height()/2, dimensions.Width()/2)
+				object.AddChildren(col)
+				col.ResetLocalTransformProperties()
+			}
+
+		}
+
+	}
+
+	g.Controlling = g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
-	g.Scene.Root.AddChildren(g.Camera)
+	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
 
 func (g *Game) Update() error {
+
 	var err error
 
-	moveSpd := 0.05
+	moveSpd := 0.1
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
-
-	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
 	forward := g.Camera.LocalRotation().Forward().Invert()
@@ -119,7 +147,45 @@ func (g *Game) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
-	// Rotating the camera with the mouse
+	if ebiten.IsKeyPressed(ebiten.KeyRight) {
+		g.Controlling.Move(moveSpd, 0, 0)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+		g.Controlling.Move(-moveSpd, 0, 0)
+	}
+
+	if ebiten.IsKeyPressed(ebiten.KeyUp) {
+		g.Controlling.Move(0, 0, -moveSpd)
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+		g.Controlling.Move(0, 0, moveSpd)
+	}
+
+	// Gravity
+	g.Controlling.Move(0, -0.1, 0)
+
+	bounds := g.Controlling.Get("bounds").(tetra3d.BoundingObject)
+
+	for _, ob := range g.Scene.Root.FindByName("bounds") {
+
+		if inter := bounds.Intersection(ob.(tetra3d.BoundingObject)); inter != nil {
+
+			mtv := inter.MTV
+			g.Controlling.Move(mtv[0], mtv[1], mtv[2])
+
+		}
+
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)
+		capsule := g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
+		if g.Controlling == sphere {
+			g.Controlling = capsule
+		} else {
+			g.Controlling = sphere
+		}
+	}
 
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
@@ -138,10 +204,6 @@ func (g *Game) Update() error {
 
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
 	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	// Spinning the tetrahedron in the logo
-	tetra := g.Scene.Root.Get("LogoGroup/Tetra")
-	tetra.SetLocalRotation(tetra.LocalRotation().Rotated(0, 1, 0, 0.05))
 
 	g.PrevMousePosition = mv.Clone()
 
@@ -175,7 +237,7 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
+		g.DrawDebugBounds = !g.DrawDebugBounds
 	}
 
 	return err
@@ -183,25 +245,17 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	screen.Fill(color.RGBA{60, 70, 80, 255})
+	// screen.Fill(color.RGBA{20, 25, 30, 255})
+	screen.Fill(color.Black)
 
-	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the logo first
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("LogoGroup"))
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
-	// Clear the Offscreen, then draw the camera's color texture output to it as well.
-	g.Offscreen.Fill(color.Black)
-	g.Offscreen.DrawImage(g.Camera.ColorTexture, nil)
-
-	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("ScreenBorder"))
-
-	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
-	// we could just draw the images straight.
 	opt := &ebiten.DrawImageOptions{}
 	w, h := g.Camera.ColorTexture.Size()
+
+	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
 	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
 		screen.DrawImage(g.Camera.DepthTexture, opt)
@@ -209,11 +263,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(g.Camera.ColorTexture, opt)
 	}
 
+	if g.DrawDebugBounds {
+		g.Camera.DrawDebugBounds(screen, g.Scene.Root, color.RGBA{0, 255, 0, 128})
+	}
+
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe screen object shows what the\ncamera is looking at.\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
+		shapeName := g.Controlling.Name()
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nArrow keys: Move " + shapeName + "\nF: switch between capsule and sphere\nF1, F2, F3: Debug views\nF5: Display bounds shapes\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{192, 192, 192, 255})
 	}
+
 }
 
 func (g *Game) StartProfiling() {
@@ -237,8 +297,13 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Logo Test")
+	ebiten.SetWindowTitle("Tetra3d - Shapes Test")
 	ebiten.SetWindowResizable(true)
+
+	traceFile, _ := os.Create("trace.out")
+	defer traceFile.Close()
+	trace.Start(traceFile)
+	defer trace.Stop()
 
 	game := NewGame()
 
