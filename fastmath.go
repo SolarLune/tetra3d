@@ -63,3 +63,41 @@ func vectorCross(vecA, vecB, failsafeVec vector.Vector) vector.Vector {
 
 	return cross
 }
+
+type VectorPool struct {
+	Vectors        []vector.Vector
+	RetrievalIndex int
+}
+
+func NewVectorPool(vectorCount int) *VectorPool {
+	pool := &VectorPool{
+		Vectors: []vector.Vector{},
+	}
+	for i := 0; i < vectorCount; i++ {
+		pool.Vectors = append(pool.Vectors, vector.Vector{0, 0, 0, 0})
+	}
+	return pool
+}
+
+func (pool *VectorPool) Reset() {
+	pool.RetrievalIndex = 0
+}
+
+func (pool *VectorPool) Get() vector.Vector {
+	v := pool.Vectors[pool.RetrievalIndex]
+	pool.RetrievalIndex++
+	return v
+}
+
+func (pool *VectorPool) MultVecW(matrix Matrix4, vect vector.Vector) vector.Vector {
+
+	v := pool.Get()
+
+	v[0] = matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0]
+	v[1] = matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1]
+	v[2] = matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2]
+	v[3] = matrix[0][3]*vect[0] + matrix[1][3]*vect[1] + matrix[2][3]*vect[2] + matrix[3][3]
+
+	return v
+
+}

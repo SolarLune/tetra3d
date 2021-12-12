@@ -315,11 +315,11 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
-	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something of the correct order
+	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
 	if !camera.RenderDepth {
 
 		sort.SliceStable(models, func(i, j int) bool {
-			return models[i].WorldPosition().Sub(camera.WorldPosition()).Magnitude() > models[j].LocalPosition().Sub(camera.WorldPosition()).Magnitude()
+			return fastVectorDistanceSquared(models[i].WorldPosition(), camera.WorldPosition()) > fastVectorDistanceSquared(models[j].WorldPosition(), camera.WorldPosition())
 		})
 
 	}
@@ -380,6 +380,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 
 		}
+
+		camera.DebugInfo.DrawnObjects++
 
 		tris := model.TransformedVertices(vpMatrix, pureViewRot, camera)
 
@@ -457,6 +459,26 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			vertexList[vertexListIndex+2].DstX = float32(math.Round(p2[0]))
 			vertexList[vertexListIndex+2].DstY = float32(math.Round(p2[1]))
 
+			if camera.RenderDepth {
+
+				far := camera.Far
+				if !camera.Perspective {
+					far = 2.0
+				}
+
+				for i, vert := range tri.Vertices {
+
+					depth := (math.Max(vert.transformed[2], 0) / far)
+
+					vertexList[vertexListIndex+i].ColorR = float32(depth)
+					vertexList[vertexListIndex+i].ColorG = float32(depth)
+					vertexList[vertexListIndex+i].ColorB = float32(depth)
+					vertexList[vertexListIndex+i].ColorA = 1
+
+				}
+
+			}
+
 			vertexListIndex += 3
 
 		}
@@ -469,31 +491,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			indexList[i] = uint16(i)
 		}
 
-		index := 0
-
 		// Render the depth map here
 		if camera.RenderDepth {
-
-			far := camera.Far
-			if !camera.Perspective {
-				far = 2.0
-			}
-
-			for _, tri := range triList[:vertexListIndex/3] {
-
-				for _, vert := range tri.Vertices {
-
-					depth := (math.Max(vert.transformed[2], 0) / far)
-
-					vertexList[index].ColorR = float32(depth)
-					vertexList[index].ColorG = float32(depth)
-					vertexList[index].ColorB = float32(depth)
-					vertexList[index].ColorA = 1
-					index++
-
-				}
-
-			}
 
 			shaderOpt := &ebiten.DrawTrianglesShaderOptions{
 				Images: [4]*ebiten.Image{camera.DepthTexture},
@@ -512,7 +511,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			srcH = float64(model.Mesh.Material.Image.Bounds().Dy())
 		}
 
-		index = 0
+		index := 0
 
 		for _, tri := range triList[:vertexListIndex/3] {
 
@@ -565,7 +564,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
 		}
 
-		camera.DebugInfo.DrawnObjects++
 		camera.DebugInfo.DrawnTris += vertexListIndex / 3
 
 	}
@@ -697,10 +695,11 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 		camera.drawCircle(screen, node.WorldPosition(), 8, color)
 
-		if node.Parent() != nil {
+		// If the node's parent is something, and its parent's parent is something (i.e. it's not the root)
+		if node.Parent() != nil && node.Parent() != node.Root() {
 			parentPos := camera.WorldToScreen(node.Parent().WorldPosition())
 			pos := camera.WorldToScreen(node.WorldPosition())
-			ebitenutil.DrawLine(camera.ColorTexture, pos[0], pos[1], parentPos[0], parentPos[1], color)
+			ebitenutil.DrawLine(screen, pos[0], pos[1], parentPos[0], parentPos[1], color)
 		}
 
 	}
@@ -746,26 +745,6 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
 
 				}
-
-				// transformedCenter := camera.WorldToScreen(bounds.WorldPosition())
-				// transformedRadius := camera.WorldToScreen(model.Position.Add(sphere.Position).Add(vector.Vector{model.BoundingSphereRadius(), 0, 0}))
-				// radius := transformedRadius.Sub(transformedCenter).Magnitude()
-
-				// fmt.Println(transformedCenter, radius)
-
-				// stepCount := float64(32)
-
-				// for i := 0; i < int(stepCount); i++ {
-
-				// 	x := (math.Sin(math.Pi*2*float64(i)/stepCount) * radius)
-				// 	y := (math.Cos(math.Pi*2*float64(i)/stepCount) * radius)
-
-				// 	x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
-				// 	y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
-
-				// 	ebitenutil.DrawLine(screen, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, color.White)
-
-				// }
 
 			case *BoundingCapsule:
 

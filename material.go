@@ -2,18 +2,26 @@ package tetra3d
 
 import "github.com/hajimehoshi/ebiten/v2"
 
+const (
+	TriangleSortBackToFront = iota
+	TriangleSortFrontToBack
+	TriangleSortNone
+)
+
 type Material struct {
-	Name            string
-	Image           *ebiten.Image
-	Tags            *Tags
-	BackfaceCulling bool
+	Name             string
+	Image            *ebiten.Image
+	Tags             *Tags
+	BackfaceCulling  bool
+	TriangleSortMode int
 }
 
 func NewMaterial(name string) *Material {
 	return &Material{
-		Name:            name,
-		Tags:            NewTags(),
-		BackfaceCulling: true,
+		Name:             name,
+		Tags:             NewTags(),
+		BackfaceCulling:  true,
+		TriangleSortMode: TriangleSortBackToFront,
 	}
 }
 

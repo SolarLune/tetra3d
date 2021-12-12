@@ -189,10 +189,10 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 	toYUp := NewMatrix4Rotate(1, 0, 0, math.Pi/2)
 
 	daeURLsToMeshes := map[string]*Mesh{}
-	daeURLsToMaterialNames := map[string]string{}
+	daeURLsToMaterials := map[string]*Material{}
 
 	for _, mat := range daeMaterials.MaterialNames {
-		daeURLsToMaterialNames[mat.ID] = mat.Name
+		daeURLsToMaterials[mat.ID] = NewMaterial(mat.Name)
 	}
 
 	for _, geo := range daeGeo.Geometries {
@@ -312,7 +312,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 			mesh.ApplyMatrix(NewMatrix4Rotate(1, 0, 0, -math.Pi/2))
 		}
 
-		mesh.MaterialName = daeURLsToMaterialNames[geo.Triangles.MaterialName]
+		mesh.Material = daeURLsToMaterials[geo.Triangles.MaterialName]
 		scenes.Meshes[geo.Name] = mesh
 		daeURLsToMeshes[geo.URL] = mesh
 

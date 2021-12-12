@@ -70,10 +70,12 @@ func (g *Game) Init() {
 
 	for i := 0; i < 30; i++ {
 		for j := 0; j < 30; j++ {
-			cubeMesh := tetra3d.NewCube()
-			cube := tetra3d.NewModel(cubeMesh, "Cube")
-			cube.SetLocalPosition(vector.Vector{float64(i * 3), 0, float64(-j * 3)})
-			cubes = append(cubes, cube)
+			for k := 0; k < 3; k++ {
+				cubeMesh := tetra3d.NewCube()
+				cube := tetra3d.NewModel(cubeMesh, "Cube")
+				cube.SetLocalPosition(vector.Vector{float64(i * 3), float64(k * 3), float64(-j * 3)})
+				cubes = append(cubes, cube)
+			}
 		}
 	}
 
@@ -89,6 +91,7 @@ func (g *Game) Init() {
 	// }
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
+	g.Camera.Far = 400
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)

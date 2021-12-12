@@ -1,30 +1,29 @@
 package tetra3d
 
 import (
+	"math"
 	"sort"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
-	"github.com/takeyourhatoff/bitset"
 )
 
 // Model represents a singular visual instantiation of a Mesh. A Mesh contains the vertex information (what to draw); a Model references the Mesh to draw it with a specific
 // Position, Rotation, and/or Scale (where and how to draw).
 type Model struct {
 	*Node
-	Mesh                *Mesh
-	FrustumCulling      bool // Whether the Model is culled when it leaves the frustum.
-	closestTris         []*Triangle
-	Color               *Color // The overall color of the Model.
-	ColorBlendingFunc   func(model *Model) ebiten.ColorM
-	BoundingSphere      *BoundingSphere
-	BoundingAABB        *BoundingAABB
-	SortTrisBackToFront bool // Whether the Model's triangles are sorted back-to-front or not.
+	Mesh              *Mesh
+	FrustumCulling    bool   // Whether the Model is culled when it leaves the frustum.
+	Color             *Color // The overall color of the Model.
+	ColorBlendingFunc func(model *Model) ebiten.ColorM
+	BoundingSphere    *BoundingSphere
+	BoundingAABB      *BoundingAABB
 
 	Skinned    bool // If the model is skinned and this is enabled, the model will tranform its vertices to match its target armature
 	skinMatrix Matrix4
 	bones      [][]*Node
+	vectorPool *VectorPool
 }
 
 var defaultColorBlendingFunc = func(model *Model) ebiten.ColorM {
@@ -37,13 +36,16 @@ var defaultColorBlendingFunc = func(model *Model) ebiten.ColorM {
 func NewModel(mesh *Mesh, name string) *Model {
 
 	model := &Model{
-		Node:                NewNode(name),
-		Mesh:                mesh,
-		FrustumCulling:      true,
-		Color:               NewColor(1, 1, 1, 1),
-		ColorBlendingFunc:   defaultColorBlendingFunc,
-		SortTrisBackToFront: true,
-		skinMatrix:          NewMatrix4(),
+		Node:              NewNode(name),
+		Mesh:              mesh,
+		FrustumCulling:    true,
+		Color:             NewColor(1, 1, 1, 1),
+		ColorBlendingFunc: defaultColorBlendingFunc,
+		skinMatrix:        NewMatrix4(),
+	}
+
+	if mesh != nil {
+		model.vectorPool = NewVectorPool(len(mesh.Vertices))
 	}
 
 	model.onTransformUpdate = func() {
@@ -68,7 +70,6 @@ func (model *Model) Clone() INode {
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.visible = model.visible
 	newModel.Color = model.Color.Clone()
-	newModel.SortTrisBackToFront = model.SortTrisBackToFront
 
 	newModel.Skinned = model.Skinned
 	for i := range model.bones {
@@ -127,6 +128,8 @@ func (model *Model) Merge(models ...*Model) {
 
 	model.BoundingSphere.SetLocalPosition(model.Mesh.Dimensions.Center())
 	model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
+
+	model.vectorPool = NewVectorPool(len(model.Mesh.Vertices))
 
 }
 
@@ -187,57 +190,60 @@ func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
 
 }
 
-// TransformedVertices returns the vertices of the Model, as transformed by the (provided) Camera's view matrix, sorted by distance to the (provided) Camera's position.
 func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector, camera *Camera) []*Triangle {
 
 	mvp := model.Transform().Mult(vpMatrix)
+
+	model.vectorPool.Reset()
 
 	if model.Skinned {
 
 		t := time.Now()
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
-		for _, vert := range model.Mesh.sortedVertices {
-			vert.transformed = vpMatrix.MultVecW(model.skinVertex(vert))
+		for _, tri := range model.Mesh.Triangles {
+			tri.closestDepth = math.MaxFloat64
+			for _, vert := range tri.Vertices {
+				vert.transformed = model.vectorPool.MultVecW(vpMatrix, model.skinVertex(vert))
+				if vert.transformed[2] < tri.closestDepth {
+					tri.closestDepth = vert.transformed[2]
+				}
+			}
 		}
 
 		camera.DebugInfo.animationTime += time.Since(t)
 
 	} else {
 
-		for _, vert := range model.Mesh.sortedVertices {
-			vert.transformed = mvp.MultVecW(vert.Position)
+		for _, tri := range model.Mesh.Triangles {
+			tri.closestDepth = math.MaxFloat64
+			for _, vert := range tri.Vertices {
+				vert.transformed = model.vectorPool.MultVecW(mvp, vert.Position)
+				if vert.transformed[2] < tri.closestDepth {
+					tri.closestDepth = vert.transformed[2]
+				}
+			}
 		}
 
 	}
 
-	// Avoid reallocating the backing array by just slicing to 0 length.
-	model.closestTris = model.closestTris[:0]
+	sortMode := TriangleSortBackToFront
 
-	if model.SortTrisBackToFront {
-		sort.SliceStable(model.Mesh.sortedVertices, func(i, j int) bool {
-			return fastVectorSub(model.Mesh.sortedVertices[i].transformed, viewPos).Magnitude() > fastVectorSub(model.Mesh.sortedVertices[j].transformed, viewPos).Magnitude()
+	if model.Mesh.Material != nil {
+		sortMode = model.Mesh.Material.TriangleSortMode
+	}
+
+	if sortMode == TriangleSortBackToFront {
+		sort.SliceStable(model.Mesh.sortedTriangles, func(i, j int) bool {
+			return model.Mesh.sortedTriangles[i].closestDepth > model.Mesh.sortedTriangles[j].closestDepth
 		})
-	} else {
-		sort.SliceStable(model.Mesh.sortedVertices, func(i, j int) bool {
-			return fastVectorSub(model.Mesh.sortedVertices[i].transformed, viewPos).Magnitude() < fastVectorSub(model.Mesh.sortedVertices[j].transformed, viewPos).Magnitude()
+	} else if sortMode == TriangleSortFrontToBack {
+		sort.SliceStable(model.Mesh.sortedTriangles, func(i, j int) bool {
+			return model.Mesh.sortedTriangles[i].closestDepth < model.Mesh.sortedTriangles[j].closestDepth
 		})
 	}
 
-	// By using a bitset.Set, we can avoid putting triangles in the closestTris slice multiple times and avoid the time cost by looping over the slice / checking
-	// a map to see if the triangle's been added.
-	set := bitset.Set{}
-
-	for _, v := range model.Mesh.sortedVertices {
-
-		if !set.Test(v.triangle.ID) {
-			model.closestTris = append(model.closestTris, v.triangle)
-			set.Add(v.triangle.ID)
-		}
-
-	}
-
-	return model.closestTris
+	return model.Mesh.sortedTriangles
 
 }
 

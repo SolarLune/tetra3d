@@ -43,16 +43,15 @@ func (dim Dimensions) MaxSpan() float64 {
 }
 
 type Mesh struct {
-	Name           string
-	Vertices       []*Vertex
-	sortedVertices []*Vertex
-	Triangles      []*Triangle
-	Material       *Material // What Image to use when rendering the triangles that define this Mesh
-	MaterialName   string    // The name of any material assigned to the Mesh from the 3D modeling program
-	FilterMode     ebiten.Filter
-	Dimensions     Dimensions
-	triIndex       int
-	Tags           *Tags
+	Name            string
+	Vertices        []*Vertex
+	Triangles       []*Triangle
+	sortedTriangles []*Triangle
+	Material        *Material // What Image to use when rendering the triangles that define this Mesh
+	FilterMode      ebiten.Filter
+	Dimensions      Dimensions
+	triIndex        int
+	Tags            *Tags
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. You must provide a number of *Vertex instances divisible by 3,
@@ -60,14 +59,13 @@ type Mesh struct {
 func NewMesh(name string, verts ...*Vertex) *Mesh {
 
 	mesh := &Mesh{
-		Name:           name,
-		Vertices:       []*Vertex{},
-		sortedVertices: []*Vertex{},
-		Triangles:      []*Triangle{},
-		FilterMode:     ebiten.FilterNearest,
-		Dimensions:     Dimensions{{0, 0, 0}, {0, 0, 0}},
-		triIndex:       1,
-		Tags:           NewTags(),
+		Name:       name,
+		Vertices:   []*Vertex{},
+		Triangles:  []*Triangle{},
+		FilterMode: ebiten.FilterNearest,
+		Dimensions: Dimensions{{0, 0, 0}, {0, 0, 0}},
+		triIndex:   1,
+		Tags:       NewTags(),
 	}
 
 	if len(verts)%3 != 0 {
@@ -107,8 +105,8 @@ func (mesh *Mesh) AddTriangles(verts ...*Vertex) {
 		tri := NewTriangle(mesh)
 		tri.ID = mesh.triIndex
 		mesh.Triangles = append(mesh.Triangles, tri)
+		mesh.sortedTriangles = append(mesh.sortedTriangles, tri)
 		mesh.Vertices = append(mesh.Vertices, verts[i], verts[i+1], verts[i+2])
-		mesh.sortedVertices = append(mesh.sortedVertices, verts[i], verts[i+1], verts[i+2])
 		tri.SetVertices(verts[i], verts[i+1], verts[i+2])
 		mesh.triIndex++
 
@@ -300,11 +298,12 @@ func NewPlane() *Mesh {
 
 // A Triangle represents the smallest renderable object in Tetra3D.
 type Triangle struct {
-	Vertices []*Vertex
-	Normal   vector.Vector
-	Mesh     *Mesh
-	Center   vector.Vector
-	ID       int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
+	Vertices     []*Vertex
+	Normal       vector.Vector
+	Mesh         *Mesh
+	Center       vector.Vector
+	closestDepth float64
+	ID           int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
 }
 
 // NewTriangle creates a new Triangle, and requires a reference to its owning Mesh.

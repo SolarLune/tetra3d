@@ -34,7 +34,7 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 `go get github.com/solarlune/tetra3d`
 
-Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, takeyourhatoff's [bitset](https://github.com/takeyourhatoff/bitset) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above.
+Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above.
 
 ## How do you use it?
 
