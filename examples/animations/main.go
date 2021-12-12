@@ -26,14 +26,17 @@ type Game struct {
 	Width, Height int
 	Library       *tetra3d.Library
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-
 	Time              float64
-	DrawDebugText     bool
-	DrawDebugDepth    bool
+	Camera            *tetra3d.Camera
+	CameraTilt        float64
+	CameraRotate      float64
 	PrevMousePosition vector.Vector
+
+	DrawDebugText      bool
+	DrawDebugDepth     bool
+	DrawDebugNormals   bool
+	DrawDebugCenters   bool
+	DrawDebugWireframe bool
 }
 
 //go:embed animations.gltf
@@ -164,15 +167,15 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.Camera.DebugDrawWireframe = !g.Camera.DebugDrawWireframe
+		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
-		g.Camera.DebugDrawNormals = !g.Camera.DebugDrawNormals
+		g.DrawDebugNormals = !g.DrawDebugNormals
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
-		g.Camera.DebugDrawNodes = !g.Camera.DebugDrawNodes
+		g.DrawDebugCenters = !g.DrawDebugCenters
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
@@ -233,11 +236,24 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(g.Camera.ColorTexture, opt)
 	}
 
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, scene.Root, color.RGBA{255, 0, 0, 255})
+	}
+
+	if g.DrawDebugNormals {
+		g.Camera.DrawDebugNormals(screen, scene.Root, 0.5, color.RGBA{0, 128, 255, 255})
+	}
+
+	if g.DrawDebugCenters {
+		g.Camera.DrawDebugNormals(screen, scene.Root, 0.5, color.RGBA{0, 128, 255, 255})
+	}
+
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1 Key: Play [SmoothRoll] Animation On Table\n2 Key: Play [StepRoll] Animation on Table\nNote the animations can blend\nF Key: Play Animation on Skinned Mesh\nNote that the bones move as well\nF4: Toggle fullscreen\nF6: Node Debug View\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
 	}
+
 }
 
 func (g *Game) StartProfiling() {

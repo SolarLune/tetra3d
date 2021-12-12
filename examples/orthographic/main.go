@@ -30,8 +30,11 @@ type Game struct {
 	Scene     *tetra3d.Scene
 	CamHandle tetra3d.INode
 
-	DrawDebugText  bool
-	DrawDebugDepth bool
+	DrawDebugText      bool
+	DrawDebugDepth     bool
+	DrawDebugWireframe bool
+	DrawDebugNormals   bool
+	DrawDebugCenters   bool
 }
 
 func NewGame() *Game {
@@ -143,11 +146,11 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		camera.DebugDrawWireframe = !camera.DebugDrawWireframe
+		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
-		camera.DebugDrawNormals = !camera.DebugDrawNormals
+		g.DrawDebugNormals = !g.DrawDebugNormals
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
@@ -155,7 +158,7 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
-		camera.DebugDrawNodes = !camera.DebugDrawNodes
+		g.DrawDebugCenters = !g.DrawDebugCenters
 	}
 
 	return err
@@ -210,6 +213,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{255, 0, 0, 255})
 	}
 
+	if g.DrawDebugWireframe {
+		camera.DrawDebugWireframe(screen, g.Scene.Root, color.White)
+	}
+
+	if g.DrawDebugNormals {
+		camera.DrawDebugNormals(screen, g.Scene.Root, 0.5, color.RGBA{0, 128, 255, 255})
+	}
+
+	if g.DrawDebugCenters {
+		camera.DrawDebugCenters(screen, g.Scene.Root, color.RGBA{0, 128, 255, 255})
+	}
 }
 
 func (g *Game) Layout(w, h int) (int, int) {

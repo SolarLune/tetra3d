@@ -44,10 +44,7 @@ type Camera struct {
 	FieldOfView float64 // Vertical field of view in degrees for a perspective projection camera
 	OrthoScale  float64 // Scale of the view for an orthographic projection camera in units horizontally
 
-	DebugInfo          DebugInfo
-	DebugDrawWireframe bool
-	DebugDrawNormals   bool
-	DebugDrawNodes     bool
+	DebugInfo DebugInfo
 
 	FrustumSphere *BoundingSphere
 }
@@ -138,6 +135,26 @@ func NewCamera(w, h int) *Camera {
 	cam.SetPerspective(60)
 
 	return cam
+}
+
+func (camera *Camera) Clone() INode {
+
+	w, h := camera.ColorTexture.Size()
+	clone := NewCamera(w, h)
+
+	clone.RenderDepth = camera.RenderDepth
+	clone.Near = camera.Near
+	clone.Far = camera.Far
+	clone.Perspective = camera.Perspective
+	clone.FieldOfView = camera.FieldOfView
+
+	clone.Node = camera.Node.Clone().(*Node)
+	for _, child := range camera.children {
+		child.setParent(camera)
+	}
+
+	return clone
+
 }
 
 func (camera *Camera) Resize(w, h int) {
@@ -275,26 +292,6 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 	}
 
 	camera.Render(scene, meshes...)
-
-	if camera.DebugDrawNodes {
-
-		for _, node := range rootNode.ChildrenRecursive(false) {
-
-			if node == camera {
-				continue
-			}
-
-			camera.drawCircle(node.WorldPosition(), 8, color.RGBA{0, 127, 255, 255})
-
-			if node.Parent() != nil && node.Parent() != scene.Root {
-				parentPos := camera.WorldToScreen(node.Parent().WorldPosition())
-				pos := camera.WorldToScreen(node.WorldPosition())
-				ebitenutil.DrawLine(camera.ColorTexture, pos[0], pos[1], parentPos[0], parentPos[1], color.RGBA{0, 192, 255, 255})
-			}
-
-		}
-
-	}
 
 }
 
@@ -571,38 +568,13 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		camera.DebugInfo.DrawnObjects++
 		camera.DebugInfo.DrawnTris += vertexListIndex / 3
 
-		if camera.DebugDrawWireframe {
-
-			for i := 0; i < vertexListIndex; i += 3 {
-				v1 := vertexList[i]
-				v2 := vertexList[i+1]
-				v3 := vertexList[i+2]
-				ebitenutil.DrawLine(camera.ColorTexture, float64(v1.DstX), float64(v1.DstY), float64(v2.DstX), float64(v2.DstY), color.White)
-				ebitenutil.DrawLine(camera.ColorTexture, float64(v2.DstX), float64(v2.DstY), float64(v3.DstX), float64(v3.DstY), color.White)
-				ebitenutil.DrawLine(camera.ColorTexture, float64(v3.DstX), float64(v3.DstY), float64(v1.DstX), float64(v1.DstY), color.White)
-			}
-
-		}
-
-		if camera.DebugDrawNormals {
-
-			triIndex := 0
-			for _, tri := range triList[:vertexListIndex/3] {
-				center := camera.WorldToScreen(model.Transform().MultVecW(tri.Center))
-				transformedNormal := camera.WorldToScreen(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(0.1))))
-				ebitenutil.DrawLine(camera.ColorTexture, center[0], center[1], transformedNormal[0], transformedNormal[1], color.RGBA{60, 158, 255, 255})
-				triIndex++
-			}
-
-		}
-
 	}
 
 	camera.DebugInfo.frameTime += time.Since(frametimeStart)
 
 }
 
-func (camera *Camera) drawCircle(position vector.Vector, radius float64, drawColor color.RGBA) {
+func (camera *Camera) drawCircle(screen *ebiten.Image, position vector.Vector, radius float64, drawColor color.Color) {
 
 	transformedCenter := camera.WorldToScreen(position)
 
@@ -616,7 +588,7 @@ func (camera *Camera) drawCircle(position vector.Vector, radius float64, drawCol
 		x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
 		y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
 
-		ebitenutil.DrawLine(camera.ColorTexture, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, drawColor)
+		ebitenutil.DrawLine(screen, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, drawColor)
 	}
 
 }
@@ -647,9 +619,99 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 
 }
 
-func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, nodeBase INode, color color.Color) {
+// DrawDebugWireframe draws the wireframe triangles of all visible Models underneath the rootNode in the color provided to the screen
+// image provided.
+func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, color color.Color) {
 
-	for _, n := range nodeBase.ChildrenRecursive(false) {
+	pureViewRot := camera.ViewMatrix().MultVec(camera.WorldPosition())
+	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
+
+	for _, m := range rootNode.ChildrenRecursive(true) {
+
+		if model, isModel := m.(*Model); isModel {
+
+			if model.FrustumCulling {
+
+				if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
+					continue
+				}
+
+			}
+
+			model.TransformedVertices(vpMatrix, pureViewRot, camera)
+
+			for _, tri := range model.Mesh.Triangles {
+
+				v0 := camera.ClipToScreen(tri.Vertices[0].transformed)
+				v1 := camera.ClipToScreen(tri.Vertices[1].transformed)
+				v2 := camera.ClipToScreen(tri.Vertices[2].transformed)
+
+				ebitenutil.DrawLine(screen, float64(v0[0]), float64(v0[1]), float64(v1[0]), float64(v1[1]), color)
+				ebitenutil.DrawLine(screen, float64(v1[0]), float64(v1[1]), float64(v2[0]), float64(v2[1]), color)
+				ebitenutil.DrawLine(screen, float64(v2[0]), float64(v2[1]), float64(v0[0]), float64(v0[1]), color)
+
+			}
+
+		}
+
+	}
+
+}
+
+// DrawDebugNormals draws the normals of visible models underneath the rootNode given to the screen. NormalLength is the length of the normal lines
+// in units. Color is the color to draw the normals.
+func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float64, color color.Color) {
+
+	for _, m := range rootNode.ChildrenRecursive(true) {
+
+		if model, isModel := m.(*Model); isModel {
+
+			if model.FrustumCulling {
+
+				if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
+					continue
+				}
+
+			}
+
+			for _, tri := range model.Mesh.Triangles {
+				center := camera.WorldToScreen(model.Transform().MultVecW(tri.Center))
+				transformedNormal := camera.WorldToScreen(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(normalLength))))
+				ebitenutil.DrawLine(screen, center[0], center[1], transformedNormal[0], transformedNormal[1], color)
+			}
+
+		}
+
+	}
+
+}
+
+// DrawDebugCenters draws the center positions of nodes under the rootNode using the color given to the screen image provided.
+func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color color.Color) {
+
+	for _, node := range rootNode.ChildrenRecursive(false) {
+
+		if node == camera {
+			continue
+		}
+
+		camera.drawCircle(screen, node.WorldPosition(), 8, color)
+
+		if node.Parent() != nil {
+			parentPos := camera.WorldToScreen(node.Parent().WorldPosition())
+			pos := camera.WorldToScreen(node.WorldPosition())
+			ebitenutil.DrawLine(camera.ColorTexture, pos[0], pos[1], parentPos[0], parentPos[1], color)
+		}
+
+	}
+
+}
+
+// DrawDebugBounds will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
+// be drawn in the color provided to the screen image provided.
+func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, color color.Color) {
+
+	for _, n := range rootNode.ChildrenRecursive(false) {
 
 		if b, isBounds := n.(BoundingObject); isBounds {
 
@@ -818,26 +880,6 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, nodeBase INode, colo
 		}
 
 	}
-
-}
-
-func (camera *Camera) Clone() INode {
-
-	w, h := camera.ColorTexture.Size()
-	clone := NewCamera(w, h)
-
-	clone.RenderDepth = camera.RenderDepth
-	clone.Near = camera.Near
-	clone.Far = camera.Far
-	clone.Perspective = camera.Perspective
-	clone.FieldOfView = camera.FieldOfView
-
-	clone.Node = camera.Node.Clone().(*Node)
-	for _, child := range camera.children {
-		child.setParent(camera)
-	}
-
-	return clone
 
 }
 

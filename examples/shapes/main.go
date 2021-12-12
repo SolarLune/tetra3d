@@ -33,10 +33,11 @@ type Game struct {
 	CameraTilt   float64
 	CameraRotate float64
 
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	DrawDebugBounds   bool
-	PrevMousePosition vector.Vector
+	DrawDebugText      bool
+	DrawDebugDepth     bool
+	DrawDebugWireframe bool
+	DrawDebugNormals   bool
+	PrevMousePosition  vector.Vector
 }
 
 func NewGame() *Game {
@@ -173,11 +174,11 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.Camera.DebugDrawWireframe = !g.Camera.DebugDrawWireframe
+		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
-		g.Camera.DebugDrawNormals = !g.Camera.DebugDrawNormals
+		g.DrawDebugNormals = !g.DrawDebugNormals
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
@@ -211,6 +212,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.Camera.DrawDebugText(screen, 1)
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1, 2, 3, 4: Change fog\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{255, 0, 0, 255})
+	}
+
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, color.RGBA{255, 0, 0, 255})
+	}
+
+	if g.DrawDebugNormals {
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, color.RGBA{0, 128, 255, 255})
 	}
 
 }

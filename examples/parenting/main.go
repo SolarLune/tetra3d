@@ -27,13 +27,15 @@ type Game struct {
 	Width, Height int
 	Scene         *tetra3d.Scene
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-
-	DrawDebugText     bool
-	DrawDebugDepth    bool
+	Camera            *tetra3d.Camera
+	CameraTilt        float64
+	CameraRotate      float64
 	PrevMousePosition vector.Vector
+
+	DrawDebugText      bool
+	DrawDebugDepth     bool
+	DrawDebugWireframe bool
+	DrawDebugCenters   bool
 }
 
 func NewGame() *Game {
@@ -214,19 +216,15 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.Camera.DebugDrawWireframe = !g.Camera.DebugDrawWireframe
+		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
-		g.Camera.DebugDrawNormals = !g.Camera.DebugDrawNormals
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
-		g.Camera.DebugDrawNodes = !g.Camera.DebugDrawNodes
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		g.DrawDebugCenters = !g.DrawDebugCenters
 	}
 
 	return err
@@ -261,9 +259,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.Camera.DrawDebugText(screen, 1)
 	}
 
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, color.White)
+	}
+
+	if g.DrawDebugCenters {
+		g.Camera.DrawDebugCenters(screen, g.Scene.Root, color.RGBA{0, 128, 255, 255})
+	}
+
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1)
-		txt := "F1 to toggle this text\nWASD: Move, Space: Go Up, Ctrl: Go Down\nMouse: Look\nArrow Keys:Move parent\nP: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent\nF1, F2, F3, F5, F6: Debug views\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Space: Go Up, Ctrl: Go Down\nMouse: Look\nArrow Keys:Move parent\nP: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
 	}
 

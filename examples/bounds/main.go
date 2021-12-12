@@ -35,10 +35,12 @@ type Game struct {
 	CameraTilt   float64
 	CameraRotate float64
 
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	DrawDebugBounds   bool
-	PrevMousePosition vector.Vector
+	DrawDebugText      bool
+	DrawDebugDepth     bool
+	DrawDebugBounds    bool
+	DrawDebugWireframe bool
+	DrawDebugNormals   bool
+	PrevMousePosition  vector.Vector
 }
 
 func NewGame() *Game {
@@ -228,11 +230,11 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.Camera.DebugDrawWireframe = !g.Camera.DebugDrawWireframe
+		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
-		g.Camera.DebugDrawNormals = !g.Camera.DebugDrawNormals
+		g.DrawDebugNormals = !g.DrawDebugNormals
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
@@ -260,6 +262,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(g.Camera.DepthTexture, opt)
 	} else {
 		screen.DrawImage(g.Camera.ColorTexture, opt)
+	}
+
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, color.White)
+	}
+
+	if g.DrawDebugNormals {
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, color.RGBA{0, 128, 255, 255})
 	}
 
 	if g.DrawDebugBounds {
