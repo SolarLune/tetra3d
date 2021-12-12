@@ -8,7 +8,6 @@ import (
 	"math"
 	"os"
 	"runtime/pprof"
-	"runtime/trace"
 	"time"
 
 	_ "embed"
@@ -299,11 +298,6 @@ func (g *Game) Layout(w, h int) (int, int) {
 func main() {
 	ebiten.SetWindowTitle("Tetra3d - Shapes Test")
 	ebiten.SetWindowResizable(true)
-
-	traceFile, _ := os.Create("trace.out")
-	defer traceFile.Close()
-	trace.Start(traceFile)
-	defer trace.Stop()
 
 	game := NewGame()
 
