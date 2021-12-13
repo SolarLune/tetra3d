@@ -101,3 +101,11 @@ func (pool *VectorPool) MultVecW(matrix Matrix4, vect vector.Vector) vector.Vect
 	return v
 
 }
+
+func (pool *VectorPool) Sub(v0, v1 vector.Vector) vector.Vector {
+	v := pool.Get()
+	for i := range v0 {
+		v[i] = v0[i] - v1[i]
+	}
+	return v
+}

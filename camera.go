@@ -47,6 +47,7 @@ type Camera struct {
 	DebugInfo DebugInfo
 
 	FrustumSphere *BoundingSphere
+	backfacePool  *VectorPool
 }
 
 // NewCamera creates a new Camera with the specified width and height.
@@ -59,6 +60,7 @@ func NewCamera(w, h int) *Camera {
 		Far:         100,
 
 		FrustumSphere: NewBoundingSphere("camera frustum sphere", 0),
+		backfacePool:  NewVectorPool(2),
 	}
 
 	depthShaderText := []byte(
@@ -209,8 +211,9 @@ func (camera *Camera) SetOrthographic(orthoScale float64) {
 	camera.OrthoScale = orthoScale
 }
 
-// ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
-func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
+// We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
+// does this by taking outVec, a vertex (vector.Vector) that it stores the values in and returns, which avoids reallocation.
+func (camera *Camera) clipToScreen(vert, outVec vector.Vector) vector.Vector {
 
 	w, h := camera.ColorTexture.Size()
 	width, height := float64(w), float64(h)
@@ -231,15 +234,18 @@ func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
 	vx := vert[0] / v3
 	vy := vert[1] / v3 * -1
 
-	vect := vector.Vector{
-		vx*width + (width / 2),
-		vy*height + (height / 2),
-		vert[2],
-		vert[3],
-	}
+	outVec[0] = vx*width + (width / 2)
+	outVec[1] = vy*height + (height / 2)
+	outVec[2] = vert[2]
+	outVec[3] = vert[3]
 
-	return vect
+	return outVec
 
+}
+
+// ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
+func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
+	return camera.clipToScreen(vert, vector.Vector{0, 0, 0, 0})
 }
 
 // WorldToScreen transforms a 3D position in the world to screen coordinates.
@@ -358,6 +364,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	}
 
+	// Reusing vectors rather than reallocating for all triangles for all models
+	p0 := vector.Vector{0, 0, 0, 0}
+	p1 := vector.Vector{0, 0, 0, 0}
+	p2 := vector.Vector{0, 0, 0, 0}
+
 	for _, model := range models {
 
 		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
@@ -426,9 +437,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			// }
 
-			p0 := camera.ClipToScreen(v0)
-			p1 := camera.ClipToScreen(v1)
-			p2 := camera.ClipToScreen(v2)
+			p0 = camera.clipToScreen(v0, p0)
+			p1 = camera.clipToScreen(v1, p1)
+			p2 = camera.clipToScreen(v2, p2)
 
 			// This is a bit of a hacky way to do backface culling; it works, but it uses
 			// the screen positions of the vertices to determine if the triangle should be culled.
@@ -438,8 +449,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			if backfaceCulling {
 
-				n0 := p0[:3].Sub(p1[:3]).Unit()
-				n1 := p1[:3].Sub(p2[:3]).Unit()
+				camera.backfacePool.Reset()
+				n0 := camera.backfacePool.Sub(p0, p1)[:3]
+				n1 := camera.backfacePool.Sub(p1, p2)[:3]
 				nor, _ := n0.Cross(n1)
 
 				if nor[2] > 0 {
@@ -468,7 +480,10 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				for i, vert := range tri.Vertices {
 
-					depth := (math.Max(vert.transformed[2], 0) / far)
+					depth := vert.transformed[2] / far
+					if depth < 0 {
+						depth = 0
+					}
 
 					vertexList[vertexListIndex+i].ColorR = float32(depth)
 					vertexList[vertexListIndex+i].ColorG = float32(depth)

@@ -19,7 +19,7 @@ func init() {
 	defaultImg = ebiten.NewImage(4, 4)
 	defaultImg.Fill(color.White)
 
-	for i := 0; i < ebiten.MaxIndicesNum; i++ {
+	for i := 0; i < cap(vertexList); i++ {
 		vertexList = append(vertexList, ebiten.Vertex{})
 		indexList = append(indexList, 0)
 	}

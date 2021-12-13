@@ -13,7 +13,6 @@ import (
 	"time"
 
 	_ "embed"
-	_ "image/png"
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
@@ -70,12 +69,10 @@ func (g *Game) Init() {
 
 	for i := 0; i < 30; i++ {
 		for j := 0; j < 30; j++ {
-			for k := 0; k < 3; k++ {
-				cubeMesh := tetra3d.NewCube()
-				cube := tetra3d.NewModel(cubeMesh, "Cube")
-				cube.SetLocalPosition(vector.Vector{float64(i * 3), float64(k * 3), float64(-j * 3)})
-				cubes = append(cubes, cube)
-			}
+			cubeMesh := tetra3d.NewCube()
+			cube := tetra3d.NewModel(cubeMesh, "Cube")
+			cube.SetLocalPosition(vector.Vector{float64(i * 3), 0, float64(-j * 3)})
+			cubes = append(cubes, cube)
 		}
 	}
 
@@ -85,6 +82,12 @@ func (g *Game) Init() {
 	merged.Merge(cubes...)
 
 	g.Scene.Root.AddChildren(merged)
+
+	for i := 0; i < 2; i++ {
+		newMerged := merged.Clone()
+		newMerged.Move(0, -float64((i+1)*3), 0)
+		g.Scene.Root.AddChildren(newMerged)
+	}
 
 	// for _, c := range cubes {
 	// 	g.Scene.Root.AddChildren(c)
