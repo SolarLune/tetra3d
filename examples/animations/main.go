@@ -185,17 +185,12 @@ func (g *Game) Update() error {
 	scene := g.Library.Scenes[0]
 
 	armature := scene.Root.FindByName("Armature")[0].(*tetra3d.Node)
-	skin := scene.Root.FindByName("SkinnedMesh")[0].(*tetra3d.Model)
-
-	if armature.Parent() != skin {
-		armature.AddChildren(skin)
-	}
+	armature.Rotate(0, 1, 0, 0.01)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+		// armature.AnimationPlayer.FinishMode = tetra3d.FinishModeStop
 		armature.AnimationPlayer.Play(g.Library.Animations["ArmatureAction"])
 	}
-
-	armature.Rotate(0, 1, 0, 0.01)
 
 	armature.AnimationPlayer.Update(1.0 / 60)
 
@@ -245,7 +240,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugCenters {
-		g.Camera.DrawDebugNormals(screen, scene.Root, 0.5, color.RGBA{0, 128, 255, 255})
+		g.Camera.DrawDebugCenters(screen, scene.Root, color.RGBA{0, 128, 255, 255})
 	}
 
 	if g.DrawDebugText {

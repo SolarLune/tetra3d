@@ -59,6 +59,9 @@ type INode interface {
 	Path() string
 
 	Tags() *Tags
+
+	IsBone() bool
+	// IsRootBone() bool
 }
 
 // Tags is an unordered set of string tags to values, representing a means of identifying Nodes or carrying data on Nodes.
@@ -156,6 +159,7 @@ type Node struct {
 	tags              *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
 	AnimationPlayer   *AnimationPlayer
 	inverseBindMatrix Matrix4 // Specifically for bones in an armature used for animating skinned meshes
+	isBone            bool
 }
 
 // NewNode returns a new Node.
@@ -195,11 +199,27 @@ func (node *Node) Clone() INode {
 	newNode.rotation = node.rotation.Clone()
 	newNode.parent = node.parent
 	newNode.AnimationPlayer = node.AnimationPlayer.Clone()
+	if node.AnimationPlayer.RootNode == node {
+		newNode.AnimationPlayer.SetRoot(newNode)
+	}
+
 	for _, child := range node.children {
 		childClone := child.Clone()
 		childClone.setParent(newNode)
 		newNode.children = append(newNode.children, childClone)
 	}
+
+	for _, child := range newNode.children {
+		if model, isModel := child.(*Model); isModel && model.SkinRoot == node {
+			model.ReassignBones(newNode)
+		}
+	}
+
+	newNode.isBone = node.isBone
+	if newNode.isBone {
+		newNode.inverseBindMatrix = node.inverseBindMatrix.Clone()
+	}
+
 	return newNode
 }
 
@@ -716,3 +736,13 @@ func (node *Node) Root() INode {
 	return parent
 
 }
+
+// IsBone returns if the Node is a "bone" (a node that was a part of an armature and so can play animations back to influence a skinned mesh).
+func (node *Node) IsBone() bool {
+	return node.isBone
+}
+
+// // IsRootBone returns if the Node SHOULD be the root of an Armature (a Node that was the base of an armature).
+// func (node *Node) IsRootBone() bool {
+// 	return node.IsBone() && (node.parent == nil || !node.parent.IsBone())
+// }

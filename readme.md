@@ -289,7 +289,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 | Ray            | ❌     | ❌           | ❌         | ❌       |   ❌  |
 
 - [ ] 3D Sound (just adjusting panning of sound sources based on 3D location, or something like that)
-- [ ] Multithreading (particularly for vertex transformations)
+- [ ] Optimzation
+- [ ] -- Multithreading (particularly for vertex transformations)
+- [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
+- [x] -- Vector pools
+- [ ] -- Matrix pools 
 - [ ] [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!

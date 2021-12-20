@@ -216,7 +216,7 @@ type AnimationPlayer struct {
 	Playhead               float64                    // Playhead of the animation. Setting this to 0 restarts the animation.
 	PlaySpeed              float64                    // Playback speed in percentage - defaults to 1 (100%)
 	Playing                bool                       // Whether the player is playing back or not.
-	FinishMode             int                        // What to do when the player finishes playback.
+	FinishMode             int                        // What to do when the player finishes playback. Defaults to looping.
 	OnFinish               func()                     // Callback indicating the Animation has completed
 	AnimatedProperties     map[INode]*AnimationValues // The properties that have been animated
 	PrevAnimatedProperties map[INode]*AnimationValues // The previous properties that have been animated from the previously Play()'d animation
@@ -229,7 +229,7 @@ func NewAnimationPlayer(node INode) *AnimationPlayer {
 	return &AnimationPlayer{
 		RootNode:               node,
 		PlaySpeed:              1,
-		FinishMode:             FinishModeStop,
+		FinishMode:             FinishModeLoop,
 		AnimatedProperties:     map[INode]*AnimationValues{},
 		PrevAnimatedProperties: map[INode]*AnimationValues{},
 	}
@@ -254,7 +254,7 @@ func (ap *AnimationPlayer) Clone() *AnimationPlayer {
 	return newAP
 }
 
-// SetRoot sets the root node of the animation player to act on. Note that this should be the root node
+// SetRoot sets the root node of the animation player to act on. Note that this should be the root node.
 func (ap *AnimationPlayer) SetRoot(node INode) {
 	ap.RootNode = node
 	ap.ChannelsUpdated = false
@@ -371,10 +371,12 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 			if ap.FinishMode == FinishModeLoop && (ap.Playhead >= ap.Animation.Length || ap.Playhead < 0) {
 
-				if ap.Playhead > ap.Animation.Length {
-					ap.Playhead = ap.Animation.Length
-				} else if ap.Playhead < 0 {
-					ap.Playhead = 0
+				for ap.Playhead > ap.Animation.Length {
+					ap.Playhead -= ap.Animation.Length
+				}
+
+				for ap.Playhead < 0 {
+					ap.Playhead += ap.Animation.Length
 				}
 
 				if ap.OnFinish != nil {
@@ -383,18 +385,29 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 			} else if ap.FinishMode == FinishModePingPong && (ap.Playhead > ap.Animation.Length || ap.Playhead < 0) {
 
-				if ap.Playhead > ap.Animation.Length {
-					ap.Playhead = ap.Animation.Length
-				} else {
-					ap.Playhead = 0
-					if ap.OnFinish != nil {
-						ap.OnFinish()
-					}
+				for ap.Playhead > ap.Animation.Length {
+					ap.Playhead -= ap.Playhead - ap.Animation.Length
+				}
+
+				finishedLoop := false
+				for ap.Playhead < 0 {
+					ap.Playhead *= -1
+					finishedLoop = true
+				}
+
+				if finishedLoop && ap.OnFinish != nil {
+					ap.OnFinish()
 				}
 
 				ap.PlaySpeed *= -1
 
-			} else if ap.FinishMode == FinishModeStop && (ap.Playhead > ap.Animation.Length || ap.Playhead < 0) {
+			} else if ap.FinishMode == FinishModeStop && ((ap.Playhead > ap.Animation.Length && ap.PlaySpeed > 0) || (ap.Playhead < 0 && ap.PlaySpeed < 0)) {
+
+				if ap.Playhead > ap.Animation.Length {
+					ap.Playhead = ap.Animation.Length
+				} else if ap.Playhead < 0 {
+					ap.Playhead = 0
+				}
 
 				if ap.OnFinish != nil {
 					ap.OnFinish()

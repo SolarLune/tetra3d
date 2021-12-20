@@ -485,6 +485,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
+	allBones := []*Node{}
+
 	// Do this twice so we can be sure that all of the nodes can be created first
 	for i, node := range doc.Nodes {
 
@@ -496,19 +498,21 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			skin := doc.Skins[*node.Skin]
 
 			// Unsure of if this is necessary.
-			if skin.Skeleton != nil {
-				skeletonRoot := objects[*skin.Skeleton]
-				model.SetWorldPosition(skeletonRoot.WorldPosition())
-				model.SetWorldScale(skeletonRoot.WorldScale())
-				model.SetWorldRotation(skeletonRoot.WorldRotation())
-			}
+			// if skin.Skeleton != nil {
+			// 	skeletonRoot := objects[*skin.Skeleton]
+			// 	model.SetWorldPosition(skeletonRoot.WorldPosition())
+			// 	model.SetWorldScale(skeletonRoot.WorldScale())
+			// 	model.SetWorldRotation(skeletonRoot.WorldRotation())
+			// }
 
 			model.Skinned = true
 
-			allBones := []*Node{}
-
 			for _, b := range skin.Joints {
-				allBones = append(allBones, objects[b].(*Node))
+				bone := objects[b].(*Node)
+				// This is incorrect, but it gives us a link to any bone in the armature to establish
+				// the true root after parenting is set below
+				model.SkinRoot = bone
+				allBones = append(allBones, bone)
 			}
 
 			matrices, err := modeler.ReadAccessor(doc, doc.Accessors[*skin.InverseBindMatrices], nil)
@@ -524,6 +528,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				}
 
 				allBones[matIndex].inverseBindMatrix = newMat
+				allBones[matIndex].isBone = true
 
 			}
 
@@ -541,6 +546,22 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		for _, childIndex := range node.Children {
 			objects[i].AddChildren(objects[int(childIndex)])
+		}
+
+	}
+
+	for _, n := range objects {
+
+		if model, isModel := n.(*Model); isModel && model.Skinned {
+
+			parent := model.SkinRoot
+
+			for parent.IsBone() && parent.Parent() != nil {
+				parent = parent.Parent()
+			}
+
+			model.SkinRoot = parent
+
 		}
 
 	}

@@ -20,7 +20,8 @@ type Model struct {
 	BoundingSphere    *BoundingSphere
 	BoundingAABB      *BoundingAABB
 
-	Skinned    bool // If the model is skinned and this is enabled, the model will tranform its vertices to match its target armature
+	Skinned    bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
+	SkinRoot   INode // The root node of the armature skinning this Model.
 	skinMatrix Matrix4
 	bones      [][]*Node
 	vectorPool *VectorPool
@@ -72,6 +73,7 @@ func (model *Model) Clone() INode {
 	newModel.Color = model.Color.Clone()
 
 	newModel.Skinned = model.Skinned
+	newModel.SkinRoot = model.SkinRoot
 	for i := range model.bones {
 		newModel.bones = append(newModel.bones, append([]*Node{}, model.bones[i]...))
 	}
@@ -135,28 +137,32 @@ func (model *Model) Merge(models ...*Model) {
 
 // ReassignBones reassigns the model to point to a different armature. armatureNode should be a pointer to the starting object Node of the
 // armature (not any of its bones).
-func (model *Model) ReassignBones(armatureNode *Node) {
+func (model *Model) ReassignBones(armatureRoot INode) {
 
 	if len(model.bones) == 0 {
 		return
 	}
 
-	bones := armatureNode.ChildrenRecursive(false)
+	if armatureRoot.IsBone() {
+		panic(`Error: Cannot reassign skinned Model [` + model.Path() + `] to armature bone [` + armatureRoot.Path() + `]. ReassignBones() should be called with the desired armature's root node.`)
+	}
+
+	bones := armatureRoot.ChildrenRecursive(false)
 
 	boneMap := map[string]*Node{}
 
 	for _, b := range bones {
-		boneMap[b.Name()] = b.(*Node)
+		if b.IsBone() {
+			boneMap[b.Name()] = b.(*Node)
+		}
 	}
+
+	model.SkinRoot = armatureRoot
 
 	for vertexIndex := range model.bones {
 
 		for i := range model.bones[vertexIndex] {
-			newBone := boneMap[model.bones[vertexIndex][i].name]
-			if newBone.inverseBindMatrix.IsZero() {
-				newBone.inverseBindMatrix = model.bones[vertexIndex][i].inverseBindMatrix.Clone()
-			}
-			model.bones[vertexIndex][i] = newBone
+			model.bones[vertexIndex][i] = boneMap[model.bones[vertexIndex][i].name]
 		}
 
 	}
