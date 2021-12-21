@@ -100,15 +100,17 @@ func NewGame() *Game {
 
 	// Here, we'll create a new Camera. We pass the size of the screen to the 
 	// Camera so it can create its own buffer textures (which are *ebiten.Images).
-
 	g.Camera = tetra3d.NewCamera(ScreenWidth, ScreenHeight)
+
+	// We could also use a camera from the scene within the GLTF file if it was 
+	// exported with one.
 
 	// A Camera implements the tetra3d.INode interface, which means it can be placed
 	// in 3D space and can be parented to another Node somewhere in the scene tree.
 	// Models and Nodes (which are essentially "empties" one can
 	// use for positioning and parenting) can, as well.
 
-	// Each Scene has a tree that starts with the root Node. To add Nodes to the Scene, 
+	// Each Scene has a tree that starts with the Root Node. To add Nodes to the Scene, 
 	// parent them to the Scene's base.
 	g.GameScene.Root.AddChildren(g.Camera)
 
@@ -124,7 +126,7 @@ func NewGame() *Game {
 	
 	// Cameras look forward down the -Z axis, so we'll move the Camera back 12 units to look
 	// towards [0, 0, 0].
-	g.Camera.SetLocalPosition(vector.Vector{0, 0, 12})
+	g.Camera.Move(0, 0, 12)
 
 	return game
 }
@@ -159,8 +161,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	// This is the size of the window; note that a larger (or smaller) 
-	// layout doesn't seem to impact performance very much at all.
+	// This is the size of the window; note that we are generally setting it
+	// to be the same as the size of the backing camera texture. However,
+	// you could use a much larger backing texture size, thereby reducing 
+	// certain visual glitches from triangles not drawing tightly enough.
 	return ScreenWidth, ScreenHeight
 }
 
@@ -195,7 +199,7 @@ func NewGame() *Game {
 	// Create a new BoundingCapsule, 1 unit tall with a 0.25 unit radius for the caps at the ends.
 	g.Capsule = tetra3d.NewBoundingCapsule("player", 1, 0.25)
 
-	// Create a new BoundingAABB, of 0.25 width, height, and depth (in that order).
+	// Create a new BoundingAABB, of 0.5 width, height, and depth (in that order).
 	g.Cube = tetra3d.NewBoundingAABB("block", 0.5, 0.5, 0.5)
 	g.Cube.Move(4, 0, 0)
 
@@ -216,7 +220,7 @@ func (g *Game) Update() {
 
 That's basically it.
 
-Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well and feels pretty solid to work with as is. Feel free to examine the examples folder for a couple of examples showing how Tetra3D works - calling `go run .` from within their directories should work.
+Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine the examples folder for a couple of examples showing how Tetra3D works - calling `go run .` from within their directories should run them.
 
 ## What's missing?
 
@@ -225,14 +229,14 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] 3D rendering
 - [x] -- Perspective projection
 - [x] -- Orthographic projection (it's kinda jank, but it works)
-- [ ] -- Billboarding
-- [ ] -- Some additional way to draw 2D stuff with no perspective changes (if desired) in 3D space
+- [ ] -- Automatic billboarding
+- [ ] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space)
 - [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [ ] -- A more advanced depth buffer - currently, the depth is written using vertex colors.
 - [x] -- Offscreen Rendering
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
-- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (texture, mainly).
+- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode and texture, for example).
 - [x] Culling
 - [x] -- Backface culling
 - [x] -- Frustum culling
@@ -246,7 +250,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Basic Texturing
 - [ ] -- Multitexturing / Per-triangle Materials
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
-- [ ] Dynamic 3D Text (Render text to texture from a font, map it to a plane)
+- [ ] Easy dynamic 3D Text (the current idea is to render the text to texture from a font, and then map it to a plane)
 - [x] Animations
 - [x] -- Armature-based animations
 - [x] -- Object transform-based animations
@@ -267,6 +271,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Normal loading
 - [x] -- Transform / full scene loading
 - [x] -- Animation loading
+- [x] -- Camera loading
 - [ ] -- Separate .bin loading
 - [x] DAE model loading
 - [x] -- Vertex colors loading
@@ -289,7 +294,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 | Ray            | ❌     | ❌           | ❌         | ❌       |   ❌  |
 
 - [ ] 3D Sound (just adjusting panning of sound sources based on 3D location, or something like that)
-- [ ] Optimzation
+- [ ] Optimization
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
 - [x] -- Vector pools

@@ -54,21 +54,23 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
-	// Load the DAE file and turn it into a scene. Note that we could also pass options to change how the file
-	// is loaded (specifically, which way is up), but we don't have to do that because it will do this by default if
-	// nil is passed as the second argument.
-	library, err := tetra3d.LoadGLTFData(shapes, nil)
+
+	// Load the GLTF file and turn it into a Library, which is a collection of scenes and data shared between them (like meshes or animations).
+
+	options := tetra3d.DefaultGLTFLoadOptions()
+	options.CameraWidth = g.Width
+	options.CameraHeight = g.Height
+
+	library, err := tetra3d.LoadGLTFData(shapes, options)
 	if err != nil {
 		panic(err)
 	}
 
 	g.Scene = library.FindScene("Scene")
 
-	// While you have to manually load images for DAE files, you don't need to do that for GLTF files.
+	// Cameras are loaded from the GLTF file.
+	g.Camera = g.Scene.Root.Get("Camera").(*tetra3d.Camera)
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
-	g.Camera.Far = 20
 	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
 	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
 

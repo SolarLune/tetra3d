@@ -13,18 +13,22 @@ import (
 )
 
 type GLTFLoadOptions struct {
-	LoadImages bool
+	LoadImages                bool
+	CameraWidth, CameraHeight int // Width and height of loaded Cameras. Defaults to 1920x1080.
 }
 
+// DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
 func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 	return &GLTFLoadOptions{
-		LoadImages: true,
+		LoadImages:   true,
+		CameraWidth:  1920,
+		CameraHeight: 1080,
 	}
 }
 
 // LoadGLTFFile loads a .gltf or .glb file from the filepath given, using a provided GLTFLoadOptions struct to alter how the file is loaded.
 // Passing nil for loadOptions will load the file using default load options. Unlike with DAE files, Animations (including armature-based
-// animations) will be parsed properly.
+// animations) and Cameras (assuming they are exported in the GLTF file) will be parsed properly.
 // LoadGLTFFile will return a Library, and an error if the process fails.
 func LoadGLTFFile(path string, loadOptions *GLTFLoadOptions) (*Library, error) {
 
@@ -40,7 +44,7 @@ func LoadGLTFFile(path string, loadOptions *GLTFLoadOptions) (*Library, error) {
 
 // LoadGLTFData loads a .gltf or .glb file from the byte data given, using a provided GLTFLoadOptions struct to alter how the file is loaded.
 // Passing nil for loadOptions will load the file using default load options. Unlike with DAE files, Animations (including armature-based
-// animations) will be parsed properly.
+// animations) and Cameras (assuming they are exported in the GLTF file) will be parsed properly.
 // LoadGLTFFile will return a Library, and an error if the process fails.
 func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
 
@@ -419,29 +423,25 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		if node.Mesh != nil {
 			mesh := library.Meshes[doc.Meshes[*node.Mesh].Name]
 			obj = NewModel(mesh, node.Name)
-			// } else if node.Camera != nil {
+		} else if node.Camera != nil {
 
-			// 	// This doesn't quiiiiite work because Cameras in GLTF are children of their parent Nodes for some reason, so
-			// 	// I'll have to consider how to approach this
+			gltfCam := doc.Cameras[*node.Camera]
 
-			// 	newCam := NewCamera(0, 0)
-			// 	newCam.InitiallySized = false // We'll resize it later
+			newCam := NewCamera(gltfLoadOptions.CameraWidth, gltfLoadOptions.CameraHeight)
 
-			// 	gltfCam := doc.Cameras[*node.Camera]
+			if gltfCam.Perspective != nil {
+				newCam.Near = float64(gltfCam.Perspective.Znear)
+				newCam.Far = float64(*gltfCam.Perspective.Zfar)
+				newCam.FieldOfView = float64(gltfCam.Perspective.Yfov) / (math.Pi * 2) * 360
+				newCam.Perspective = true
+			} else if gltfCam.Orthographic != nil {
+				newCam.Near = float64(gltfCam.Orthographic.Znear)
+				newCam.Far = float64(gltfCam.Orthographic.Zfar)
+				newCam.OrthoScale = float64(gltfCam.Orthographic.Xmag)
+				newCam.Perspective = false
+			}
 
-			// 	if gltfCam.Perspective != nil {
-			// 		newCam.Near = float64(gltfCam.Perspective.Znear)
-			// 		newCam.Far = float64(*gltfCam.Perspective.Zfar)
-			// 		newCam.FieldOfView = float64(gltfCam.Perspective.Yfov) * (math.Pi * 2)
-			// 		newCam.Perspective = true
-			// 	} else if gltfCam.Orthographic != nil {
-			// 		newCam.Near = float64(gltfCam.Orthographic.Znear)
-			// 		newCam.Far = float64(gltfCam.Orthographic.Zfar)
-			// 		newCam.OrthoScale = float64(gltfCam.Orthographic.Xmag)
-			// 		newCam.Perspective = false
-			// 	}
-
-			// 	obj = newCam
+			obj = newCam
 
 		} else {
 			obj = NewNode(node.Name)
@@ -550,6 +550,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
+	// Set up SkinRoot for skinned Models; this should be the root node of a hierarchy of bone Nodes.
 	for _, n := range objects {
 
 		if model, isModel := n.(*Model); isModel && model.Skinned {
@@ -572,6 +573,29 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		for _, n := range s.Nodes {
 			scene.Root.AddChildren(objects[n])
+		}
+
+	}
+
+	// Cameras exported through GLTF become nodes + a camera child with the correct orientation for some reason???
+	// So here we basically cut the empty nodes out of the equation, leaving just the cameras with the correct orientation.
+
+	for _, n := range objects {
+
+		if camera, isCamera := n.(*Camera); isCamera {
+			root := camera.Parent().Parent()
+
+			camera.name = camera.Parent().Name()
+
+			for _, child := range camera.Parent().Children() {
+				if child == camera {
+					continue
+				}
+				camera.AddChildren(child)
+			}
+
+			root.RemoveChildren(camera.parent)
+			root.AddChildren(camera)
 		}
 
 	}
