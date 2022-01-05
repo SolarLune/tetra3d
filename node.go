@@ -200,6 +200,8 @@ func (node *Node) Clone() INode {
 	newNode.rotation = node.rotation.Clone()
 	newNode.parent = node.parent
 	newNode.AnimationPlayer = node.AnimationPlayer.Clone()
+	newNode.tags = node.tags.Clone()
+
 	if node.AnimationPlayer.RootNode == node {
 		newNode.AnimationPlayer.SetRoot(newNode)
 	}

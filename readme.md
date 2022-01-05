@@ -3,6 +3,8 @@
 ![Tetra3D Logo](https://thumbs.gfycat.com/DifferentZealousFowl-size_restricted.gif)
 ![Dark exploration](https://thumbs.gfycat.com/ScalySlimCrayfish-size_restricted.gif)
 
+[Vertex Lighting GIF (6mb GIF)](https://gfycat.com/deliriousfemalejunebug)
+
 [Tetra3D Docs](https://pkg.go.dev/github.com/solarlune/tetra3d)
 
 [There are more tips over on the Wiki, as well.](https://github.com/SolarLune/Tetra3d/wiki)
@@ -16,13 +18,13 @@ Tetra3D is a 3D software renderer written in Go by means of [Ebiten](https://ebi
 
 It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
-In general, Tetra3D's just a basic software renderer, so you can target higher resolutions (1080p) or lower resolutions (as an example, 398x224 seems to be a similar enough resolution to PS1 while maintaining a 16:9 resolution). Anything's fine as long as the target GPU can handle generating a render texture for the resolution (if you have depth testing / depth texture rendering on, as that's how depth testing is done).
+In general, Tetra3D's just a basic software renderer, so you can target higher resolutions (like 1080p or 4K) or lower resolutions (as an example, 398x224 seems to be a similar enough resolution to PS1 while maintaining a 16:9 resolution). Anything's fine as long as the target GPU can handle generating a render texture for the resolution if you have depth testing / depth texture rendering on, as that's how depth testing is done.
 
 ## Why did I make it?
 
 Because there's not really too much of an ability to do 3D for gamedev in Go apart from [g3n](http://g3n.rocks), [go-gl](https://github.com/go-gl/gl) and [Raylib-go](https://github.com/gen2brain/raylib-go). I like Go, I like janky 3D, and so, here we are. 
 
-It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebiten but wanted to display just a few things in 3D, Tetra3D should work well for you.
+It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebiten but wanted to display just a few GUI elements or objects in 3D, Tetra3D should work well for you.
 
 Finally, while a software renderer is not by any means fast, it is relatively simple and easy to use. Any platforms that Ebiten supports should also work for Tetra3D automatically (hopefully!).
 
@@ -184,7 +186,7 @@ func main() {
 
 ```
 
-You can also do intersection testing between BoundingObjects, a category of Nodes designed for collision / intersection testing. As a simplified example:
+You can also do intersection testing between BoundingObjects, a category of nodes designed for collision / intersection testing. As a simplified example:
 
 ```go
 
@@ -223,7 +225,7 @@ func (g *Game) Update() {
 
 That's basically it.
 
-Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine the examples folder for a couple of examples showing how Tetra3D works - calling `go run .` from within their directories should run them.
+Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine the examples folder for some examples showing how Tetra3D works. Calling `go run .` from within their directories should work.
 
 ## What's missing?
 
@@ -237,6 +239,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [ ] -- A more advanced depth buffer - currently, the depth is written using vertex colors.
+- [ ] -- Inter-object depth testing - I'm unsure if I will be able to implement this.
 - [x] -- Offscreen Rendering
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
 - [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode and texture, for example).
