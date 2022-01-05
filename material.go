@@ -14,6 +14,7 @@ type Material struct {
 	Tags             *Tags
 	BackfaceCulling  bool
 	TriangleSortMode int
+	EnableLighting   bool
 }
 
 func NewMaterial(name string) *Material {
@@ -22,6 +23,7 @@ func NewMaterial(name string) *Material {
 		Tags:             NewTags(),
 		BackfaceCulling:  true,
 		TriangleSortMode: TriangleSortBackToFront,
+		EnableLighting:   true,
 	}
 }
 
@@ -30,5 +32,7 @@ func (material *Material) Clone() *Material {
 	newMat.Image = material.Image
 	newMat.Tags = material.Tags.Clone()
 	newMat.BackfaceCulling = material.BackfaceCulling
+	newMat.TriangleSortMode = material.TriangleSortMode
+	newMat.EnableLighting = material.EnableLighting
 	return newMat
 }

@@ -9,12 +9,13 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
 	"github.com/qmuntal/gltf"
+	"github.com/qmuntal/gltf/ext/lightspuntual"
 	"github.com/qmuntal/gltf/modeler"
 )
 
 type GLTFLoadOptions struct {
-	LoadImages                bool
-	CameraWidth, CameraHeight int // Width and height of loaded Cameras. Defaults to 1920x1080.
+	LoadImages                bool // Whether images embedded in the GLTF / GLB file should be loaded or not.
+	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
 }
 
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
@@ -416,6 +417,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	objects := []INode{}
 
+	defaultLightingEnable := false
+
 	for _, node := range doc.Nodes {
 
 		var obj INode
@@ -428,6 +431,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			gltfCam := doc.Cameras[*node.Camera]
 
 			newCam := NewCamera(gltfLoadOptions.CameraWidth, gltfLoadOptions.CameraHeight)
+			newCam.name = node.Name
 
 			if gltfCam.Perspective != nil {
 				newCam.Near = float64(gltfCam.Perspective.Znear)
@@ -442,6 +446,26 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			}
 
 			obj = newCam
+
+		} else if lighting := node.Extensions["KHR_lights_punctual"]; lighting != nil {
+			defaultLightingEnable = true
+			// lightspuntual.Unmarshal()
+			lights := doc.Extensions["KHR_lights_punctual"].(lightspuntual.Lights)
+			lightData := lights[lighting.(lightspuntual.LightIndex)]
+
+			if lightData.Type == lightspuntual.TypePoint {
+				pointLight := NewPointLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/1000)
+				if !math.IsInf(float64(*lightData.Range), 0) {
+					pointLight.Distance = float64(*lightData.Range)
+				}
+				obj = pointLight
+			} else if lightData.Type == lightspuntual.TypeDirectional {
+				directionalLight := NewDirectionalLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity)
+				directionalLight.Color.SetRGBA(lightData.Color[0], lightData.Color[1], lightData.Color[2], 1)
+				obj = directionalLight
+			} else {
+				// Unsupported light type, we'll just ignore
+			}
 
 		} else {
 			obj = NewNode(node.Name)
@@ -476,9 +500,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			obj.SetLocalRotation(r)
 
 		} else {
+
 			obj.SetLocalPosition(vector.Vector{float64(node.Translation[0]), float64(node.Translation[1]), float64(node.Translation[2])})
 			obj.SetLocalScale(vector.Vector{float64(node.Scale[0]), float64(node.Scale[1]), float64(node.Scale[2])})
 			obj.SetLocalRotation(NewMatrix4RotateFromQuaternion(NewQuaternion(float64(node.Rotation[0]), float64(node.Rotation[1]), float64(node.Rotation[2]), float64(node.Rotation[3]))))
+
 		}
 
 		objects = append(objects, obj)
@@ -487,7 +513,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	allBones := []*Node{}
 
-	// Do this twice so we can be sure that all of the nodes can be created first
+	// We do this again here so we can be sure that all of the nodes can be created first
 	for i, node := range doc.Nodes {
 
 		// Set up skin for skinning animations
@@ -544,6 +570,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		}
 
+		// Set up parenting
 		for _, childIndex := range node.Children {
 			objects[i].AddChildren(objects[int(childIndex)])
 		}
@@ -571,6 +598,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		scene := library.AddScene(s.Name)
 
+		scene.LightingOn = defaultLightingEnable
+
 		for _, n := range s.Nodes {
 			scene.Root.AddChildren(objects[n])
 		}
@@ -580,25 +609,30 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	// Cameras exported through GLTF become nodes + a camera child with the correct orientation for some reason???
 	// So here we basically cut the empty nodes out of the equation, leaving just the cameras with the correct orientation.
 
-	for _, n := range objects {
+	// EDIT: This is no longer done, as the camera direction in Blender and the camera direction in GLTF aren't the same, whoops.
+	// See: https://github.com/KhronosGroup/glTF-Blender-Exporter/issues/113
+	// Cutting out the inserted correction Node breaks relative transforms (i.e. camera parented to another object for positioning).
 
-		if camera, isCamera := n.(*Camera); isCamera {
-			root := camera.Parent().Parent()
+	// for _, n := range objects {
 
-			camera.name = camera.Parent().Name()
+	// 	if camera, isCamera := n.(*Camera); isCamera {
+	// 		oldParent := camera.Parent()
+	// 		root := oldParent.Parent()
 
-			for _, child := range camera.Parent().Children() {
-				if child == camera {
-					continue
-				}
-				camera.AddChildren(child)
-			}
+	// 		camera.name = oldParent.Name()
 
-			root.RemoveChildren(camera.parent)
-			root.AddChildren(camera)
-		}
+	// 		for _, child := range oldParent.Children() {
+	// 			if child == camera {
+	// 				continue
+	// 			}
+	// 			camera.AddChildren(child)
+	// 		}
 
-	}
+	// 		root.RemoveChildren(camera.parent)
+	// 		root.AddChildren(camera)
+	// 	}
+
+	// }
 
 	return library, nil
 

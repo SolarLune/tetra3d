@@ -22,6 +22,19 @@ func NewBoundingTriangles(name string, mesh *Mesh) *BoundingTriangles {
 	}
 }
 
+func (bt *BoundingTriangles) Clone() INode {
+	clone := NewBoundingTriangles(bt.name, bt.Mesh)
+	clone.Node = bt.Node.Clone().(*Node)
+	return clone
+}
+
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (bt *BoundingTriangles) AddChildren(children ...INode) {
+	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
+	bt.addChildren(bt, children...)
+}
+
 // Intersecting returns true if the BoundingTriangles object is intersecting the other specified BoundingObject.
 func (bt *BoundingTriangles) Intersecting(other BoundingObject) bool {
 	return bt.Intersection(other) != nil

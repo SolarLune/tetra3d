@@ -26,7 +26,16 @@ func NewBoundingCapsule(name string, height, radius float64) *BoundingCapsule {
 
 // Clone returns a new BoundingCapsule.
 func (capsule *BoundingCapsule) Clone() INode {
-	return NewBoundingCapsule(capsule.name, capsule.Height, capsule.Radius)
+	clone := NewBoundingCapsule(capsule.name, capsule.Height, capsule.Radius)
+	clone.Node = capsule.Node.Clone().(*Node)
+	return clone
+}
+
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (capsule *BoundingCapsule) AddChildren(children ...INode) {
+	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
+	capsule.addChildren(capsule, children...)
 }
 
 // WorldRadius is the radius of the Capsule in world units, after taking into account its scale.

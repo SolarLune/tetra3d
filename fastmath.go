@@ -49,6 +49,14 @@ func fastMatrixMult(matrix, other Matrix4) Matrix4 {
 
 }
 
+func fastMatrixMultVec(matrix Matrix4, vect vector.Vector) vector.Vector {
+
+	standinVector[0] = matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0]
+	standinVector[1] = matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1]
+	standinVector[2] = matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2]
+	return standinVector
+}
+
 func vectorCross(vecA, vecB, failsafeVec vector.Vector) vector.Vector {
 	cross, _ := vecA.Cross(vecB)
 
@@ -87,6 +95,18 @@ func (pool *VectorPool) Get() vector.Vector {
 	v := pool.Vectors[pool.RetrievalIndex]
 	pool.RetrievalIndex++
 	return v
+}
+
+func (pool *VectorPool) MultVec(matrix Matrix4, vect vector.Vector) vector.Vector {
+
+	v := pool.Get()
+
+	v[0] = matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0]
+	v[1] = matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1]
+	v[2] = matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2]
+
+	return v[:3]
+
 }
 
 func (pool *VectorPool) MultVecW(matrix Matrix4, vect vector.Vector) vector.Vector {

@@ -44,8 +44,9 @@ type INode interface {
 	SetWorldScale(scale vector.Vector)
 
 	Move(x, y, z float64)
+	MoveVec(moveVec vector.Vector)
 	Rotate(x, y, z, angle float64)
-	Scale(x, y, z float64)
+	Grow(x, y, z float64)
 
 	Transform() Matrix4
 
@@ -352,7 +353,6 @@ func (node *Node) ResetLocalTransformProperties() {
 
 // WorldPosition returns a 3D Vector consisting of the object's world position (position relative to the world origin point of {0, 0, 0}).
 func (node *Node) WorldPosition() vector.Vector {
-	// position, _, _ := node.Transform().Decompose()
 	position := node.Transform().Row(3)[:3] // We don't want to have to decompose if we don't have to
 	return position
 }
@@ -461,13 +461,22 @@ func (node *Node) Move(x, y, z float64) {
 	node.SetLocalPosition(localPos)
 }
 
+func (node *Node) MoveVec(vec vector.Vector) {
+	localPos := node.LocalPosition()
+	localPos[0] += vec[0]
+	localPos[1] += vec[1]
+	localPos[2] += vec[2]
+	node.SetLocalPosition(localPos)
+}
+
 func (node *Node) Rotate(x, y, z, angle float64) {
 	localRot := node.LocalRotation()
 	localRot = localRot.Rotated(x, y, z, angle)
 	node.SetLocalRotation(localRot)
 }
 
-func (node *Node) Scale(x, y, z float64) {
+// Grow scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
+func (node *Node) Grow(x, y, z float64) {
 	scale := node.LocalScale()
 	scale[0] += x
 	scale[1] += y
@@ -522,7 +531,7 @@ func (node *Node) RemoveChildren(children ...INode) {
 
 }
 
-// Unparent unparents the Node from its parent, removing it from the scenegraph.
+// Unparent unparents the Node from its parent, removing it from the scenegraph. Note that this needs to be overridden for objects that embed Node.
 func (node *Node) Unparent() {
 	if node.parent != nil {
 		node.parent.RemoveChildren(node)
@@ -564,6 +573,8 @@ func (node *Node) Tags() *Tags {
 
 // TreeToString returns a string displaying the hierarchy of this Node, and all recursive children.
 // Nodes will have a "+" next to their name, Models an "M", and Cameras a "C".
+// BoundingSpheres will have BS, BoundingAABB AABB, BoundingCapsule CAP, and BoundingTriangles TRI.
+// Lights will have an L next to their name.
 // This is a useful function to debug the layout of a node tree, for example.
 func (node *Node) TreeToString() string {
 
@@ -575,12 +586,18 @@ func (node *Node) TreeToString() string {
 
 		if _, ok := node.(*Model); ok {
 			nodeType = "M"
+		} else if _, ok := node.(Light); ok {
+			nodeType = "L"
 		} else if _, ok := node.(*Camera); ok {
 			nodeType = "C"
 		} else if _, ok := node.(*BoundingSphere); ok {
 			nodeType = "BS"
 		} else if _, ok := node.(*BoundingAABB); ok {
 			nodeType = "AABB"
+		} else if _, ok := node.(*BoundingCapsule); ok {
+			nodeType = "CAP"
+		} else if _, ok := node.(*BoundingTriangles); ok {
+			nodeType = "TRI"
 		}
 
 		str := ""
@@ -677,7 +694,7 @@ func (node *Node) Path() string {
 
 }
 
-// FindByName allows you to search the node's tree for Nodes with the provided name, returning a slice
+// FindByName allows you to search the node's recursive children, returning a slice
 // of Nodes with the name given. If none are found, an empty slice is returned.
 // After finding a Node, you can convert it to a more specific type as necessary via type assertion.
 func (node *Node) FindByName(name string) []INode {
@@ -690,22 +707,10 @@ func (node *Node) FindByName(name string) []INode {
 	return out
 }
 
-// FindBytags allows you to search the node's tree for Nodes with the provided tags, returning a slice
+// FindBytags allows you to search the node's recursive children, returning a slice
 // of Nodes with the tags given. If none are found, an empty slice is returned.
 // After finding a Node, you can convert it to a more specific type as necessary via type assertion.
 func (node *Node) FindByTags(tagNames ...string) []INode {
-	out := []INode{}
-	for _, node := range node.ChildrenRecursive(false) {
-		if node.Tags().Has(tagNames...) {
-			out = append(out, node)
-		}
-	}
-	return out
-}
-
-// GetMultipleByTags allows you to search the node's tree for multiple Nodes with the provided tag.
-// After finding Nodes, you can convert it to a more specific type as necessary via type assertion.
-func (node *Node) GetMultipleByTags(tagNames ...string) []INode {
 	out := []INode{}
 	for _, node := range node.ChildrenRecursive(false) {
 		if node.Tags().Has(tagNames...) {

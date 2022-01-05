@@ -1,7 +1,6 @@
 package tetra3d
 
 import (
-	"math"
 	"sort"
 	"time"
 
@@ -81,6 +80,11 @@ func (model *Model) Clone() INode {
 	newModel.Node = model.Node.Clone().(*Node)
 	for _, child := range newModel.children {
 		child.setParent(newModel)
+	}
+
+	newModel.onTransformUpdate = func() {
+		newModel.BoundingSphere.SetLocalPosition(newModel.WorldPosition().Add(model.Mesh.Dimensions.Center()))
+		newModel.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
 	}
 
 	return newModel
@@ -196,9 +200,7 @@ func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
 
 }
 
-func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector, camera *Camera) []*Triangle {
-
-	mvp := model.Transform().Mult(vpMatrix)
+func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Triangle {
 
 	model.vectorPool.Reset()
 
@@ -208,27 +210,27 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, viewPos vector.Vector,
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
 		for _, tri := range model.Mesh.Triangles {
-			tri.closestDepth = math.MaxFloat64
+			tri.closestDepth = 0
 			for _, vert := range tri.Vertices {
 				vert.transformed = model.vectorPool.MultVecW(vpMatrix, model.skinVertex(vert))
-				if vert.transformed[2] < tri.closestDepth {
-					tri.closestDepth = vert.transformed[2]
-				}
+				tri.closestDepth += vert.transformed[2]
 			}
+			tri.closestDepth /= 3
 		}
 
 		camera.DebugInfo.animationTime += time.Since(t)
 
 	} else {
 
+		mvp := model.Transform().Mult(vpMatrix)
+
 		for _, tri := range model.Mesh.Triangles {
-			tri.closestDepth = math.MaxFloat64
+			tri.closestDepth = 0
 			for _, vert := range tri.Vertices {
 				vert.transformed = model.vectorPool.MultVecW(mvp, vert.Position)
-				if vert.transformed[2] < tri.closestDepth {
-					tri.closestDepth = vert.transformed[2]
-				}
+				tri.closestDepth += vert.transformed[2]
 			}
+			tri.closestDepth /= 3
 		}
 
 	}

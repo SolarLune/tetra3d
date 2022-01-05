@@ -12,7 +12,7 @@
 If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune). I also have a [Discord server here](https://discord.gg/cepcpfV). Thanks~!
 ## What is Tetra3D?
 
-Tetra3D is a 3D software renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering systems like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D uses the GPU a bit for rendering the depth texture, though this can be turned off for a performance increase and no inter-object depth testing.
+Tetra3D is a 3D software renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D uses the GPU a bit for rendering the depth texture, though this can be turned off for a performance increase in exchange for no inter-object depth testing.
 
 It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
@@ -77,6 +77,7 @@ func NewGame() *Game {
 	// First, we load a scene from a .gltf or .glb file. LoadGLTFFile takes a filepath and
 	// any loading options (nil is taken as a default), and returns a *Library 
 	// and an error if it was unsuccessful. 
+
 	library, err := tetra3d.LoadGLTFFile("example.gltf", nil) 
 
 	if err != nil {
@@ -92,14 +93,16 @@ func NewGame() *Game {
 	// (or any other kind of matrix) to the vertices, thereby rotating 
 	// them and their triangles' normals. 
 
-	// With Blender, this conversion is handled for you.
-
 	// Tetra uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
 	// in comparison to Blender's coordinate system (+X = Right, +Y = Forward, 
 	// +Z = Up). 
 
 	// Here, we'll create a new Camera. We pass the size of the screen to the 
 	// Camera so it can create its own buffer textures (which are *ebiten.Images).
+
+	// If we were to load the camera in from the GLTF file, the loading options struct would 
+	// specify the camera's backing texture size (defaulting to 1920x1080).
+
 	g.Camera = tetra3d.NewCamera(ScreenWidth, ScreenHeight)
 
 	// We could also use a camera from the scene within the GLTF file if it was 
@@ -128,7 +131,7 @@ func NewGame() *Game {
 	// towards [0, 0, 0].
 	g.Camera.Move(0, 0, 12)
 
-	return game
+	return g
 }
 
 func (g *Game) Update() error { return nil }
@@ -278,7 +281,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- UV map loading
 - [x] -- Normal loading
 - [x] -- Transform / full scene loading
-- [ ] Lighting
+- [x] Lighting
+- [x] -- Ambient lights
+- [x] -- Point lights
+- [x] -- Directional lights
+- [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit)
 - [ ] Shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)
 - [x] Intersection Testing:
@@ -298,7 +305,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
 - [x] -- Vector pools
-- [ ] -- Matrix pools 
+- [ ] -- Matrix pools
+- [ ] -- Lighting speed improvements 
 - [ ] [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!

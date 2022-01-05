@@ -45,17 +45,21 @@ func (lib *Library) AddScene(sceneName string) *Scene {
 // graph of parents and children. Models (visual instances of Meshes), Cameras, and "empty" NodeBases all are kinds of Nodes.
 type Scene struct {
 	Name string // The name of the Scene. Set automatically to the scene name in your 3D modeler if the DAE file exports it.
+
 	// Root indicates the root node for the scene hierarchy. For visual Models to be displayed, they must be added to the
 	// scene graph by simply adding them into the tree via parenting anywhere under the Root. For them to be removed from rendering,
 	// they simply need to be removed from the tree.
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
-	Root     INode
+	Root INode
+
 	FogColor *Color  // The Color of any fog present in the Scene.
 	FogMode  FogMode // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
 	// the first indicating the start of the fog, and the second the end, in terms of total depth
 	// of the near / far clipping plane.
 	FogRange []float32
+
+	LightingOn bool // If lighting is enabled when rendering the scene.
 }
 
 // NewScene creates a new Scene by the name given.
@@ -67,6 +71,8 @@ func NewScene(name string) *Scene {
 		Root:     NewNode("Root"),
 		FogColor: NewColor(0, 0, 0, 0),
 		FogRange: []float32{0, 1},
+
+		LightingOn: false,
 	}
 
 	return scene
@@ -86,19 +92,6 @@ func (scene *Scene) Clone() *Scene {
 	newScene.FogRange[1] = scene.FogRange[1]
 	return newScene
 
-}
-
-// FilterNodes filters out the Scene's Node tree to return just the Nodes
-// that satisfy the function passed. You can use this to, for example, find
-// Nodes that have a specific name, or render a Scene in stages.
-func (scene *Scene) FilterNodes(filterFunc func(node INode) bool) []INode {
-	newMS := []INode{}
-	for _, m := range scene.Root.ChildrenRecursive(false) {
-		if filterFunc(m) {
-			newMS = append(newMS, m)
-		}
-	}
-	return newMS
 }
 
 func (scene *Scene) fogAsFloatSlice() []float32 {

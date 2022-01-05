@@ -18,7 +18,9 @@ import (
 type DebugInfo struct {
 	AvgFrameTime     time.Duration // Amount of CPU frame time spent transforming vertices. Doesn't necessarily include CPU time spent sending data to the GPU.
 	AvgAnimationTime time.Duration // Amount of CPU frame time spent animating vertices.
+	AvgLightTime     time.Duration // Amount of CPU frame time spent lighting vertices.
 	animationTime    time.Duration
+	lightTime        time.Duration
 	frameTime        time.Duration
 	tickTime         time.Time
 	DrawnObjects     int // Number of rendered objects, excluding those invisible or culled based on distance
@@ -270,9 +272,11 @@ func (camera *Camera) Clear() {
 		camera.DebugInfo.tickTime = time.Now()
 		camera.DebugInfo.AvgFrameTime = camera.DebugInfo.frameTime
 		camera.DebugInfo.AvgAnimationTime = camera.DebugInfo.animationTime
+		camera.DebugInfo.AvgLightTime = camera.DebugInfo.lightTime
 	}
 	camera.DebugInfo.frameTime = 0
 	camera.DebugInfo.animationTime = 0
+	camera.DebugInfo.lightTime = 0
 	camera.DebugInfo.DrawnObjects = 0
 	camera.DebugInfo.TotalObjects = 0
 	camera.DebugInfo.TotalTris = 0
@@ -321,6 +325,21 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
+	frametimeStart := time.Now()
+
+	lights := []Light{}
+
+	if scene.LightingOn {
+
+		for _, l := range scene.Root.ChildrenRecursive(false) {
+			if light, isLight := l.(Light); isLight && light.isOn() {
+				lights = append(lights, light)
+				light.begin()
+			}
+		}
+
+	}
+
 	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
 	if !camera.RenderDepth {
 
@@ -332,17 +351,14 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	// By multiplying the camera's position against the view matrix (which contains the negated camera position), we're left with just the rotation
 	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
-	pureViewRot := camera.ViewMatrix().MultVec(camera.WorldPosition())
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
 	// Update the camera's frustum sphere
 	dist := (camera.Far - camera.Near) / 2
-	forward := camera.LocalRotation().Forward().Invert()
+	forward := camera.WorldRotation().Forward().Invert()
 
 	camera.FrustumSphere.SetWorldPosition(camera.WorldPosition().Add(forward.Scale(camera.Near + dist)))
 	camera.FrustumSphere.Radius = dist * 1.5
-
-	frametimeStart := time.Now()
 
 	rectShaderOptions := &ebiten.DrawRectShaderOptions{}
 	rectShaderOptions.Images[0] = camera.ColorIntermediate
@@ -394,7 +410,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		camera.DebugInfo.DrawnObjects++
 
-		tris := model.TransformedVertices(vpMatrix, pureViewRot, camera)
+		tris := model.TransformedVertices(vpMatrix, camera)
 
 		vertexListIndex := 0
 
@@ -528,15 +544,46 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		index := 0
 
+		modelTrans := model.Transform()
+
+		lighting := scene.LightingOn
+		if model.Mesh.Material != nil {
+			lighting = scene.LightingOn && model.Mesh.Material.EnableLighting
+		}
+
 		for _, tri := range triList[:vertexListIndex/3] {
 
 			for _, vert := range tri.Vertices {
 
 				// Vertex colors
 
-				vertexList[index].ColorR = vert.Color.R
-				vertexList[index].ColorG = vert.Color.G
-				vertexList[index].ColorB = vert.Color.B
+				if lighting {
+
+					t := time.Now()
+
+					r := float32(0)
+					g := float32(0)
+					b := float32(0)
+
+					for _, light := range lights {
+						lr, lg, lb := light.Light(vert, modelTrans)
+						r += lr
+						g += lg
+						b += lb
+					}
+
+					camera.DebugInfo.lightTime += time.Since(t)
+
+					vertexList[index].ColorR = vert.Color.R * r
+					vertexList[index].ColorG = vert.Color.G * g
+					vertexList[index].ColorB = vert.Color.B * b
+
+				} else {
+					vertexList[index].ColorR = vert.Color.R
+					vertexList[index].ColorG = vert.Color.G
+					vertexList[index].ColorB = vert.Color.B
+				}
+
 				vertexList[index].ColorA = vert.Color.A
 
 				vertexList[index].SrcX = float32(vert.UV[0] * srcW)
@@ -619,11 +666,15 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 	m = camera.DebugInfo.AvgAnimationTime.Round(time.Microsecond).Microseconds()
 	at := fmt.Sprintf("%.2fms", float32(m)/1000)
 
+	m = camera.DebugInfo.AvgLightTime.Round(time.Microsecond).Microseconds()
+	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
+
 	text.DrawWithOptions(screen, fmt.Sprintf(
-		"FPS: %f\nFrame time: %s\nSkinned mesh animation time: %s\nRendered objects:%d/%d\nRendered triangles: %d/%d",
+		"FPS: %f\nTotal frame time: %s\nSkinned mesh animation time: %s\nLighting time:%s\nRendered objects:%d/%d\nRendered triangles: %d/%d",
 		ebiten.CurrentFPS(),
 		ft,
 		at,
+		lt,
 		camera.DebugInfo.DrawnObjects,
 		camera.DebugInfo.TotalObjects,
 		camera.DebugInfo.DrawnTris,
@@ -636,7 +687,6 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 // image provided.
 func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, color color.Color) {
 
-	pureViewRot := camera.ViewMatrix().MultVec(camera.WorldPosition())
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
 	for _, m := range rootNode.ChildrenRecursive(true) {
@@ -651,7 +701,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			}
 
-			model.TransformedVertices(vpMatrix, pureViewRot, camera)
+			model.TransformedVertices(vpMatrix, camera)
 
 			for _, tri := range model.Mesh.Triangles {
 
@@ -876,6 +926,8 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 	}
 
 }
+
+/////
 
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 // hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.

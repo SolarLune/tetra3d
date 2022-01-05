@@ -76,7 +76,16 @@ func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float64) {
 
 // Clone returns a new BoundingAABB.
 func (box *BoundingAABB) Clone() INode {
-	return NewBoundingAABB(box.name, box.internalSize[0], box.internalSize[1], box.internalSize[2])
+	clone := NewBoundingAABB(box.name, box.internalSize[0], box.internalSize[1], box.internalSize[2])
+	clone.Node = box.Node.Clone().(*Node)
+	return clone
+}
+
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (box *BoundingAABB) AddChildren(children ...INode) {
+	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
+	box.addChildren(box, children...)
 }
 
 // ClosestPoint returns the closest point, to the point given, on the inside or surface of the BoundingAABB.

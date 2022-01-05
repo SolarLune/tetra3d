@@ -142,7 +142,7 @@ func (track *AnimationTrack) ValueAsQuaternion(time float64) *Quaternion {
 
 			t := (time - first.Time) / (last.Time - first.Time)
 
-			return fd.Slerp(ld, t)
+			return fd.Lerp(ld, t)
 
 		}
 
@@ -218,10 +218,10 @@ type AnimationPlayer struct {
 	Playing                bool                       // Whether the player is playing back or not.
 	FinishMode             int                        // What to do when the player finishes playback. Defaults to looping.
 	OnFinish               func()                     // Callback indicating the Animation has completed
-	AnimatedProperties     map[INode]*AnimationValues // The properties that have been animated
-	PrevAnimatedProperties map[INode]*AnimationValues // The previous properties that have been animated from the previously Play()'d animation
+	animatedProperties     map[INode]*AnimationValues // The properties that have been animated
+	prevAnimatedProperties map[INode]*AnimationValues // The previous properties that have been animated from the previously Play()'d animation
 	BlendTime              float64                    // How much time in seconds to blend between two animations
-	BlendStart             time.Time                  // The time that the blend started
+	blendStart             time.Time                  // The time that the blend started
 }
 
 // NewAnimationPlayer returns a new AnimationPlayer for the Node.
@@ -230,8 +230,8 @@ func NewAnimationPlayer(node INode) *AnimationPlayer {
 		RootNode:               node,
 		PlaySpeed:              1,
 		FinishMode:             FinishModeLoop,
-		AnimatedProperties:     map[INode]*AnimationValues{},
-		PrevAnimatedProperties: map[INode]*AnimationValues{},
+		animatedProperties:     map[INode]*AnimationValues{},
+		prevAnimatedProperties: map[INode]*AnimationValues{},
 	}
 }
 
@@ -260,23 +260,26 @@ func (ap *AnimationPlayer) SetRoot(node INode) {
 	ap.ChannelsUpdated = false
 }
 
-// Play plays the specified animation back. Calling Play() resets the playhead.
+// Play plays the specified animation back, resetting the playhead if the specified animation is not currently
+// playing. If the animation is already playing, Play() does nothing.
 func (ap *AnimationPlayer) Play(animation *Animation) {
-
-	ap.Playhead = 0.0
-	ap.ChannelsUpdated = false
 
 	if ap.Animation != animation || !ap.Playing {
 		ap.Animation = animation
 		ap.Playing = true
+	} else {
+		return
 	}
 
+	ap.Playhead = 0.0
+	ap.ChannelsUpdated = false
+
 	if ap.BlendTime > 0 {
-		ap.PrevAnimatedProperties = map[INode]*AnimationValues{}
-		for n, v := range ap.AnimatedProperties {
-			ap.PrevAnimatedProperties[n] = v
+		ap.prevAnimatedProperties = map[INode]*AnimationValues{}
+		for n, v := range ap.animatedProperties {
+			ap.prevAnimatedProperties[n] = v
 		}
-		ap.BlendStart = time.Now()
+		ap.blendStart = time.Now()
 	}
 
 }
@@ -287,7 +290,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 	if ap.Animation != nil {
 
-		ap.AnimatedProperties = map[INode]*AnimationValues{}
+		ap.animatedProperties = map[INode]*AnimationValues{}
 
 		ap.ChannelsToNodes = map[*AnimationChannel]INode{}
 
@@ -297,7 +300,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 			if ap.RootNode.Name() == channel.Name {
 				ap.ChannelsToNodes[channel] = ap.RootNode
-				ap.AnimatedProperties[ap.RootNode] = &AnimationValues{}
+				ap.animatedProperties[ap.RootNode] = &AnimationValues{}
 				continue
 			}
 
@@ -307,7 +310,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 				if n.Name() == channel.Name {
 					ap.ChannelsToNodes[channel] = n
-					ap.AnimatedProperties[n] = &AnimationValues{}
+					ap.animatedProperties[n] = &AnimationValues{}
 					found = true
 					break
 				}
@@ -318,7 +321,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 			if !found {
 				ap.ChannelsToNodes[channel] = ap.RootNode
-				ap.AnimatedProperties[ap.RootNode] = &AnimationValues{}
+				ap.animatedProperties[ap.RootNode] = &AnimationValues{}
 			}
 
 		}
@@ -349,18 +352,18 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 					if track, exists := channel.Tracks[TrackTypePosition]; exists {
 						// node.SetLocalPosition(track.ValueAsVector(ap.Playhead))
-						ap.AnimatedProperties[node].Position = track.ValueAsVector(ap.Playhead)
+						ap.animatedProperties[node].Position = track.ValueAsVector(ap.Playhead)
 					}
 
 					if track, exists := channel.Tracks[TrackTypeScale]; exists {
 						// node.SetLocalScale(track.ValueAsVector(ap.Playhead))
-						ap.AnimatedProperties[node].Scale = track.ValueAsVector(ap.Playhead)
+						ap.animatedProperties[node].Scale = track.ValueAsVector(ap.Playhead)
 					}
 
 					if track, exists := channel.Tracks[TrackTypeRotation]; exists {
 						quat := track.ValueAsQuaternion(ap.Playhead)
 						// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
-						ap.AnimatedProperties[node].Rotation = quat
+						ap.animatedProperties[node].Rotation = quat
 					}
 
 				}
@@ -427,23 +430,23 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 	ap.updateValues(dt)
 
-	if !ap.Playing && !ap.BlendStart.IsZero() {
-		ap.BlendStart = time.Time{}
-		ap.PrevAnimatedProperties = map[INode]*AnimationValues{}
+	if !ap.Playing && !ap.blendStart.IsZero() {
+		ap.blendStart = time.Time{}
+		ap.prevAnimatedProperties = map[INode]*AnimationValues{}
 	}
 
-	for node, props := range ap.AnimatedProperties {
+	for node, props := range ap.animatedProperties {
 
-		_, prevExists := ap.PrevAnimatedProperties[node]
+		_, prevExists := ap.prevAnimatedProperties[node]
 
-		if !ap.BlendStart.IsZero() && prevExists {
+		if !ap.blendStart.IsZero() && prevExists {
 
-			bp := float64(time.Since(ap.BlendStart).Milliseconds()) / (ap.BlendTime * 1000)
+			bp := float64(time.Since(ap.blendStart).Milliseconds()) / (ap.BlendTime * 1000)
 			if bp > 1 {
 				bp = 1
 			}
 
-			start := ap.PrevAnimatedProperties[node]
+			start := ap.prevAnimatedProperties[node]
 
 			if start.Position != nil && props.Position != nil {
 				diff := props.Position.Sub(start.Position)
@@ -464,7 +467,7 @@ func (ap *AnimationPlayer) Update(dt float64) {
 			}
 
 			if start.Rotation != nil && props.Rotation != nil {
-				rot := start.Rotation.Slerp(props.Rotation, bp)
+				rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
 				node.SetLocalRotation(NewMatrix4RotateFromQuaternion(rot))
 			} else if props.Rotation != nil {
 				node.SetLocalRotation(NewMatrix4RotateFromQuaternion(props.Rotation))
@@ -473,8 +476,8 @@ func (ap *AnimationPlayer) Update(dt float64) {
 			}
 
 			if bp == 1 {
-				ap.BlendStart = time.Time{}
-				ap.PrevAnimatedProperties = map[INode]*AnimationValues{}
+				ap.blendStart = time.Time{}
+				ap.prevAnimatedProperties = map[INode]*AnimationValues{}
 			}
 
 		} else {

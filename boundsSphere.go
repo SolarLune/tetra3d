@@ -22,7 +22,16 @@ func NewBoundingSphere(name string, radius float64) *BoundingSphere {
 
 // Clone returns a new BoundingSphere instance.
 func (sphere *BoundingSphere) Clone() INode {
-	return NewBoundingSphere(sphere.name, sphere.Radius)
+	clone := NewBoundingSphere(sphere.name, sphere.Radius)
+	clone.Node = sphere.Node.Clone().(*Node)
+	return clone
+}
+
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (sphere *BoundingSphere) AddChildren(children ...INode) {
+	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
+	sphere.addChildren(sphere, children...)
 }
 
 // WorldRadius returns the radius of the BoundingSphere in world units, after taking into account its scale.

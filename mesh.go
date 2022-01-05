@@ -54,7 +54,7 @@ type Mesh struct {
 	Tags            *Tags
 }
 
-// NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. You must provide a number of *Vertex instances divisible by 3,
+// NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,
 // or NewMesh will panic.
 func NewMesh(name string, verts ...*Vertex) *Mesh {
 
@@ -253,12 +253,12 @@ func NewPlane() *Mesh {
 
 	mesh := NewMesh("Plane",
 		NewVertex(1, 0, -1, 1, 0),
-		NewVertex(1, 0, 1, 1, 1),
 		NewVertex(-1, 0, -1, 0, 0),
+		NewVertex(1, 0, 1, 1, 1),
 
 		NewVertex(-1, 0, -1, 0, 0),
-		NewVertex(1, 0, 1, 1, 1),
 		NewVertex(-1, 0, 1, 0, 1),
+		NewVertex(1, 0, 1, 1, 1),
 	)
 
 	mesh.Material = NewMaterial("Plane")
