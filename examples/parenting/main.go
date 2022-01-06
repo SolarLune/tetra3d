@@ -134,7 +134,7 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyI) {
-		parent.SetVisible(!parent.Visible())
+		parent.SetVisible(!parent.Visible(), true)
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {

@@ -23,7 +23,7 @@ type INode interface {
 	Unparent()
 	Root() INode
 	Children() []INode
-	ChildrenRecursive(onlyVisible bool) []INode
+	ChildrenRecursive() []INode
 	AddChildren(...INode)
 	RemoveChildren(...INode)
 	updateLocalTransform(newParent INode)
@@ -51,7 +51,7 @@ type INode interface {
 	Transform() Matrix4
 
 	Visible() bool
-	SetVisible(visible bool)
+	SetVisible(visible, recursive bool)
 
 	Get(path string) INode
 	FindByName(name string) []INode
@@ -271,7 +271,7 @@ func (node *Node) dirtyTransform() {
 
 	if !node.isTransformDirty {
 
-		for _, child := range node.ChildrenRecursive(false) {
+		for _, child := range node.ChildrenRecursive() {
 			child.dirtyTransform()
 		}
 
@@ -545,15 +545,12 @@ func (node *Node) Children() []INode {
 	return append([]INode{}, node.children...)
 }
 
-// ChildrenRecursive returns all related children Nodes underneath this one. If onlyVisible is true, ChildrenRecursive will only return
-// Nodes that are visible.
-func (node *Node) ChildrenRecursive(onlyVisible bool) []INode {
+// ChildrenRecursive returns all related children Nodes underneath this one.
+func (node *Node) ChildrenRecursive() []INode {
 	out := []INode{}
 	for _, child := range node.children {
-		if !onlyVisible || child.Visible() {
-			out = append(out, child)
-			out = append(out, child.ChildrenRecursive(onlyVisible)...)
-		}
+		out = append(out, child)
+		out = append(out, child.ChildrenRecursive()...)
 	}
 	return out
 }
@@ -563,9 +560,14 @@ func (node *Node) Visible() bool {
 	return node.visible
 }
 
-// SetVisible sets the object's visibility.
-func (node *Node) SetVisible(visible bool) {
+// SetVisible sets the object's visibility. If recursive is true, all recursive children of this Node will have their visibility set the same way.
+func (node *Node) SetVisible(visible bool, recursive bool) {
 	node.visible = visible
+	if recursive {
+		for _, child := range node.ChildrenRecursive() {
+			child.SetVisible(visible, true)
+		}
+	}
 }
 
 // Tags represents an unordered set of string tags that can be used to identify this object.
@@ -701,7 +703,7 @@ func (node *Node) Path() string {
 // After finding a Node, you can convert it to a more specific type as necessary via type assertion.
 func (node *Node) FindByName(name string) []INode {
 	out := []INode{}
-	for _, node := range node.ChildrenRecursive(false) {
+	for _, node := range node.ChildrenRecursive() {
 		if node.Name() == name {
 			out = append(out, node)
 		}
@@ -714,7 +716,7 @@ func (node *Node) FindByName(name string) []INode {
 // After finding a Node, you can convert it to a more specific type as necessary via type assertion.
 func (node *Node) FindByTags(tagNames ...string) []INode {
 	out := []INode{}
-	for _, node := range node.ChildrenRecursive(false) {
+	for _, node := range node.ChildrenRecursive() {
 		if node.Tags().Has(tagNames...) {
 			out = append(out, node)
 		}

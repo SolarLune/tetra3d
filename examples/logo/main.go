@@ -54,12 +54,12 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
-	dae, err := tetra3d.LoadGLTFData(logoModel, nil)
+	data, err := tetra3d.LoadGLTFData(logoModel, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	g.Scene = dae.Scenes[0]
+	g.Scene = data.Scenes[0]
 
 	// Get the ScreenTexture node, which is a model
 	screen := g.Scene.Root.Get("ScreenBorder/ScreenTexture")

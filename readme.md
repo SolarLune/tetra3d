@@ -288,6 +288,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Ambient lights
 - [x] -- Point lights
 - [x] -- Directional lights
+- [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better)
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit)
 - [ ] Shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)

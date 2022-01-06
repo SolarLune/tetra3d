@@ -293,7 +293,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 		meshes = append(meshes, model)
 	}
 
-	nodes := rootNode.ChildrenRecursive(true)
+	nodes := rootNode.ChildrenRecursive()
 
 	for _, node := range nodes {
 		if model, ok := node.(*Model); ok {
@@ -331,7 +331,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	if scene.LightingOn {
 
-		for _, l := range scene.Root.ChildrenRecursive(false) {
+		for _, l := range scene.Root.ChildrenRecursive() {
 			if light, isLight := l.(Light); isLight && light.isOn() {
 				lights = append(lights, light)
 				light.begin()
@@ -689,7 +689,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	for _, m := range rootNode.ChildrenRecursive(true) {
+	for _, m := range rootNode.ChildrenRecursive() {
 
 		if model, isModel := m.(*Model); isModel {
 
@@ -725,7 +725,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 // in units. Color is the color to draw the normals.
 func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float64, color color.Color) {
 
-	for _, m := range rootNode.ChildrenRecursive(true) {
+	for _, m := range rootNode.ChildrenRecursive() {
 
 		if model, isModel := m.(*Model); isModel {
 
@@ -752,7 +752,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 // DrawDebugCenters draws the center positions of nodes under the rootNode using the color given to the screen image provided.
 func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color color.Color) {
 
-	for _, node := range rootNode.ChildrenRecursive(false) {
+	for _, node := range rootNode.ChildrenRecursive() {
 
 		if node == camera {
 			continue
@@ -775,7 +775,7 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 // be drawn in the color provided to the screen image provided.
 func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, color color.Color) {
 
-	for _, n := range rootNode.ChildrenRecursive(false) {
+	for _, n := range rootNode.ChildrenRecursive() {
 
 		if b, isBounds := n.(BoundingObject); isBounds {
 

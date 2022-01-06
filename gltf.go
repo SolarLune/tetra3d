@@ -461,7 +461,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				obj = pointLight
 			} else if lightData.Type == lightspuntual.TypeDirectional {
 				directionalLight := NewDirectionalLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity)
-				directionalLight.Color.SetRGBA(lightData.Color[0], lightData.Color[1], lightData.Color[2], 1)
+				directionalLight.Color.Set(lightData.Color[0], lightData.Color[1], lightData.Color[2], 1)
 				obj = directionalLight
 			} else {
 				// Unsupported light type, we'll just ignore

@@ -144,13 +144,13 @@ func (g *Game) Update() error {
 
 	// Fog controls
 	if ebiten.IsKeyPressed(ebiten.Key1) {
-		g.Scene.FogColor.SetRGBA(1, 0, 0, 1)
+		g.Scene.FogColor.Set(1, 0, 0, 1)
 		g.Scene.FogMode = tetra3d.FogAdd
 	} else if ebiten.IsKeyPressed(ebiten.Key2) {
-		g.Scene.FogColor.SetRGBA(0, 0, 0, 1)
+		g.Scene.FogColor.Set(0, 0, 0, 1)
 		g.Scene.FogMode = tetra3d.FogMultiply
 	} else if ebiten.IsKeyPressed(ebiten.Key3) {
-		g.Scene.FogColor.SetRGBA(0, 0, 0, 1)
+		g.Scene.FogColor.Set(0, 0, 0, 1)
 		g.Scene.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key4) {
 		g.Scene.FogMode = tetra3d.FogOff
@@ -194,8 +194,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	// screen.Fill(color.RGBA{20, 25, 30, 255})
-	screen.Fill(color.Black)
+	screen.Fill(g.Scene.FogColor.ToRGBA64())
 
 	camera := g.Camera.Get("Camera_Orientation").(*tetra3d.Camera)
 

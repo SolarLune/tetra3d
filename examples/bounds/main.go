@@ -65,7 +65,7 @@ func (g *Game) Init() {
 
 	g.Scene = library.FindScene("Scene")
 
-	for _, object := range g.Scene.Root.ChildrenRecursive(false) {
+	for _, object := range g.Scene.Root.ChildrenRecursive() {
 
 		if object.Tags().Has("collision") {
 

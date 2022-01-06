@@ -28,7 +28,7 @@ type Model struct {
 
 var defaultColorBlendingFunc = func(model *Model) ebiten.ColorM {
 	colorM := ebiten.ColorM{}
-	colorM.Scale(model.Color.RGBA64())
+	colorM.Scale(model.Color.ToFloat64s())
 	return colorM
 }
 
@@ -151,7 +151,7 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 		panic(`Error: Cannot reassign skinned Model [` + model.Path() + `] to armature bone [` + armatureRoot.Path() + `]. ReassignBones() should be called with the desired armature's root node.`)
 	}
 
-	bones := armatureRoot.ChildrenRecursive(false)
+	bones := armatureRoot.ChildrenRecursive()
 
 	boneMap := map[string]*Node{}
 
