@@ -185,6 +185,10 @@ func (g *Game) Update() error {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+		g.Scene.LightingOn = !g.Scene.LightingOn
+	}
+
 	return err
 }
 
@@ -211,8 +215,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1)
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\n1 Key: Toggle lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 150, color.RGBA{255, 0, 0, 255})
 	}
 }
 

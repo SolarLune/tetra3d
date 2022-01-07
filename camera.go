@@ -27,6 +27,8 @@ type DebugInfo struct {
 	TotalObjects     int // Total number of objects
 	DrawnTris        int // Number of drawn triangles, excluding those hidden from backface culling
 	TotalTris        int // Total number of triangles
+	LightCount       int // Total number of lights
+	ActiveLightCount int // Total active number of lights
 }
 
 // Camera represents a camera (where you look from) in Tetra3D.
@@ -281,7 +283,8 @@ func (camera *Camera) Clear() {
 	camera.DebugInfo.TotalObjects = 0
 	camera.DebugInfo.TotalTris = 0
 	camera.DebugInfo.DrawnTris = 0
-
+	camera.DebugInfo.LightCount = 0
+	camera.DebugInfo.ActiveLightCount = 0
 }
 
 // RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example).
@@ -332,9 +335,13 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	if scene.LightingOn {
 
 		for _, l := range scene.Root.ChildrenRecursive() {
-			if light, isLight := l.(Light); isLight && light.isOn() {
-				lights = append(lights, light)
-				light.begin()
+			if light, isLight := l.(Light); isLight {
+				camera.DebugInfo.LightCount++
+				if light.isOn() {
+					lights = append(lights, light)
+					light.beginRender()
+					camera.DebugInfo.ActiveLightCount++
+				}
 			}
 		}
 
@@ -544,45 +551,15 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		index := 0
 
-		modelTrans := model.Transform()
-
-		lighting := scene.LightingOn
-		if model.Mesh.Material != nil {
-			lighting = scene.LightingOn && model.Mesh.Material.EnableLighting
-		}
-
 		for _, tri := range triList[:vertexListIndex/3] {
 
 			for _, vert := range tri.Vertices {
 
 				// Vertex colors
 
-				if lighting {
-
-					t := time.Now()
-
-					r := float32(0)
-					g := float32(0)
-					b := float32(0)
-
-					for _, light := range lights {
-						lr, lg, lb := light.Light(vert, modelTrans)
-						r += lr
-						g += lg
-						b += lb
-					}
-
-					camera.DebugInfo.lightTime += time.Since(t)
-
-					vertexList[index].ColorR = vert.Color.R * r
-					vertexList[index].ColorG = vert.Color.G * g
-					vertexList[index].ColorB = vert.Color.B * b
-
-				} else {
-					vertexList[index].ColorR = vert.Color.R
-					vertexList[index].ColorG = vert.Color.G
-					vertexList[index].ColorB = vert.Color.B
-				}
+				vertexList[index].ColorR = vert.Color.R
+				vertexList[index].ColorG = vert.Color.G
+				vertexList[index].ColorB = vert.Color.B
 
 				vertexList[index].ColorA = vert.Color.A
 
@@ -595,6 +572,50 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				index++
 
 			}
+
+		}
+
+		lighting := scene.LightingOn
+		if model.Mesh.Material != nil {
+			lighting = scene.LightingOn && model.Mesh.Material.EnableLighting
+		}
+
+		if lighting {
+
+			index = 0
+
+			t := time.Now()
+
+			for _, light := range lights {
+				light.beginModel(model)
+			}
+
+			lightColors := [9]float32{}
+
+			for _, tri := range triList[:vertexListIndex/3] {
+
+				for i := range lightColors {
+					lightColors[i] = 0
+				}
+
+				for _, light := range lights {
+					for i, v := range light.Light(tri) {
+						lightColors[i] += v
+					}
+				}
+
+				for vertIndex := range tri.Vertices {
+
+					vertexList[index].ColorR *= lightColors[(vertIndex)*3]
+					vertexList[index].ColorG *= lightColors[(vertIndex)*3+1]
+					vertexList[index].ColorB *= lightColors[(vertIndex)*3+2]
+					index++
+
+				}
+
+			}
+
+			camera.DebugInfo.lightTime += time.Since(t)
 
 		}
 
@@ -670,10 +691,12 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64) {
 	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
 
 	text.DrawWithOptions(screen, fmt.Sprintf(
-		"FPS: %f\nTotal frame time: %s\nSkinned mesh animation time: %s\nLighting time:%s\nRendered objects:%d/%d\nRendered triangles: %d/%d",
+		"FPS: %f\nTotal frame time: %s\nSkinned mesh animation time: %s\nActive Lights:%d/%d\nLighting time:%s\nRendered objects:%d/%d\nRendered triangles: %d/%d",
 		ebiten.CurrentFPS(),
 		ft,
 		at,
+		camera.DebugInfo.ActiveLightCount,
+		camera.DebugInfo.LightCount,
 		lt,
 		camera.DebugInfo.DrawnObjects,
 		camera.DebugInfo.TotalObjects,

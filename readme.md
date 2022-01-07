@@ -14,7 +14,7 @@
 If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune). I also have a [Discord server here](https://discord.gg/cepcpfV). Thanks~!
 ## What is Tetra3D?
 
-Tetra3D is a 3D software renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D uses the GPU a bit for rendering the depth texture, though this can be turned off for a performance increase in exchange for no inter-object depth testing.
+Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing. Depth testing can be turned off for a performance increase in exchange for no inter-object intersection.
 
 It evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
@@ -239,7 +239,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [ ] -- A more advanced depth buffer - currently, the depth is written using vertex colors.
-- [ ] -- Inter-object depth testing - I'm unsure if I will be able to implement this.
+- [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
 - [x] -- Offscreen Rendering
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
 - [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode and texture, for example).
