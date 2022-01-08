@@ -14,40 +14,32 @@ import (
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
-	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
-
-//go:embed bounds.gltf
-var gltfData []byte
 
 type Game struct {
 	Width, Height int
 	Scene         *tetra3d.Scene
 
-	Controlling *tetra3d.Model
-
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
+	Camera            *tetra3d.Camera
+	CameraTilt        float64
+	CameraRotate      float64
+	PrevMousePosition vector.Vector
 
 	DrawDebugText      bool
 	DrawDebugDepth     bool
-	DrawDebugBounds    bool
 	DrawDebugWireframe bool
 	DrawDebugNormals   bool
-	PrevMousePosition  vector.Vector
 }
 
 func NewGame() *Game {
+
 	game := &Game{
 		Width:             398,
 		Height:            224,
 		PrevMousePosition: vector.Vector{},
-		DrawDebugText:     true,
 	}
 
 	game.Init()
@@ -57,48 +49,59 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(gltfData, nil)
-	if err != nil {
-		panic(err)
-	}
+	g.Scene = tetra3d.NewScene("Test Scene")
 
-	g.Scene = library.FindScene("Scene")
+	const mapSize = 10
+	for y := 0.0; y < mapSize; y++ {
+		for x := 0.0; x < mapSize; x++ {
+			plane := tetra3d.NewCube()
+			plane.ApplyMatrix(tetra3d.NewMatrix4Scale(5, 0.5, 5))
+			plane.SetVertexColor(tetra3d.Color{0, 0, 1, 1})
+			planeModel := tetra3d.NewModel(plane, "plane")
 
-	for _, object := range g.Scene.Root.ChildrenRecursive() {
+			g.Scene.Root.AddChildren(planeModel)
 
-		if object.Tags().Has("collision") {
+			//planeModel.Rotate(0, 1, 0, math.Pi)
 
-			model := object.(*tetra3d.Model)
-			colType := object.Tags().GetAsString("collision")
-
-			if colType == "sphere" {
-				col := tetra3d.NewBoundingSphere("bounds", model.Mesh.Dimensions.Max()/2)
-				object.AddChildren(col)
-				col.ResetLocalTransformProperties()
-			} else if colType == "aabb" {
-				dimensions := object.(*tetra3d.Model).Mesh.Dimensions
-				col := tetra3d.NewBoundingAABB("bounds", dimensions.Width(), dimensions.Height(), dimensions.Depth())
-				object.AddChildren(col)
-				col.ResetLocalTransformProperties()
-			} else if colType == "triangle" {
-				col := tetra3d.NewBoundingTriangles("bounds", model.Mesh)
-				object.AddChildren(col)
-				col.ResetLocalTransformProperties()
-			} else if colType == "capsule" {
-				dimensions := object.(*tetra3d.Model).Mesh.Dimensions
-				col := tetra3d.NewBoundingCapsule("bounds", dimensions.Height()/2, dimensions.Width()/2)
-				object.AddChildren(col)
-				col.ResetLocalTransformProperties()
-			}
-
+			planeModel.SetLocalPosition(vector.Vector{x * 10, -1.5, y * 10})
 		}
-
 	}
 
-	g.Controlling = g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
+	// merged := tetra3d.NewModel(tetra3d.NewMesh("merged"), "merged cubes")
+	// merged.Mesh.Material = tetra3d.NewMaterial("merged cubes")
+	// merged.Mesh.Material.Image = ebiten.NewImageFromImage(img)
+
+	// cubes := []*tetra3d.Model{}
+
+	// for i := 0; i < 30; i++ {
+	// 	for j := 0; j < 30; j++ {
+	// 		cubeMesh := tetra3d.NewCube()
+	// 		cube := tetra3d.NewModel(cubeMesh, "Cube")
+	// 		cube.SetLocalPosition(vector.Vector{float64(i * 3), 0, float64(-j * 3)})
+	// 		cubes = append(cubes, cube)
+	// 	}
+	// }
+
+	// // Here, we merge all of the cubes into one mesh. This is good for when you have elements
+	// // you want to freely position in your modeler, for example, before combining them for
+	// // increased render speed in-game. Note that the maximum number of triangles is 32
+	// merged.Merge(cubes...)
+
+	// g.Scene.Root.AddChildren(merged)
+
+	// for i := 0; i < 2; i++ {
+	// 	newMerged := merged.Clone()
+	// 	newMerged.Move(0, -float64((i+1)*3), 0)
+	// 	g.Scene.Root.AddChildren(newMerged)
+	// }
+
+	// for _, c := range cubes {
+	// 	g.Scene.Root.AddChildren(c)
+	// }
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
+	g.Camera.Far = 400
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -113,6 +116,8 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
+
+	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
 	forward := g.Camera.LocalRotation().Forward().Invert()
@@ -147,45 +152,7 @@ func (g *Game) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		g.Controlling.Move(moveSpd, 0, 0)
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		g.Controlling.Move(-moveSpd, 0, 0)
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		g.Controlling.Move(0, 0, -moveSpd)
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		g.Controlling.Move(0, 0, moveSpd)
-	}
-
-	// Gravity
-	g.Controlling.Move(0, -0.1, 0)
-
-	bounds := g.Controlling.Get("bounds").(tetra3d.BoundingObject)
-
-	for _, ob := range g.Scene.Root.FindByName("bounds") {
-
-		if inter := bounds.Intersection(ob.(tetra3d.BoundingObject)); inter != nil {
-
-			mtv := inter.MTV
-			g.Controlling.Move(mtv[0], mtv[1], mtv[2])
-
-		}
-
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)
-		capsule := g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
-		if g.Controlling == sphere {
-			g.Controlling = capsule
-		} else {
-			g.Controlling = sphere
-		}
-	}
+	// Rotating the camera with the mouse
 
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
@@ -237,55 +204,17 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugBounds = !g.DrawDebugBounds
+		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
 	return err
-}
-
-func (g *Game) Draw(screen *ebiten.Image) {
-	// Clear, but with a color
-	// screen.Fill(color.RGBA{20, 25, 30, 255})
-	screen.Fill(color.Black)
-
-	g.Camera.Clear()
-
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
-
-	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture.Size()
-
-	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
-	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture, opt)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture, opt)
-	}
-
-	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, color.White)
-	}
-
-	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, color.RGBA{0, 128, 255, 255})
-	}
-
-	if g.DrawDebugBounds {
-		g.Camera.DrawDebugBounds(screen, g.Scene.Root, color.RGBA{0, 255, 0, 128})
-	}
-
-	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1)
-		shapeName := g.Controlling.Name()
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nArrow keys: Move " + shapeName + "\nF: switch between capsule and sphere\nF1, F2, F3: Debug views\nF5: Display bounds shapes\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{192, 192, 192, 255})
-	}
 
 }
 
 func (g *Game) StartProfiling() {
+
 	outFile, err := os.Create("./cpu.pprof")
+
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -298,6 +227,45 @@ func (g *Game) StartProfiling() {
 		pprof.StopCPUProfile()
 		fmt.Println("CPU profiling finished.")
 	}()
+
+}
+
+func (g *Game) Draw(screen *ebiten.Image) {
+
+	// Clear, but with a color
+	screen.Fill(color.RGBA{60, 70, 80, 255})
+
+	// Clear the Camera
+	g.Camera.Clear()
+
+	// Render the non-screen Models
+	// g.Camera.Render(g.Scene, g.Scene.Models...)
+
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+
+	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
+	// we could just draw the images straight.
+	opt := &ebiten.DrawImageOptions{}
+	w, h := g.Camera.ColorTexture.Size()
+	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
+	if g.DrawDebugDepth {
+		screen.DrawImage(g.Camera.DepthTexture, opt)
+	} else {
+		screen.DrawImage(g.Camera.ColorTexture, opt)
+	}
+
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, color.RGBA{255, 0, 0, 255})
+	}
+
+	if g.DrawDebugNormals {
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, color.RGBA{0, 128, 255, 255})
+	}
+
+	if g.DrawDebugText {
+		g.Camera.DrawDebugText(screen, 1)
+	}
+
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
@@ -305,7 +273,8 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Shapes Test")
+
+	ebiten.SetWindowTitle("Tetra3d Test - Stress Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()
@@ -313,4 +282,5 @@ func main() {
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}
+
 }

@@ -347,15 +347,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	}
 
-	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
-	if !camera.RenderDepth {
-
-		sort.SliceStable(models, func(i, j int) bool {
-			return fastVectorDistanceSquared(models[i].WorldPosition(), camera.WorldPosition()) > fastVectorDistanceSquared(models[j].WorldPosition(), camera.WorldPosition())
-		})
-
-	}
-
 	// By multiplying the camera's position against the view matrix (which contains the negated camera position), we're left with just the rotation
 	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
@@ -392,11 +383,31 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	p1 := vector.Vector{0, 0, 0, 0}
 	p2 := vector.Vector{0, 0, 0, 0}
 
+	solids := []*Model{}
+	transparents := []*Model{}
+
 	for _, model := range models {
+		if model.Mesh.Material != nil && model.Mesh.Material.Transparent {
+			transparents = append(transparents, model)
+		} else {
+			solids = append(solids, model)
+		}
+	}
+
+	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
+	if len(solids) > 0 && !camera.RenderDepth {
+
+		sort.SliceStable(solids, func(i, j int) bool {
+			return fastVectorDistanceSquared(solids[i].WorldPosition(), camera.WorldPosition()) > fastVectorDistanceSquared(solids[j].WorldPosition(), camera.WorldPosition())
+		})
+
+	}
+
+	render := func(model *Model) {
 
 		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
 		if model.Mesh == nil {
-			continue
+			return
 		}
 
 		camera.DebugInfo.TotalObjects++
@@ -404,13 +415,13 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		camera.DebugInfo.TotalTris += len(model.Mesh.Triangles)
 
 		if !model.visible {
-			continue
+			return
 		}
 
 		if model.FrustumCulling {
 
 			if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
-				continue
+				return
 			}
 
 		}
@@ -522,7 +533,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		if vertexListIndex == 0 {
-			continue
+			return
 		}
 
 		for i := 0; i < vertexListIndex; i++ {
@@ -537,7 +548,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 			camera.DepthIntermediate.Clear()
 			camera.DepthIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.DepthShader, shaderOpt)
-			camera.DepthTexture.DrawImage(camera.DepthIntermediate, nil)
+			if model.Mesh.Material == nil || !model.Mesh.Material.Transparent {
+				camera.DepthTexture.DrawImage(camera.DepthIntermediate, nil)
+			}
 
 		}
 
@@ -648,6 +661,22 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		camera.DebugInfo.DrawnTris += vertexListIndex / 3
+
+	}
+
+	for _, model := range solids {
+		render(model)
+	}
+
+	if len(transparents) > 0 {
+
+		sort.SliceStable(transparents, func(i, j int) bool {
+			return fastVectorDistanceSquared(transparents[i].WorldPosition(), camera.WorldPosition()) > fastVectorDistanceSquared(transparents[j].WorldPosition(), camera.WorldPosition())
+		})
+
+		for _, transparent := range transparents {
+			render(transparent)
+		}
 
 	}
 

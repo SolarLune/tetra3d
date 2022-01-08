@@ -11,7 +11,6 @@ import (
 	"time"
 
 	_ "embed"
-	_ "image/png"
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"

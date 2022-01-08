@@ -11,7 +11,6 @@ import (
 	"time"
 
 	_ "embed"
-	_ "image/png"
 
 	"github.com/solarlune/tetra3d"
 	"golang.org/x/image/font/basicfont"
