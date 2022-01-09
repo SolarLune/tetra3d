@@ -15,6 +15,14 @@ func NewColor(r, g, b, a float32) *Color {
 	return &Color{r, g, b, a}
 }
 
+func ColorWhite() *Color {
+	return NewColor(1, 1, 1, 1)
+}
+
+func ColorBlack() *Color {
+	return NewColor(0, 0, 0, 1)
+}
+
 // Clone returns a clone of the Color instance.
 func (color *Color) Clone() *Color {
 	return NewColor(color.R, color.G, color.B, color.A)

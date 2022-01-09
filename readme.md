@@ -238,11 +238,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space)
 - [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
-- [ ] -- A more advanced depth buffer - currently, the depth is written using vertex colors.
+- [ ] -- A more advanced / accurate depth buffer? Currently, the depth is written using vertex colors.
 - [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
 - [x] -- Offscreen Rendering
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
 - [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode and texture, for example).
+- [ ] -- Texture wrapping (unsure if I can do much about this; I believe Ebiten has its limits in this regard)
 - [x] Culling
 - [x] -- Backface culling
 - [x] -- Frustum culling
@@ -269,7 +270,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Fog
 - [x] -- A node or scenegraph for parenting and simple visibility culling
 - [x] - Vertex Coloring
-- [ ] -- Ambient vertex coloring
+- [ ] -- Ambient vertex coloring?
 - [ ] -- Multiple vertex color channels
 - [x] GLTF / GLB model loading
 - [x] -- Vertex colors loading
@@ -288,8 +289,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Ambient lights
 - [x] -- Point lights
 - [x] -- Directional lights
-- [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better)
+- [x] -- Smooth shading
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit)
+- [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
 - [ ] Shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)
 - [x] Intersection Testing:

@@ -157,9 +157,9 @@ func (point *PointLight) Light(tri *Triangle) [9]float32 {
 
 	vertColors := [9]float32{}
 
-	normal := point.vectorPool.MultVec(point.workingModelRotationalTransform, tri.Normal)
-
 	for i, vert := range tri.Vertices {
+
+		normal := point.vectorPool.MultVec(point.workingModelRotationalTransform, vert.Normal)
 
 		lightVec := fastVectorSub(point.workingPosition, vert.Position).Unit()
 
@@ -257,14 +257,18 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
 func (sun *DirectionalLight) Light(tri *Triangle) [9]float32 {
 
-	normal := sun.workingModelRotationalTransform.MultVec(tri.Normal)
+	n0 := sun.workingModelRotationalTransform.MultVec(tri.Vertices[0].Normal)
+	n1 := sun.workingModelRotationalTransform.MultVec(tri.Vertices[1].Normal)
+	n2 := sun.workingModelRotationalTransform.MultVec(tri.Vertices[2].Normal)
 
-	diffuseFactor := math.Max(normal.Dot(sun.workingForward), 0.0)
+	diffuseFactor0 := math.Max(n0.Dot(sun.workingForward), 0.0)
+	diffuseFactor1 := math.Max(n1.Dot(sun.workingForward), 0.0)
+	diffuseFactor2 := math.Max(n2.Dot(sun.workingForward), 0.0)
 
 	return [9]float32{
-		sun.Color.R * float32(diffuseFactor) * sun.Energy, sun.Color.G * float32(diffuseFactor) * sun.Energy, sun.Color.B * float32(diffuseFactor) * sun.Energy,
-		sun.Color.R * float32(diffuseFactor) * sun.Energy, sun.Color.G * float32(diffuseFactor) * sun.Energy, sun.Color.B * float32(diffuseFactor) * sun.Energy,
-		sun.Color.R * float32(diffuseFactor) * sun.Energy, sun.Color.G * float32(diffuseFactor) * sun.Energy, sun.Color.B * float32(diffuseFactor) * sun.Energy,
+		sun.Color.R * float32(diffuseFactor0) * sun.Energy, sun.Color.G * float32(diffuseFactor0) * sun.Energy, sun.Color.B * float32(diffuseFactor0) * sun.Energy,
+		sun.Color.R * float32(diffuseFactor1) * sun.Energy, sun.Color.G * float32(diffuseFactor1) * sun.Energy, sun.Color.B * float32(diffuseFactor1) * sun.Energy,
+		sun.Color.R * float32(diffuseFactor2) * sun.Energy, sun.Color.G * float32(diffuseFactor2) * sun.Energy, sun.Color.B * float32(diffuseFactor2) * sun.Energy,
 	}
 
 }

@@ -16,6 +16,7 @@ import (
 type GLTFLoadOptions struct {
 	LoadImages                bool // Whether images embedded in the GLTF / GLB file should be loaded or not.
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
+	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying)
 }
 
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
@@ -103,7 +104,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	for _, gltfMat := range doc.Materials {
 
 		newMat := NewMaterial(gltfMat.Name)
-		newMat.BackfaceCulling = !gltfMat.DoubleSided
+
+		if gltfLoadOptions.LoadBackfaceCulling {
+			newMat.BackfaceCulling = !gltfMat.DoubleSided
+		}
 
 		if gltfLoadOptions.LoadImages {
 			if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
@@ -117,6 +121,14 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					newMat.Tags.Set(tagName, data)
 				}
 			}
+		}
+
+		if gltfMat.AlphaMode == gltf.AlphaOpaque {
+			newMat.TransparencyMode = TransparencyModeOpaque
+		} else if gltfMat.AlphaMode == gltf.AlphaBlend {
+			newMat.TransparencyMode = TransparencyModeTransparent
+		} else { //if gltfMat.AlphaMode == gltf.AlphaMask
+			newMat.TransparencyMode = TransparencyModeAlphaClip
 		}
 
 		library.Materials[gltfMat.Name] = newMat
@@ -177,13 +189,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				normalBuffer := [][3]float32{}
 
-				texCoords, err := modeler.ReadNormal(doc, doc.Accessors[normalAccessor], normalBuffer)
+				normals, err := modeler.ReadNormal(doc, doc.Accessors[normalAccessor], normalBuffer)
 
 				if err != nil {
 					return nil, err
 				}
 
-				for i, v := range texCoords {
+				for i, v := range normals {
 					vertexData[i].Normal = vector.Vector{float64(v[0]), float64(v[1]), float64(v[2])}
 				}
 
@@ -257,6 +269,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				newVert := NewVertex(vd.Pos[0], vd.Pos[1], vd.Pos[2], vd.UV[0], vd.UV[1])
 				newVert.Color = vd.Color.Clone()
 				newVert.Weights = append(newVert.Weights, vd.WeightData...)
+				newVert.Normal = vd.Normal
 				newVerts = append(newVerts, newVert)
 				verticesToVertexData[newVert] = vd
 			}

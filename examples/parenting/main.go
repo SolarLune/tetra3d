@@ -255,7 +255,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1)
+		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorWhite())
 	}
 
 	if g.DrawDebugWireframe {

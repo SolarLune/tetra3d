@@ -42,8 +42,8 @@ type Game struct {
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             398,
-		Height:            224,
+		Width:             1920,
+		Height:            1080,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -67,18 +67,16 @@ func (g *Game) Init() {
 	g.Scene = library.Scenes[0]
 
 	g.Camera = tetra3d.NewCamera(1920, 1080)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 15})
+	g.Camera.SetLocalPosition(vector.Vector{0, 5, 15})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ambientLight := tetra3d.NewAmbientLight("ambient", 0.8, 0.9, 1, 0.5)
 	g.Scene.Root.AddChildren(ambientLight)
 
-	library.Materials["TransparentSquare"].Transparent = true
-	library.Materials["Water"].Transparent = true
+	g.Scene.Root.Get("Water").(*tetra3d.Model).Color.A = 0.6
 
-	// g.Scene.FogMode = tetra3d.FogMultiply
-
-	g.Camera.Far = 20
+	g.Scene.FogMode = tetra3d.FogOverwrite
+	g.Scene.FogColor = tetra3d.NewColor(1, 1, 1, 1)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -97,8 +95,13 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.Library.Materials["TransparentSquare"].Transparent = !g.Library.Materials["TransparentSquare"].Transparent
-		g.Library.Materials["Water"].Transparent = !g.Library.Materials["Water"].Transparent
+		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {
+			g.Library.Materials["TransparentSquare"].TransparencyMode = tetra3d.TransparencyModeAlphaClip
+			g.Library.Materials["Water"].TransparencyMode = tetra3d.TransparencyModeTransparent
+		} else {
+			g.Library.Materials["TransparentSquare"].TransparencyMode = tetra3d.TransparencyModeOpaque
+			g.Library.Materials["Water"].TransparencyMode = tetra3d.TransparencyModeOpaque
+		}
 	}
 
 	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
@@ -195,7 +198,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	screen.Fill(color.RGBA{60, 70, 80, 255})
+	screen.Fill(g.Scene.FogColor.ToRGBA64())
 
 	// Clear the Camera
 	g.Camera.Clear()
@@ -216,10 +219,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 
-		g.Camera.DrawDebugText(screen, 1)
+		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorBlack())
 
 		transparencyOn := "On"
-		if !g.Library.Materials["TransparentSquare"].Transparent {
+		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {
 			transparencyOn = "Off"
 		}
 

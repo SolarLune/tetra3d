@@ -368,6 +368,7 @@ type Vertex struct {
 	Color       *Color
 	UV          vector.Vector
 	transformed vector.Vector
+	Normal      vector.Vector
 	triangle    *Triangle
 	Weights     []float32
 	ID          int
@@ -379,6 +380,7 @@ func NewVertex(x, y, z, u, v float64) *Vertex {
 		Position:    vector.Vector{x, y, z},
 		Color:       NewColor(1, 1, 1, 1),
 		UV:          vector.Vector{u, v},
+		Normal:      vector.Vector{},
 		Weights:     make([]float32, 0, 4),
 		transformed: vector.Vector{0, 0, 0},
 	}

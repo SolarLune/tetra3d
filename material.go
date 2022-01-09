@@ -6,6 +6,10 @@ const (
 	TriangleSortBackToFront = iota
 	TriangleSortFrontToBack
 	TriangleSortNone
+
+	TransparencyModeOpaque = iota
+	TransparencyModeAlphaClip
+	TransparencyModeTransparent
 )
 
 type Material struct {
@@ -18,7 +22,7 @@ type Material struct {
 	// If a material is tagged as transparent, it's rendered in a separate render pass.
 	// Objects with transparent materials don't render to the depth texture and are sorted and rendered back-to-front, AFTER
 	// all non-transparent materials.
-	Transparent bool
+	TransparencyMode int
 }
 
 func NewMaterial(name string) *Material {
@@ -28,6 +32,7 @@ func NewMaterial(name string) *Material {
 		BackfaceCulling:  true,
 		TriangleSortMode: TriangleSortBackToFront,
 		EnableLighting:   true,
+		TransparencyMode: TransparencyModeOpaque,
 	}
 }
 
@@ -38,6 +43,6 @@ func (material *Material) Clone() *Material {
 	newMat.BackfaceCulling = material.BackfaceCulling
 	newMat.TriangleSortMode = material.TriangleSortMode
 	newMat.EnableLighting = material.EnableLighting
-	newMat.Transparent = true
+	newMat.TransparencyMode = material.TransparencyMode
 	return newMat
 }
