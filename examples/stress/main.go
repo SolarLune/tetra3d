@@ -94,7 +94,7 @@ func (g *Game) Init() {
 	// }
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.Far = 400
+	g.Camera.Far = 90
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
