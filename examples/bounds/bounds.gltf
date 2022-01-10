@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v1.6.16",
+        "generator" : "Khronos glTF Blender I/O v1.7.33",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -9,12 +9,6 @@
     "scene" : 0,
     "scenes" : [
         {
-            "extras" : {
-                "glTF2ExportSettings" : {
-                    "export_extras" : 1,
-                    "export_format" : "GLTF_EMBEDDED"
-                }
-            },
             "name" : "Scene",
             "nodes" : [
                 0,
@@ -129,9 +123,9 @@
             "mesh" : 4,
             "name" : "Plane",
             "translation" : [
-                12,
+                12.5,
                 1,
-                0
+                3.5999999046325684
             ]
         },
         {

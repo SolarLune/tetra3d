@@ -38,12 +38,13 @@ type Camera struct {
 	DepthTexture          *ebiten.Image
 	ColorIntermediate     *ebiten.Image
 	DepthIntermediate     *ebiten.Image
-	AlphaClipIntermediate *ebiten.Image
+	ClipAlphaIntermediate *ebiten.Image
 
 	RenderDepth bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture will hold the depth texture render results.
 
 	DepthShader              *ebiten.Shader
-	ClipAlphaShaderComposite *ebiten.Shader
+	ClipAlphaCompositeShader *ebiten.Shader
+	ClipAlphaRenderShader    *ebiten.Shader
 	ColorShader              *ebiten.Shader
 	Near, Far                float64
 	Perspective              bool
@@ -72,12 +73,23 @@ func NewCamera(w, h int) *Camera {
 	depthShaderText := []byte(
 		`package main
 
+		func encodeDepth(depth float) vec4 {
+			r := floor(depth * 255) / 255
+			g := floor(fract(depth * 255) * 255) / 255
+			b := fract(depth * 255*255)
+			return vec4(r, g, b, 1);
+		}
+
+		func decodeDepth(rgba vec4) float {
+			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+		}
+
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
 			depthValue := imageSrc0At(position.xy / imageSrcTextureSize())
 
-			if depthValue.a == 0 || depthValue.r >= color.r {
-				return color
+			if depthValue.a == 0 || decodeDepth(depthValue) > color.r {
+				return encodeDepth(color.r)
 			}
 
 		}
@@ -93,16 +105,44 @@ func NewCamera(w, h int) *Camera {
 		panic(err)
 	}
 
+	clipRenderText := []byte(
+		`package main
+
+		func encodeDepth(depth float) vec4 {
+			r := floor(depth * 255) / 255
+			g := floor(fract(depth * 255) * 255) / 255
+			b := fract(depth * 255*255)
+			return vec4(r, g, b, 1);
+		}
+
+		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+			tex := imageSrc0At(texCoord)
+			return vec4(encodeDepth(color.r).rgb, tex.a)
+		}
+
+		`,
+	)
+
+	cam.ClipAlphaRenderShader, err = ebiten.NewShader(clipRenderText)
+
+	if err != nil {
+		panic(err)
+	}
+
 	clipCompositeShaderText := []byte(
 		`package main
+
+		func decodeDepth(rgba vec4) float {
+			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+		}
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
 			depthValue := imageSrc0At(texCoord)
-			newDepth := imageSrc1At(texCoord)
+			texture := imageSrc1At(texCoord)
 
-			if depthValue.a == 0 || depthValue.r >= newDepth.r {
-				return newDepth
+			if depthValue.a == 0 || decodeDepth(depthValue) > texture.r {
+				return texture
 			}
 
 		}
@@ -110,7 +150,7 @@ func NewCamera(w, h int) *Camera {
 		`,
 	)
 
-	cam.ClipAlphaShaderComposite, err = ebiten.NewShader(clipCompositeShaderText)
+	cam.ClipAlphaCompositeShader, err = ebiten.NewShader(clipCompositeShaderText)
 
 	if err != nil {
 		panic(err)
@@ -122,6 +162,10 @@ func NewCamera(w, h int) *Camera {
 		var Fog vec4
 		var FogRange [2]float
 
+		func decodeDepth(rgba vec4) float {
+			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+		}
+		
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
 			// texSize := imageSrcTextureSize()
@@ -131,7 +175,7 @@ func NewCamera(w, h int) *Camera {
 			if depth.a > 0 {
 				color := imageSrc0At(texCoord)
 				
-				d := smoothstep(FogRange[0], FogRange[1], depth.r)
+				d := smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
 
 				if Fog.a == 1 {
 					color.rgb += Fog.rgb * d
@@ -191,14 +235,14 @@ func (camera *Camera) Resize(w, h int) {
 		camera.DepthTexture.Dispose()
 		camera.ColorIntermediate.Dispose()
 		camera.DepthIntermediate.Dispose()
-		camera.AlphaClipIntermediate.Dispose()
+		camera.ClipAlphaIntermediate.Dispose()
 	}
 
 	camera.ColorTexture = ebiten.NewImage(w, h)
 	camera.DepthTexture = ebiten.NewImage(w, h)
 	camera.ColorIntermediate = ebiten.NewImage(w, h)
 	camera.DepthIntermediate = ebiten.NewImage(w, h)
-	camera.AlphaClipIntermediate = ebiten.NewImage(w, h)
+	camera.ClipAlphaIntermediate = ebiten.NewImage(w, h)
 
 }
 
@@ -566,6 +610,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					vertexList[vertexListIndex+i].ColorB = float32(depth)
 					vertexList[vertexListIndex+i].ColorA = 1
 
+					// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
 					vertexList[vertexListIndex+i].SrcX = float32(vert.UV[0] * srcW)
 
 					// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
@@ -602,16 +647,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			// allowing them to be seen through the transparent materials.
 			// Transparent objects are rendered in a second pass, in far-to-close ordering.
 
-			// 3) For alpha clip objects, we first render the triangles to an intermediate texture (camera.AlphaClipIntermediate) and crush the RGB channels
-			// so it's pure white + alpha. We then draw the intermediate render to DepthIntermediate using the camera.ClipAlphaShaderComposit shader, which is
-			// used to both discard previous closer fragments on camera.DepthTexture, as well as cut out the alpha of the actual texture according to the
-			// ClipIntermediate image. This ClipIntermediate rendering step would be unnecessary if we could render to DepthIntermediate using the material's
+			// 3) For alpha clip objects, we first render the triangles to an intermediate texture (camera.AlphaClipIntermediate). We use the camera.ClipAlphaRenderShader to
+			// render the triangles with their vertex colors, and use the texture's alpha channel for clipping. We then draw the intermediate render
+			// to DepthIntermediate using the camera.ClipAlphaShaderComposite shader, which is used to both discard previous closer fragments on camera.DepthTexture,
+			// as well as cut out the alpha of the actual texture according to the ClipIntermediate image. This ClipIntermediate rendering step would be unnecessary if we could render to DepthIntermediate using the material's
 			// image while also reading the DepthTexture, but unfortunately, images can't currently be different sizes in Ebiten.
 			// See: https://github.com/hajimehoshi/ebiten/issues/1870
-
-			shaderOpt := &ebiten.DrawTrianglesShaderOptions{
-				Images: [4]*ebiten.Image{camera.DepthTexture},
-			}
 
 			transparencyMode := TransparencyModeOpaque
 
@@ -623,21 +664,19 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			if transparencyMode == TransparencyModeAlphaClip {
 
-				camera.AlphaClipIntermediate.Clear()
+				camera.ClipAlphaIntermediate.Clear()
 
-				shaderOpt.Images[0] = model.Mesh.Material.Image
-
-				// Crush the colors and leave the alpha channel unchanged
-				opt := &ebiten.DrawTrianglesOptions{}
-				opt.ColorM.Scale(0, 0, 0, 1)
-				opt.ColorM.Translate(1, 1, 1, 0)
-				camera.AlphaClipIntermediate.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, opt)
+				camera.ClipAlphaIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.ClipAlphaRenderShader, &ebiten.DrawTrianglesShaderOptions{Images: [4]*ebiten.Image{img}})
 
 				w, h := camera.DepthIntermediate.Size()
 
-				camera.DepthIntermediate.DrawRectShader(w, h, camera.ClipAlphaShaderComposite, &ebiten.DrawRectShaderOptions{Images: [4]*ebiten.Image{camera.DepthTexture, camera.AlphaClipIntermediate}})
+				camera.DepthIntermediate.DrawRectShader(w, h, camera.ClipAlphaCompositeShader, &ebiten.DrawRectShaderOptions{Images: [4]*ebiten.Image{camera.DepthTexture, camera.ClipAlphaIntermediate}})
 
 			} else {
+				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
+					Images: [4]*ebiten.Image{camera.DepthTexture},
+				}
+
 				camera.DepthIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.DepthShader, shaderOpt)
 			}
 

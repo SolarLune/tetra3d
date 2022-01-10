@@ -64,6 +64,7 @@ func (g *Game) Init() {
 	}
 
 	g.Library = library
+	library.Materials["Gate"].BackfaceCulling = false
 	g.Scene = library.Scenes[0]
 
 	g.Camera = tetra3d.NewCamera(1920, 1080)
@@ -106,7 +107,7 @@ func (g *Game) Update() error {
 
 	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
 	for _, v := range water.Mesh.Vertices {
-		v.Position[1] += math.Sin((g.Time*math.Pi)+(v.Position[0]*1.2)+(v.Position[2]*0.739)) * 0.005
+		v.Position[1] += math.Sin((g.Time*math.Pi)+(v.Position[0]*1.2)+(v.Position[2]*0.739)) * 0.007
 	}
 
 	// Moving the Camera

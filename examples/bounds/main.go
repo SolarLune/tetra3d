@@ -99,6 +99,7 @@ func (g *Game) Init() {
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
+	g.Camera.Far = 20
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -238,6 +239,10 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugBounds = !g.DrawDebugBounds
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
+		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
 	return err

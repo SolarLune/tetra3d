@@ -6,7 +6,9 @@ const (
 	TriangleSortBackToFront = iota
 	TriangleSortFrontToBack
 	TriangleSortNone
+)
 
+const (
 	TransparencyModeOpaque = iota
 	TransparencyModeAlphaClip
 	TransparencyModeTransparent
