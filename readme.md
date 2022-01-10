@@ -2,6 +2,7 @@
 
 ![Tetra3D Logo](https://thumbs.gfycat.com/DifferentZealousFowl-size_restricted.gif)
 ![Dark exploration](https://thumbs.gfycat.com/ScalySlimCrayfish-size_restricted.gif)
+![Transparency](https://i.imgur.com/4DhJomC.jpg)
 
 [Vertex Lighting GIF (6mb GIF)](https://gfycat.com/deliriousfemalejunebug)
 
@@ -238,7 +239,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space)
 - [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
-- [ ] -- A more advanced / accurate depth buffer? Currently, the depth is written using vertex colors.
+- [x] -- A more advanced / accurate depth buffer
+- [ ] -- Writing depth through some other means than vertex colors for precision
 - [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
 - [x] -- Offscreen Rendering
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
