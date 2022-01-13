@@ -80,6 +80,7 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *In
 	}
 
 	invertedTransform := triangles.Node.Transform().Inverted()
+	transformNoLoc := triangles.Node.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
 	spherePos := invertedTransform.MultVec(sphere.WorldPosition())
 	sphereRadius := sphere.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
 
@@ -103,7 +104,7 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *In
 			if contact == nil || d < closestDist {
 				contact = closest
 				closestDist = d
-				mtv = delta.Unit().Scale(sphereRadius - delta.Magnitude())
+				mtv = transformNoLoc.MultVec(delta.Unit().Scale(sphereRadius - delta.Magnitude()))
 			}
 
 			// if contact == nil || d < closestDist {
@@ -508,8 +509,9 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 	}
 
 	invertedTransform := triangles.Node.Transform().Inverted()
-	capsuleRadius := capsule.WorldRadius()
-	capsuleRadius *= math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
+	transformNoLoc := triangles.Node.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
+
+	capsuleRadius := capsule.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
 
 	var mtv vector.Vector
 	var contact vector.Vector
@@ -553,7 +555,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 			if contact == nil || d < closestDist {
 				contact = closest
 				closestDist = d
-				mtv = delta.Unit().Scale(capsuleRadius - delta.Magnitude())
+				mtv = transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - delta.Magnitude()))
 			}
 
 		}

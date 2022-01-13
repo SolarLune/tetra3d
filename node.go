@@ -16,6 +16,7 @@ type INode interface {
 	Name() string
 	SetName(name string)
 	Clone() INode
+	SetData(data interface{})
 	Data() interface{}
 
 	setParent(INode)
@@ -26,7 +27,7 @@ type INode interface {
 	ChildrenRecursive() []INode
 	AddChildren(...INode)
 	RemoveChildren(...INode)
-	updateLocalTransform(newParent INode)
+	// updateLocalTransform(newParent INode)
 	dirtyTransform()
 
 	LocalRotation() Matrix4
@@ -284,47 +285,47 @@ func (node *Node) dirtyTransform() {
 // updateLocalTransform updates the local transform properties for a Node given a change in parenting. This is done so that, for example,
 // parenting an object with a given postiion, scale, and rotation keeps those visual properties when parenting (by updating them to take into
 // account the parent's transforms as well).
-func (node *Node) updateLocalTransform(newParent INode) {
+// func (node *Node) updateLocalTransform(newParent INode) {
 
-	if newParent != nil {
+// 	if newParent != nil {
 
-		parentTransform := newParent.Transform()
-		parentPos, parentScale, parentRot := parentTransform.Decompose()
+// 		parentTransform := newParent.Transform()
+// 		parentPos, parentScale, parentRot := parentTransform.Decompose()
 
-		diff := node.position.Sub(parentPos)
-		diff[0] /= parentScale[0]
-		diff[1] /= parentScale[1]
-		diff[2] /= parentScale[2]
-		node.position = parentRot.Transposed().MultVec(diff)
-		node.rotation = node.rotation.Mult(parentRot.Transposed())
+// 		diff := node.position.Sub(parentPos)
+// 		diff[0] /= parentScale[0]
+// 		diff[1] /= parentScale[1]
+// 		diff[2] /= parentScale[2]
+// 		node.position = parentRot.Transposed().MultVec(diff)
+// 		node.rotation = node.rotation.Mult(parentRot.Transposed())
 
-		node.scale[0] /= parentScale[0]
-		node.scale[1] /= parentScale[1]
-		node.scale[2] /= parentScale[2]
+// 		node.scale[0] /= parentScale[0]
+// 		node.scale[1] /= parentScale[1]
+// 		node.scale[2] /= parentScale[2]
 
-	} else {
+// 	} else {
 
-		// Reverse
+// 		// Reverse
 
-		parentTransform := node.Parent().Transform()
-		parentPos, parentScale, parentRot := parentTransform.Decompose()
+// 		parentTransform := node.Parent().Transform()
+// 		parentPos, parentScale, parentRot := parentTransform.Decompose()
 
-		pr := parentRot.MultVec(node.position)
-		pr[0] *= parentScale[0]
-		pr[1] *= parentScale[1]
-		pr[2] *= parentScale[2]
-		node.position = parentPos.Add(pr)
-		node.rotation = node.rotation.Mult(parentRot)
+// 		pr := parentRot.MultVec(node.position)
+// 		pr[0] *= parentScale[0]
+// 		pr[1] *= parentScale[1]
+// 		pr[2] *= parentScale[2]
+// 		node.position = parentPos.Add(pr)
+// 		node.rotation = node.rotation.Mult(parentRot)
 
-		node.scale[0] *= parentScale[0]
-		node.scale[1] *= parentScale[1]
-		node.scale[2] *= parentScale[2]
+// 		node.scale[0] *= parentScale[0]
+// 		node.scale[1] *= parentScale[1]
+// 		node.scale[2] *= parentScale[2]
 
-	}
+// 	}
 
-	node.dirtyTransform()
+// 	node.dirtyTransform()
 
-}
+// }
 
 // LocalPosition returns a 3D Vector consisting of the object's local position (position relative to its parent). If this object has no parent, the position will be
 // relative to world origin (0, 0, 0).
@@ -342,7 +343,7 @@ func (node *Node) SetLocalPosition(position vector.Vector) {
 // ResetLocalTransformProperties resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
 // by default, when you parent one Node to another, the local transform properties (position, scale, and rotation) are altered to keep the
 // object in the same absolute location, even though the origin changes.
-func (node *Node) ResetLocalTransformProperties() {
+func (node *Node) ResetLocalTransform() {
 	node.position[0] = 0
 	node.position[1] = 0
 	node.position[2] = 0
@@ -501,7 +502,7 @@ func (node *Node) setParent(parent INode) {
 // after parent.AddChildren(child), child.Parent() wouldn't be parent, but rather parent.Node, which is no good.
 func (node *Node) addChildren(parent INode, children ...INode) {
 	for _, child := range children {
-		child.updateLocalTransform(parent)
+		// child.updateLocalTransform(parent)
 		if child.Parent() != nil {
 			child.Parent().RemoveChildren(child)
 		}
@@ -522,7 +523,7 @@ func (node *Node) RemoveChildren(children ...INode) {
 	for _, child := range children {
 		for i, c := range node.children {
 			if c == child {
-				child.updateLocalTransform(nil)
+				// child.updateLocalTransform(nil)
 				child.setParent(nil)
 				node.children[i] = nil
 				node.children = append(node.children[:i], node.children[i+1:]...)

@@ -103,9 +103,8 @@ type PointLight struct {
 	// If the light is on and contributing to the scene.
 	On bool
 
-	vectorPool                      *VectorPool
-	workingPosition                 vector.Vector
-	workingModelRotationalTransform Matrix4
+	vectorPool      *VectorPool
+	workingPosition vector.Vector
 }
 
 // NewPointLight creates a new Point light.
@@ -140,14 +139,13 @@ func (point *PointLight) beginRender() {}
 
 func (point *PointLight) beginModel(model *Model) {
 
-	// The rotational transform is used to transform the normal of a triangle when lighting. We can't use model.Transform() for this
-	// directly because that would transpose the triangle's normal vector, effectively "moving" it.
-	point.workingModelRotationalTransform = model.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
+	p, _, r := model.Transform().Inverted().Decompose()
 
 	// Rather than transforming all vertices of all triangles of a mesh, we can just transform the
 	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
-	point.workingPosition = model.Transform().Inverted().MultVec(point.WorldPosition())
+	point.workingPosition = r.MultVec(point.WorldPosition()).Add(p)
+
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
@@ -159,11 +157,9 @@ func (point *PointLight) Light(tri *Triangle) [9]float32 {
 
 	for i, vert := range tri.Vertices {
 
-		normal := point.vectorPool.MultVec(point.workingModelRotationalTransform, vert.Normal)
-
 		lightVec := fastVectorSub(point.workingPosition, vert.Position).Unit()
 
-		diffuse := normal.Dot(lightVec)
+		diffuse := vert.Normal.Dot(lightVec)
 		if diffuse < 0 {
 			diffuse = 0
 		}

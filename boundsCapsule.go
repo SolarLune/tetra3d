@@ -14,11 +14,12 @@ type BoundingCapsule struct {
 	internalSphere *BoundingSphere
 }
 
-// NewBoundingCapsule returns a new BoundingCapsule instance.
+// NewBoundingCapsule returns a new BoundingCapsule instance. Name is the name of the underlying Node for the Capsule, height is the total
+// height of the Capsule, and radius is how big around the capsule is. Height has to be at least radius (otherwise, it would no longer be a capsule).
 func NewBoundingCapsule(name string, height, radius float64) *BoundingCapsule {
 	return &BoundingCapsule{
 		Node:           NewNode(name),
-		Height:         height,
+		Height:         math.Max(radius, height),
 		Radius:         radius,
 		internalSphere: NewBoundingSphere("internal sphere", 0),
 	}
@@ -95,8 +96,8 @@ func (capsule *BoundingCapsule) PointInside(point vector.Vector) bool {
 func (capsule *BoundingCapsule) ClosestPoint(point vector.Vector) vector.Vector {
 
 	up := capsule.Node.WorldRotation().Up()
-	start := capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 - capsule.Radius))
-	end := capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 + capsule.Radius))
+	start := capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 + capsule.Radius))
+	end := capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 - capsule.Radius))
 	segment := end.Sub(start)
 
 	t := point.Sub(start).Dot(segment) / segment.Dot(segment)
@@ -109,11 +110,11 @@ func (capsule *BoundingCapsule) ClosestPoint(point vector.Vector) vector.Vector 
 // Top returns the world position of the top of the BoundingCapsule.
 func (capsule *BoundingCapsule) Top() vector.Vector {
 	up := capsule.Node.WorldRotation().Up()
-	return capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 + capsule.Radius))
+	return capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 - capsule.Radius))
 }
 
 // Bottom returns the world position of the bottom of the BoundingCapsule.
 func (capsule *BoundingCapsule) Bottom() vector.Vector {
 	up := capsule.Node.WorldRotation().Up()
-	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 - capsule.Radius))
+	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 + capsule.Radius))
 }

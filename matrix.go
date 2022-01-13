@@ -228,24 +228,171 @@ func (matrix Matrix4) Transposed() Matrix4 {
 
 // Inverted returns an inverted (reversed) clone of a Matrix4. An inverted matrix is defined here as a matrix
 // composed of a decomposed matrix's transposed rotation, negated position, and the same scale (since scale is multiplicative).
+// func (matrix Matrix4) InvertedOld() Matrix4 {
+
+// 	p, s, r := matrix.Decompose()
+
+// 	newMat := NewMatrix4()
+// 	newMat = newMat.SetRow(0, r.Row(0))
+// 	newMat = newMat.SetRow(1, r.Row(1))
+// 	newMat = newMat.SetRow(2, r.Row(2))
+// 	newMat = newMat.Transposed()
+
+// 	newMat[0][0] *= 1 / s[0]
+// 	newMat[1][1] *= 1 / s[1]
+// 	newMat[2][2] *= 1 / s[2]
+
+// 	newMat = newMat.SetRow(3, vector.Vector{-p[0], -p[1], -p[2], 1})
+
+// 	return newMat
+
+// }
+
+// The ultimate sin; I'm just going to copy this code for inverting a 4x4 Matrix and call it a day.
+
+// Inverted returns an inverted (reversed) clone of a Matrix4. See: https://stackoverflow.com/questions/1148309/inverting-a-4x4-matrix
 func (matrix Matrix4) Inverted() Matrix4 {
 
-	p, s, r := matrix.Decompose()
+	inv := NewMatrix4()
 
-	newMat := NewMatrix4()
-	newMat = newMat.SetRow(0, r.Row(0))
-	newMat = newMat.SetRow(1, r.Row(1))
-	newMat = newMat.SetRow(2, r.Row(2))
-	newMat = newMat.Transposed()
+	m := matrix.Index
 
-	newMat[0][0] *= s[0]
-	newMat[1][1] *= s[1]
-	newMat[2][2] *= s[2]
+	inv.setIndex(0, m(5)*m(10)*m(15)-
+		m(5)*m(11)*m(14)-
+		m(9)*m(6)*m(15)+
+		m(9)*m(7)*m(14)+
+		m(13)*m(6)*m(11)-
+		m(13)*m(7)*m(10))
 
-	newMat = newMat.SetRow(3, vector.Vector{-p[0], -p[1], -p[2], 1})
+	inv.setIndex(4, -m(4)*m(10)*m(15)+
+		m(4)*m(11)*m(14)+
+		m(8)*m(6)*m(15)-
+		m(8)*m(7)*m(14)-
+		m(12)*m(6)*m(11)+
+		m(12)*m(7)*m(10))
 
-	return newMat
+	inv.setIndex(8, m(4)*m(9)*m(15)-
+		m(4)*m(11)*m(13)-
+		m(8)*m(5)*m(15)+
+		m(8)*m(7)*m(13)+
+		m(12)*m(5)*m(11)-
+		m(12)*m(7)*m(9))
 
+	inv.setIndex(12, -m(4)*m(9)*m(14)+
+		m(4)*m(10)*m(13)+
+		m(8)*m(5)*m(14)-
+		m(8)*m(6)*m(13)-
+		m(12)*m(5)*m(10)+
+		m(12)*m(6)*m(9))
+
+	inv.setIndex(1, -m(1)*m(10)*m(15)+
+		m(1)*m(11)*m(14)+
+		m(9)*m(2)*m(15)-
+		m(9)*m(3)*m(14)-
+		m(13)*m(2)*m(11)+
+		m(13)*m(3)*m(10))
+
+	inv.setIndex(5, m(0)*m(10)*m(15)-
+		m(0)*m(11)*m(14)-
+		m(8)*m(2)*m(15)+
+		m(8)*m(3)*m(14)+
+		m(12)*m(2)*m(11)-
+		m(12)*m(3)*m(10))
+
+	inv.setIndex(9, -m(0)*m(9)*m(15)+
+		m(0)*m(11)*m(13)+
+		m(8)*m(1)*m(15)-
+		m(8)*m(3)*m(13)-
+		m(12)*m(1)*m(11)+
+		m(12)*m(3)*m(9))
+
+	inv.setIndex(13, m(0)*m(9)*m(14)-
+		m(0)*m(10)*m(13)-
+		m(8)*m(1)*m(14)+
+		m(8)*m(2)*m(13)+
+		m(12)*m(1)*m(10)-
+		m(12)*m(2)*m(9))
+
+	inv.setIndex(2, m(1)*m(6)*m(15)-
+		m(1)*m(7)*m(14)-
+		m(5)*m(2)*m(15)+
+		m(5)*m(3)*m(14)+
+		m(13)*m(2)*m(7)-
+		m(13)*m(3)*m(6))
+
+	inv.setIndex(6, -m(0)*m(6)*m(15)+
+		m(0)*m(7)*m(14)+
+		m(4)*m(2)*m(15)-
+		m(4)*m(3)*m(14)-
+		m(12)*m(2)*m(7)+
+		m(12)*m(3)*m(6))
+
+	inv.setIndex(10, m(0)*m(5)*m(15)-
+		m(0)*m(7)*m(13)-
+		m(4)*m(1)*m(15)+
+		m(4)*m(3)*m(13)+
+		m(12)*m(1)*m(7)-
+		m(12)*m(3)*m(5))
+
+	inv.setIndex(14, -m(0)*m(5)*m(14)+
+		m(0)*m(6)*m(13)+
+		m(4)*m(1)*m(14)-
+		m(4)*m(2)*m(13)-
+		m(12)*m(1)*m(6)+
+		m(12)*m(2)*m(5))
+
+	inv.setIndex(3, -m(1)*m(6)*m(11)+
+		m(1)*m(7)*m(10)+
+		m(5)*m(2)*m(11)-
+		m(5)*m(3)*m(10)-
+		m(9)*m(2)*m(7)+
+		m(9)*m(3)*m(6))
+
+	inv.setIndex(7, m(0)*m(6)*m(11)-
+		m(0)*m(7)*m(10)-
+		m(4)*m(2)*m(11)+
+		m(4)*m(3)*m(10)+
+		m(8)*m(2)*m(7)-
+		m(8)*m(3)*m(6))
+
+	inv.setIndex(11, -m(0)*m(5)*m(11)+
+		m(0)*m(7)*m(9)+
+		m(4)*m(1)*m(11)-
+		m(4)*m(3)*m(9)-
+		m(8)*m(1)*m(7)+
+		m(8)*m(3)*m(5))
+
+	inv.setIndex(15, m(0)*m(5)*m(10)-
+		m(0)*m(6)*m(9)-
+		m(4)*m(1)*m(10)+
+		m(4)*m(2)*m(9)+
+		m(8)*m(1)*m(6)-
+		m(8)*m(2)*m(5))
+
+	det := m(0)*inv.Index(0) + m(1)*inv.Index(4) + m(2)*inv.Index(8) + m(3)*inv.Index(12)
+
+	if det == 0 {
+		return NewMatrix4()
+	}
+
+	det = 1.0 / det
+
+	for i := 0; i < 16; i++ {
+		inv.setIndex(i, inv.Index(i)*det)
+	}
+
+	return inv
+
+}
+
+func (matrix *Matrix4) setIndex(index int, value float64) {
+	matrix[index/4][index%4] = value
+}
+
+func (matrix *Matrix4) Index(index int) float64 {
+	y := index / 4
+	x := index % 4
+	return matrix[y][x]
 }
 
 // Equals returns true if the matrix equals the same values in the provided Other Matrix4.

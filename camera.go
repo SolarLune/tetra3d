@@ -487,6 +487,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		if model.FrustumCulling {
 
+			// We simply call this to update the bounding sphere as necessary. Skinned meshes don't actually call this for Model.TransformedVertices(), and rather than putting it there,
+			// it seems better to put it here to ensure the sphere is in the right position since it's possible FrustumCulling is on but the model has never been rendered, it never updates
+			// BoundingSphere, and so remains invisible.
+			model.Transform()
+
 			if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
 				return
 			}
@@ -976,7 +981,7 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 
 				pos := bounds.WorldPosition()
 				radius := bounds.WorldRadius()
-				height := bounds.Height
+				height := bounds.Height / 2
 
 				uv := bounds.WorldRotation().Up()
 				rv := bounds.WorldRotation().Right()
@@ -1052,11 +1057,14 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 
 				lines := []vector.Vector{}
 
-				for _, t := range bounds.Mesh.Triangles {
+				for _, tri := range bounds.Mesh.Triangles {
 
-					lines = append(lines, camera.ClipToScreen(t.Vertices[0].transformed))
-					lines = append(lines, camera.ClipToScreen(t.Vertices[1].transformed))
-					lines = append(lines, camera.ClipToScreen(t.Vertices[2].transformed))
+					mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
+
+					for _, vert := range tri.Vertices {
+						tv := mvpMatrix.MultVecW(vert.Position)
+						lines = append(lines, camera.ClipToScreen(tv))
+					}
 
 				}
 

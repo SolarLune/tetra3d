@@ -74,21 +74,17 @@ func (g *Game) Init() {
 			if colType == "sphere" {
 				col := tetra3d.NewBoundingSphere("bounds", model.Mesh.Dimensions.Max()/2)
 				object.AddChildren(col)
-				col.ResetLocalTransformProperties()
 			} else if colType == "aabb" {
 				dimensions := object.(*tetra3d.Model).Mesh.Dimensions
 				col := tetra3d.NewBoundingAABB("bounds", dimensions.Width(), dimensions.Height(), dimensions.Depth())
 				object.AddChildren(col)
-				col.ResetLocalTransformProperties()
 			} else if colType == "triangle" {
 				col := tetra3d.NewBoundingTriangles("bounds", model.Mesh)
 				object.AddChildren(col)
-				col.ResetLocalTransformProperties()
 			} else if colType == "capsule" {
 				dimensions := object.(*tetra3d.Model).Mesh.Dimensions
-				col := tetra3d.NewBoundingCapsule("bounds", dimensions.Height()/2, dimensions.Width()/2)
+				col := tetra3d.NewBoundingCapsule("bounds", dimensions.Height(), dimensions.Width()/2)
 				object.AddChildren(col)
-				col.ResetLocalTransformProperties()
 			}
 
 		}

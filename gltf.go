@@ -111,7 +111,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		if gltfLoadOptions.LoadImages {
 			if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
-				newMat.Image = images[texture.Index]
+				newMat.Image = images[*doc.Textures[texture.Index].Source]
 			}
 		}
 
