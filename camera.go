@@ -188,6 +188,7 @@ func NewCamera(w, h int) *Camera {
 				return color
 			}
 
+			return imageSrc0At(texCoord)
 		}
 
 		`,
