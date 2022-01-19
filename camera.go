@@ -86,11 +86,13 @@ func NewCamera(w, h int) *Camera {
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
-			depthValue := imageSrc0At(position.xy / imageSrcTextureSize())
+			existingDepth := imageSrc0At(position.xy / imageSrcTextureSize())
 
-			if depthValue.a == 0 || decodeDepth(depthValue) > color.r {
+			if existingDepth.a == 0 || decodeDepth(existingDepth) > color.r {
 				return encodeDepth(color.r)
 			}
+
+			return vec4(0.0, 0.0, 0.0, 0.0)
 
 		}
 
@@ -145,6 +147,8 @@ func NewCamera(w, h int) *Camera {
 				return texture
 			}
 
+			return vec4(0.0, 0.0, 0.0, 0.0)
+
 		}
 
 		`,
@@ -168,25 +172,25 @@ func NewCamera(w, h int) *Camera {
 		
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
-			// texSize := imageSrcTextureSize()
-
 			depth := imageSrc1At(texCoord)
 			
 			if depth.a > 0 {
-				color := imageSrc0At(texCoord)
+				colorTex := imageSrc0At(texCoord)
 				
 				d := smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
 
 				if Fog.a == 1 {
-					color.rgb += Fog.rgb * d
+					colorTex.rgb += Fog.rgb * d
 				} else if Fog.a == 2 {
-					color.rgb -= Fog.rgb * d
+					colorTex.rgb -= Fog.rgb * d
 				} else if Fog.a == 3 {
-					color.rgb = mix(color.rgb, Fog.rgb, d)
+					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d)
 				}
 
-				return color
+				return colorTex
 			}
+
+			return vec4(0.0, 0.0, 0.0, 0.0)
 
 		}
 
@@ -284,7 +288,7 @@ func (camera *Camera) SetOrthographic(orthoScale float64) {
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
 // does this by taking outVec, a vertex (vector.Vector) that it stores the values in and returns, which avoids reallocation.
-func (camera *Camera) clipToScreen(vert, outVec vector.Vector) vector.Vector {
+func (camera *Camera) clipToScreen(vert, outVec vector.Vector, mat *Material) vector.Vector {
 
 	w, h := camera.ColorTexture.Size()
 	width, height := float64(w), float64(h)
@@ -310,13 +314,17 @@ func (camera *Camera) clipToScreen(vert, outVec vector.Vector) vector.Vector {
 	outVec[2] = vert[2]
 	outVec[3] = vert[3]
 
+	if mat != nil && mat.ClipProgram != nil {
+		outVec = mat.ClipProgram(outVec)
+	}
+
 	return outVec
 
 }
 
 // ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
 func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
-	return camera.clipToScreen(vert, vector.Vector{0, 0, 0, 0})
+	return camera.clipToScreen(vert, vector.Vector{0, 0, 0, 0}, nil)
 }
 
 // WorldToScreen transforms a 3D position in the world to screen coordinates.
@@ -561,9 +569,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			// }
 
-			p0 = camera.clipToScreen(v0, p0)
-			p1 = camera.clipToScreen(v1, p1)
-			p2 = camera.clipToScreen(v2, p2)
+			p0 = camera.clipToScreen(v0, p0, tri.Mesh.Material)
+			p1 = camera.clipToScreen(v1, p1, tri.Mesh.Material)
+			p2 = camera.clipToScreen(v2, p2, tri.Mesh.Material)
 
 			// This is a bit of a hacky way to do backface culling; it works, but it uses
 			// the screen positions of the vertices to determine if the triangle should be culled.
@@ -1087,6 +1095,8 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
 
 				}
+
+				camera.DrawDebugBounds(screen, bounds.BoundingAABB, color)
 
 			}
 

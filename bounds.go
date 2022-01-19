@@ -94,6 +94,12 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *In
 		v1 := tri.Vertices[1].Position
 		v2 := tri.Vertices[2].Position
 
+		// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
+		// only has to check triangles in the nearby cells.
+		if fastVectorSub(spherePos, tri.Center).Magnitude() > tri.MaxSpan+sphereRadius {
+			continue
+		}
+
 		closest := closestPointOnTri(spherePos, v0, v1, v2)
 		delta := fastVectorSub(spherePos, closest)
 
@@ -106,12 +112,6 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *In
 				closestDist = d
 				mtv = transformNoLoc.MultVec(delta.Unit().Scale(sphereRadius - delta.Magnitude()))
 			}
-
-			// if contact == nil || d < closestDist {
-			// 	contact = closest
-			// 	closestDist = d
-			// 	mtv = delta.Unit().Scale(sphereRadius - delta.Magnitude())
-			// }
 
 		}
 
@@ -512,22 +512,26 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 	transformNoLoc := triangles.Node.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
 
 	capsuleRadius := capsule.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
-
 	var mtv vector.Vector
 	var contact vector.Vector
 	closestDist := math.MaxFloat64
 
 	capsuleTop := invertedTransform.MultVec(capsule.Top())
 	capsuleBottom := invertedTransform.MultVec(capsule.Bottom())
+	capsulePosition := invertedTransform.MultVec(capsule.WorldPosition())
 	capsuleLine := capsuleTop.Sub(capsuleBottom)
+	capSpread := capsuleLine.Magnitude() + capsuleRadius
+	capDot := capsuleLine.Dot(capsuleLine)
 
 	var closestCapsulePoint vector.Vector
 
 	for _, tri := range triangles.Mesh.Triangles {
 
-		v0 := tri.Vertices[0].Position
-		v1 := tri.Vertices[1].Position
-		v2 := tri.Vertices[2].Position
+		// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
+		// only has to check triangles in the nearby cells.
+		if fastVectorSub(capsulePosition, tri.Center).Magnitude() > tri.MaxSpan+capSpread {
+			continue
+		}
 
 		if fastVectorDistanceSquared(tri.Center, capsuleTop) < fastVectorDistanceSquared(tri.Center, capsuleBottom) {
 			closestCapsulePoint = capsuleTop
@@ -535,17 +539,17 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 			closestCapsulePoint = capsuleBottom
 		}
 
+		v0 := tri.Vertices[0].Position
+		v1 := tri.Vertices[1].Position
+		v2 := tri.Vertices[2].Position
+
 		closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
 
 		// Doing this manually to avoid doing as much as possible~
 
-		t := closest.Sub(capsuleBottom).Dot(capsuleLine) / capsuleLine.Dot(capsuleLine)
+		t := closest.Sub(capsuleBottom).Dot(capsuleLine) / capDot
 		t = math.Max(math.Min(t, 1), 0)
 		spherePos := capsuleBottom.Add(capsuleLine.Scale(t))
-
-		// spherePos := invertedTransform.MultVec(capsule.ClosestPoint(closest))
-
-		// spherePos := capsule.ClosestPoint(closest)
 
 		delta := fastVectorSub(spherePos, closest)
 
@@ -569,6 +573,84 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 	return NewIntersectionResult(contact, mtv)
 
 }
+
+// func btCapsuleTrianglesNew(capsule *BoundingCapsule, triangles *BoundingTriangles) *IntersectionResult {
+
+// 	capsule.internalSphere.SetLocalScale(capsule.LocalScale())
+// 	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(triangles.WorldPosition()))
+// 	capsule.internalSphere.Radius = capsule.Radius
+
+// 	triangles.BoundingAABB.SetLocalPosition(triangles.WorldPosition().Add(triangles.Mesh.Dimensions.Center()))
+// 	triangles.BoundingAABB.SetLocalRotation(triangles.WorldRotation())
+// 	triangles.BoundingAABB.SetLocalScale(triangles.WorldScale())
+
+// 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
+// 	if !capsule.internalSphere.Intersecting(triangles.BoundingAABB) {
+// 		return nil
+// 	}
+
+// 	invertedTransform := triangles.Node.Transform().Inverted()
+// 	transformNoLoc := triangles.Node.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
+
+// 	capsuleRadius := capsule.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
+
+// 	var mtv vector.Vector
+// 	var contact vector.Vector
+// 	closestDist := math.MaxFloat64
+
+// 	capsuleTop := invertedTransform.MultVec(capsule.Top())
+// 	capsuleBottom := invertedTransform.MultVec(capsule.Bottom())
+// 	capsuleLine := capsuleTop.Sub(capsuleBottom)
+// 	capDot := capsuleLine.Dot(capsuleLine)
+
+// 	var closestCapsulePoint vector.Vector
+
+// 	for _, tri := range triangles.Mesh.Triangles {
+
+// 		v0 := tri.Vertices[0].Position
+// 		v1 := tri.Vertices[1].Position
+// 		v2 := tri.Vertices[2].Position
+
+// 		if fastVectorDistanceSquared(tri.Center, capsuleTop) < fastVectorDistanceSquared(tri.Center, capsuleBottom) {
+// 			closestCapsulePoint = capsuleTop
+// 		} else {
+// 			closestCapsulePoint = capsuleBottom
+// 		}
+
+// 		closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
+
+// 		// Doing this manually to avoid doing as much as possible~
+
+// 		t := fastVectorSub(closest, capsuleBottom).Dot(capsuleLine) / capDot
+// 		t = math.Max(math.Min(t, 1), 0)
+// 		spherePos := capsuleBottom.Add(capsuleLine.Scale(t))
+
+// 		// spherePos := invertedTransform.MultVec(capsule.ClosestPoint(closest))
+
+// 		// spherePos := capsule.ClosestPoint(closest)
+
+// 		delta := fastVectorSub(spherePos, closest).Clone()
+
+// 		if delta.Magnitude() <= capsuleRadius {
+
+// 			d := fastVectorDistanceSquared(spherePos, closest)
+// 			if contact == nil || d < closestDist {
+// 				contact = closest
+// 				closestDist = d
+// 				mtv = transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - delta.Magnitude()))
+// 			}
+
+// 		}
+
+// 	}
+
+// 	if mtv == nil {
+// 		return nil
+// 	}
+
+// 	return NewIntersectionResult(contact, mtv)
+
+// }
 
 type projection struct {
 	Min, Max float64

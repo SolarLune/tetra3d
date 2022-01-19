@@ -129,3 +129,21 @@ func (pool *VectorPool) Sub(v0, v1 vector.Vector) vector.Vector {
 	}
 	return v
 }
+
+func (pool *VectorPool) Add(v0, v1 vector.Vector) vector.Vector {
+	v := pool.Get()
+	for i := range v0 {
+		v[i] = v0[i] + v1[i]
+	}
+	return v
+}
+
+func (pool *VectorPool) Cross(v0, v1 vector.Vector) vector.Vector {
+	v := pool.Get()
+
+	v[0] = v0[1]*v1[2] - v1[1]*v0[2]
+	v[1] = v0[2]*v1[0] - v1[2]*v0[0]
+	v[2] = v0[0]*v1[1] - v1[0]*v0[1]
+
+	return v[:3]
+}

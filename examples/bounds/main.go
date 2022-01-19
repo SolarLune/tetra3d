@@ -44,8 +44,8 @@ type Game struct {
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             398,
-		Height:            224,
+		Width:             1920,
+		Height:            1080,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -94,10 +94,29 @@ func (g *Game) Init() {
 	g.Controlling = g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
-	g.Camera.Far = 20
+	g.Camera.SetLocalPosition(vector.Vector{0, 6, 15})
+	g.Camera.Far = 40
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+
+	// g.Scene.Root.Get("Ground").SetVisible(false, false)
+
+}
+
+func (g *Game) ResolveCollisions() {
+
+	bounds := g.Controlling.Get("bounds").(tetra3d.BoundingObject)
+
+	for _, ob := range g.Scene.Root.FindByName("bounds") {
+
+		if inter := bounds.Intersection(ob.(tetra3d.BoundingObject)); inter != nil {
+
+			mtv := inter.MTV
+			g.Controlling.Move(mtv[0], mtv[1], mtv[2])
+
+		}
+
+	}
 
 }
 
@@ -158,21 +177,12 @@ func (g *Game) Update() error {
 		g.Controlling.Move(0, 0, moveSpd)
 	}
 
+	g.ResolveCollisions()
+
 	// Gravity
 	g.Controlling.Move(0, -0.1, 0)
 
-	bounds := g.Controlling.Get("bounds").(tetra3d.BoundingObject)
-
-	for _, ob := range g.Scene.Root.FindByName("bounds") {
-
-		if inter := bounds.Intersection(ob.(tetra3d.BoundingObject)); inter != nil {
-
-			mtv := inter.MTV
-			g.Controlling.Move(mtv[0], mtv[1], mtv[2])
-
-		}
-
-	}
+	g.ResolveCollisions()
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)

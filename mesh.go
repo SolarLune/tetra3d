@@ -299,6 +299,7 @@ func NewPlane() *Mesh {
 // A Triangle represents the smallest renderable object in Tetra3D.
 type Triangle struct {
 	Vertices     []*Vertex
+	MaxSpan      float64
 	Normal       vector.Vector
 	Mesh         *Mesh
 	Center       vector.Vector
@@ -351,6 +352,40 @@ func (tri *Triangle) RecalculateCenter() {
 	tri.Center[0] = (tri.Vertices[0].Position[0] + tri.Vertices[1].Position[0] + tri.Vertices[2].Position[0]) / 3
 	tri.Center[1] = (tri.Vertices[0].Position[1] + tri.Vertices[1].Position[1] + tri.Vertices[2].Position[1]) / 3
 	tri.Center[2] = (tri.Vertices[0].Position[2] + tri.Vertices[1].Position[2] + tri.Vertices[2].Position[2]) / 3
+
+	// Determine the maximum span of the triangle; this is done for bounds checking, since we can reject triangles early if we
+	// can easily tell we're too far away from them.
+	dim := Dimensions{{0, 0, 0}, {0, 0, 0}}
+
+	for _, v := range tri.Vertices {
+
+		if dim[0][0] > v.Position[0] {
+			dim[0][0] = v.Position[0]
+		}
+
+		if dim[0][1] > v.Position[1] {
+			dim[0][1] = v.Position[1]
+		}
+
+		if dim[0][2] > v.Position[2] {
+			dim[0][2] = v.Position[2]
+		}
+
+		if dim[1][0] < v.Position[0] {
+			dim[1][0] = v.Position[0]
+		}
+
+		if dim[1][1] < v.Position[1] {
+			dim[1][1] = v.Position[1]
+		}
+
+		if dim[1][2] < v.Position[2] {
+			dim[1][2] = v.Position[2]
+		}
+
+	}
+
+	tri.MaxSpan = dim.MaxSpan()
 
 }
 

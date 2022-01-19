@@ -17,6 +17,16 @@ type BoundingAABB struct {
 
 // NewBoundingAABB returns a new BoundingAABB Node.
 func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
+	min := 0.0001
+	if width <= 0 {
+		width = min
+	}
+	if height <= 0 {
+		height = min
+	}
+	if depth <= 0 {
+		depth = min
+	}
 	bounds := &BoundingAABB{
 		Node:         NewNode(name),
 		internalSize: vector.Vector{width, height, depth},
@@ -64,6 +74,17 @@ func (box *BoundingAABB) UpdateSize() {
 
 // SetDimensions sets the BoundingAABB's internal dimensions (prior to resizing or rotating the Node).
 func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float64) {
+
+	min := 0.00001
+	if newWidth <= 0 {
+		newWidth = min
+	}
+	if newHeight <= 0 {
+		newHeight = min
+	}
+	if newDepth <= 0 {
+		newDepth = min
+	}
 
 	if box.internalSize[0] != newWidth || box.internalSize[1] != newHeight || box.internalSize[2] != newDepth {
 		box.internalSize[0] = newWidth

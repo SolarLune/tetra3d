@@ -80,20 +80,22 @@ func (bt *BoundingTriangles) Intersection(other BoundingObject) *IntersectionRes
 }
 
 type collisionPlane struct {
-	Normal   vector.Vector
-	Distance float64
+	Normal     vector.Vector
+	Distance   float64
+	VectorPool *VectorPool
 }
 
 func newCollisionPlane() *collisionPlane {
-	return &collisionPlane{}
+	return &collisionPlane{
+		VectorPool: NewVectorPool(10),
+	}
 }
 
 func (plane *collisionPlane) Set(v0, v1, v2 vector.Vector) {
 
-	first := v1.Sub(v0)
-	second := v2.Sub(v0)
-	normal, _ := first.Cross(second)
-	normal = normal.Unit()
+	first := plane.VectorPool.Sub(v1, v0)
+	second := plane.VectorPool.Sub(v2, v0)
+	normal := plane.VectorPool.Cross(first, second).Unit()
 	distance := normal.Dot(v0)
 
 	plane.Normal = normal
@@ -104,7 +106,7 @@ func (plane *collisionPlane) Set(v0, v1, v2 vector.Vector) {
 func (plane *collisionPlane) ClosestPoint(point vector.Vector) vector.Vector {
 
 	dist := plane.Normal.Dot(point) - plane.Distance
-	return point.Sub(plane.Normal.Scale(dist))
+	return plane.VectorPool.Sub(point, plane.Normal.Scale(dist))[:3]
 
 }
 
@@ -112,14 +114,16 @@ var colPlane = newCollisionPlane()
 
 func closestPointOnTri(point, v0, v1, v2 vector.Vector) vector.Vector {
 
+	colPlane.VectorPool.Reset()
+
 	colPlane.Set(v0, v1, v2)
-	if planePoint := colPlane.ClosestPoint(point); pointInsideTriangle(planePoint, v0, v1, v2) {
+	if planePoint := colPlane.ClosestPoint(point); colPlane.pointInsideTriangle(planePoint, v0, v1, v2) {
 		return planePoint
 	}
 
-	ab := closestPointOnLine(point, v0, v1)
-	bc := closestPointOnLine(point, v1, v2)
-	ca := closestPointOnLine(point, v2, v0)
+	ab := colPlane.closestPointOnLine(point, v0, v1)
+	bc := colPlane.closestPointOnLine(point, v1, v2)
+	ca := colPlane.closestPointOnLine(point, v2, v0)
 
 	closest := ab
 	closestDist := fastVectorDistanceSquared(point, ab)
@@ -140,11 +144,11 @@ func closestPointOnTri(point, v0, v1, v2 vector.Vector) vector.Vector {
 
 }
 
-func pointInsideTriangle(point, v0, v1, v2 vector.Vector) bool {
+func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 vector.Vector) bool {
 
-	ca := v2.Sub(v0)
-	ba := v1.Sub(v0)
-	pa := point.Sub(v0)
+	ca := plane.VectorPool.Sub(v2, v0)[:3]
+	ba := plane.VectorPool.Sub(v1, v0)[:3]
+	pa := plane.VectorPool.Sub(point, v0)[:3]
 
 	dot00 := ca.Dot(ca)
 	dot01 := ca.Dot(ba)
@@ -159,32 +163,16 @@ func pointInsideTriangle(point, v0, v1, v2 vector.Vector) bool {
 
 	return (u >= 0) && (v >= 0) && (u+v < 1)
 
-	// v0 = v0.Sub(point)
-	// v1 = v1.Sub(point)
-	// v2 = v2.Sub(point)
-
-	// u, _ := v1.Cross(v2)
-	// v, _ := v2.Cross(v0)
-	// w, _ := v0.Cross(v1)
-
-	// if u.Dot(v) < 0 {
-	// 	return false
-	// }
-
-	// if u.Dot(w) < 0 {
-	// 	return false
-	// }
-
-	// return true
-
 }
 
-func closestPointOnLine(point, start, end vector.Vector) vector.Vector {
+func (plane *collisionPlane) closestPointOnLine(point, start, end vector.Vector) vector.Vector {
 
-	diff := end.Sub(start)
-	dotA := fastVectorSub(point, start).Dot(diff)
+	plane.VectorPool.Reset()
+
+	diff := plane.VectorPool.Sub(end, start)
+	dotA := plane.VectorPool.Sub(point, start).Dot(diff)
 	dotB := diff.Dot(diff)
 	d := math.Min(math.Max(dotA/dotB, 0), 1)
-	return start.Add(diff.Scale(d))
+	return plane.VectorPool.Add(start, diff.Scale(d))
 
 }

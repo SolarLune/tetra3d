@@ -57,7 +57,7 @@ type INode interface {
 	Get(path string) INode
 	FindByName(name string) []INode
 	FindByTags(tags ...string) []INode
-	TreeToString() string
+	HierarchyAsString() string
 	Path() string
 
 	Tags() *Tags
@@ -576,12 +576,12 @@ func (node *Node) Tags() *Tags {
 	return node.tags
 }
 
-// TreeToString returns a string displaying the hierarchy of this Node, and all recursive children.
+// HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.
 // Nodes will have a "+" next to their name, Models an "M", and Cameras a "C".
 // BoundingSpheres will have BS, BoundingAABB AABB, BoundingCapsule CAP, and BoundingTriangles TRI.
 // Lights will have an L next to their name.
 // This is a useful function to debug the layout of a node tree, for example.
-func (node *Node) TreeToString() string {
+func (node *Node) HierarchyAsString() string {
 
 	var printNode func(node INode, level int) string
 

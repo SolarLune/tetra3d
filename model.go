@@ -204,6 +204,12 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 
 	model.vectorPool.Reset()
 
+	var transformFunc func(vector.Vector) vector.Vector
+
+	if model.Mesh.Material != nil && model.Mesh.Material.VertexProgram != nil {
+		transformFunc = model.Mesh.Material.VertexProgram
+	}
+
 	if model.Skinned {
 
 		t := time.Now()
@@ -212,7 +218,12 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 		for _, tri := range model.Mesh.Triangles {
 			tri.closestDepth = 0
 			for _, vert := range tri.Vertices {
-				vert.transformed = model.vectorPool.MultVecW(vpMatrix, model.skinVertex(vert))
+
+				v := model.skinVertex(vert)
+				if transformFunc != nil {
+					v = transformFunc(v)
+				}
+				vert.transformed = model.vectorPool.MultVecW(vpMatrix, v)
 				tri.closestDepth += vert.transformed[2]
 			}
 			tri.closestDepth /= 3
@@ -227,7 +238,11 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 		for _, tri := range model.Mesh.Triangles {
 			tri.closestDepth = 0
 			for _, vert := range tri.Vertices {
-				vert.transformed = model.vectorPool.MultVecW(mvp, vert.Position)
+				v := vert.Position
+				if transformFunc != nil {
+					v = transformFunc(v)
+				}
+				vert.transformed = model.vectorPool.MultVecW(mvp, v)
 				tri.closestDepth += vert.transformed[2]
 			}
 			tri.closestDepth /= 3
