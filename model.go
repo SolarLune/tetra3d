@@ -29,6 +29,9 @@ type Model struct {
 var defaultColorBlendingFunc = func(model *Model) ebiten.ColorM {
 	colorM := ebiten.ColorM{}
 	colorM.Scale(model.Color.ToFloat64s())
+	if model.Mesh.Material != nil {
+		colorM.Scale(model.Mesh.Material.Color.ToFloat64s())
+	}
 	return colorM
 }
 

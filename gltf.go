@@ -104,6 +104,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	for _, gltfMat := range doc.Materials {
 
 		newMat := NewMaterial(gltfMat.Name)
+		color := gltfMat.PBRMetallicRoughness.BaseColorFactor
+
+		newMat.Color.R = float32(color[0])
+		newMat.Color.G = float32(color[1])
+		newMat.Color.B = float32(color[2])
+		newMat.Color.A = float32(color[3])
+		newMat.Color.ConvertTosRGB()
 
 		if gltfLoadOptions.LoadBackfaceCulling {
 			newMat.BackfaceCulling = !gltfMat.DoubleSided

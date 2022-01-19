@@ -19,6 +19,7 @@ const (
 
 type Material struct {
 	Name             string
+	Color            *Color // The overall color of the Model.
 	Image            *ebiten.Image
 	Tags             *Tags
 	BackfaceCulling  bool
@@ -42,6 +43,7 @@ type Material struct {
 func NewMaterial(name string) *Material {
 	return &Material{
 		Name:             name,
+		Color:            NewColor(1, 1, 1, 1),
 		Tags:             NewTags(),
 		BackfaceCulling:  true,
 		TriangleSortMode: TriangleSortBackToFront,
@@ -52,6 +54,7 @@ func NewMaterial(name string) *Material {
 
 func (material *Material) Clone() *Material {
 	newMat := NewMaterial(material.Name)
+	newMat.Color = material.Color.Clone()
 	newMat.Image = material.Image
 	newMat.Tags = material.Tags.Clone()
 	newMat.BackfaceCulling = material.BackfaceCulling
