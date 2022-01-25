@@ -7,6 +7,33 @@ import (
 	"github.com/kvartborg/vector"
 )
 
+// NodeType represents a Node's type. Node types are categorized, and can be said to extend or "be of" more general types.
+// For example, a BoundingSphere has a type of NodeTypeBoundingSphere. That type can also be said to be NodeTypeBounding
+// (because it is a bounding object). However, it is not of type NodeTypeBoundingTriangles, as that is a different category.
+type NodeType string
+
+const (
+	NodeTypeNode              NodeType = "Node"
+	NodeTypeModel             NodeType = "NodeModel"
+	NodeTypeCamera            NodeType = "NodeCamera"
+	NodeTypeBounding          NodeType = "NodeBounding"
+	NodeTypeBoundingAABB      NodeType = "NodeBoundingAABB"
+	NodeTypeBoundingCapsule   NodeType = "NodeBoundingCapsule"
+	NodeTypeBoundingTriangles NodeType = "NodeBoundingTriangles"
+	NodeTypeBoundingSphere    NodeType = "NodeBoundingSphere"
+	NodeTypeLight             NodeType = "NodeLight"
+	NodeTypeAmbientLight      NodeType = "NodeLightAmbient"
+	NodeTypePointLight        NodeType = "NodeLightPoint"
+	NodeTypeDirectionalLight  NodeType = "NodeLightDirectional"
+)
+
+// Is returns true if a NodeType satisfies another NodeType category. A specific node type can be said to
+// contain a more general one, but not vice-versa. For example, a Model (which has type NodeTypeModel) can be
+// said to be a Node (NodeTypeNode), but the reverse is not true (a NodeTypeNode is not a NodeTypeModel).
+func (nt NodeType) Is(other NodeType) bool {
+	return strings.Contains(string(nt), string(other))
+}
+
 // INode represents an object that exists in 3D space and can be positioned relative to an origin point.
 // By default, this origin point is {0, 0, 0} (or world origin), but Nodes can be parented
 // to other Nodes to change this origin (making their movements relative and their transforms
@@ -18,6 +45,9 @@ type INode interface {
 	Clone() INode
 	SetData(data interface{})
 	Data() interface{}
+	Type() NodeType
+	setLibrary(lib *Library)
+	Library() *Library
 
 	setParent(INode)
 	Parent() INode
@@ -29,6 +59,8 @@ type INode interface {
 	RemoveChildren(...INode)
 	// updateLocalTransform(newParent INode)
 	dirtyTransform()
+
+	SetWorldTransform(p, s vector.Vector, r Matrix4)
 
 	LocalRotation() Matrix4
 	SetLocalRotation(rotation Matrix4)
@@ -55,8 +87,9 @@ type INode interface {
 	SetVisible(visible, recursive bool)
 
 	Get(path string) INode
-	FindByName(name string) []INode
+	FindByName(name string, exactMatch bool) []INode
 	FindByTags(tags ...string) []INode
+	FindByType(nodeType NodeType) []INode
 	HierarchyAsString() string
 	Path() string
 
@@ -147,6 +180,7 @@ func (tags *Tags) GetAsFloat(tagName string) float64 {
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
 // into their structs to automatically easily implement Node.
 type Node struct {
+	library           *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 	name              string
 	parent            INode
 	position          vector.Vector
@@ -193,6 +227,20 @@ func (node *Node) SetName(name string) {
 	node.name = name
 }
 
+// Type returns the NodeType for this object.
+func (node *Node) Type() NodeType {
+	return NodeTypeNode
+}
+
+// Library returns the Library from which this Node was instantiated. If it was created through code, this will be nil.
+func (node *Node) Library() *Library {
+	return node.library
+}
+
+func (node *Node) setLibrary(library *Library) {
+	node.library = library
+}
+
 // Clone returns a new Node.
 func (node *Node) Clone() INode {
 	newNode := NewNode(node.name)
@@ -202,6 +250,7 @@ func (node *Node) Clone() INode {
 	newNode.parent = node.parent
 	newNode.AnimationPlayer = node.AnimationPlayer.Clone()
 	newNode.tags = node.tags.Clone()
+	newNode.library = node.library
 
 	if node.AnimationPlayer.RootNode == node {
 		newNode.AnimationPlayer.SetRoot(newNode)
@@ -264,6 +313,13 @@ func (node *Node) Transform() Matrix4 {
 
 	return transform
 
+}
+
+// SetWorldTransform sets the Node's global (world) transform given the position vector, scale vector, and rotation matrix provided.
+func (node *Node) SetWorldTransform(position, scale vector.Vector, rotationMatrix Matrix4) {
+	node.SetWorldPosition(position)
+	node.SetWorldScale(scale)
+	node.SetWorldRotation(rotationMatrix)
 }
 
 // dirtyTransform sets this Node and all recursive children's isTransformDirty flags to be true, indicating that they need to be
@@ -333,13 +389,6 @@ func (node *Node) LocalPosition() vector.Vector {
 	return node.position
 }
 
-// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
-// relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetLocalPosition(position vector.Vector) {
-	node.position = position
-	node.dirtyTransform()
-}
-
 // ResetLocalTransformProperties resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
 // by default, when you parent one Node to another, the local transform properties (position, scale, and rotation) are altered to keep the
 // object in the same absolute location, even though the origin changes.
@@ -360,6 +409,15 @@ func (node *Node) WorldPosition() vector.Vector {
 	return position
 }
 
+// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
+// relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
+func (node *Node) SetLocalPosition(position vector.Vector) {
+	node.position[0] = position[0]
+	node.position[1] = position[1]
+	node.position[2] = position[2]
+	node.dirtyTransform()
+}
+
 // SetWorldPosition sets the object's world position (position relative to the world origin point of {0, 0, 0}).
 // position needs to be a 3D vector (i.e. X, Y, and Z components).
 func (node *Node) SetWorldPosition(position vector.Vector) {
@@ -377,7 +435,9 @@ func (node *Node) SetWorldPosition(position vector.Vector) {
 		node.position = pr
 
 	} else {
-		node.position = position
+		node.position[0] = position[0]
+		node.position[1] = position[1]
+		node.position[2] = position[2]
 	}
 
 	node.dirtyTransform()
@@ -392,7 +452,9 @@ func (node *Node) LocalScale() vector.Vector {
 // SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
 // scale should be a 3D vector (i.e. X, Y, and Z components).
 func (node *Node) SetLocalScale(scale vector.Vector) {
-	node.scale = scale
+	node.scale[0] = scale[0]
+	node.scale[1] = scale[1]
+	node.scale[2] = scale[2]
 	node.dirtyTransform()
 }
 
@@ -417,7 +479,9 @@ func (node *Node) SetWorldScale(scale vector.Vector) {
 		}
 
 	} else {
-		node.scale = scale
+		node.scale[0] = scale[0]
+		node.scale[1] = scale[1]
+		node.scale[2] = scale[2]
 	}
 
 	node.dirtyTransform()
@@ -430,7 +494,7 @@ func (node *Node) LocalRotation() Matrix4 {
 
 // SetLocalRotation sets the object's local rotation Matrix4 (relative to any parent).
 func (node *Node) SetLocalRotation(rotation Matrix4) {
-	node.rotation = rotation
+	node.rotation = rotation.Clone()
 	node.dirtyTransform()
 }
 
@@ -450,7 +514,7 @@ func (node *Node) SetWorldRotation(rotation Matrix4) {
 		node.rotation = parentRot.Transposed().Mult(rotation)
 
 	} else {
-		node.rotation = rotation
+		node.rotation = rotation.Clone()
 	}
 
 	node.dirtyTransform()
@@ -634,12 +698,19 @@ func (node *Node) HierarchyAsString() string {
 // slashes ('/'), and is relative to the node you use to call Get. As an example of Get, if you had a cup parented to a desk, which was
 // parented to a room, that was finally parented to the root of the scene, it would be found at "Room/Desk/Cup". Note also that you can use "../" to
 // "go up one" in the hierarchy (so cup.Get("../") would return the Desk node).
-// Since Get uses forward slashes as path separation, it would be good to avoid using forward slashes in your object names.
+// Since Get uses forward slashes as path separation, it would be good to avoid using forward slashes in your Node names. Also note that Get()
+// trims the extra spaces from the beginning and end of Node Names, so avoid using spaces at the beginning or end of your Nodes' names.
 func (node *Node) Get(path string) INode {
 
 	var search func(node INode) INode
 
-	split := strings.Split(path, `/`)
+	split := []string{}
+
+	for _, s := range strings.Split(path, `/`) {
+		if len(strings.TrimSpace(s)) > 0 {
+			split = append(split, s)
+		}
+	}
 
 	search = func(node INode) INode {
 
@@ -700,16 +771,46 @@ func (node *Node) Path() string {
 }
 
 // FindByName allows you to search the node's recursive children, returning a slice
-// of Nodes with the name given. If none are found, an empty slice is returned.
+// of Nodes with the name given. If wildcard is true, the nodes' names can contain the
+// name provided; othwerise, they have to match exactly. If no matchins Nodes are found,
+// an empty slice is returned.
 // After finding a Node, you can convert it to a more specific type as necessary via type assertion.
-func (node *Node) FindByName(name string) []INode {
+func (node *Node) FindByName(name string, exactMatch bool) []INode {
 	out := []INode{}
 	for _, node := range node.ChildrenRecursive() {
-		if node.Name() == name {
+
+		var nameExists bool
+
+		if exactMatch {
+			nameExists = node.Name() == name
+		} else {
+			nameExists = strings.Contains(node.Name(), name)
+		}
+
+		if nameExists {
 			out = append(out, node)
 		}
 	}
 	return out
+}
+
+// FindByType allows you to search the node's recursive children, returning a slice
+// of Nodes with the NodeType given.
+// After finding a Node, you can convert it to a more specific type as necessary via type assertion.
+func (node *Node) FindByType(nodeType NodeType) []INode {
+
+	out := []INode{}
+
+	for _, node := range node.ChildrenRecursive() {
+
+		if node.Type().Is(nodeType) {
+			out = append(out, node)
+		}
+
+	}
+
+	return out
+
 }
 
 // FindBytags allows you to search the node's recursive children, returning a slice

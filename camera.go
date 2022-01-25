@@ -34,8 +34,8 @@ type DebugInfo struct {
 // Camera represents a camera (where you look from) in Tetra3D.
 type Camera struct {
 	*Node
-	ColorTexture          *ebiten.Image
-	DepthTexture          *ebiten.Image
+	ColorTexture          *ebiten.Image // ColorTexture holds the color results of rendering any models.
+	DepthTexture          *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
 	ColorIntermediate     *ebiten.Image
 	DepthIntermediate     *ebiten.Image
 	ClipAlphaIntermediate *ebiten.Image
@@ -46,8 +46,8 @@ type Camera struct {
 	ClipAlphaCompositeShader *ebiten.Shader
 	ClipAlphaRenderShader    *ebiten.Shader
 	ColorShader              *ebiten.Shader
-	Near, Far                float64
-	Perspective              bool
+	Near, Far                float64 // The near and far clipping plane.
+	Perspective              bool    // If the Camera has a perspective projection. If not, it would be orthographic
 	FieldOfView              float64 // Vertical field of view in degrees for a perspective projection camera
 	OrthoScale               float64 // Scale of the view for an orthographic projection camera in units horizontally
 
@@ -120,6 +120,9 @@ func NewCamera(w, h int) *Camera {
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 			tex := imageSrc0At(texCoord)
 			return vec4(encodeDepth(color.r).rgb, tex.a)
+			// TODO: This shader needs to discard if tex.a is transparent. We can't sample the texture to return 
+			// what's underneath here, so discard is basically necessary. We need to implement it once the dicard
+			// keyword / function is implemented (if it ever is; hopefully it will be).
 		}
 
 		`,
@@ -180,11 +183,11 @@ func NewCamera(w, h int) *Camera {
 				d := smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
 
 				if Fog.a == 1 {
-					colorTex.rgb += Fog.rgb * d
+					colorTex.rgb += Fog.rgb * d * colorTex.a
 				} else if Fog.a == 2 {
-					colorTex.rgb -= Fog.rgb * d
+					colorTex.rgb -= Fog.rgb * d * colorTex.a
 				} else if Fog.a == 3 {
-					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d)
+					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
 				}
 
 				return colorTex
@@ -362,7 +365,8 @@ func (camera *Camera) Clear() {
 	camera.DebugInfo.ActiveLightCount = 0
 }
 
-// RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example).
+// RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example). Note that if Camera.RenderDepth
+// is false, scenes rendered one after another in multiple RenderNodes() calls will be rendered on top of each other in the Camera's texture buffers.
 func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	meshes := []*Model{}
@@ -731,7 +735,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			t := time.Now()
 
 			for _, light := range lights {
-				light.beginModel(model)
+				light.beginModel(model, camera)
 			}
 
 			lightColors := [9]float32{}
@@ -1119,4 +1123,9 @@ func (camera *Camera) Unparent() {
 	if camera.parent != nil {
 		camera.parent.RemoveChildren(camera)
 	}
+}
+
+// Type returns the NodeType for this object.
+func (camera *Camera) Type() NodeType {
+	return NodeTypeCamera
 }

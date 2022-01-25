@@ -55,8 +55,8 @@ type Scene struct {
 	FogColor *Color  // The Color of any fog present in the Scene.
 	FogMode  FogMode // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
-	// the first indicating the start of the fog, and the second the end, in terms of total depth
-	// of the near / far clipping plane.
+	// ranging from 0 to 1. The first indicates the start of the fog, and the second the end, in
+	// terms of total depth of the near / far clipping plane. The default is [0, 1].
 	FogRange []float32
 
 	LightingOn bool // If lighting is enabled when rendering the scene.

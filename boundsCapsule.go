@@ -118,3 +118,8 @@ func (capsule *BoundingCapsule) Bottom() vector.Vector {
 	up := capsule.Node.WorldRotation().Up()
 	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 + capsule.Radius))
 }
+
+// Type returns the NodeType for this object.
+func (capsule *BoundingCapsule) Type() NodeType {
+	return NodeTypeBoundingCapsule
+}

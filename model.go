@@ -219,7 +219,9 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
 		for _, tri := range model.Mesh.Triangles {
+
 			tri.closestDepth = 0
+
 			for _, vert := range tri.Vertices {
 
 				v := model.skinVertex(vert)
@@ -227,9 +229,11 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 					v = transformFunc(v)
 				}
 				vert.transformed = model.vectorPool.MultVecW(vpMatrix, v)
-				tri.closestDepth += vert.transformed[2]
+				if vert.transformed[3] > tri.closestDepth {
+					tri.closestDepth = vert.transformed[3]
+				}
 			}
-			tri.closestDepth /= 3
+
 		}
 
 		camera.DebugInfo.animationTime += time.Since(t)
@@ -239,16 +243,22 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 		mvp := model.Transform().Mult(vpMatrix)
 
 		for _, tri := range model.Mesh.Triangles {
+
 			tri.closestDepth = 0
+
 			for _, vert := range tri.Vertices {
 				v := vert.Position
 				if transformFunc != nil {
 					v = transformFunc(v)
 				}
 				vert.transformed = model.vectorPool.MultVecW(mvp, v)
-				tri.closestDepth += vert.transformed[2]
+
+				if vert.transformed[3] > tri.closestDepth {
+					tri.closestDepth = vert.transformed[3]
+				}
+
 			}
-			tri.closestDepth /= 3
+
 		}
 
 	}
@@ -285,4 +295,9 @@ func (model *Model) Unparent() {
 	if model.parent != nil {
 		model.parent.RemoveChildren(model)
 	}
+}
+
+// Type returns the NodeType for this object.
+func (model *Model) Type() NodeType {
+	return NodeTypeModel
 }

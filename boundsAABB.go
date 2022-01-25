@@ -178,3 +178,8 @@ func (box *BoundingAABB) Intersection(other BoundingObject) *IntersectionResult 
 	return nil
 
 }
+
+// Type returns the NodeType for this object.
+func (box *BoundingAABB) Type() NodeType {
+	return NodeTypeBoundingAABB
+}

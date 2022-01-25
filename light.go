@@ -14,7 +14,7 @@ type Light interface {
 
 	// beginModel() is, similarly to beginRender(), used to prepare or precompute any math necessary when lighting the scene.
 	// It gets called once before lighting all visible triangles of a given Model.
-	beginModel(model *Model)
+	beginModel(model *Model, camera *Camera)
 
 	Light(tri *Triangle) [9]float32 // Light() returns the R, G, and B colors used to light the three vertices of the given triangle (and so, it returns a 9 length float32 array)
 	isOn() bool                     // isOn() is simply used to tell if a "generic" Light is on or not.
@@ -58,7 +58,7 @@ func (amb *AmbientLight) Clone() INode {
 
 func (amb *AmbientLight) beginRender() {}
 
-func (amb *AmbientLight) beginModel(model *Model) {}
+func (amb *AmbientLight) beginModel(model *Model, camera *Camera) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
 func (amb *AmbientLight) Light(tri *Triangle) [9]float32 {
@@ -86,6 +86,11 @@ func (amb *AmbientLight) isOn() bool {
 	return amb.On
 }
 
+// Type returns the NodeType for this object.
+func (amb *AmbientLight) Type() NodeType {
+	return NodeTypeAmbientLight
+}
+
 //---------------//
 
 // PointLight represents a point light (naturally).
@@ -105,6 +110,7 @@ type PointLight struct {
 
 	vectorPool      *VectorPool
 	workingPosition vector.Vector
+	cameraPosition  vector.Vector
 }
 
 // NewPointLight creates a new Point light.
@@ -135,15 +141,19 @@ func (point *PointLight) Clone() INode {
 
 }
 
-func (point *PointLight) beginRender() {}
+func (point *PointLight) beginRender() {
+}
 
-func (point *PointLight) beginModel(model *Model) {
+func (point *PointLight) beginModel(model *Model, camera *Camera) {
 
 	p, _, r := model.Transform().Inverted().Decompose()
 
 	// Rather than transforming all vertices of all triangles of a mesh, we can just transform the
 	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
+
+	point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
+
 	point.workingPosition = r.MultVec(point.WorldPosition()).Add(p)
 
 }
@@ -158,8 +168,14 @@ func (point *PointLight) Light(tri *Triangle) [9]float32 {
 	for i, vert := range tri.Vertices {
 
 		lightVec := fastVectorSub(point.workingPosition, vert.Position).Unit()
+		eyeVec := fastVectorSub(point.cameraPosition, vert.Position).Unit()
 
-		diffuse := vert.Normal.Dot(lightVec)
+		// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
+		// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
+		// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
+		eyeDot := vert.Normal.Dot(eyeVec)
+		diffuse := vert.Normal.Dot(lightVec) * eyeDot
+
 		if diffuse < 0 {
 			diffuse = 0
 		}
@@ -199,6 +215,11 @@ func (point *PointLight) Unparent() {
 
 func (point *PointLight) isOn() bool {
 	return point.On
+}
+
+// Type returns the NodeType for this object.
+func (point *PointLight) Type() NodeType {
+	return NodeTypePointLight
 }
 
 //---------------//
@@ -246,26 +267,28 @@ func (sun *DirectionalLight) beginRender() {
 	sun.workingForward = sun.WorldRotation().Forward()
 }
 
-func (sun *DirectionalLight) beginModel(model *Model) {
+func (sun *DirectionalLight) beginModel(model *Model, camera *Camera) {
 	sun.workingModelRotationalTransform = model.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
 func (sun *DirectionalLight) Light(tri *Triangle) [9]float32 {
 
-	n0 := sun.workingModelRotationalTransform.MultVec(tri.Vertices[0].Normal)
-	n1 := sun.workingModelRotationalTransform.MultVec(tri.Vertices[1].Normal)
-	n2 := sun.workingModelRotationalTransform.MultVec(tri.Vertices[2].Normal)
+	// TODO: Directional lights should also be able to be "dark" if the camera is behind the triangle, like Point lights
+	colors := [9]float32{}
 
-	diffuseFactor0 := math.Max(n0.Dot(sun.workingForward), 0.0)
-	diffuseFactor1 := math.Max(n1.Dot(sun.workingForward), 0.0)
-	diffuseFactor2 := math.Max(n2.Dot(sun.workingForward), 0.0)
-
-	return [9]float32{
-		sun.Color.R * float32(diffuseFactor0) * sun.Energy, sun.Color.G * float32(diffuseFactor0) * sun.Energy, sun.Color.B * float32(diffuseFactor0) * sun.Energy,
-		sun.Color.R * float32(diffuseFactor1) * sun.Energy, sun.Color.G * float32(diffuseFactor1) * sun.Energy, sun.Color.B * float32(diffuseFactor1) * sun.Energy,
-		sun.Color.R * float32(diffuseFactor2) * sun.Energy, sun.Color.G * float32(diffuseFactor2) * sun.Energy, sun.Color.B * float32(diffuseFactor2) * sun.Energy,
+	for i, vert := range tri.Vertices {
+		normal := sun.workingModelRotationalTransform.MultVec(vert.Normal)
+		diffuseFactor := normal.Dot(sun.workingForward)
+		if diffuseFactor < 0 {
+			diffuseFactor = 0
+		}
+		colors[i*3] = sun.Color.R * float32(diffuseFactor) * sun.Energy
+		colors[i*3+1] = sun.Color.G * float32(diffuseFactor) * sun.Energy
+		colors[i*3+2] = sun.Color.B * float32(diffuseFactor) * sun.Energy
 	}
+
+	return colors
 
 }
 
@@ -284,4 +307,9 @@ func (sun *DirectionalLight) Unparent() {
 
 func (sun *DirectionalLight) isOn() bool {
 	return sun.On
+}
+
+// Type returns the NodeType for this object.
+func (sun *DirectionalLight) Type() NodeType {
+	return NodeTypeDirectionalLight
 }

@@ -104,6 +104,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	for _, gltfMat := range doc.Materials {
 
 		newMat := NewMaterial(gltfMat.Name)
+		newMat.library = library
 		color := gltfMat.PBRMetallicRoughness.BaseColorFactor
 
 		newMat.Color.R = float32(color[0])
@@ -146,6 +147,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		newMesh := NewMesh(mesh.Name)
 		library.Meshes[mesh.Name] = newMesh
+		newMesh.library = library
 
 		if mesh.Extras != nil {
 			if dataMap, isMap := mesh.Extras.(map[string]interface{}); isMap {
@@ -313,6 +315,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	for _, gltfAnim := range doc.Animations {
 		anim := NewAnimation(gltfAnim.Name)
+		anim.library = library
 		library.Animations[gltfAnim.Name] = anim
 
 		animLength := 0.0
@@ -490,6 +493,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		} else {
 			obj = NewNode(node.Name)
 		}
+
+		obj.setLibrary(library)
 
 		for _, child := range node.Children {
 			obj.AddChildren(objects[int(child)])

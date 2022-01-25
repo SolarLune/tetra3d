@@ -79,6 +79,11 @@ func (bt *BoundingTriangles) Intersection(other BoundingObject) *IntersectionRes
 	return nil
 }
 
+// Type returns the NodeType for this object.
+func (bt *BoundingTriangles) Type() NodeType {
+	return NodeTypeBoundingTriangles
+}
+
 type collisionPlane struct {
 	Normal     vector.Vector
 	Distance   float64

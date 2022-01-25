@@ -25,25 +25,25 @@ func (dim Dimensions) Center() vector.Vector {
 	}
 }
 
+// Width returns the total difference between the minimum and maximum X values.
 func (dim Dimensions) Width() float64 {
 	return dim[1][0] - dim[0][0]
 }
 
+// Height returns the total difference between the minimum and maximum Y values.
 func (dim Dimensions) Height() float64 {
 	return dim[1][1] - dim[0][1]
 }
 
+// Depth returns the total difference between the minimum and maximum Z values.
 func (dim Dimensions) Depth() float64 {
 	return dim[1][2] - dim[0][2]
 }
 
-// MaxSpan returns the maximum span out of width, height, and depth.
-func (dim Dimensions) MaxSpan() float64 {
-	return math.Max(math.Max(dim.Width(), dim.Height()), dim.Depth())
-}
-
+// Mesh represents a mesh that can be represented visually in different locations via Models.
 type Mesh struct {
 	Name            string
+	library         *Library // A reference to the Library this Mesh came from.
 	Vertices        []*Vertex
 	Triangles       []*Triangle
 	sortedTriangles []*Triangle
@@ -84,6 +84,7 @@ func NewMesh(name string, verts ...*Vertex) *Mesh {
 // Clone clones the Mesh, creating a new
 func (mesh *Mesh) Clone() *Mesh {
 	newMesh := NewMesh(mesh.Name)
+	newMesh.library = mesh.library
 	newMesh.Tags = mesh.Tags.Clone()
 	for _, t := range mesh.Triangles {
 		newTri := t.Clone()
@@ -91,6 +92,11 @@ func (mesh *Mesh) Clone() *Mesh {
 		newTri.Mesh = mesh
 	}
 	return newMesh
+}
+
+// Library returns the Library from which this Mesh was loaded. If it was created through code, this function will return nil.
+func (mesh *Mesh) Library() *Library {
+	return mesh.library
 }
 
 // AddTriangles adds triangles consisting of vertices to the Mesh. You must provide a number of *Vertex instances divisible by 3.
@@ -385,7 +391,7 @@ func (tri *Triangle) RecalculateCenter() {
 
 	}
 
-	tri.MaxSpan = dim.MaxSpan()
+	tri.MaxSpan = dim.Max()
 
 }
 

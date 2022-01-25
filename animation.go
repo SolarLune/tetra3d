@@ -175,12 +175,15 @@ func (channel *AnimationChannel) AddTrack(trackType string) *AnimationTrack {
 	return newTrack
 }
 
+// Animation represents an animation of some description; it can have multiple channels, indicating movement, scale, or rotational change of one or more Nodes in the Animation.
 type Animation struct {
+	library  *Library
 	Name     string
 	Channels map[string]*AnimationChannel
 	Length   float64 // Length of the animation in seconds
 }
 
+// NewAnimation creates a new Animation of the name specified.
 func NewAnimation(name string) *Animation {
 	return &Animation{
 		Name:     name,
@@ -192,6 +195,11 @@ func (animation *Animation) AddChannel(name string) *AnimationChannel {
 	newChannel := NewAnimationChannel(name)
 	animation.Channels[name] = newChannel
 	return newChannel
+}
+
+// Library returns the Library from which this Animation was loaded. If it was created in code, this function would return nil.
+func (animation *Animation) Library() *Library {
+	return animation.library
 }
 
 const (

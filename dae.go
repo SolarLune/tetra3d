@@ -192,7 +192,9 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 	daeURLsToMaterials := map[string]*Material{}
 
 	for _, mat := range daeMaterials.MaterialNames {
-		daeURLsToMaterials[mat.ID] = NewMaterial(mat.Name)
+		newMat := NewMaterial(mat.Name)
+		newMat.library = scenes
+		daeURLsToMaterials[mat.ID] = newMat
 	}
 
 	for _, geo := range daeGeo.Geometries {
@@ -288,6 +290,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 		}
 
 		mesh := NewMesh(geo.Name, verts...)
+		mesh.library = scenes
 
 		if len(normals) > 0 {
 
@@ -343,6 +346,8 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 		} else {
 			model = NewNode(node.Name)
 		}
+
+		model.setLibrary(scenes)
 
 		mat := node.ParseTransform()
 

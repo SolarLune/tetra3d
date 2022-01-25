@@ -99,7 +99,7 @@ func (g *Game) Update() error {
 	parent := g.Scene.Root.Get("parent")
 	parent.SetLocalRotation(parent.LocalRotation().Rotated(0, 1, 0, 0.05))
 
-	child := g.Scene.Root.FindByName("child")[0]
+	child := g.Scene.Root.FindByName("child", true)[0]
 
 	// Moving the Camera
 
@@ -139,9 +139,15 @@ func (g *Game) Update() error {
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
 
 		if child.Parent() == parent {
+			p, s, r := child.Transform().Decompose()
+			// After changing parenting, the child's position would change because of a different parent (so now
+			// 0, 0, 0 corresponds to a different location). We counteract this by manually setting the world transform to be the original location.
 			g.Scene.Root.AddChildren(child)
+			child.SetWorldTransform(p, s, r)
 		} else {
+			p, s, r := child.Transform().Decompose()
 			parent.AddChildren(child)
+			child.SetWorldTransform(p, s, r)
 		}
 
 	}
@@ -268,7 +274,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		txt := "F1 to toggle this text\nWASD: Move, Space: Go Up, Ctrl: Go Down\nMouse: Look\nArrow Keys:Move parent\nP: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 104, color.RGBA{255, 0, 0, 255})
 	}
 
 }

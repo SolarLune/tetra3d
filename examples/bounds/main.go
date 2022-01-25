@@ -107,7 +107,7 @@ func (g *Game) ResolveCollisions() {
 
 	bounds := g.Controlling.Get("bounds").(tetra3d.BoundingObject)
 
-	for _, ob := range g.Scene.Root.FindByName("bounds") {
+	for _, ob := range g.Scene.Root.FindByName("bounds", true) {
 
 		if inter := bounds.Intersection(ob.(tetra3d.BoundingObject)); inter != nil {
 

@@ -81,3 +81,8 @@ func (sphere *BoundingSphere) Intersection(other BoundingObject) *IntersectionRe
 func (sphere *BoundingSphere) PointInside(point vector.Vector) bool {
 	return sphere.Node.WorldPosition().Sub(point).Magnitude() < sphere.WorldRadius()
 }
+
+// Type returns the NodeType for this object.
+func (sphere *BoundingSphere) Type() NodeType {
+	return NodeTypeBoundingSphere
+}
