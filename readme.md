@@ -1,25 +1,25 @@
 # Tetra3D
 
+[Ebiten Discord](https://discord.gg/fXM7VYASTu)
+
 ![Tetra3D Logo](https://thumbs.gfycat.com/DifferentZealousFowl-size_restricted.gif)
 ![Dark exploration](https://thumbs.gfycat.com/ScalySlimCrayfish-size_restricted.gif)
 ![Transparency](https://i.imgur.com/4DhJomC.jpg)
 
 [Vertex Lighting GIF (6mb GIF)](https://gfycat.com/deliriousfemalejunebug)
 
-[Tetra3D Docs](https://pkg.go.dev/github.com/solarlune/tetra3d)
-
-[There are more tips over on the Wiki, as well.](https://github.com/SolarLune/Tetra3d/wiki)
+[Tetra3D Docs](https://pkg.go.dev/github.com/solarlune/tetra3d) / [Tetra3D Wiki](https://github.com/SolarLune/Tetra3d/wiki)
 
 ## Support
 
 If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune). I also have a [Discord server here](https://discord.gg/cepcpfV). Thanks~!
 ## What is Tetra3D?
 
-Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing. Depth testing can be turned off for a performance increase in exchange for no inter-object intersection.
+Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing (by use of shaders to compare and write depth and composite the result onto the finished texture). Depth testing can be turned off for a performance increase in exchange for no inter-object intersection.
 
-Tetra's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively rudimentary fully 3D game (_maybe_ something on the level of a PS1 or N64 game would be possible). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
+Tetra's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a largely-software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively simple fully 3D game (i.e. something on the level of a PS1 or N64 game). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
-In general, Tetra3D's just a basic software renderer, so you can target higher resolutions (like 1080p or 4K) or lower resolutions (as an example, 398x224 seems to be a similar enough resolution to PS1 while maintaining a 16:9 resolution). Anything's fine as long as the target GPU can handle generating a render texture for the resolution if you have depth testing / depth texture rendering on, as that's how depth testing is done.
+In general, Tetra3D's just a renderer, so you can target higher resolutions (like 1080p or 4K) _or_ lower resolutions. Anything's fine as long as the target GPU can handle generating the color and depth textures at your desired resolution (assuming you have depth texture rendering on).
 
 ## Why did I make it?
 
@@ -37,7 +37,7 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 `go get github.com/solarlune/tetra3d`
 
-Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above.
+Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This version is somewhat arbitrary, as it could run on an older Go version if a couple of functions were changed.
 
 ## How do you use it?
 
@@ -53,15 +53,8 @@ import (
 	"errors"
 	"fmt"
 	"image/color"
-	"math"
-	"os"
-	"runtime/pprof"
-	"time"
-
-	_ "image/png"
 
 	"github.com/solarlune/tetra3d"
-	"github.com/kvartborg/vector"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -69,7 +62,7 @@ const ScreenWidth = 398
 const ScreenHeight = 224
 
 type Game struct {
-	GameScene        *tetra3d.Scene
+	GameScene    *tetra3d.Scene
 	Camera       *tetra3d.Camera
 }
 
@@ -91,30 +84,39 @@ func NewGame() *Game {
 	// all of the scenes, meshes, materials, and animations.
 	g.GameScene = library.FindScene("Game")
 
-	// NOTE: If you need to rotate the model,
+	// NOTE: If you need to rotate any meshes after importing,
 	// you can call Mesh.ApplyMatrix() to apply a rotation matrix 
-	// (or any other kind of matrix) to the vertices, thereby rotating 
-	// them and their triangles' normals. 
+	// (or any other kind of matrix) to all of its vertices.
 
 	// Tetra uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
 	// in comparison to Blender's coordinate system (+X = Right, +Y = Forward, 
-	// +Z = Up). 
+	// +Z = Up). Note that when loading models in via GLTF or DAE, models are
+	// converted automatically (so up is +Z in Blender and +Y in Tetra3D automatically).
 
 	// Here, we'll create a new Camera. We pass the size of the screen to the 
 	// Camera so it can create its own buffer textures (which are *ebiten.Images).
 
-	// If we were to load the camera in from the GLTF file, the loading options struct would 
+	// If we were to load a camera in from the GLTF file, the loading options struct would 
 	// specify the camera's backing texture size (defaulting to 1920x1080).
 
 	g.Camera = tetra3d.NewCamera(ScreenWidth, ScreenHeight)
-
-	// We could also use a camera from the scene within the GLTF file if it was 
-	// exported with one.
 
 	// A Camera implements the tetra3d.INode interface, which means it can be placed
 	// in 3D space and can be parented to another Node somewhere in the scene tree.
 	// Models and Nodes (which are essentially "empties" one can
 	// use for positioning and parenting) can, as well.
+
+	// We can place Models, Cameras, and other Nodes with Node.SetWorldPosition() or 
+	// Node.SetLocalPosition(). Both functions take a 3D vector.Vector from kvartborg's 
+	// vector package.
+	
+	// The *World variants position Nodes in absolute space; the Local variants
+	// position Nodes relative to their parents' positioning and transforms.
+	// You can also move Nodes using Node.Move(x, y, z).
+	
+	// Cameras look forward down the local -Z axis, so we'll move the Camera back 
+	// 12 units to look towards [0, 0, 0].
+	g.Camera.Move(0, 0, 12)
 
 	// Each Scene has a tree that starts with the Root Node. To add Nodes to the Scene, 
 	// parent them to the Scene's base.
@@ -123,16 +125,8 @@ func NewGame() *Game {
 	// For Cameras, we don't actually need to have them in the scene to view it, since
 	// the presence of the Camera in the Scene node tree doesn't impact what it would see.
 
-	// Place Models or Cameras with SetWorldPosition() or SetLocalPosition(). 
-	// Both functions take a 3D vector.Vector from kvartborg's vector package. 
-	
-	// The *World variants position Nodes in absolute space; the Local variants
-	// position Nodes relative to their parents' positioning and transforms.
-	// You can also move Nodes using Node.Move(x, y, z).
-	
-	// Cameras look forward down the -Z axis, so we'll move the Camera back 12 units to look
-	// towards [0, 0, 0].
-	g.Camera.Move(0, 0, 12)
+	// We can see the tree "visually" by printing out the hierarchy:
+	fmt.Println(g.GameScene.Root.HierarchyAsString())
 
 	return g
 }
@@ -292,7 +286,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Point lights
 - [x] -- Directional lights
 - [x] -- Smooth shading
-- [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit)
+- [x] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
 - [ ] Shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)
