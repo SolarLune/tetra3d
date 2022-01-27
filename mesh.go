@@ -309,6 +309,7 @@ type Triangle struct {
 	Normal       vector.Vector
 	Mesh         *Mesh
 	Center       vector.Vector
+	visible      bool
 	closestDepth float64
 	ID           int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
 }

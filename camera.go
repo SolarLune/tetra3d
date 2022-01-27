@@ -466,7 +466,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	transparents := []*Model{}
 
 	for _, model := range models {
-		if model.Mesh.Material != nil && model.Mesh.Material.TransparencyMode == TransparencyModeTransparent {
+		if model.IsTransparent() {
 			transparents = append(transparents, model)
 		} else {
 			solids = append(solids, model)
@@ -540,6 +540,10 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		for _, tri := range tris {
+
+			if !tri.visible {
+				continue
+			}
 
 			v0 := tri.Vertices[0].transformed
 			v1 := tri.Vertices[1].transformed
@@ -697,7 +701,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				camera.DepthIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.DepthShader, shaderOpt)
 			}
 
-			if transparencyMode != TransparencyModeTransparent {
+			if !model.IsTransparent() {
 				camera.DepthTexture.DrawImage(camera.DepthIntermediate, nil)
 			}
 
@@ -771,18 +775,35 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		t.ColorM = model.ColorBlendingFunc(model) // Modify the model's appearance using its color blending function
 		t.Filter = model.Mesh.FilterMode
 
+		hasFragShader := model.Mesh.Material != nil && model.Mesh.Material.fragmentShader != nil && model.Mesh.Material.FragmentShaderOn
+		w, h := camera.ColorTexture.Size()
+
+		// If rendering depth, and rendering through a custom fragment shader, we'll need to render the tris to the ColorIntermediate buffer using the custom shader.
+		// If we're not rendering through a custom shader, we can render to ColorIntermediate and then composite that onto the finished ColorTexture.
+
+		// If we're not rendering depth, but still rendering through the shader, we can render to the intermediate texture, and then from there composite.
+		// Otherwise
+
 		if camera.RenderDepth {
 
 			camera.ColorIntermediate.Clear()
 
-			camera.ColorIntermediate.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
-
-			w, h := camera.ColorTexture.Size()
+			if hasFragShader {
+				camera.ColorIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], model.Mesh.Material.fragmentShader, model.Mesh.Material.FragmentShaderOptions)
+			} else {
+				camera.ColorIntermediate.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+			}
 
 			camera.ColorTexture.DrawRectShader(w, h, camera.ColorShader, rectShaderOptions)
 
 		} else {
-			camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+
+			if hasFragShader {
+				camera.ColorTexture.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], model.Mesh.Material.fragmentShader, model.Mesh.Material.FragmentShaderOptions)
+			} else {
+				camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+			}
+
 		}
 
 		camera.DebugInfo.DrawnTris += vertexListIndex / 3
@@ -949,9 +970,9 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 }
 
-// DrawDebugBounds will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
-// be drawn in the color provided to the screen image provided.
-func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, color color.Color) {
+// DrawDebugBoundsColored will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
+// be drawn in the color provided for each kind of bounding object to the screen image provided.
+func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor color.Color) {
 
 	for _, n := range rootNode.ChildrenRecursive() {
 
@@ -985,7 +1006,7 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 
 					start := lines[i]
 					end := lines[i+1]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], sphereColor)
 
 				}
 
@@ -1028,7 +1049,7 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 
 					start := lines[i]
 					end := lines[i+1]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], capsuleColor)
 
 				}
 
@@ -1061,7 +1082,7 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 
 					start := lines[i]
 					end := lines[i+1]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], aabbColor)
 
 				}
 
@@ -1088,19 +1109,19 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 
 					start := lines[i]
 					end := lines[i+1]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], trianglesColor)
 
 					start = lines[i+1]
 					end = lines[i+2]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], trianglesColor)
 
 					start = lines[i+2]
 					end = lines[i]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color)
+					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], trianglesColor)
 
 				}
 
-				camera.DrawDebugBounds(screen, bounds.BoundingAABB, color)
+				camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, aabbColor, sphereColor, capsuleColor, trianglesColor)
 
 			}
 
@@ -1108,6 +1129,12 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, colo
 
 	}
 
+}
+
+// DrawDebugBounds will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
+// be drawn in the color provided to the screen image provided.
+func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, color color.Color) {
+	camera.DrawDebugBoundsColored(screen, rootNode, color, color, color, color)
 }
 
 /////

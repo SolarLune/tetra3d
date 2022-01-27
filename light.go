@@ -165,16 +165,23 @@ func (point *PointLight) Light(tri *Triangle) [9]float32 {
 
 	vertColors := [9]float32{}
 
+	eyeVec := fastVectorSub(point.cameraPosition, tri.Center).Unit()
+
 	for i, vert := range tri.Vertices {
 
 		lightVec := fastVectorSub(point.workingPosition, vert.Position).Unit()
-		eyeVec := fastVectorSub(point.cameraPosition, vert.Position).Unit()
 
 		// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 		// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 		// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
-		eyeDot := vert.Normal.Dot(eyeVec)
-		diffuse := vert.Normal.Dot(lightVec) * eyeDot
+		eyeFacing := 1.0
+
+		// We don't want the light to be modulated by the eye vector, just turn the light off 100% if you're looking from the other side of the triangle
+		if vert.Normal.Dot(eyeVec) < 0 {
+			eyeFacing = -1
+		}
+
+		diffuse := vert.Normal.Dot(lightVec) * eyeFacing
 
 		if diffuse < 0 {
 			diffuse = 0
@@ -235,6 +242,7 @@ type DirectionalLight struct {
 
 	workingForward                  vector.Vector // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
 	workingModelRotationalTransform Matrix4       // Similarly, this is an internal rotational transform (without the transformation row) for the Model being lit.
+	workingCameraPosition           vector.Vector
 }
 
 // NewDirectionalLight creates a new Directional Light with the specified RGB color and energy (assuming 1.0 energy is standard / "100%" lighting).
@@ -269,6 +277,7 @@ func (sun *DirectionalLight) beginRender() {
 
 func (sun *DirectionalLight) beginModel(model *Model, camera *Camera) {
 	sun.workingModelRotationalTransform = model.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
+	sun.workingCameraPosition = sun.workingModelRotationalTransform.MultVec(camera.WorldPosition()).Add(model.WorldPosition().Invert())
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
@@ -277,9 +286,19 @@ func (sun *DirectionalLight) Light(tri *Triangle) [9]float32 {
 	// TODO: Directional lights should also be able to be "dark" if the camera is behind the triangle, like Point lights
 	colors := [9]float32{}
 
+	eyeVec := fastVectorSub(sun.workingCameraPosition, tri.Center).Unit()
+
 	for i, vert := range tri.Vertices {
 		normal := sun.workingModelRotationalTransform.MultVec(vert.Normal)
-		diffuseFactor := normal.Dot(sun.workingForward)
+
+		eyeFacing := 1.0
+
+		// We don't want the light to be modulated by the eye vector, just turn the light off 100% if you're looking from the other side of the triangle
+		if normal.Dot(eyeVec) < 0 {
+			eyeFacing = -1
+		}
+
+		diffuseFactor := normal.Dot(sun.workingForward) * eyeFacing
 		if diffuseFactor < 0 {
 			diffuseFactor = 0
 		}

@@ -21,12 +21,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-//go:embed lighting.gltf
-var gltfData []byte
-
 type Game struct {
 	Width, Height int
-	Library       *tetra3d.Library
 	Scene         *tetra3d.Scene
 
 	Camera       *tetra3d.Camera
@@ -36,14 +32,13 @@ type Game struct {
 	DrawDebugText     bool
 	DrawDebugDepth    bool
 	PrevMousePosition vector.Vector
-
-	Time float64
 }
 
 func NewGame() *Game {
+
 	game := &Game{
-		Width:             1920,
-		Height:            1080,
+		Width:             796,
+		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -55,35 +50,35 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	opt := tetra3d.DefaultGLTFLoadOptions()
-	opt.CameraWidth = 1920
-	opt.CameraHeight = 1080
-	opt.LoadBackfaceCulling = true
-	library, err := tetra3d.LoadGLTFData(gltfData, opt)
+	g.Scene = tetra3d.NewScene("shader test scene")
+
+	mesh := tetra3d.NewCube()
+
+	_, err := mesh.Material.SetShader([]byte(`
+	package main
+
+	func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+		scrSize := imageDstTextureSize()
+		return vec4(position.x / scrSize.x, position.y / scrSize.y, 0, 1)
+	}`))
+
 	if err != nil {
 		panic(err)
 	}
 
-	g.Library = library
-	g.Scene = library.Scenes[0]
+	model := tetra3d.NewModel(mesh, "plane")
+	model.Rotate(1, 0, 0, math.Pi/2)
+	g.Scene.Root.AddChildren(model)
 
-	g.Camera = tetra3d.NewCamera(1920, 1080)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 15})
+	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
+	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
 	g.Scene.Root.AddChildren(g.Camera)
-
-	ambientLight := tetra3d.NewAmbientLight("ambient", 1, 0.5, 0.25, 1)
-	g.Scene.Root.AddChildren(ambientLight)
-
-	// g.Scene.FogMode = tetra3d.FogMultiply
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
 
 func (g *Game) Update() error {
-
-	g.Time += 1.0 / 60.0
-
 	var err error
 
 	moveSpd := 0.05
@@ -92,15 +87,6 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	// light := g.Scene.Root.Get("Point light").(*tetra3d.Node)
-	// light.AnimationPlayer.Play(g.Library.Animations["LightAction"])
-	// light.AnimationPlayer.Update(1.0 / 60.0)
-
-	// g.Scene.Root.Get("plane").Rotate(1, 0, 0, 0.04)
-
-	// light := g.Scene.Root.Get("third point light")
-	// light.Move(math.Sin(g.Time*math.Pi)*0.1, 0, math.Cos(g.Time*math.Pi*0.19)*0.03)
-
 	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
@@ -108,8 +94,6 @@ func (g *Game) Update() error {
 	right := g.Camera.LocalRotation().Right()
 
 	pos := g.Camera.LocalPosition()
-
-	// g.Scene.Root.Get("point light").(*tetra3d.PointLight).Distance = 10 + (math.Sin(g.Time*math.Pi) * 5)
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		pos = pos.Add(forward.Scale(moveSpd))
@@ -185,10 +169,6 @@ func (g *Game) Update() error {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.Scene.LightingOn = !g.Scene.LightingOn
-	}
-
 	return err
 }
 
@@ -199,7 +179,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the scene
+	// Render the logo first
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
@@ -215,8 +195,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorWhite())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\n1 Key: Toggle lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 150, color.RGBA{255, 0, 0, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe cube is running a custom shader.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{255, 0, 0, 255})
 	}
 }
 
@@ -241,7 +221,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Lighting Test")
+	ebiten.SetWindowTitle("Tetra3d - Logo Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()

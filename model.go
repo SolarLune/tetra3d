@@ -220,6 +220,8 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
 		for _, tri := range model.Mesh.Triangles {
 
+			tri.visible = true
+
 			tri.closestDepth = 0
 
 			for _, vert := range tri.Vertices {
@@ -227,6 +229,10 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 				v := model.skinVertex(vert)
 				if transformFunc != nil {
 					v = transformFunc(v)
+					if v == nil {
+						tri.visible = false
+						break
+					}
 				}
 				vert.transformed = model.vectorPool.MultVecW(vpMatrix, v)
 				if vert.transformed[3] > tri.closestDepth {
@@ -244,12 +250,18 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 
 		for _, tri := range model.Mesh.Triangles {
 
+			tri.visible = true
+
 			tri.closestDepth = 0
 
 			for _, vert := range tri.Vertices {
 				v := vert.Position
 				if transformFunc != nil {
 					v = transformFunc(v)
+					if v == nil {
+						tri.visible = false
+						break
+					}
 				}
 				vert.transformed = model.vectorPool.MultVecW(mvp, v)
 
@@ -268,6 +280,8 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 	if model.Mesh.Material != nil {
 		sortMode = model.Mesh.Material.TriangleSortMode
 	}
+
+	// Preliminary tests indicate sort.SliceStable is faster than sort.Slice for our purposes
 
 	if sortMode == TriangleSortBackToFront {
 		sort.SliceStable(model.Mesh.sortedTriangles, func(i, j int) bool {
@@ -300,4 +314,10 @@ func (model *Model) Unparent() {
 // Type returns the NodeType for this object.
 func (model *Model) Type() NodeType {
 	return NodeTypeModel
+}
+
+// IsTransparent returns true if the material's TransparencyMode is TransparencyModeTransparent, or if it's
+// TransparencyModeAuto with the model or material alpha color being under 0.99.
+func (model *Model) IsTransparent() bool {
+	return model.Mesh.Material != nil && (model.Mesh.Material.TransparencyMode == TransparencyModeTransparent || (model.Mesh.Material.TransparencyMode == TransparencyModeAuto && (model.Mesh.Material.Color.A < 0.99 || model.Color.A < 0.99)))
 }

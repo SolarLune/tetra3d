@@ -12,8 +12,11 @@ const (
 )
 
 const (
+	// TransparencyModeAuto means it will be opaque if the object or material's alpha >= 1, and transparent otherwise.
+	TransparencyModeAuto = iota
+
 	// TransparencyModeOpaque means the triangles are rendered to the color and depth buffer as normal.
-	TransparencyModeOpaque = iota
+	TransparencyModeOpaque
 
 	// TransparencyModeAlphaClip means the triangles are rendered to the color and depth buffer, using the alpha of the triangles' texture to "cut out" the triangles.
 	TransparencyModeAlphaClip
@@ -36,10 +39,22 @@ type Material struct {
 	// One can use this to simply transform the vertices of the mesh (note that this is, of course, not as performant as
 	// a traditional vertex shader, but is fine for simple / low-poly mesh transformations). This function is run after
 	// skinning the vertex (if the material belongs to a mesh that is skinned by an armature).
+	// If the VertexProgram returns nil, the triangle that the vertex belongs to will not be rendered.
 	VertexProgram func(vector.Vector) vector.Vector
 
 	// ClipProgram is a function that runs on the clipped result of each vertex position rendered with the material.
 	ClipProgram func(vector.Vector) vector.Vector
+
+	// fragmentShader represents a shader used to render the material with. This shader is activated after rendering
+	// to the depth texture, but before compositing the finished render to the screen after fog.
+	fragmentShader *ebiten.Shader
+	// FragmentShaderOn is an easy boolean toggle to control whether the shader is activated or not (it defaults to on).
+	FragmentShaderOn bool
+	// FragmentShaderOptions allows you to customize the custom fragment shader with uniforms or images. By default, it's an empty
+	// DrawTrianglesShaderOptions struct.
+	FragmentShaderOptions *ebiten.DrawTrianglesShaderOptions
+	fragmentSrc           []byte
+
 	// If a material is tagged as transparent, it's rendered in a separate render pass.
 	// Objects with transparent materials don't render to the depth texture and are sorted and rendered back-to-front, AFTER
 	// all non-transparent materials.
@@ -49,17 +64,19 @@ type Material struct {
 // NewMaterial creates a new Material with the name given.
 func NewMaterial(name string) *Material {
 	return &Material{
-		Name:             name,
-		Color:            NewColor(1, 1, 1, 1),
-		Tags:             NewTags(),
-		BackfaceCulling:  true,
-		TriangleSortMode: TriangleSortBackToFront,
-		EnableLighting:   true,
-		TransparencyMode: TransparencyModeOpaque,
+		Name:                  name,
+		Color:                 NewColor(1, 1, 1, 1),
+		Tags:                  NewTags(),
+		BackfaceCulling:       true,
+		TriangleSortMode:      TriangleSortBackToFront,
+		EnableLighting:        true,
+		TransparencyMode:      TransparencyModeAuto,
+		FragmentShaderOptions: &ebiten.DrawTrianglesShaderOptions{},
+		FragmentShaderOn:      true,
 	}
 }
 
-// Clone creates a clone of the specified Material.
+// Clone creates a clone of the specified Material. Note that Clone() cannot clone the Material's fragment shader or shader options.
 func (material *Material) Clone() *Material {
 	newMat := NewMaterial(material.Name)
 	newMat.library = material.library
@@ -70,7 +87,61 @@ func (material *Material) Clone() *Material {
 	newMat.TriangleSortMode = material.TriangleSortMode
 	newMat.EnableLighting = material.EnableLighting
 	newMat.TransparencyMode = material.TransparencyMode
+
+	newMat.VertexProgram = material.VertexProgram
+	newMat.ClipProgram = material.ClipProgram
+	newMat.SetShader(material.fragmentSrc)
+	newMat.FragmentShaderOn = material.FragmentShaderOn
+
+	newMat.FragmentShaderOptions.CompositeMode = material.FragmentShaderOptions.CompositeMode
+	newMat.FragmentShaderOptions.FillRule = material.FragmentShaderOptions.FillRule
+	for i := range material.FragmentShaderOptions.Images {
+		newMat.FragmentShaderOptions.Images[i] = material.FragmentShaderOptions.Images[i]
+	}
+	for k, v := range newMat.FragmentShaderOptions.Uniforms {
+		newMat.FragmentShaderOptions.Uniforms[k] = v
+	}
+
 	return newMat
+}
+
+// SetShader creates a new custom Kage fragment shader for the Material if provided the shader's source code, provided as a []byte.
+// This custom shader would be used to render the mesh utilizing the material after rendering to the depth texture, but before
+// compositing the finished render to the screen after fog. If the shader is nil, the Material will render using the default Tetra3D
+// render setup (e.g. texture, UV values, vertex colors, and vertex lighting).
+// SetShader will return the Shader, and an error if the Shader failed to compile.
+func (material *Material) SetShader(src []byte) (*ebiten.Shader, error) {
+
+	if src == nil {
+		material.fragmentShader = nil
+		material.fragmentSrc = nil
+		return nil, nil
+	}
+
+	newShader, err := ebiten.NewShader(src)
+	if err != nil {
+		return nil, err
+	}
+
+	material.fragmentShader = newShader
+	material.fragmentSrc = src
+
+	return material.fragmentShader, nil
+
+}
+
+// Shader returns the custom Kage fragment shader for the Material.
+func (material *Material) Shader() *ebiten.Shader {
+	return material.fragmentShader
+}
+
+// DisposeShader disposes the custom fragment Shader for the Material (assuming it has one). If it does not have a Shader, nothing happens.
+func (material *Material) DisposeShader() {
+	if material.fragmentShader != nil {
+		material.fragmentShader.Dispose()
+	}
+	material.fragmentSrc = nil
+	material.fragmentShader = nil
 }
 
 // Library returns the Library from which this Material was loaded. If it was created through code, this function will return nil.

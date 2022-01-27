@@ -17,14 +17,16 @@ type GLTFLoadOptions struct {
 	LoadImages                bool // Whether images embedded in the GLTF / GLB file should be loaded or not.
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
 	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying)
+	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
 }
 
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
 func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 	return &GLTFLoadOptions{
-		LoadImages:   true,
-		CameraWidth:  1920,
-		CameraHeight: 1080,
+		LoadImages:                true,
+		CameraWidth:               1920,
+		CameraHeight:              1080,
+		DefaultToAutoTransparency: true,
 	}
 }
 
@@ -132,7 +134,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		}
 
 		if gltfMat.AlphaMode == gltf.AlphaOpaque {
-			newMat.TransparencyMode = TransparencyModeOpaque
+			if gltfLoadOptions.DefaultToAutoTransparency {
+				newMat.TransparencyMode = TransparencyModeAuto
+			} else {
+				newMat.TransparencyMode = TransparencyModeOpaque
+			}
 		} else if gltfMat.AlphaMode == gltf.AlphaBlend {
 			newMat.TransparencyMode = TransparencyModeTransparent
 		} else { //if gltfMat.AlphaMode == gltf.AlphaMask
