@@ -251,7 +251,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Normal debug rendering
 - [x] Materials
 - [x] -- Basic Texturing
-- [ ] -- Multitexturing / Per-triangle Materials
+- [x] -- Multitexturing / Per-triangle Materials
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
 - [ ] Easy dynamic 3D Text (the current idea is to render the text to texture from a font, and then map it to a plane)
 - [x] Animations
@@ -288,7 +288,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Smooth shading
 - [x] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
-- [ ] Shaders
+- [x] Shaders
+- [x] -- Custom fragment shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)
 - [x] Intersection Testing:
 - [ ] -- Normal reporting
