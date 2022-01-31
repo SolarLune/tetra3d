@@ -15,7 +15,7 @@ type Model struct {
 	Mesh              *Mesh
 	FrustumCulling    bool   // Whether the Model is culled when it leaves the frustum.
 	Color             *Color // The overall color of the Model.
-	ColorBlendingFunc func(model *Model) ebiten.ColorM
+	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM
 	BoundingSphere    *BoundingSphere
 	BoundingAABB      *BoundingAABB
 
@@ -26,12 +26,14 @@ type Model struct {
 	vectorPool *VectorPool
 }
 
-var defaultColorBlendingFunc = func(model *Model) ebiten.ColorM {
+var defaultColorBlendingFunc = func(model *Model, meshPart *MeshPart) ebiten.ColorM {
 	colorM := ebiten.ColorM{}
 	colorM.Scale(model.Color.ToFloat64s())
-	if model.Mesh.Material != nil {
-		colorM.Scale(model.Mesh.Material.Color.ToFloat64s())
+
+	if meshPart.Material != nil {
+		colorM.Scale(meshPart.Material.Color.ToFloat64s())
 	}
+
 	return colorM
 }
 
@@ -48,7 +50,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 	}
 
 	if mesh != nil {
-		model.vectorPool = NewVectorPool(len(mesh.Vertices))
+		model.vectorPool = NewVectorPool(mesh.TotalVertexCount())
 	}
 
 	model.onTransformUpdate = func() {
@@ -95,8 +97,9 @@ func (model *Model) Clone() INode {
 }
 
 // Merge merges the provided models into the calling Model. You can use this to merge several objects initially dynamically placed into the calling Model's mesh,
-// thereby saving on draw calls. Note that the finished Mesh still only uses one Image for texturing, so this is best done between objects that share textures or
-// tilemaps.
+// thereby saving on draw calls. Note that models are merged into MeshParts (saving draw calls) based on maximum vertex count and shared materials (so to get any
+// benefit from merging, ensure the merged models share materials; if they all have unique materials, they will be turned into individual MeshParts, thereby forcing multiple
+// draw calls).
 func (model *Model) Merge(models ...*Model) {
 
 	for _, other := range models {
@@ -112,24 +115,43 @@ func (model *Model) Merge(models ...*Model) {
 
 		inverted = inverted.Mult(NewMatrix4Translate(op[0]-p[0], op[1]-p[1], op[2]-p[2]))
 
-		verts := []*Vertex{}
+		for _, otherPart := range other.Mesh.MeshParts {
 
-		for i := 0; i < len(other.Mesh.Vertices); i += 3 {
+			// Here, we'll merge models into the calling Model, using its existing mesh parts if the materials match and if adding the vertices wouldn't exceed the maximum triangle count (21845 in a single draw call).
 
-			v0 := other.Mesh.Vertices[i].Clone()
-			v0.Position = inverted.MultVec(v0.Position)
+			var targetPart *MeshPart
 
-			v1 := other.Mesh.Vertices[i+1].Clone()
-			v1.Position = inverted.MultVec(v1.Position)
+			for _, mp := range model.Mesh.MeshParts {
+				if mp.Material == otherPart.Material && len(mp.Triangles)+len(otherPart.Triangles) < ebiten.MaxIndicesNum/3 {
+					targetPart = mp
+					break
+				}
+			}
 
-			v2 := other.Mesh.Vertices[i+2].Clone()
-			v2.Position = inverted.MultVec(v2.Position)
+			if targetPart == nil {
+				targetPart = model.Mesh.AddMeshPart(otherPart.Material)
+			}
 
-			verts = append(verts, v0, v1, v2)
+			verts := []*Vertex{}
+
+			for _, tri := range otherPart.Triangles {
+
+				v0 := tri.Vertices[0].Clone()
+				v0.Position = inverted.MultVec(v0.Position)
+
+				v1 := tri.Vertices[1].Clone()
+				v1.Position = inverted.MultVec(v1.Position)
+
+				v2 := tri.Vertices[2].Clone()
+				v2.Position = inverted.MultVec(v2.Position)
+
+				verts = append(verts, v0, v1, v2)
+
+			}
+
+			targetPart.AddTriangles(verts...)
 
 		}
-
-		model.Mesh.AddTriangles(verts...)
 
 	}
 
@@ -138,7 +160,7 @@ func (model *Model) Merge(models ...*Model) {
 	model.BoundingSphere.SetLocalPosition(model.Mesh.Dimensions.Center())
 	model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
 
-	model.vectorPool = NewVectorPool(len(model.Mesh.Vertices))
+	model.vectorPool = NewVectorPool(model.Mesh.TotalVertexCount())
 
 }
 
@@ -203,14 +225,14 @@ func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
 
 }
 
-func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Triangle {
+func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart) []*Triangle {
 
 	model.vectorPool.Reset()
 
 	var transformFunc func(vector.Vector) vector.Vector
 
-	if model.Mesh.Material != nil && model.Mesh.Material.VertexProgram != nil {
-		transformFunc = model.Mesh.Material.VertexProgram
+	if meshPart.Material != nil && meshPart.Material.VertexProgram != nil {
+		transformFunc = meshPart.Material.VertexProgram
 	}
 
 	if model.Skinned {
@@ -218,7 +240,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 		t := time.Now()
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
-		for _, tri := range model.Mesh.Triangles {
+		for _, tri := range meshPart.Triangles {
 
 			tri.visible = true
 
@@ -248,7 +270,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 
 		mvp := model.Transform().Mult(vpMatrix)
 
-		for _, tri := range model.Mesh.Triangles {
+		for _, tri := range meshPart.Triangles {
 
 			tri.visible = true
 
@@ -277,23 +299,23 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera) []*Tri
 
 	sortMode := TriangleSortBackToFront
 
-	if model.Mesh.Material != nil {
-		sortMode = model.Mesh.Material.TriangleSortMode
+	if meshPart.Material != nil {
+		sortMode = meshPart.Material.TriangleSortMode
 	}
 
 	// Preliminary tests indicate sort.SliceStable is faster than sort.Slice for our purposes
 
 	if sortMode == TriangleSortBackToFront {
-		sort.SliceStable(model.Mesh.sortedTriangles, func(i, j int) bool {
-			return model.Mesh.sortedTriangles[i].closestDepth > model.Mesh.sortedTriangles[j].closestDepth
+		sort.SliceStable(meshPart.sortedTriangles, func(i, j int) bool {
+			return meshPart.sortedTriangles[i].closestDepth > meshPart.sortedTriangles[j].closestDepth
 		})
 	} else if sortMode == TriangleSortFrontToBack {
-		sort.SliceStable(model.Mesh.sortedTriangles, func(i, j int) bool {
-			return model.Mesh.sortedTriangles[i].closestDepth < model.Mesh.sortedTriangles[j].closestDepth
+		sort.SliceStable(meshPart.sortedTriangles, func(i, j int) bool {
+			return meshPart.sortedTriangles[i].closestDepth < meshPart.sortedTriangles[j].closestDepth
 		})
 	}
 
-	return model.Mesh.sortedTriangles
+	return meshPart.sortedTriangles
 
 }
 
@@ -316,8 +338,10 @@ func (model *Model) Type() NodeType {
 	return NodeTypeModel
 }
 
-// IsTransparent returns true if the material's TransparencyMode is TransparencyModeTransparent, or if it's
-// TransparencyModeAuto with the model or material alpha color being under 0.99.
-func (model *Model) IsTransparent() bool {
-	return model.Mesh.Material != nil && (model.Mesh.Material.TransparencyMode == TransparencyModeTransparent || (model.Mesh.Material.TransparencyMode == TransparencyModeAuto && (model.Mesh.Material.Color.A < 0.99 || model.Color.A < 0.99)))
+// isTransparent returns true if the provided MeshPart has a Material with TransparencyModeTransparent, or if it's
+// TransparencyModeAuto with the model or material alpha color being under 0.99. This is a helper function for sorting
+// MeshParts into either transparent or opaque buckets for rendering.
+func (model *Model) isTransparent(meshPart *MeshPart) bool {
+	mat := meshPart.Material
+	return mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || (mat.TransparencyMode == TransparencyModeAuto && (mat.Color.A < 0.99 || model.Color.A < 0.99)))
 }

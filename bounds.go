@@ -88,29 +88,33 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *In
 	var contact vector.Vector
 	closestDist := math.MaxFloat64
 
-	for _, tri := range triangles.Mesh.Triangles {
+	for _, meshPart := range triangles.Mesh.MeshParts {
 
-		v0 := tri.Vertices[0].Position
-		v1 := tri.Vertices[1].Position
-		v2 := tri.Vertices[2].Position
+		for _, tri := range meshPart.Triangles {
 
-		// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
-		// only has to check triangles in the nearby cells.
-		if fastVectorSub(spherePos, tri.Center).Magnitude() > tri.MaxSpan+sphereRadius {
-			continue
-		}
+			v0 := tri.Vertices[0].Position
+			v1 := tri.Vertices[1].Position
+			v2 := tri.Vertices[2].Position
 
-		closest := closestPointOnTri(spherePos, v0, v1, v2)
-		delta := fastVectorSub(spherePos, closest)
+			// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
+			// only has to check triangles in the nearby cells.
+			if fastVectorSub(spherePos, tri.Center).Magnitude() > tri.MaxSpan+sphereRadius {
+				continue
+			}
 
-		if delta.Magnitude() <= sphereRadius {
+			closest := closestPointOnTri(spherePos, v0, v1, v2)
+			delta := fastVectorSub(spherePos, closest)
 
-			d := fastVectorDistanceSquared(spherePos, closest)
+			if delta.Magnitude() <= sphereRadius {
 
-			if contact == nil || d < closestDist {
-				contact = closest
-				closestDist = d
-				mtv = transformNoLoc.MultVec(delta.Unit().Scale(sphereRadius - delta.Magnitude()))
+				d := fastVectorDistanceSquared(spherePos, closest)
+
+				if contact == nil || d < closestDist {
+					contact = closest
+					closestDist = d
+					mtv = transformNoLoc.MultVec(delta.Unit().Scale(sphereRadius - delta.Magnitude()))
+				}
+
 			}
 
 		}
@@ -241,79 +245,83 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Intersect
 	overallAxis := vector.Vector{0, 0, 0}
 	overlapDistance := 0.0
 
-	for _, tri := range triangles.Mesh.Triangles {
+	for _, meshPart := range triangles.Mesh.MeshParts {
 
-		v0 := transform.MultVec(tri.Vertices[0].Position).Sub(boxPos)
-		v1 := transform.MultVec(tri.Vertices[1].Position).Sub(boxPos)
-		v2 := transform.MultVec(tri.Vertices[2].Position).Sub(boxPos)
-		// tc := v0.Add(v1).Add(v2).Scale(1.0 / 3.0)
+		for _, tri := range meshPart.Triangles {
 
-		ab := v1.Sub(v0).Unit()
-		bc := v2.Sub(v1).Unit()
-		ca := v0.Sub(v2).Unit()
+			v0 := transform.MultVec(tri.Vertices[0].Position).Sub(boxPos)
+			v1 := transform.MultVec(tri.Vertices[1].Position).Sub(boxPos)
+			v2 := transform.MultVec(tri.Vertices[2].Position).Sub(boxPos)
+			// tc := v0.Add(v1).Add(v2).Scale(1.0 / 3.0)
 
-		axes := []vector.Vector{
+			ab := v1.Sub(v0).Unit()
+			bc := v2.Sub(v1).Unit()
+			ca := v0.Sub(v2).Unit()
 
-			vector.X,
-			vector.Y,
-			vector.Z,
+			axes := []vector.Vector{
 
-			vectorCross(vector.X, ab, bc),
-			vectorCross(vector.X, bc, ca),
-			vectorCross(vector.X, ca, ab),
+				vector.X,
+				vector.Y,
+				vector.Z,
 
-			vectorCross(vector.Y, ab, bc),
-			vectorCross(vector.Y, bc, ca),
-			vectorCross(vector.Y, ca, ab),
+				vectorCross(vector.X, ab, bc),
+				vectorCross(vector.X, bc, ca),
+				vectorCross(vector.X, ca, ab),
 
-			vectorCross(vector.Z, ab, bc),
-			vectorCross(vector.Z, bc, ca),
-			vectorCross(vector.Z, ca, ab),
+				vectorCross(vector.Y, ab, bc),
+				vectorCross(vector.Y, bc, ca),
+				vectorCross(vector.Y, ca, ab),
 
-			transform.MultVec(tri.Normal),
-		}
+				vectorCross(vector.Z, ab, bc),
+				vectorCross(vector.Z, bc, ca),
+				vectorCross(vector.Z, ca, ab),
 
-		var overlapAxis vector.Vector
-		smallestOverlap := math.MaxFloat64
-
-		for _, axis := range axes {
-
-			if axis == nil {
-				return nil
+				transform.MultVec(tri.Normal),
 			}
 
-			axis = axis.Unit()
+			var overlapAxis vector.Vector
+			smallestOverlap := math.MaxFloat64
 
-			p1 := project(axis, v0, v1, v2)
+			for _, axis := range axes {
 
-			r := boxSize[0]*math.Abs(vector.X.Dot(axis)) +
-				boxSize[1]*math.Abs(vector.Y.Dot(axis)) +
-				boxSize[2]*math.Abs(vector.Z.Dot(axis))
+				if axis == nil {
+					return nil
+				}
 
-			p2 := projection{
-				Max: r,
-				Min: -r,
+				axis = axis.Unit()
+
+				p1 := project(axis, v0, v1, v2)
+
+				r := boxSize[0]*math.Abs(vector.X.Dot(axis)) +
+					boxSize[1]*math.Abs(vector.Y.Dot(axis)) +
+					boxSize[2]*math.Abs(vector.Z.Dot(axis))
+
+				p2 := projection{
+					Max: r,
+					Min: -r,
+				}
+
+				overlap := p1.Overlap(p2)
+
+				if !p1.IsOverlapping(p2) {
+					overlapAxis = nil
+					break
+				}
+
+				if overlap < smallestOverlap {
+					smallestOverlap = overlap
+					overlapAxis = axis
+				}
+
 			}
 
-			overlap := p1.Overlap(p2)
-
-			if !p1.IsOverlapping(p2) {
-				overlapAxis = nil
-				break
+			if overlapAxis != nil && smallestOverlap > overlapDistance {
+				overallAxis[0] = overlapAxis[0]
+				overallAxis[1] = overlapAxis[1]
+				overallAxis[2] = overlapAxis[2]
+				overlapDistance = smallestOverlap
 			}
 
-			if overlap < smallestOverlap {
-				smallestOverlap = overlap
-				overlapAxis = axis
-			}
-
-		}
-
-		if overlapAxis != nil && smallestOverlap > overlapDistance {
-			overallAxis[0] = overlapAxis[0]
-			overallAxis[1] = overlapAxis[1]
-			overallAxis[2] = overlapAxis[2]
-			overlapDistance = smallestOverlap
 		}
 
 	}
@@ -352,39 +360,47 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Intersecti
 	transformedA := [][]vector.Vector{}
 	transformedB := [][]vector.Vector{}
 
-	for _, tri := range trianglesA.Mesh.Triangles {
+	for _, meshPart := range trianglesA.Mesh.MeshParts {
 
-		v0 := transformA.MultVec(tri.Vertices[0].Position)
-		v1 := transformA.MultVec(tri.Vertices[1].Position)
-		v2 := transformA.MultVec(tri.Vertices[2].Position)
+		for _, tri := range meshPart.Triangles {
 
-		transformedA = append(transformedA,
-			[]vector.Vector{
-				v0, v1, v2,
-				v1.Sub(v0).Unit(),
-				v2.Sub(v1).Unit(),
-				v0.Sub(v2).Unit(),
-				transformA.MultVec(tri.Normal),
-			},
-		)
+			v0 := transformA.MultVec(tri.Vertices[0].Position)
+			v1 := transformA.MultVec(tri.Vertices[1].Position)
+			v2 := transformA.MultVec(tri.Vertices[2].Position)
+
+			transformedA = append(transformedA,
+				[]vector.Vector{
+					v0, v1, v2,
+					v1.Sub(v0).Unit(),
+					v2.Sub(v1).Unit(),
+					v0.Sub(v2).Unit(),
+					transformA.MultVec(tri.Normal),
+				},
+			)
+
+		}
 
 	}
 
-	for _, tri := range trianglesB.Mesh.Triangles {
+	for _, meshPart := range trianglesB.Mesh.MeshParts {
 
-		v0 := transformB.MultVec(tri.Vertices[0].Position)
-		v1 := transformB.MultVec(tri.Vertices[1].Position)
-		v2 := transformB.MultVec(tri.Vertices[2].Position)
+		for _, tri := range meshPart.Triangles {
 
-		transformedB = append(transformedB,
-			[]vector.Vector{
-				v0, v1, v2,
-				v1.Sub(v0).Unit(),
-				v2.Sub(v1).Unit(),
-				v0.Sub(v2).Unit(),
-				transformB.MultVec(tri.Normal),
-			},
-		)
+			v0 := transformB.MultVec(tri.Vertices[0].Position)
+			v1 := transformB.MultVec(tri.Vertices[1].Position)
+			v2 := transformB.MultVec(tri.Vertices[2].Position)
+
+			transformedB = append(transformedB,
+				[]vector.Vector{
+					v0, v1, v2,
+					v1.Sub(v0).Unit(),
+					v2.Sub(v1).Unit(),
+					v0.Sub(v2).Unit(),
+					transformB.MultVec(tri.Normal),
+				},
+			)
+
+		}
 
 	}
 
@@ -525,41 +541,45 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	var closestCapsulePoint vector.Vector
 
-	for _, tri := range triangles.Mesh.Triangles {
+	for _, meshPart := range triangles.Mesh.MeshParts {
 
-		// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
-		// only has to check triangles in the nearby cells.
-		if fastVectorSub(capsulePosition, tri.Center).Magnitude() > tri.MaxSpan+capSpread {
-			continue
-		}
+		for _, tri := range meshPart.Triangles {
 
-		if fastVectorDistanceSquared(tri.Center, capsuleTop) < fastVectorDistanceSquared(tri.Center, capsuleBottom) {
-			closestCapsulePoint = capsuleTop
-		} else {
-			closestCapsulePoint = capsuleBottom
-		}
+			// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
+			// only has to check triangles in the nearby cells.
+			if fastVectorSub(capsulePosition, tri.Center).Magnitude() > tri.MaxSpan+capSpread {
+				continue
+			}
 
-		v0 := tri.Vertices[0].Position
-		v1 := tri.Vertices[1].Position
-		v2 := tri.Vertices[2].Position
+			if fastVectorDistanceSquared(tri.Center, capsuleTop) < fastVectorDistanceSquared(tri.Center, capsuleBottom) {
+				closestCapsulePoint = capsuleTop
+			} else {
+				closestCapsulePoint = capsuleBottom
+			}
 
-		closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
+			v0 := tri.Vertices[0].Position
+			v1 := tri.Vertices[1].Position
+			v2 := tri.Vertices[2].Position
 
-		// Doing this manually to avoid doing as much as possible~
+			closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
 
-		t := closest.Sub(capsuleBottom).Dot(capsuleLine) / capDot
-		t = math.Max(math.Min(t, 1), 0)
-		spherePos := capsuleBottom.Add(capsuleLine.Scale(t))
+			// Doing this manually to avoid doing as much as possible~
 
-		delta := fastVectorSub(spherePos, closest)
+			t := closest.Sub(capsuleBottom).Dot(capsuleLine) / capDot
+			t = math.Max(math.Min(t, 1), 0)
+			spherePos := capsuleBottom.Add(capsuleLine.Scale(t))
 
-		if delta.Magnitude() <= capsuleRadius {
+			delta := fastVectorSub(spherePos, closest)
 
-			d := fastVectorDistanceSquared(spherePos, closest)
-			if contact == nil || d < closestDist {
-				contact = closest
-				closestDist = d
-				mtv = transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - delta.Magnitude()))
+			if delta.Magnitude() <= capsuleRadius {
+
+				d := fastVectorDistanceSquared(spherePos, closest)
+				if contact == nil || d < closestDist {
+					contact = closest
+					closestDist = d
+					mtv = transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - delta.Magnitude()))
+				}
+
 			}
 
 		}

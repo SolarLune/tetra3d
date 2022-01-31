@@ -60,11 +60,12 @@ func (g *Game) Init() {
 
 	g.Scene = data.Scenes[0]
 
-	// Get the ScreenTexture node, which is a model
-	screen := g.Scene.Root.Get("ScreenBorder/ScreenTexture")
+	// And set its image to the offscreen buffer
+	data.Materials["ScreenTexture"].Image = g.Offscreen
 
-	// And set its image
-	screen.(*tetra3d.Model).Mesh.Material.Image = g.Offscreen
+	// This is another way to do it
+	// screen := g.Scene.Root.Get("Screen").(*tetra3d.Model)
+	// screen.Mesh.FindMeshPartByMaterialName("ScreenTexture").Material.Image = g.Offscreen
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
@@ -187,7 +188,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Offscreen.DrawImage(g.Camera.ColorTexture, nil)
 
 	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("ScreenBorder"))
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("Screen"))
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
@@ -203,7 +204,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorWhite())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe screen object shows what the\ncamera is looking at.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 100, color.RGBA{255, 0, 0, 255})
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
 	}
 }
 

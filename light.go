@@ -165,6 +165,8 @@ func (point *PointLight) Light(tri *Triangle) [9]float32 {
 
 	vertColors := [9]float32{}
 
+	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
+
 	eyeVec := fastVectorSub(point.cameraPosition, tri.Center).Unit()
 
 	for i, vert := range tri.Vertices {

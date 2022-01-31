@@ -69,7 +69,7 @@ func (g *Game) Init() {
 	g.Scene = tetra3d.NewScene("Test Scene")
 
 	cubeMesh := tetra3d.NewCube()
-	cubeMesh.Material.Image = loadImage(testImageData)
+	cubeMesh.MeshParts[0].Material.Image = loadImage(testImageData)
 
 	parent := tetra3d.NewModel(cubeMesh, "parent")
 	parent.SetLocalPosition(vector.Vector{0, -3, 0})

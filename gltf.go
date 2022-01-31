@@ -289,29 +289,37 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				verticesToVertexData[newVert] = vd
 			}
 
-			newMesh.AddTriangles(newVerts...)
-
-			if vertexData[0].Normal != nil {
-
-				normals := []vector.Vector{}
-
-				for i := 0; i < len(indices); i += 3 {
-					normal := vertexData[indices[i]].Normal
-					normal = normal.Add(vertexData[indices[i+1]].Normal)
-					normal = normal.Add(vertexData[indices[i+2]].Normal)
-					normals = append(normals, normal.Unit())
-				}
-
-				for triIndex, tri := range newMesh.Triangles {
-					tri.Normal = normals[triIndex]
-				}
-
-			}
+			var mat *Material
 
 			if v.Material != nil {
 				gltfMat := doc.Materials[*v.Material]
-				newMesh.Material = library.Materials[gltfMat.Name]
+				mat = library.Materials[gltfMat.Name]
 			}
+
+			mp := newMesh.AddMeshPart(mat)
+
+			mp.AddTriangles(newVerts...)
+
+			for _, tri := range mp.Triangles {
+				tri.Normal = tri.Vertices[0].Normal.Add(tri.Vertices[1].Normal).Add(tri.Vertices[2].Normal).Unit()
+			}
+
+			// if vertexData[0].Normal != nil {
+
+			// 	normals := []vector.Vector{}
+
+			// 	for i := 0; i < len(indices); i += 3 {
+			// 		normal := vertexData[indices[i]].Normal
+			// 		normal = normal.Add(vertexData[indices[i+1]].Normal)
+			// 		normal = normal.Add(vertexData[indices[i+2]].Normal)
+			// 		normals = append(normals, normal.Unit())
+			// 	}
+
+			// 	for triIndex, tri := range newMesh.Triangles {
+			// 		tri.Normal = normals[triIndex]
+			// 	}
+
+			// }
 
 			newMesh.UpdateBounds()
 
@@ -589,12 +597,16 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
-			for _, vertex := range model.Mesh.Vertices {
+			for _, part := range model.Mesh.MeshParts {
 
-				model.bones = append(model.bones, []*Node{})
+				for _, vertex := range part.Vertices {
 
-				for _, boneID := range verticesToVertexData[vertex].Bones {
-					model.bones[vertex.ID] = append(model.bones[vertex.ID], allBones[boneID])
+					model.bones = append(model.bones, []*Node{})
+
+					for _, boneID := range verticesToVertexData[vertex].Bones {
+						model.bones[vertex.ID] = append(model.bones[vertex.ID], allBones[boneID])
+					}
+
 				}
 
 			}

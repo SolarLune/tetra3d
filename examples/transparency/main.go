@@ -68,6 +68,7 @@ func (g *Game) Init() {
 	g.Scene = library.Scenes[0]
 
 	g.Camera = tetra3d.NewCamera(1920, 1080)
+	g.Camera.Far = 30
 	g.Camera.SetLocalPosition(vector.Vector{0, 5, 15})
 	g.Scene.Root.AddChildren(g.Camera)
 
@@ -77,9 +78,16 @@ func (g *Game) Init() {
 	g.Scene.Root.Get("Water").(*tetra3d.Model).Color.A = 0.6
 
 	g.Scene.FogMode = tetra3d.FogOverwrite
-	g.Scene.FogColor = tetra3d.NewColor(1, 1, 1, 1)
+	g.Scene.FogColor = tetra3d.NewColor(0.8, 0.9, 1, 1)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+
+	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
+
+	water.Mesh.MeshParts[0].Material.VertexProgram = func(v vector.Vector) vector.Vector {
+		v[1] += math.Sin((g.Time*math.Pi)+(v[0]*1.2)+(v[2]*0.739)) * 0.007
+		return v
+	}
 
 }
 
@@ -95,6 +103,8 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
+	// We toggle transparency here; note that we can also just leave the mode set to TransparencyModeAuto for the water, instead; then, we would just need to make the material or object color transparent.
+	// Tetra3D would then treat the material as though it had TransparencyModeTransparent set.
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {
 			g.Library.Materials["TransparentSquare"].TransparencyMode = tetra3d.TransparencyModeAlphaClip
@@ -103,11 +113,6 @@ func (g *Game) Update() error {
 			g.Library.Materials["TransparentSquare"].TransparencyMode = tetra3d.TransparencyModeOpaque
 			g.Library.Materials["Water"].TransparencyMode = tetra3d.TransparencyModeOpaque
 		}
-	}
-
-	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
-	for _, v := range water.Mesh.Vertices {
-		v.Position[1] += math.Sin((g.Time*math.Pi)+(v.Position[0]*1.2)+(v.Position[2]*0.739)) * 0.007
 	}
 
 	// Moving the Camera

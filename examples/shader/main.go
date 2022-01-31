@@ -54,7 +54,7 @@ func (g *Game) Init() {
 
 	mesh := tetra3d.NewCube()
 
-	_, err := mesh.Material.SetShader([]byte(`
+	_, err := mesh.MeshParts[0].Material.SetShader([]byte(`
 	package main
 
 	func Fragment(position vec4, texCoord vec2, color vec4) vec4 {

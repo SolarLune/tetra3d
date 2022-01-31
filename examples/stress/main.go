@@ -62,17 +62,20 @@ func (g *Game) Init() {
 	}
 
 	merged := tetra3d.NewModel(tetra3d.NewMesh("merged"), "merged cubes")
-	merged.Mesh.Material = tetra3d.NewMaterial("merged cubes")
-	merged.Mesh.Material.Image = ebiten.NewImageFromImage(img)
 
 	cubes := []*tetra3d.Model{}
 
-	for i := 0; i < 30; i++ {
-		for j := 0; j < 30; j++ {
-			cubeMesh := tetra3d.NewCube()
-			cube := tetra3d.NewModel(cubeMesh, "Cube")
-			cube.SetLocalPosition(vector.Vector{float64(i * 3), 0, float64(-j * 3)})
-			cubes = append(cubes, cube)
+	ogCubeMesh := tetra3d.NewCube()
+	cubeMesh := ogCubeMesh.Clone()
+	ogCubeMesh.MeshParts[0].ApplyMatrix(tetra3d.NewMatrix4Translate(40, 0, 0))
+
+	for i := 0; i < 31; i++ {
+		for j := 0; j < 31; j++ {
+			for k := 0; k < 3; k++ {
+				cube := tetra3d.NewModel(cubeMesh, "Cube")
+				cube.SetLocalPosition(vector.Vector{float64(i * 3), float64(k * 3), float64(-j * 3)})
+				cubes = append(cubes, cube)
+			}
 		}
 	}
 
@@ -81,17 +84,9 @@ func (g *Game) Init() {
 	// increased render speed in-game. Note that the maximum number of triangles is 32
 	merged.Merge(cubes...)
 
+	merged.Mesh.MeshParts[0].Material.Image = ebiten.NewImageFromImage(img)
+
 	g.Scene.Root.AddChildren(merged)
-
-	for i := 0; i < 2; i++ {
-		newMerged := merged.Clone()
-		newMerged.Move(0, -float64((i+1)*3), 0)
-		g.Scene.Root.AddChildren(newMerged)
-	}
-
-	// for _, c := range cubes {
-	// 	g.Scene.Root.AddChildren(c)
-	// }
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Far = 90

@@ -289,33 +289,40 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 		}
 
-		mesh := NewMesh(geo.Name, verts...)
+		mesh := NewMesh(geo.Name)
+		var mat *Material
+		mat = daeURLsToMaterials[geo.Triangles.MaterialName]
+		mesh.AddMeshPart(mat).AddTriangles(verts...)
 		mesh.library = scenes
 
 		if len(normals) > 0 {
 
-			for _, tri := range mesh.Triangles {
+			for _, part := range mesh.MeshParts {
 
-				normal := vector.Vector{0, 0, 0}
-				for _, vert := range tri.Vertices {
-					normal = normal.Add(normals[vert])
+				for _, tri := range part.Triangles {
+
+					normal := vector.Vector{0, 0, 0}
+					for _, vert := range tri.Vertices {
+						normal = normal.Add(normals[vert])
+					}
+					normal = normal.Scale(1.0 / 3.0).Unit()
+
+					normal = toYUp.MultVec(normal)
+					normal[2] *= -1
+					normal[1] *= -1
+					tri.Normal = normal
+
 				}
-				normal = normal.Scale(1.0 / 3.0).Unit()
 
-				normal = toYUp.MultVec(normal)
-				normal[2] *= -1
-				normal[1] *= -1
-				tri.Normal = normal
+				if options.CorrectYUp {
+					part.ApplyMatrix(NewMatrix4Rotate(1, 0, 0, -math.Pi/2))
+					mesh.UpdateBounds()
+				}
 
 			}
 
 		}
 
-		if options.CorrectYUp {
-			mesh.ApplyMatrix(NewMatrix4Rotate(1, 0, 0, -math.Pi/2))
-		}
-
-		mesh.Material = daeURLsToMaterials[geo.Triangles.MaterialName]
 		scenes.Meshes[geo.Name] = mesh
 		daeURLsToMeshes[geo.URL] = mesh
 

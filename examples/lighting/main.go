@@ -92,9 +92,9 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	// light := g.Scene.Root.Get("Point light").(*tetra3d.Node)
-	// light.AnimationPlayer.Play(g.Library.Animations["LightAction"])
-	// light.AnimationPlayer.Update(1.0 / 60.0)
+	light := g.Scene.Root.Get("Point light").(*tetra3d.Node)
+	light.AnimationPlayer.Play(g.Library.Animations["LightAction"])
+	light.AnimationPlayer.Update(1.0 / 60.0)
 
 	// g.Scene.Root.Get("plane").Rotate(1, 0, 0, 0.04)
 
