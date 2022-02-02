@@ -61,17 +61,19 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
+	// When creating a new mesh, it has no MeshParts.
 	merged := tetra3d.NewModel(tetra3d.NewMesh("merged"), "merged cubes")
 
+	// Here, we'll store all of the cubes we'll merge together.
 	cubes := []*tetra3d.Model{}
 
-	ogCubeMesh := tetra3d.NewCube()
-	cubeMesh := ogCubeMesh.Clone()
-	ogCubeMesh.MeshParts[0].ApplyMatrix(tetra3d.NewMatrix4Translate(40, 0, 0))
+	// We can reuse the mesh for all of the models.
+	cubeMesh := tetra3d.NewCube()
 
 	for i := 0; i < 31; i++ {
 		for j := 0; j < 31; j++ {
 			for k := 0; k < 3; k++ {
+				// Create a new Model, position it, and add it to the cubes slice.
 				cube := tetra3d.NewModel(cubeMesh, "Cube")
 				cube.SetLocalPosition(vector.Vector{float64(i * 3), float64(k * 3), float64(-j * 3)})
 				cubes = append(cubes, cube)
@@ -81,11 +83,17 @@ func (g *Game) Init() {
 
 	// Here, we merge all of the cubes into one mesh. This is good for when you have elements
 	// you want to freely position in your modeler, for example, before combining them for
-	// increased render speed in-game. Note that the maximum number of triangles is 32
+	// increased render speed in-game. Note that the maximum number of rendered triangles
+	// in a single draw call is 21845.
 	merged.Merge(cubes...)
 
+	// After merging the cubes, the merged mesh has multiple MeshParts, but because the cube Models
+	// shared a single Mesh (which has a single Material (aptly named "Cube")), the MeshParts also
+	// share the same Material. This being the case, we don't need to set the image on all MeshParts'
+	// Materials; just the first one is fine.
 	merged.Mesh.MeshParts[0].Material.Image = ebiten.NewImageFromImage(img)
 
+	// Add the merged result model, and we're done, basically.
 	g.Scene.Root.AddChildren(merged)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
