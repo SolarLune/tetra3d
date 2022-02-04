@@ -244,7 +244,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 			tri.visible = true
 
-			tri.closestDepth = 0
+			tri.depth = 0
 
 			for _, vert := range tri.Vertices {
 
@@ -257,8 +257,8 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 					}
 				}
 				vert.transformed = model.vectorPool.MultVecW(vpMatrix, v)
-				if vert.transformed[3] > tri.closestDepth {
-					tri.closestDepth = vert.transformed[3]
+				if vert.transformed[3] > tri.depth {
+					tri.depth = vert.transformed[3]
 				}
 			}
 
@@ -274,7 +274,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 			tri.visible = true
 
-			tri.closestDepth = 0
+			tri.depth = 0
 
 			for _, vert := range tri.Vertices {
 				v := vert.Position
@@ -287,8 +287,8 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 				}
 				vert.transformed = model.vectorPool.MultVecW(mvp, v)
 
-				if vert.transformed[3] > tri.closestDepth {
-					tri.closestDepth = vert.transformed[3]
+				if vert.transformed[3] > tri.depth {
+					tri.depth = vert.transformed[3]
 				}
 
 			}
@@ -307,11 +307,11 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 	if sortMode == TriangleSortBackToFront {
 		sort.SliceStable(meshPart.sortedTriangles, func(i, j int) bool {
-			return meshPart.sortedTriangles[i].closestDepth > meshPart.sortedTriangles[j].closestDepth
+			return meshPart.sortedTriangles[i].depth > meshPart.sortedTriangles[j].depth
 		})
 	} else if sortMode == TriangleSortFrontToBack {
 		sort.SliceStable(meshPart.sortedTriangles, func(i, j int) bool {
-			return meshPart.sortedTriangles[i].closestDepth < meshPart.sortedTriangles[j].closestDepth
+			return meshPart.sortedTriangles[i].depth < meshPart.sortedTriangles[j].depth
 		})
 	}
 

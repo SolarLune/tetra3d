@@ -290,14 +290,14 @@ func NewPlane() *Mesh {
 
 // A Triangle represents the smallest renderable object in Tetra3D.
 type Triangle struct {
-	Vertices     []*Vertex
-	MaxSpan      float64
-	Normal       vector.Vector
-	MeshPart     *MeshPart
-	Center       vector.Vector
-	visible      bool
-	closestDepth float64
-	ID           int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
+	Vertices []*Vertex
+	MaxSpan  float64
+	Normal   vector.Vector
+	MeshPart *MeshPart
+	Center   vector.Vector
+	visible  bool
+	depth    float64
+	ID       int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
 }
 
 // NewTriangle creates a new Triangle, and requires a reference to its owning Mesh.

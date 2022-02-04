@@ -909,7 +909,9 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	for _, m := range rootNode.ChildrenRecursive() {
+	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+
+	for _, m := range allModels {
 
 		if model, isModel := m.(*Model); isModel {
 
@@ -945,11 +947,58 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 }
 
+// DrawDebugDrawOrder draws the drawing order of all triangles of all visible Models underneath the rootNode in the color provided to the screen
+// image provided.
+func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, textScale float64, color *Color) {
+
+	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
+
+	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+
+	for _, m := range allModels {
+
+		if model, isModel := m.(*Model); isModel {
+
+			if model.FrustumCulling {
+
+				if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
+					continue
+				}
+
+			}
+
+			for _, meshPart := range model.Mesh.MeshParts {
+
+				model.TransformedVertices(vpMatrix, camera, meshPart)
+
+				for triIndex, tri := range meshPart.sortedTriangles {
+
+					screenPos := camera.WorldToScreen(model.Transform().MultVec(tri.Center))
+
+					dr := &ebiten.DrawImageOptions{}
+					dr.ColorM.Scale(color.ToFloat64s())
+					dr.GeoM.Translate(screenPos[0], screenPos[1]+(textScale*16))
+					dr.GeoM.Scale(textScale, textScale)
+
+					text.DrawWithOptions(screen, fmt.Sprintf("%d", triIndex), basicfont.Face7x13, dr)
+
+				}
+
+			}
+
+		}
+
+	}
+
+}
+
 // DrawDebugNormals draws the normals of visible models underneath the rootNode given to the screen. NormalLength is the length of the normal lines
 // in units. Color is the color to draw the normals.
 func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float64, color color.Color) {
 
-	for _, m := range rootNode.ChildrenRecursive() {
+	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+
+	for _, m := range allModels {
 
 		if model, isModel := m.(*Model); isModel {
 
@@ -980,7 +1029,9 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 // DrawDebugCenters draws the center positions of nodes under the rootNode using the color given to the screen image provided.
 func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color color.Color) {
 
-	for _, node := range rootNode.ChildrenRecursive() {
+	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+
+	for _, node := range allModels {
 
 		if node == camera {
 			continue
@@ -1003,7 +1054,9 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 // be drawn in the color provided for each kind of bounding object to the screen image provided.
 func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor color.Color) {
 
-	for _, n := range rootNode.ChildrenRecursive() {
+	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+
+	for _, n := range allModels {
 
 		if b, isBounds := n.(BoundingObject); isBounds {
 
