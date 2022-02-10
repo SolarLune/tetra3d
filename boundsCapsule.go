@@ -70,7 +70,9 @@ func (capsule *BoundingCapsule) Intersection(other BoundingObject) *Intersection
 	case *BoundingSphere:
 		intersection := btSphereCapsule(otherBounds, capsule)
 		if intersection != nil {
-			intersection.MTV = intersection.MTV.Invert()
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+			}
 		}
 		return intersection
 

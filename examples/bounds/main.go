@@ -111,8 +111,14 @@ func (g *Game) ResolveCollisions() {
 
 		if inter := bounds.Intersection(ob.(tetra3d.BoundingObject)); inter != nil {
 
-			mtv := inter.MTV
-			g.Controlling.Move(mtv[0], mtv[1], mtv[2])
+			maxMTV := vector.Vector{0, 0, 0}
+			for _, i := range inter.Intersections {
+				if i.MTV.Magnitude() > maxMTV.Magnitude() {
+					maxMTV = i.MTV
+				}
+			}
+
+			g.Controlling.MoveVec(maxMTV)
 
 		}
 

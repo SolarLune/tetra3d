@@ -60,7 +60,7 @@ type INode interface {
 	// updateLocalTransform(newParent INode)
 	dirtyTransform()
 
-	SetWorldTransform(p, s vector.Vector, r Matrix4)
+	SetWorldTransform(transform Matrix4)
 
 	LocalRotation() Matrix4
 	SetLocalRotation(rotation Matrix4)
@@ -315,8 +315,9 @@ func (node *Node) Transform() Matrix4 {
 
 }
 
-// SetWorldTransform sets the Node's global (world) transform given the position vector, scale vector, and rotation matrix provided.
-func (node *Node) SetWorldTransform(position, scale vector.Vector, rotationMatrix Matrix4) {
+// SetWorldTransform sets the Node's global (world) transform to the full 4x4 transformation matrix provided.
+func (node *Node) SetWorldTransform(transform Matrix4) {
+	position, scale, rotationMatrix := transform.Decompose()
 	node.SetWorldPosition(position)
 	node.SetWorldScale(scale)
 	node.SetWorldRotation(rotationMatrix)

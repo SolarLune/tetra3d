@@ -31,13 +31,13 @@ func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
 		Node:         NewNode(name),
 		internalSize: vector.Vector{width, height, depth},
 	}
-	bounds.onTransformUpdate = bounds.UpdateSize
+	bounds.onTransformUpdate = bounds.updateSize
 	return bounds
 }
 
-// UpdateSize updates the BoundingAABB's external Size property to reflect its size after reposition, rotation, or resizing. \
+// updateSize updates the BoundingAABB's external Size property to reflect its size after reposition, rotation, or resizing.
 // This is be called automatically internally as necessary after the node's transform is updated.
-func (box *BoundingAABB) UpdateSize() {
+func (box *BoundingAABB) updateSize() {
 
 	_, s, r := box.Node.Transform().Decompose()
 
@@ -90,7 +90,7 @@ func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float64) {
 		box.internalSize[0] = newWidth
 		box.internalSize[1] = newHeight
 		box.internalSize[2] = newDepth
-		box.UpdateSize()
+		box.updateSize()
 	}
 
 }
@@ -159,7 +159,9 @@ func (box *BoundingAABB) Intersection(other BoundingObject) *IntersectionResult 
 	case *BoundingSphere:
 		intersection := btSphereAABB(otherBounds, box)
 		if intersection != nil {
-			intersection.MTV = intersection.MTV.Invert()
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+			}
 		}
 		return intersection
 
@@ -169,7 +171,9 @@ func (box *BoundingAABB) Intersection(other BoundingObject) *IntersectionResult 
 	case *BoundingCapsule:
 		intersection := btCapsuleAABB(otherBounds, box)
 		if intersection != nil {
-			intersection.MTV = intersection.MTV.Invert()
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+			}
 		}
 		return intersection
 

@@ -67,7 +67,7 @@ func NewCamera(w, h int) *Camera {
 		Far:         100,
 
 		FrustumSphere: NewBoundingSphere("camera frustum sphere", 0),
-		backfacePool:  NewVectorPool(2),
+		backfacePool:  NewVectorPool(3),
 	}
 
 	depthShaderText := []byte(
@@ -291,10 +291,7 @@ func (camera *Camera) SetOrthographic(orthoScale float64) {
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
 // does this by taking outVec, a vertex (vector.Vector) that it stores the values in and returns, which avoids reallocation.
-func (camera *Camera) clipToScreen(vert, outVec vector.Vector, mat *Material) vector.Vector {
-
-	w, h := camera.ColorTexture.Size()
-	width, height := float64(w), float64(h)
+func (camera *Camera) clipToScreen(vert, outVec vector.Vector, mat *Material, width, height float64) vector.Vector {
 
 	v3 := vert[3]
 
@@ -309,11 +306,9 @@ func (camera *Camera) clipToScreen(vert, outVec vector.Vector, mat *Material) ve
 	}
 
 	// Again, this function should only be called with pre-transformed 4D vertex arguments.
-	vx := vert[0] / v3
-	vy := vert[1] / v3 * -1
 
-	outVec[0] = vx*width + (width / 2)
-	outVec[1] = vy*height + (height / 2)
+	outVec[0] = (vert[0]/v3)*width + (width / 2)
+	outVec[1] = (vert[1]/v3*-1)*height + (height / 2)
 	outVec[2] = vert[2]
 	outVec[3] = vert[3]
 
@@ -327,7 +322,8 @@ func (camera *Camera) clipToScreen(vert, outVec vector.Vector, mat *Material) ve
 
 // ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
 func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
-	return camera.clipToScreen(vert, vector.Vector{0, 0, 0, 0}, nil)
+	width, height := camera.ColorTexture.Size()
+	return camera.clipToScreen(vert, vector.Vector{0, 0, 0, 0}, nil, float64(width), float64(height))
 }
 
 // WorldToScreen transforms a 3D position in the world to screen coordinates.
@@ -493,6 +489,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	}
 
+	camWidth, camHeight := camera.ColorTexture.Size()
+
 	render := func(renderPair RenderPair) {
 
 		model := renderPair.Model
@@ -591,9 +589,17 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			// }
 
-			p0 = camera.clipToScreen(v0, p0, meshPart.Material)
-			p1 = camera.clipToScreen(v1, p1, meshPart.Material)
-			p2 = camera.clipToScreen(v2, p2, meshPart.Material)
+			p0 = camera.clipToScreen(v0, p0, meshPart.Material, float64(camWidth), float64(camHeight))
+			p1 = camera.clipToScreen(v1, p1, meshPart.Material, float64(camWidth), float64(camHeight))
+			p2 = camera.clipToScreen(v2, p2, meshPart.Material, float64(camWidth), float64(camHeight))
+
+			// We can skip triangles that lie entirely outside of the view horizontally and vertically.
+			if (p0[0] < 0 && p1[0] < 0 && p2[0] < 0) ||
+				(p0[1] < 0 && p1[1] < 0 && p2[1] < 0) ||
+				(p0[0] > float64(camWidth) && p1[0] > float64(camWidth) && p2[0] > float64(camWidth)) ||
+				(p0[1] > float64(camHeight) && p1[1] > float64(camHeight) && p2[1] > float64(camHeight)) {
+				continue
+			}
 
 			// This is a bit of a hacky way to do backface culling; it works, but it uses
 			// the screen positions of the vertices to determine if the triangle should be culled.
@@ -606,7 +612,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				camera.backfacePool.Reset()
 				n0 := camera.backfacePool.Sub(p0, p1)[:3]
 				n1 := camera.backfacePool.Sub(p1, p2)[:3]
-				nor, _ := n0.Cross(n1)
+				nor := camera.backfacePool.Cross(n0, n1)
 
 				if nor[2] > 0 {
 					continue

@@ -139,15 +139,15 @@ func (g *Game) Update() error {
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
 
 		if child.Parent() == parent {
-			p, s, r := child.Transform().Decompose()
+			transform := child.Transform()
 			// After changing parenting, the child's position would change because of a different parent (so now
 			// 0, 0, 0 corresponds to a different location). We counteract this by manually setting the world transform to be the original location.
 			g.Scene.Root.AddChildren(child)
-			child.SetWorldTransform(p, s, r)
+			child.SetWorldTransform(transform)
 		} else {
-			p, s, r := child.Transform().Decompose()
+			transform := child.Transform()
 			parent.AddChildren(child)
-			child.SetWorldTransform(p, s, r)
+			child.SetWorldTransform(transform)
 		}
 
 	}

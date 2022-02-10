@@ -72,7 +72,7 @@ func (g *Game) Init() {
 
 	for i := 0; i < 31; i++ {
 		for j := 0; j < 31; j++ {
-			for k := 0; k < 3; k++ {
+			for k := 0; k < 6; k++ {
 				// Create a new Model, position it, and add it to the cubes slice.
 				cube := tetra3d.NewModel(cubeMesh, "Cube")
 				cube.SetLocalPosition(vector.Vector{float64(i * 3), float64(k * 3), float64(-j * 3)})
@@ -97,7 +97,7 @@ func (g *Game) Init() {
 	g.Scene.Root.AddChildren(merged)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.Far = 90
+	g.Camera.Far = 180
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -220,7 +220,7 @@ func (g *Game) StartProfiling() {
 	fmt.Println("Beginning CPU profiling...")
 	pprof.StartCPUProfile(outFile)
 	go func() {
-		time.Sleep(2 * time.Second)
+		time.Sleep(10 * time.Second)
 		pprof.StopCPUProfile()
 		fmt.Println("CPU profiling finished.")
 	}()

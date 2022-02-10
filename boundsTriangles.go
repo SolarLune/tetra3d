@@ -51,28 +51,34 @@ func (bt *BoundingTriangles) Intersection(other BoundingObject) *IntersectionRes
 	switch otherBounds := other.(type) {
 
 	case *BoundingAABB:
-		oi := otherBounds.Intersection(bt)
-		if oi != nil {
-			oi.MTV = oi.MTV.Invert()
+		intersection := otherBounds.Intersection(bt)
+		if intersection != nil {
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+			}
 		}
-		return oi
+		return intersection
 
 	case *BoundingSphere:
-		oi := otherBounds.Intersection(bt)
-		if oi != nil {
-			oi.MTV = oi.MTV.Invert()
+		intersection := otherBounds.Intersection(bt)
+		if intersection != nil {
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+			}
 		}
-		return oi
+		return intersection
 
 	case *BoundingTriangles:
 		return btTrianglesTriangles(bt, otherBounds)
 
 	case *BoundingCapsule:
-		oi := otherBounds.Intersection(bt)
-		if oi != nil {
-			oi.MTV = oi.MTV.Invert()
+		intersection := otherBounds.Intersection(bt)
+		if intersection != nil {
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+			}
 		}
-		return oi
+		return intersection
 
 	}
 
@@ -92,7 +98,7 @@ type collisionPlane struct {
 
 func newCollisionPlane() *collisionPlane {
 	return &collisionPlane{
-		VectorPool: NewVectorPool(10),
+		VectorPool: NewVectorPool(16),
 	}
 }
 
@@ -171,8 +177,6 @@ func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 vector.Vector
 }
 
 func (plane *collisionPlane) closestPointOnLine(point, start, end vector.Vector) vector.Vector {
-
-	plane.VectorPool.Reset()
 
 	diff := plane.VectorPool.Sub(end, start)
 	dotA := plane.VectorPool.Sub(point, start).Dot(diff)
