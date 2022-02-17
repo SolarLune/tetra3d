@@ -180,22 +180,21 @@ func (tags *Tags) GetAsFloat(tagName string) float64 {
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
 // into their structs to automatically easily implement Node.
 type Node struct {
-	library           *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 	name              string
-	parent            INode
 	position          vector.Vector
 	scale             vector.Vector
 	rotation          Matrix4
+	visible           bool
 	data              interface{} // A place to store a pointer to something if you need it
+	children          []INode
+	parent            INode
 	cachedTransform   Matrix4
 	isTransformDirty  bool
-	onTransformUpdate func()
-	children          []INode
-	visible           bool
 	tags              *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
 	AnimationPlayer   *AnimationPlayer
 	inverseBindMatrix Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 	isBone            bool
+	library           *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 }
 
 // NewNode returns a new Node.
@@ -247,9 +246,11 @@ func (node *Node) Clone() INode {
 	newNode.position = node.position.Clone()
 	newNode.scale = node.scale.Clone()
 	newNode.rotation = node.rotation.Clone()
-	newNode.parent = node.parent
-	newNode.AnimationPlayer = node.AnimationPlayer.Clone()
+	newNode.visible = node.visible
+	newNode.data = node.data
+	newNode.isTransformDirty = node.isTransformDirty
 	newNode.tags = node.tags.Clone()
+	newNode.AnimationPlayer = node.AnimationPlayer.Clone()
 	newNode.library = node.library
 
 	if node.AnimationPlayer.RootNode == node {
@@ -307,8 +308,11 @@ func (node *Node) Transform() Matrix4 {
 
 	node.cachedTransform = transform
 	node.isTransformDirty = false
-	if node.onTransformUpdate != nil {
-		node.onTransformUpdate()
+
+	// We want to call child.Transform() here to ensure the children also rebuild their transforms as necessary; otherwise,
+	// children (i.e. BoundingAABBs) may not be rotating along with their owning Nodes (as they don't get rendered).
+	for _, child := range node.children {
+		child.Transform()
 	}
 
 	return transform

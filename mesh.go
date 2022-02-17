@@ -516,7 +516,11 @@ func (part *MeshPart) AddTriangles(verts ...*Vertex) {
 	}
 
 	if len(part.Triangles) >= ebiten.MaxIndicesNum/3 {
-		log.Println("warning: mesh [" + part.Mesh.Name + "] has part with material named [" + part.Material.Name + "], which has " + fmt.Sprintf("%d", len(part.Triangles)) + " triangles. This exceeds the renderable maximum of 21845 triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into models. Otherwise, the game will crash if it renders over the maximum number of triangles.")
+		matName := "nil"
+		if part.Material != nil {
+			matName = part.Material.Name
+		}
+		log.Println("warning: mesh [" + part.Mesh.Name + "] has part with material named [" + matName + "], which has " + fmt.Sprintf("%d", len(part.Triangles)) + " triangles. This exceeds the renderable maximum of 21845 triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into models. Otherwise, the game will crash if it renders over the maximum number of triangles.")
 	}
 
 }

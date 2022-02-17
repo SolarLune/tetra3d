@@ -31,8 +31,15 @@ func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
 		Node:         NewNode(name),
 		internalSize: vector.Vector{width, height, depth},
 	}
-	bounds.onTransformUpdate = bounds.updateSize
+	bounds.updateSize()
 	return bounds
+}
+
+func (box *BoundingAABB) Transform() Matrix4 {
+	if box.isTransformDirty {
+		box.updateSize()
+	}
+	return box.Node.Transform()
 }
 
 // updateSize updates the BoundingAABB's external Size property to reflect its size after reposition, rotation, or resizing.

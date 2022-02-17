@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"math"
 	"sort"
 	"time"
 
@@ -53,11 +54,6 @@ func NewModel(mesh *Mesh, name string) *Model {
 		model.vectorPool = NewVectorPool(mesh.TotalVertexCount())
 	}
 
-	model.onTransformUpdate = func() {
-		model.BoundingSphere.SetLocalPosition(model.WorldPosition().Add(model.Mesh.Dimensions.Center()))
-		model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
-	}
-
 	radius := 0.0
 	if mesh != nil {
 		radius = mesh.Dimensions.Max() / 2
@@ -87,12 +83,16 @@ func (model *Model) Clone() INode {
 		child.setParent(newModel)
 	}
 
-	newModel.onTransformUpdate = func() {
-		newModel.BoundingSphere.SetLocalPosition(newModel.WorldPosition().Add(model.Mesh.Dimensions.Center()))
-		newModel.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
-	}
-
 	return newModel
+
+}
+
+func (model *Model) Transform() Matrix4 {
+
+	model.BoundingSphere.SetLocalPosition(model.WorldPosition().Add(model.Mesh.Dimensions.Center()))
+	model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
+
+	return model.Node.Transform()
 
 }
 
@@ -244,7 +244,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 			tri.visible = true
 
-			tri.depth = 0
+			tri.depth = math.MaxFloat64
 
 			for _, vert := range tri.Vertices {
 
@@ -257,7 +257,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 					}
 				}
 				vert.transformed = model.vectorPool.MultVecW(vpMatrix, v)
-				if vert.transformed[3] > tri.depth {
+				if vert.transformed[3] < tri.depth {
 					tri.depth = vert.transformed[3]
 				}
 			}
@@ -274,7 +274,8 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 			tri.visible = true
 
-			tri.depth = 0
+			// tri.depth = 0
+			tri.depth = math.MaxFloat64
 
 			for _, vert := range tri.Vertices {
 				v := vert.Position
@@ -287,7 +288,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 				}
 				vert.transformed = model.vectorPool.MultVecW(mvp, v)
 
-				if vert.transformed[3] > tri.depth {
+				if vert.transformed[3] < tri.depth {
 					tri.depth = vert.transformed[3]
 				}
 

@@ -44,8 +44,8 @@ func (lib *Library) AddScene(sceneName string) *Scene {
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
 // graph of parents and children. Models (visual instances of Meshes), Cameras, and "empty" NodeBases all are kinds of Nodes.
 type Scene struct {
-	Name string // The name of the Scene. Set automatically to the scene name in your 3D modeler if the DAE file exports it.
-
+	Name    string   // The name of the Scene. Set automatically to the scene name in your 3D modeler if the DAE file exports it.
+	library *Library // The library from which this Scene was created. If the Scene was instantiated through code, this will be nil.
 	// Root indicates the root node for the scene hierarchy. For visual Models to be displayed, they must be added to the
 	// scene graph by simply adding them into the tree via parenting anywhere under the Root. For them to be removed from rendering,
 	// they simply need to be removed from the tree.
@@ -82,6 +82,7 @@ func NewScene(name string) *Scene {
 func (scene *Scene) Clone() *Scene {
 
 	newScene := NewScene(scene.Name)
+	newScene.library = scene.library
 
 	// newScene.Models = append(newScene.Models, scene.Models...)
 	newScene.Root = scene.Root.Clone()
@@ -110,4 +111,9 @@ func (scene *Scene) fogAsFloatSlice() []float32 {
 	}
 
 	return fog
+}
+
+// Library returns the Library from which this Scene was loaded. If it was created through code and not associated with a Library, this function will return nil.
+func (scene *Scene) Library() *Library {
+	return scene.library
 }

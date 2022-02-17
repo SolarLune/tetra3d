@@ -185,6 +185,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 	scenes := NewLibrary()
 	scene := scenes.AddScene(daeScene.LibraryScene.Name)
+	scene.library = scenes
 
 	toYUp := NewMatrix4Rotate(1, 0, 0, math.Pi/2)
 
@@ -290,8 +291,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 		}
 
 		mesh := NewMesh(geo.Name)
-		var mat *Material
-		mat = daeURLsToMaterials[geo.Triangles.MaterialName]
+		mat := daeURLsToMaterials[geo.Triangles.MaterialName]
 		mesh.AddMeshPart(mat).AddTriangles(verts...)
 		mesh.library = scenes
 

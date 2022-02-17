@@ -3,8 +3,10 @@ package tetra3d
 import (
 	"bytes"
 	"image"
+	"log"
 	"math"
 	"os"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
@@ -456,6 +458,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	defaultLightingEnable := false
 
+	objToNode := map[INode]*gltf.Node{}
+
 	for _, node := range doc.Nodes {
 
 		var obj INode
@@ -508,6 +512,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			obj = NewNode(node.Name)
 		}
 
+		objToNode[obj] = node
+
 		obj.setLibrary(library)
 
 		for _, child := range node.Children {
@@ -516,8 +522,130 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		if node.Extras != nil {
 			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
+
+				getOrDefaultBool := func(path string, defaultValue bool) bool {
+					if value, exists := dataMap[path]; exists {
+						return value.(float64) > 0.5
+					}
+					return defaultValue
+				}
+
+				getOrDefaultFloat := func(path string, defaultValue float64) float64 {
+					if value, exists := dataMap[path]; exists {
+						return value.(float64)
+					}
+					return defaultValue
+				}
+
+				getOrDefaultFloatSlice := func(path string, defaultValues []float64) []float64 {
+					if value, exists := dataMap[path]; exists {
+						floats := []float64{}
+						for _, v := range value.([]interface{}) {
+							floats = append(floats, v.(float64))
+						}
+						return floats
+					}
+					return defaultValues
+				}
+
+				obj.SetVisible(getOrDefaultBool("t3dVisible__", true), false)
+
+				if bt, exists := dataMap["t3dBoundsType__"]; exists {
+
+					boundsType := int(bt.(float64))
+
+					switch boundsType {
+					// case 0: // NONE
+					case 1: // AABB
+
+						var aabb *BoundingAABB
+
+						if aabbCustomEnabled := getOrDefaultBool("t3dAABBCustomEnabled__", false); aabbCustomEnabled {
+
+							boundsSize := getOrDefaultFloatSlice("t3dAABBCustomSize__", []float64{2, 2, 2})
+							aabb = NewBoundingAABB("_bounding aabb", boundsSize[0], boundsSize[1], boundsSize[2])
+
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+							mesh := obj.(*Model).Mesh
+							dim := mesh.Dimensions
+							aabb = NewBoundingAABB("_bounding aabb", dim.Width(), dim.Height(), dim.Depth())
+						}
+
+						if aabb != nil {
+
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+								aabb.SetLocalPosition(obj.(*Model).Mesh.Dimensions.Center())
+							}
+
+							obj.AddChildren(aabb)
+
+						} else {
+							log.Println("Warning: object " + obj.Name() + " has bounds type BoundingAABB with no size and is not a Model")
+						}
+
+					case 2: // Capsule
+
+						var capsule *BoundingCapsule
+
+						if capsuleCustomEnabled := getOrDefaultBool("t3dCapsuleCustomEnabled__", false); capsuleCustomEnabled {
+							height := getOrDefaultFloat("t3dCapsuleCustomHeight__", 2)
+							radius := getOrDefaultFloat("t3dCapsuleCustomRadius__", 0.5)
+							capsule = NewBoundingCapsule("_bounding capsule", height, radius)
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+							mesh := obj.(*Model).Mesh
+							dim := mesh.Dimensions
+							capsule = NewBoundingCapsule("_bounding capsule", math.Max(dim.Width(), dim.Depth())/2, dim.Height())
+						}
+
+						if capsule != nil {
+
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+								capsule.SetLocalPosition(obj.(*Model).Mesh.Dimensions.Center())
+							}
+
+							obj.AddChildren(capsule)
+
+						} else {
+							log.Println("Warning: object " + obj.Name() + " has bounds type BoundingCapsule with no size and is not a Model")
+						}
+
+					case 3: // Sphere
+
+						var sphere *BoundingSphere
+
+						if sphereCustomEnabled := getOrDefaultBool("t3dSphereCustomEnabled__", false); sphereCustomEnabled {
+							radius := getOrDefaultFloat("t3dSphereCustomRadius__", 1)
+							sphere = NewBoundingSphere("_bounding sphere", radius)
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+							sphere = NewBoundingSphere("_bounding sphere", obj.(*Model).Mesh.Dimensions.Max()/2)
+						}
+
+						if sphere != nil {
+
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+								sphere.SetLocalPosition(obj.(*Model).Mesh.Dimensions.Center())
+							}
+
+							obj.AddChildren(sphere)
+
+						} else {
+							log.Println("Warning: object " + obj.Name() + " has bounds type BoundingSphere with no size and is not a Model")
+						}
+
+					case 4: // Triangles
+
+						if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+							triangles := NewBoundingTriangles("_bounding triangles", obj.(*Model).Mesh)
+							obj.AddChildren(triangles)
+						}
+
+					}
+				}
+
 				for tagName, data := range dataMap {
-					obj.Tags().Set(tagName, data)
+					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
+						obj.Tags().Set(tagName, data)
+					}
 				}
 			}
 		}
@@ -620,6 +748,29 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
+	for obj, node := range objToNode {
+
+		if node.Extras != nil {
+			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
+
+				if instancingObjects, exists := dataMap["t3dInstanceCollection__"]; exists {
+					for _, n := range instancingObjects.([]interface{}) {
+						name := n.(string)
+						for _, clone := range objects {
+							if clone.Name() == name {
+								cloned := clone.Clone()
+								obj.AddChildren(cloned)
+								break
+							}
+						}
+					}
+				}
+
+			}
+
+		}
+	}
+
 	// Set up SkinRoot for skinned Models; this should be the root node of a hierarchy of bone Nodes.
 	for _, n := range objects {
 
@@ -640,6 +791,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	for _, s := range doc.Scenes {
 
 		scene := library.AddScene(s.Name)
+
+		scene.library = library
 
 		scene.LightingOn = defaultLightingEnable
 

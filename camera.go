@@ -998,6 +998,39 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 }
 
+// DrawDebugDrawCallCount draws the draw call count of all visible Models underneath the rootNode in the color provided to the screen
+// image provided.
+func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float64, color *Color) {
+
+	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+
+	for _, m := range allModels {
+
+		if model, isModel := m.(*Model); isModel {
+
+			if model.FrustumCulling {
+
+				if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
+					continue
+				}
+
+			}
+
+			screenPos := camera.WorldToScreen(model.WorldPosition())
+
+			dr := &ebiten.DrawImageOptions{}
+			dr.ColorM.Scale(color.ToFloat64s())
+			dr.GeoM.Translate(screenPos[0], screenPos[1]+(textScale*16))
+			dr.GeoM.Scale(textScale, textScale)
+
+			text.DrawWithOptions(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), basicfont.Face7x13, dr)
+
+		}
+
+	}
+
+}
+
 // DrawDebugNormals draws the normals of visible models underneath the rootNode given to the screen. NormalLength is the length of the normal lines
 // in units. Color is the color to draw the normals.
 func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float64, color color.Color) {

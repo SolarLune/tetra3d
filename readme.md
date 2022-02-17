@@ -226,7 +226,7 @@ Note that Tetra3D is, indeed, a work-in-progress and so will require time to get
 
 The following is a rough to-do list (tasks with checks have been implemented):
 
-- [x] 3D rendering
+- [x] **3D rendering**
 - [x] -- Perspective projection
 - [x] -- Orthographic projection (it's kinda jank, but it works)
 - [ ] -- Automatic billboarding (not sure?)
@@ -238,23 +238,23 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
 - [x] -- Offscreen Rendering
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
-- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode and texture, for example).
-- [ ] -- Texture wrapping (unsure if I can do much about this; I believe Ebiten has its limits in this regard)
-- [x] Culling
+- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc). Perhaps these Materials can have a flag that you can toggle to enable this behavior?
+- [ ] -- Texture wrapping (will require rendering with shaders)
+- [x] **Culling**
 - [x] -- Backface culling
 - [ ] -- Frustum culling (this is implemented, but just with sphere-checks instead of actual frustum code)
 - [x] -- Far triangle culling
 - [ ] -- Triangle clipping to view (this isn't implemented, but not having it doesn't seem to be too much of a problem for now)
-- [x] Debug
+- [x] **Debug**
 - [x] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
 - [x] -- Wireframe debug rendering
 - [x] -- Normal debug rendering
-- [x] Materials
+- [x] **Materials**
 - [x] -- Basic Texturing
 - [x] -- Multitexturing / Per-triangle Materials
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
 - [ ] Easy dynamic 3D Text (the current idea is to render the text to texture from a font, and then map it to a plane)
-- [x] Animations
+- [x] **Animations**
 - [x] -- Armature-based animations
 - [x] -- Object transform-based animations
 - [x] -- Blending between animations
@@ -262,13 +262,13 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
 - [ ] -- Morph (mesh-based) animations
-- [x] Scenes
+- [x] **Scenes**
 - [x] -- Fog
 - [x] -- A node or scenegraph for parenting and simple visibility culling
 - [x] - Vertex Coloring
 - [ ] -- Ambient vertex coloring?
 - [ ] -- Multiple vertex color channels
-- [x] GLTF / GLB model loading
+- [x] **GLTF / GLB model loading**
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
 - [x] -- Normal loading
@@ -276,22 +276,22 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Animation loading
 - [x] -- Camera loading
 - [ ] -- Separate .bin loading
-- [x] DAE model loading
+- [x] **DAE model loading**
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
 - [x] -- Normal loading
 - [x] -- Transform / full scene loading
-- [x] Lighting
+- [x] **Lighting**
 - [x] -- Ambient lights
 - [x] -- Point lights
 - [x] -- Directional lights
 - [x] -- Smooth shading
 - [x] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
-- [x] Shaders
+- [x] **Shaders**
 - [x] -- Custom fragment shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)
-- [x] Intersection Testing:
+- [x] **Intersection Testing**
 - [ ] -- Normal reporting
 - [x] -- Varying collision shapes
 
@@ -303,14 +303,14 @@ The following is a rough to-do list (tasks with checks have been implemented):
 | Capsule        | ✅     | ✅           | ✅         | ✅       |   ❌  |
 | Ray            | ❌     | ❌           | ❌         | ❌       |   ❌  |
 
-- [ ] 3D Sound (just adjusting panning of sound sources based on 3D location, or something like that)
-- [ ] Optimization
+- [ ] **3D Sound** (just adjusting panning of sound sources based on 3D location, or something like that)
+- [ ] **Optimization**
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
 - [x] -- Vector pools
 - [ ] -- Matrix pools
 - [ ] -- Lighting speed improvements 
-- [ ] [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
+- [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!
 

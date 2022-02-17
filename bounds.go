@@ -97,13 +97,6 @@ func btSphereAABB(sphere *BoundingSphere, aabb *BoundingAABB) *IntersectionResul
 
 func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *IntersectionResult {
 
-	worldRot := triangles.WorldRotation()
-	// We do this so that the AABB object properly rotates around the center along with triangles as necessary.
-	pos := worldRot.MultVec(triangles.Mesh.Dimensions.Center())
-	triangles.BoundingAABB.SetLocalPosition(triangles.WorldPosition().Add(pos))
-	triangles.BoundingAABB.SetLocalRotation(worldRot)
-	triangles.BoundingAABB.SetLocalScale(triangles.WorldScale())
-
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
 	if !sphere.Intersecting(triangles.BoundingAABB) {
 		return nil
@@ -257,12 +250,6 @@ func btAABBAABB(aabbA, aabbB *BoundingAABB) *IntersectionResult {
 func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *IntersectionResult {
 	// See https://gdbooks.gitbooks.io/3dcollisions/content/Chapter4/aabb-triangle.html
 
-	worldRot := triangles.WorldRotation()
-	pos := worldRot.MultVec(triangles.Mesh.Dimensions.Center())
-	triangles.BoundingAABB.SetLocalPosition(triangles.WorldPosition().Add(pos))
-	triangles.BoundingAABB.SetLocalRotation(worldRot)
-	triangles.BoundingAABB.SetLocalScale(triangles.WorldScale())
-
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
 	if !box.Intersecting(triangles.BoundingAABB) {
 		return nil
@@ -372,18 +359,6 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Intersect
 
 func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *IntersectionResult {
 	// See https://gdbooks.gitbooks.io/3dcollisions/content/Chapter4/aabb-triangle.html
-
-	worldRot := trianglesA.WorldRotation()
-	pos := worldRot.MultVec(trianglesA.Mesh.Dimensions.Center())
-	trianglesA.BoundingAABB.SetLocalPosition(trianglesA.WorldPosition().Add(pos))
-	trianglesA.BoundingAABB.SetLocalRotation(worldRot)
-	trianglesA.BoundingAABB.SetLocalScale(trianglesA.WorldScale())
-
-	worldRot = trianglesB.WorldRotation()
-	pos = worldRot.MultVec(trianglesB.Mesh.Dimensions.Center())
-	trianglesB.BoundingAABB.SetLocalPosition(trianglesB.WorldPosition().Add(pos))
-	trianglesB.BoundingAABB.SetLocalRotation(worldRot)
-	trianglesB.BoundingAABB.SetLocalScale(trianglesB.WorldScale())
 
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
 	if !trianglesA.BoundingAABB.Intersecting(trianglesB.BoundingAABB) {
@@ -557,12 +532,6 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 	capsule.internalSphere.SetLocalScale(capsule.LocalScale())
 	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(triangles.WorldPosition()))
 	capsule.internalSphere.Radius = capsule.Radius
-
-	worldRot := triangles.WorldRotation()
-	pos := worldRot.MultVec(triangles.Mesh.Dimensions.Center())
-	triangles.BoundingAABB.SetLocalPosition(triangles.WorldPosition().Add(pos))
-	triangles.BoundingAABB.SetLocalRotation(worldRot)
-	triangles.BoundingAABB.SetLocalScale(triangles.WorldScale())
 
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
 	if !capsule.internalSphere.Intersecting(triangles.BoundingAABB) {

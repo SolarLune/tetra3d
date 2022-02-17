@@ -22,6 +22,22 @@ func NewBoundingTriangles(name string, mesh *Mesh) *BoundingTriangles {
 	}
 }
 
+func (bt *BoundingTriangles) Transform() Matrix4 {
+
+	transformDirty := bt.Node.isTransformDirty
+
+	transform := bt.Node.Transform()
+
+	if transformDirty {
+		bt.BoundingAABB.SetWorldTransform(transform)
+		bt.BoundingAABB.MoveVec(bt.Mesh.Dimensions.Center())
+		bt.BoundingAABB.Transform()
+	}
+
+	return transform
+
+}
+
 func (bt *BoundingTriangles) Clone() INode {
 	clone := NewBoundingTriangles(bt.name, bt.Mesh)
 	clone.Node = bt.Node.Clone().(*Node)
