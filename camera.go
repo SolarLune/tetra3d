@@ -917,6 +917,8 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
 
+	camWidth, camHeight := camera.ColorTexture.Size()
+
 	for _, m := range allModels {
 
 		if model, isModel := m.(*Model); isModel {
@@ -938,6 +940,13 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 					v0 := camera.ClipToScreen(tri.Vertices[0].transformed)
 					v1 := camera.ClipToScreen(tri.Vertices[1].transformed)
 					v2 := camera.ClipToScreen(tri.Vertices[2].transformed)
+
+					if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
+						(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
+						(v0[0] > float64(camWidth) && v1[0] > float64(camWidth) && v2[0] > float64(camWidth)) ||
+						(v0[1] > float64(camHeight) && v1[1] > float64(camHeight) && v2[1] > float64(camHeight)) {
+						continue
+					}
 
 					ebitenutil.DrawLine(screen, float64(v0[0]), float64(v0[1]), float64(v1[0]), float64(v1[1]), color)
 					ebitenutil.DrawLine(screen, float64(v1[0]), float64(v1[1]), float64(v2[0]), float64(v2[1]), color)
@@ -1095,6 +1104,8 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
 
+	camWidth, camHeight := camera.ColorTexture.Size()
+
 	for _, n := range allModels {
 
 		if b, isBounds := n.(BoundingObject); isBounds {
@@ -1217,10 +1228,18 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
 
-						for _, vert := range tri.Vertices {
-							tv := mvpMatrix.MultVecW(vert.Position)
-							lines = append(lines, camera.ClipToScreen(tv))
+						v0 := camera.ClipToScreen(mvpMatrix.MultVecW(tri.Vertices[0].Position))
+						v1 := camera.ClipToScreen(mvpMatrix.MultVecW(tri.Vertices[1].Position))
+						v2 := camera.ClipToScreen(mvpMatrix.MultVecW(tri.Vertices[2].Position))
+
+						if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
+							(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
+							(v0[0] > float64(camWidth) && v1[0] > float64(camWidth) && v2[0] > float64(camWidth)) ||
+							(v0[1] > float64(camHeight) && v1[1] > float64(camHeight) && v2[1] > float64(camHeight)) {
+							continue
 						}
+
+						lines = append(lines, v0, v1, v2)
 
 					}
 

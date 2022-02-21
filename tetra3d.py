@@ -23,7 +23,7 @@ boundsTypes = [
 
 gltfExportTypes = [
     ("GLB", ".glb", "Exports a single file, with all data packed in binary form. Most efficient and portable, but more difficult to edit later", 0, 0),
-    ("GLTF_SEPARATE", ".gltf + .bin + textures", "Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later", 0, 1),
+    ("GLTF_SEPARATE", ".gltf + .bin + textures", "Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later - Note that Tetra3D doesn't support this properly currently", 0, 1),
     ("GLTF_EMBEDDED", ".gltf", "Exports a single file, with all data packed in JSON. Less efficient than binary, but easier to edit later", 0, 2),
  ]
 
@@ -70,6 +70,14 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
 #        row = self.layout.row()
 #        row.operator("object.tetra3daddprop", text="Add Property")
         
+# The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
+def globalGet(propName):
+    if propName in bpy.data.scenes[0]:
+        return bpy.data.scenes[0][propName]
+
+def globalSet(propName, value):
+    bpy.data.scenes[0][propName] = value
+
 class RENDER_PT_tetra3d(bpy.types.Panel):
     bl_idname = "RENDER_PT_tetra3d"
     bl_label = "Tetra3D Properties"
@@ -80,8 +88,7 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
     def draw(self, context):
         row = self.layout.row()
         row.prop(context.scene, "t3dExportOnSave__")
-        global exportOnSaveGlobal
-        if exportOnSaveGlobal:
+        if globalGet("t3dExportOnSave__"):
             row = self.layout.row()
             row.prop(context.scene, "t3dExportFilepath__")
             
@@ -96,21 +103,19 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
 @persistent
 def exportOnSave(dummy):
     
-    global exportOnSaveGlobal
-    if exportOnSaveGlobal:
+    if globalGet("t3dExportOnSave__"):
         scene = bpy.context.scene
         
         blendPath = bpy.context.blend_data.filepath
+        if scene.t3dExportFilepath__ != "":
+            blendPath = scene.t3dExportFilepath__
         
         if scene.t3dExportFormat__ == "GLB":
             ending = ".glb"
         elif scene.t3dExportFormat__ == "GLTF_SEPARATE" or scene.t3dExportFormat__ == "GLTF_EMBEDDED":
             ending = ".gltf"
         
-        if blendPath != "":
-            newPath = os.path.splitext(blendPath)[0] + ending
-        else:
-            newPath = scene.t3dExportFilepath__ + ending
+        newPath = os.path.splitext(blendPath)[0] + ending
 
         for obj in bpy.data.objects:
             cloning = []
@@ -119,7 +124,6 @@ def exportOnSave(dummy):
                     if o.parent == None:
                         cloning.append(o.name)
             if len(cloning) > 0:
-                obj["t3dInstanceCollection__"] = cloning
                 obj["t3dInstanceCollection__"] = cloning
 
         # We force on exporting of Extra values because otherwise, values from Blender would not be able to be exported.
@@ -139,17 +143,6 @@ def exportOnSave(dummy):
             if "t3dInstanceCollection__" in obj:
                 del(obj["t3dInstanceCollection__"])
 
-# Default to false so you won't be exporting GLTF files all the time unknowingly
-exportOnSaveGlobal = False
-
-def getGlobalExportOnSave(self):
-    global exportOnSaveGlobal
-    return exportOnSaveGlobal
-
-def setGlobalExportOnSave(self, value):
-    global exportOnSaveGlobal
-    exportOnSaveGlobal = value
-
 objectProps = {
     "t3dVisible__" : bpy.props.BoolProperty(name="Visible", description="Whether the object is visible or not when exported to Tetra3D", default=True),
     "t3dBoundsType__" : bpy.props.EnumProperty(items=boundsTypes, name="Bounds", description="What Bounding node type to create and parent to this object"),
@@ -162,6 +155,61 @@ objectProps = {
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Sphere Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
 }
 
+def getExportOnSave(self):
+    s = globalGet("t3dExportOnSave__")
+    if s is None:
+        s = False
+    return s
+
+def setExportOnSave(self, value):
+    globalSet("t3dExportOnSave__", value)
+
+
+
+def getExportFilepath(self):
+    fp = globalGet("t3dExportFilepath__")
+    if fp is None:
+        fp = ""
+    return fp
+
+def setExportFilepath(self, value):
+    globalSet("t3dExportFilepath__", value)
+
+
+
+def getExportFormat(self):
+    f = globalGet("t3dExportFormat__")
+    if f is None:
+        f = 0
+    return f
+
+def setExportFormat(self, value):
+    globalSet("t3dExportFormat__", value)
+
+
+
+def getExportCameras(self):
+    c = globalGet("t3dExportCameras__")
+    if c is None:
+        c = True
+    return c
+
+def setExportCameras(self, value):
+    globalSet("t3dExportCameras__", value)
+
+
+
+def getExportLights(self):
+    l = globalGet("t3dExportLights__")
+    if l is None:
+        l = True
+    return l
+
+def setExportLights(self, value):
+    globalSet("t3dExportLights__", value)
+
+
+
 def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
@@ -172,13 +220,19 @@ def register():
         setattr(bpy.types.Object, propName, prop)
 
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
-    get=getGlobalExportOnSave, set=setGlobalExportOnSave)
-    bpy.types.Scene.t3dExportFilepath__ = bpy.props.StringProperty(name="Export Filepath", description="Filepath to export GLTF file. If left blank, it will export to the same directory as the blend file and will have the same filename; in this case, if the blend file has not been saved, nothing will happen", default="", subtype="FILE_PATH")
-    bpy.types.Scene.t3dExportFormat__ = bpy.props.EnumProperty(items=gltfExportTypes, name="Export Format", description="What format to export the file in", default="GLTF_EMBEDDED")
+    get=getExportOnSave, set=setExportOnSave)
     
-    bpy.types.Scene.t3dExportCameras__ = bpy.props.BoolProperty(name="Export Cameras", description="Whether Blender should export cameras to the GLTF file", default=True)
-    bpy.types.Scene.t3dExportLights__ = bpy.props.BoolProperty(name="Export Lights", description="Whether Blender should export lights to the GLTF file", default=True)
-    # bpy.types.Scene.t3dExportExtras__ = bpy.props.BoolProperty(name="Export Extras", description="Whether Blender should export extra properties to the GLTF file", default=True)
+    bpy.types.Scene.t3dExportFilepath__ = bpy.props.StringProperty(name="Export Filepath", description="Filepath to export GLTF file. If left blank, it will export to the same directory as the blend file and will have the same filename; in this case, if the blend file has not been saved, nothing will happen", 
+    default="", subtype="FILE_PATH", get=getExportFilepath, set=setExportFilepath)
+    
+    bpy.types.Scene.t3dExportFormat__ = bpy.props.EnumProperty(items=gltfExportTypes, name="Export Format", description="What format to export the file in", default="GLTF_EMBEDDED",
+    get=getExportFormat, set=setExportFormat)
+    
+    bpy.types.Scene.t3dExportCameras__ = bpy.props.BoolProperty(name="Export Cameras", description="Whether Blender should export cameras to the GLTF file", default=True,
+    get=getExportCameras, set=setExportCameras)
+
+    bpy.types.Scene.t3dExportLights__ = bpy.props.BoolProperty(name="Export Lights", description="Whether Blender should export lights to the GLTF file", default=True,
+    get=getExportLights, set=setExportLights)
     
     if not exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.append(exportOnSave)
