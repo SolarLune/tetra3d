@@ -830,6 +830,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	// }
 
+	library.ExportedScene = library.Scenes[*doc.Scene]
+
 	return library, nil
 
 }

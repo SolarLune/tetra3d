@@ -186,6 +186,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 	scenes := NewLibrary()
 	scene := scenes.AddScene(daeScene.LibraryScene.Name)
 	scene.library = scenes
+	scenes.ExportedScene = scene
 
 	toYUp := NewMatrix4Rotate(1, 0, 0, math.Pi/2)
 

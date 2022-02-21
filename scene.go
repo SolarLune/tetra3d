@@ -11,10 +11,11 @@ type FogMode int
 
 // Library represents a collection of Scenes, Meshes, and Animations, as loaded from an intermediary file format (.dae or .gltf / .glb).
 type Library struct {
-	Scenes     []*Scene
-	Meshes     map[string]*Mesh
-	Animations map[string]*Animation
-	Materials  map[string]*Material
+	Scenes        []*Scene              // A slice of Scenes
+	ExportedScene *Scene                // The scene that was open when the library was exported from the modeler
+	Meshes        map[string]*Mesh      // A Map of Meshes to their names
+	Animations    map[string]*Animation // A Map of Animations to their names
+	Materials     map[string]*Material  // A Map of Materials to their names
 }
 
 func NewLibrary() *Library {
