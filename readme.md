@@ -19,7 +19,9 @@ Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [E
 
 Tetra's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a largely-software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively simple fully 3D game (i.e. something on the level of a PS1 or N64 game). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
-In general, Tetra3D's just a renderer, so you can target higher resolutions (like 1080p or 4K) _or_ lower resolutions. Anything's fine as long as the target GPU can handle generating the color and depth textures at your desired resolution (assuming you have depth texture rendering on).
+In general, Tetra3D's just a renderer, so you can target higher resolutions (like 1080p or 4K) _or_ lower resolutions. Anything's fine as long as the target GPU can handle generating the color and depth textures at your desired resolution (assuming you have depth texture rendering on). 
+
+Tetra3D also gives you a Blender add-on to make the Blender > Tetra3D development process flow a bit smoother. See the Releases section for the add-on, and [this wiki page](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon) for more information.
 
 ## Why did I make it?
 
@@ -39,7 +41,7 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed. 
 
-The Blender add-on is not required, but is provided as well, and can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). For the "why" of the add-on, check the Wiki.
+The Blender add-on is not required, but is provided as well, and can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). For the "why" of the add-on, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
 
 ## How do you use it?
 
@@ -84,11 +86,9 @@ func NewGame() *Game {
 
 	// A Library is essentially everything that got exported from your 3D modeler - 
 	// all of the scenes, meshes, materials, and animations.
-	g.GameScene = library.FindScene("Game")
 
-	// NOTE: If you need to rotate any meshes after importing,
-	// you can call Mesh.ApplyMatrix() to apply a rotation matrix 
-	// (or any other kind of matrix) to all of its vertices.
+	// The ExportedScene of a Library is the scene that was active when the file was exported.
+	g.GameScene = library.ExportedScene
 
 	// Tetra uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
 	// in comparison to Blender's coordinate system (+X = Right, +Y = Forward, 
@@ -224,7 +224,7 @@ That's basically it.
 
 Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine the examples folder for some examples showing how Tetra3D works. Calling `go run .` from within their directories should work. 
 
-Tetra3D also has an add-on that smooths out the workflow a bit more and adds a few features. Check the Releases section for the Python file, which, after downloading, you can install from Blender. You can also just download `tetra3d.py` from the file list above and install it that way. For more information, check out the Wiki for tips and tricks.
+For more information, check out the [Wiki](https://github.com/SolarLune/Tetra3d/wiki) for tips and tricks.
 
 ## What's missing?
 
