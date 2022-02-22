@@ -5,12 +5,14 @@ from bpy.app.handlers import persistent
 
 bl_info = {
     "name" : "Tetra3D Addon",                        # The name in the addon search menu
-    "author" : "SolarLune",
-    "description" : "An addon for Tetra3D + Blender",
+    "author" : "SolarLune Games",
+    "description" : "An addon for exporting GLTF content from Blender for use with Tetra3D.",
     "blender" : (3, 0, 1),                             # Lowest version to use
     "location" : "View3D",
     "category" : "Gamedev",
     "version" : (0, 1),
+    "support" : "COMMUNITY",
+    "doc_url" : "https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon",
 }
 
 boundsTypes = [
@@ -162,11 +164,11 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             if context.object.t3dSphereCustomEnabled__:
                 row = self.layout.row()
                 row.prop(context.object, "t3dSphereCustomRadius__")
-
         row = self.layout.row()
-        row.operator("object.tetra3daddprop", text="Add Game Property")
+        row.separator()
         row = self.layout.row()
-        row.operator("object.tetra3dcopyprops", text="Copy Game Properties")
+        row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
+        row.operator("object.tetra3dcopyprops", text="Copy Game Properties", icon="COPYDOWN")
         
         for index, prop in enumerate(context.object.t3dGameProperties__):
             box = self.layout.box()
