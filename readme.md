@@ -163,7 +163,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	// This is the size of the window; note that we are generally setting it
+	// This is the size of the window; note that we set it
 	// to be the same as the size of the backing camera texture. However,
 	// you could use a much larger backing texture size, thereby reducing 
 	// certain visual glitches from triangles not drawing tightly enough.
