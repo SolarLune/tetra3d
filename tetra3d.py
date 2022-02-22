@@ -27,14 +27,110 @@ gltfExportTypes = [
     ("GLTF_EMBEDDED", ".gltf", "Exports a single file, with all data packed in JSON. Less efficient than binary, but easier to edit later", 0, 2),
  ]
 
-#class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
-#    bl_idname = "object.tetra3daddprop"
-#    bl_label = "Tetra3d Add Custom Property"
-#    bl_options = {'REGISTER', 'UNDO'}
-#    
-#    def execute(self, context):
-#        context.object.t3dCustomProperties__.append("PropName")
-#        return {'FINISHED'}
+GamePropTypeBool = 1
+GamePropTypeFloat = 2
+GamePropTypeString = 3
+GamePropTypeLink = 4
+
+gamePropTypes = [
+    ("bool", "Bool", "Boolean data type", 0, 0),
+    ("int", "Int", "Int data type", 0, 1),
+    ("float", "Float", "Float data type", 0, 2),
+    ("string", "String", "String data type", 0, 3),
+    ("reference", "Object Reference", "Object reference data type", 0, 4),
+]
+
+class t3dGamePropertyItem__(bpy.types.PropertyGroup):
+
+    name: bpy.props.StringProperty(name="Name", default="New Property")
+    valueType: bpy.props.EnumProperty(items=gamePropTypes, name="Type")
+
+    valueBool: bpy.props.BoolProperty(name = "", description="The boolean value of the property")
+    valueInt: bpy.props.IntProperty(name = "", description="The integer value of the property")
+    valueFloat: bpy.props.FloatProperty(name = "", description="The float value of the property")
+    valueString: bpy.props.StringProperty(name = "", description="The string value of the property")
+    valueReference: bpy.props.PointerProperty(name = "", type=bpy.types.Object, description="The string reference value of the property")
+    
+
+class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
+   bl_idname = "object.tetra3daddprop"
+   bl_label = "Add Game Property"
+   bl_description= "Adds a game property to the currently selected object. A game property gets added to an Object's Tags object in Tetra3D"
+   bl_options = {'REGISTER', 'UNDO'}
+
+   def execute(self, context):
+        context.object.t3dGameProperties__.add()
+        return {'FINISHED'}
+
+class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
+    bl_idname = "object.tetra3ddeleteprop"
+    bl_label = "Delete Game Property"
+    bl_description= "Deletes a game property from the currently selected object"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+
+    def execute(self, context):
+        context.object.t3dGameProperties__.remove(self.index)
+        return {'FINISHED'}
+
+class OBJECT_OT_tetra3dReorderProps(bpy.types.Operator):
+    bl_idname = "object.tetra3dreorderprops"
+    bl_label = "Re-order Game Property"
+    bl_description= "Moves a game property up or down in the list"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+    moveUp : bpy.props.BoolProperty()
+
+    def execute(self, context):
+        if self.moveUp:
+            context.object.t3dGameProperties__.move(self.index, self.index-1)
+        else:
+            context.object.t3dGameProperties__.move(self.index, self.index+1)
+        return {'FINISHED'}
+
+class OBJECT_OT_tetra3dCopyProps(bpy.types.Operator):
+   bl_idname = "object.tetra3dcopyprops"
+   bl_label = "Copy Game Properties"
+   bl_description= "Copies game properties from the currently selected object to all other selected objects"
+   bl_options = {'REGISTER', 'UNDO'}
+
+   def execute(self, context):
+
+        obj = context.object
+
+        for o in context.selected_objects:
+            if o == obj:
+                continue
+            o.t3dGameProperties__.clear()
+            for prop in obj.t3dGameProperties__:
+                newProp = o.t3dGameProperties__.add()
+                newProp.name = prop.name
+                newProp.valueType = prop.valueType
+                newProp.valueBool = prop.valueBool
+                newProp.valueInt = prop.valueInt
+                newProp.valueFloat = prop.valueFloat
+                newProp.valueString = prop.valueString
+                newProp.valueReference = prop.valueReference
+
+        return {'FINISHED'}
+
+class OBJECT_OT_tetra3dClearProps(bpy.types.Operator):
+   bl_idname = "object.tetra3dclearprops"
+   bl_label = "Clear Game Properties"
+   bl_description= "Clears game properties from all currently selected objects"
+   bl_options = {'REGISTER', 'UNDO'}
+
+   def execute(self, context):
+
+        obj = context.object
+
+        for o in context.selected_objects:
+            o.t3dGameProperties__.clear()
+
+        return {'FINISHED'}
+
 
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
@@ -66,9 +162,45 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             if context.object.t3dSphereCustomEnabled__:
                 row = self.layout.row()
                 row.prop(context.object, "t3dSphereCustomRadius__")
-                
-#        row = self.layout.row()
-#        row.operator("object.tetra3daddprop", text="Add Property")
+
+        row = self.layout.row()
+        row.operator("object.tetra3daddprop", text="Add Game Property")
+        row = self.layout.row()
+        row.operator("object.tetra3dcopyprops", text="Copy Game Properties")
+        
+        for index, prop in enumerate(context.object.t3dGameProperties__):
+            box = self.layout.box()
+            row = box.row()
+            row.prop(prop, "name")
+            
+            moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
+            moveUpOptions.index = index
+            moveUpOptions.moveUp = True
+
+            moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
+            moveDownOptions.index = index
+            moveDownOptions.moveUp = False
+
+            deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
+            deleteOptions.index = index
+
+            row = box.row()
+            row.prop(prop, "valueType")
+            if prop.valueType == "bool":
+                row.prop(prop, "valueBool")
+            elif prop.valueType == "int":
+                row.prop(prop, "valueInt")
+            elif prop.valueType == "float":
+                row.prop(prop, "valueFloat")
+            elif prop.valueType == "string":
+                row.prop(prop, "valueString")
+            elif prop.valueType == "reference":
+                # row.prop_search(prop, "valueReference", context.scene, "objects")
+                row.prop(prop, "valueReference")
+        
+        row = self.layout.row()
+        row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+        
         
 # The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
 def globalGet(propName):
@@ -147,12 +279,12 @@ objectProps = {
     "t3dVisible__" : bpy.props.BoolProperty(name="Visible", description="Whether the object is visible or not when exported to Tetra3D", default=True),
     "t3dBoundsType__" : bpy.props.EnumProperty(items=boundsTypes, name="Bounds", description="What Bounding node type to create and parent to this object"),
     "t3dAABBCustomEnabled__" : bpy.props.BoolProperty(name="Custom AABB Size", description="If enabled, you can manually set the BoundingAABB node's size. If disabled, the AABB's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingAABB node will be generated)", default=False),
-    "t3dAABBCustomSize__" : bpy.props.FloatVectorProperty(name="AABB Size", description="Width (X), height (Y), and depth (Z) of the BoundingAABB node that will be created", min=0.0, default=[2,2,2]),
+    "t3dAABBCustomSize__" : bpy.props.FloatVectorProperty(name="Size", description="Width (X), height (Y), and depth (Z) of the BoundingAABB node that will be created", min=0.0, default=[2,2,2]),
     "t3dCapsuleCustomEnabled__" : bpy.props.BoolProperty(name="Custom Capsule Size", description="If enabled, you can manually set the BoundingCapsule node's size properties. If disabled, the Capsule's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingCapsule node will be generated)", default=False),
-    "t3dCapsuleCustomRadius__" : bpy.props.FloatProperty(name="Capsule Radius", description="The radius of the BoundingCapsule node.", min=0.0, default=0.5),
-    "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Capsule Height", description="The height of the BoundingCapsule node.", min=0.0, default=2),
+    "t3dCapsuleCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="The radius of the BoundingCapsule node.", min=0.0, default=0.5),
+    "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Height", description="The height of the BoundingCapsule node.", min=0.0, default=2),
     "t3dSphereCustomEnabled__" : bpy.props.BoolProperty(name="Custom Sphere Size", description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)", default=False),
-    "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Sphere Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
+    "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
 }
 
 def getExportOnSave(self):
@@ -214,10 +346,18 @@ def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
     bpy.utils.register_class(RENDER_PT_tetra3d)
-#    bpy.utils.register_class(OBJECT_OT_tetra3dAddProp)
+    bpy.utils.register_class(OBJECT_OT_tetra3dAddProp)
+    bpy.utils.register_class(OBJECT_OT_tetra3dDeleteProp)
+    bpy.utils.register_class(OBJECT_OT_tetra3dReorderProps)
+    bpy.utils.register_class(OBJECT_OT_tetra3dCopyProps)
+    bpy.utils.register_class(OBJECT_OT_tetra3dClearProps)
     
+    bpy.utils.register_class(t3dGamePropertyItem__)
+
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
+
+    bpy.types.Object.t3dGameProperties__ = bpy.props.CollectionProperty(type=t3dGamePropertyItem__)
 
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
     get=getExportOnSave, set=setExportOnSave)
@@ -240,7 +380,13 @@ def register():
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
     bpy.utils.unregister_class(RENDER_PT_tetra3d)
-#    bpy.utils.unregister_class(OBJECT_OT_tetra3dAddProp)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dAddProp)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dDeleteProp)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dReorderProps)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyProps)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dClearProps)
+    
+    bpy.utils.unregister_class(t3dGamePropertyItem__)
     
     for propName, prop in objectProps.items():
         delattr(bpy.types.Object, propName)

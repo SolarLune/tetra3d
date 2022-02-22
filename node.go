@@ -143,11 +143,13 @@ func (tags *Tags) Has(nodeTags ...string) bool {
 }
 
 // Get returns the value associated with the specified tag (key).
+// Note that this does not sanity check to ensure the tag exists first.
 func (tags *Tags) Get(tagName string) interface{} {
 	return tags.tags[tagName]
 }
 
-// IsString returns true if the value associated with the specified tag is a string.
+// IsString returns true if the value associated with the specified tag is a string. If the
+// tag doesn't exist, this returns false.
 func (tags *Tags) IsString(tagName string) bool {
 	if _, exists := tags.tags[tagName]; exists {
 		if _, ok := tags.tags[tagName].(string); ok {
@@ -158,11 +160,13 @@ func (tags *Tags) IsString(tagName string) bool {
 }
 
 // GetAsString returns the value associated with the specified tag (key) as a string.
+// Note that this does not sanity check to ensure the tag exists first.
 func (tags *Tags) GetAsString(tagName string) string {
 	return tags.tags[tagName].(string)
 }
 
-// IsFloat returns true if the value associated with the specified tag is a float64.
+// IsFloat returns true if the value associated with the specified tag is a float64. If the
+// tag doesn't exist, this returns false.
 func (tags *Tags) IsFloat(tagName string) bool {
 	if _, exists := tags.tags[tagName]; exists {
 		if _, ok := tags.tags[tagName].(float64); ok {
@@ -173,8 +177,26 @@ func (tags *Tags) IsFloat(tagName string) bool {
 }
 
 // GetAsFloat returns the value associated with the specified tag (key) as a float.
+// Note that this does not sanity check to ensure the tag exists first.
 func (tags *Tags) GetAsFloat(tagName string) float64 {
 	return tags.tags[tagName].(float64)
+}
+
+// IsInt returns true if the value associated with the specified tag is a float64. If the
+// tag doesn't exist, this returns false.
+func (tags *Tags) IsInt(tagName string) bool {
+	if _, exists := tags.tags[tagName]; exists {
+		if _, ok := tags.tags[tagName].(int); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// GetAsInt returns the value associated with the specified tag (key) as a float.
+// Note that this does not sanity check to ensure the tag exists first.
+func (tags *Tags) GetAsInt(tagName string) int {
+	return tags.tags[tagName].(int)
 }
 
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node

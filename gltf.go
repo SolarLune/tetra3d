@@ -748,6 +748,34 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
+	getOrDefaultInt := func(propMap map[string]interface{}, key string, defaultValue int) int {
+		if value, keyExists := propMap[key]; keyExists {
+			return int(value.(float64))
+		}
+		return defaultValue
+	}
+
+	getOrDefaultString := func(propMap map[string]interface{}, key string, defaultValue string) string {
+		if value, keyExists := propMap[key]; keyExists {
+			return value.(string)
+		}
+		return defaultValue
+	}
+
+	getOrDefaultFloat := func(propMap map[string]interface{}, key string, defaultValue float64) float64 {
+		if value, keyExists := propMap[key]; keyExists {
+			return value.(float64)
+		}
+		return defaultValue
+	}
+
+	getOrDefaultBool := func(propMap map[string]interface{}, key string, defaultValue bool) bool {
+		if value, keyExists := propMap[key]; keyExists {
+			return value.(float64) > 0
+		}
+		return defaultValue
+	}
+
 	for obj, node := range objToNode {
 
 		if node.Extras != nil {
@@ -763,6 +791,40 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 								break
 							}
 						}
+					}
+				}
+
+				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {
+					for _, p := range gameProps.([]interface{}) {
+
+						property := p.(map[string]interface{})
+
+						propType := getOrDefaultInt(property, "valueType", 0)
+
+						// Property types:
+
+						// bool, int, float, string, reference (string)
+
+						name := getOrDefaultString(property, "name", "New Property")
+						var value interface{}
+
+						if propType == 0 {
+							value = getOrDefaultBool(property, "valueBool", false)
+						} else if propType == 1 {
+							value = getOrDefaultInt(property, "valueInt", 0)
+						} else if propType == 2 {
+							value = getOrDefaultFloat(property, "valueFloat", 0)
+						} else if propType == 3 {
+							value = getOrDefaultString(property, "valueString", "")
+						} else if propType == 4 {
+							if r, exists := property["valueReference"]; exists {
+								ref := r.(map[string]interface{})
+								value = getOrDefaultString(ref, "name", "")
+							}
+						}
+
+						obj.Tags().Set(name, value)
+
 					}
 				}
 
