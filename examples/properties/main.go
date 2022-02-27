@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"runtime/pprof"
+	"strings"
 	"time"
 
 	_ "embed"
@@ -67,6 +68,20 @@ func (g *Game) Init() {
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
+	for _, o := range g.Scene.Root.Children() {
+
+		if o.Tags().Has("parented to") {
+
+			// Object reference properties are composed of [Scene Name]:[Object Name]. If the scene to search is not set in Blender, that portion will be blank.
+			link := strings.Split(o.Tags().GetAsString("parented to"), ":")
+
+			ot := o.Transform()
+			g.Scene.Root.Get(link[1]).AddChildren(o)
+			o.SetWorldTransform(ot)
+		}
+
+	}
+
 }
 
 func (g *Game) Update() error {
@@ -80,7 +95,9 @@ func (g *Game) Update() error {
 
 		if o.Tags().Has("turn") {
 			o.Rotate(0, 1, 0, 0.02*o.Tags().GetAsFloat("turn"))
-		} else if o.Tags().Has("wave") {
+		}
+
+		if o.Tags().Has("wave") {
 			o.Move(0, math.Sin(g.Time*math.Pi)*0.02, 0)
 		}
 

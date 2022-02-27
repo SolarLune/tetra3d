@@ -3,6 +3,9 @@
         "generator" : "Khronos glTF Blender I/O v1.7.33",
         "version" : "2.0"
     },
+    "extensionsUsed" : [
+        "KHR_materials_unlit"
+    ],
     "scene" : 0,
     "scenes" : [
         {
@@ -21,7 +24,9 @@
                 5,
                 6,
                 7,
-                8
+                8,
+                9,
+                10
             ]
         }
     ],
@@ -36,6 +41,16 @@
                         "valueType" : 2,
                         "valueInt" : 2,
                         "valueFloat" : 2.0
+                    },
+                    {
+                        "name" : "wave",
+                        "valueType" : 0,
+                        "valueBool" : 1,
+                        "valueInt" : 0,
+                        "valueFloat" : 0.0,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null
                     }
                 ]
             },
@@ -108,9 +123,9 @@
                         "valueInt" : 0,
                         "valueFloat" : 0.0,
                         "valueString" : "",
-                        "valueReference" : null
-                    },
-                    {}
+                        "valueReference" : null,
+                        "valueReferenceScene" : {}
+                    }
                 ]
             },
             "mesh" : 0,
@@ -132,6 +147,16 @@
                         "valueFloat" : 1.0,
                         "valueString" : "",
                         "valueReference" : null
+                    },
+                    {
+                        "name" : "wave",
+                        "valueType" : 0,
+                        "valueBool" : 1,
+                        "valueInt" : 0,
+                        "valueFloat" : 0.0,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null
                     }
                 ]
             },
@@ -204,15 +229,72 @@
                 0,
                 -20
             ]
+        },
+        {
+            "extras" : {
+                "t3dGameProperties__" : [
+                    {
+                        "valueType" : 4,
+                        "valueReferenceScene" : null,
+                        "valueReference" : {
+                            "name" : "Parent",
+                            "type" : "Object"
+                        },
+                        "name" : "parented to"
+                    }
+                ]
+            },
+            "mesh" : 0,
+            "name" : "Cube.009",
+            "translation" : [
+                30,
+                0,
+                -10
+            ]
+        },
+        {
+            "extras" : {
+                "t3dGameProperties__" : [
+                    {
+                        "name" : "turn",
+                        "valueType" : 2,
+                        "valueBool" : 1,
+                        "valueInt" : 2,
+                        "valueFloat" : 1.0,
+                        "valueString" : "",
+                        "valueReference" : null
+                    },
+                    {
+                        "name" : "wave",
+                        "valueType" : 0,
+                        "valueBool" : 1,
+                        "valueInt" : 0,
+                        "valueFloat" : 0.0,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null
+                    }
+                ]
+            },
+            "mesh" : 0,
+            "name" : "Parent",
+            "translation" : [
+                25,
+                0,
+                -10
+            ]
         }
     ],
     "materials" : [
         {
             "doubleSided" : true,
+            "extensions" : {
+                "KHR_materials_unlit" : {}
+            },
             "name" : "Material",
             "pbrMetallicRoughness" : {
                 "metallicFactor" : 0,
-                "roughnessFactor" : 0.4000000059604645
+                "roughnessFactor" : 0.9
             }
         }
     ],

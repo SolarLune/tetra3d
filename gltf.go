@@ -822,6 +822,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		return defaultValue
 	}
 
+	getIfExistingMap := func(propMap map[string]interface{}, key string) map[string]interface{} {
+		if value, keyExists := propMap[key]; keyExists && value != nil {
+			return value.(map[string]interface{})
+		}
+		return nil
+	}
+
 	for obj, node := range objToNode {
 
 		if node.Extras != nil {
@@ -863,9 +870,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						} else if propType == 3 {
 							value = getOrDefaultString(property, "valueString", "")
 						} else if propType == 4 {
-							if r, exists := property["valueReference"]; exists {
-								ref := r.(map[string]interface{})
-								value = getOrDefaultString(ref, "name", "")
+							scene := ""
+							// Can be nil if it was set to something and then set to nothing
+							if ref := getIfExistingMap(property, "valueReferenceScene"); ref != nil {
+								scene = getOrDefaultString(ref, "name", "")
+							}
+							if ref := getIfExistingMap(property, "valueReference"); ref != nil {
+								value = scene + ":" + getOrDefaultString(ref, "name", "")
 							}
 						}
 
