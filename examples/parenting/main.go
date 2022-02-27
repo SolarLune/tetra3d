@@ -14,6 +14,7 @@ import (
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
+	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -261,15 +262,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorWhite())
+		g.Camera.DrawDebugText(screen, 1, colors.White())
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorWhite())
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.White())
 	}
 
 	if g.DrawDebugCenters {
-		g.Camera.DrawDebugCenters(screen, g.Scene.Root, tetra3d.ColorSkyBlue())
+		g.Camera.DrawDebugCenters(screen, g.Scene.Root, colors.SkyBlue())
 	}
 
 	if g.DrawDebugText {

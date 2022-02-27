@@ -14,6 +14,7 @@ import (
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
+	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -225,7 +226,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 
-		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorBlack())
+		g.Camera.DrawDebugText(screen, 1, colors.Black())
 
 		transparencyOn := "On"
 		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {

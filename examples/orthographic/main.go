@@ -13,6 +13,7 @@ import (
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
+	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -207,21 +208,21 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		camera.DrawDebugText(screen, 1, tetra3d.ColorWhite())
+		camera.DrawDebugText(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nArrow Keys: Pan in cardinal directions\nW, S: Zoom in and Out\nQ, E: Rotate View\nR: Restart\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{255, 0, 0, 255})
 	}
 
 	if g.DrawDebugWireframe {
-		camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorWhite())
+		camera.DrawDebugWireframe(screen, g.Scene.Root, colors.White())
 	}
 
 	if g.DrawDebugNormals {
-		camera.DrawDebugNormals(screen, g.Scene.Root, 0.5, tetra3d.ColorBlue())
+		camera.DrawDebugNormals(screen, g.Scene.Root, 0.5, colors.Blue())
 	}
 
 	if g.DrawDebugCenters {
-		camera.DrawDebugCenters(screen, g.Scene.Root, tetra3d.ColorSkyBlue())
+		camera.DrawDebugCenters(screen, g.Scene.Root, colors.SkyBlue())
 	}
 }
 

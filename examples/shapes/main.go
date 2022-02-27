@@ -14,6 +14,7 @@ import (
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
+	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -155,11 +156,11 @@ func (g *Game) Update() error {
 		g.Scene.FogColor.Set(0, 0, 0, 1)
 		g.Scene.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key4) {
-		g.Scene.FogColor = tetra3d.ColorWhite()
+		g.Scene.FogColor = colors.White()
 		g.Scene.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key5) {
 		g.Scene.FogMode = tetra3d.FogOff
-		g.Scene.FogColor = tetra3d.ColorBlack() // Fog being off, this doesn't do anything directly, but the clear color is set below to the fog color
+		g.Scene.FogColor = colors.Black() // Fog being off, this doesn't do anything directly, but the clear color is set below to the fog color
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
@@ -226,11 +227,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorRed())
+		camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Red())
 	}
 
 	if g.DrawDebugNormals {
-		camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, tetra3d.ColorBlue())
+		camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, colors.Blue())
 	}
 
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
+	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -231,19 +232,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, scene.Root, tetra3d.ColorRed())
+		g.Camera.DrawDebugWireframe(screen, scene.Root, colors.Red())
 	}
 
 	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, scene.Root, 0.5, tetra3d.ColorBlue())
+		g.Camera.DrawDebugNormals(screen, scene.Root, 0.5, colors.Blue())
 	}
 
 	if g.DrawDebugCenters {
-		g.Camera.DrawDebugCenters(screen, scene.Root, tetra3d.ColorSkyBlue())
+		g.Camera.DrawDebugCenters(screen, scene.Root, colors.SkyBlue())
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorWhite())
+		g.Camera.DrawDebugText(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1 Key: Play [SmoothRoll] Animation On Table\n2 Key: Play [StepRoll] Animation on Table\nNote the animations can blend\nF Key: Play Animation on Skinned Mesh\nNote that the nodes move as well\nF4: Toggle fullscreen\nF6: Node Debug View\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 104, color.RGBA{255, 0, 0, 255})
 	}

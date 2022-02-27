@@ -16,6 +16,7 @@ import (
 
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
+	"github.com/solarlune/tetra3d/colors"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -252,15 +253,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorRed())
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Red())
 	}
 
 	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, tetra3d.ColorBlue())
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, colors.Blue())
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorWhite())
+		g.Camera.DrawDebugText(screen, 1, colors.White())
 	}
 
 }

@@ -501,9 +501,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			return
 		}
 
-		camera.DebugInfo.TotalParts += len(model.Mesh.MeshParts)
-
-		camera.DebugInfo.TotalTris += model.Mesh.TotalTriangleCount()
+		camera.DebugInfo.TotalParts++
+		camera.DebugInfo.TotalTris += len(meshPart.Triangles)
 
 		if !model.visible {
 			return
