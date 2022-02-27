@@ -312,9 +312,9 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Intersect
 
 				p1 := project(axis, v0, v1, v2)
 
-				r := boxSize[0]*math.Abs(vector.X.Dot(axis)) +
-					boxSize[1]*math.Abs(vector.Y.Dot(axis)) +
-					boxSize[2]*math.Abs(vector.Z.Dot(axis))
+				r := boxSize[0]*math.Abs(dot(vector.X, axis)) +
+					boxSize[1]*math.Abs(dot(vector.Y, axis)) +
+					boxSize[2]*math.Abs(dot(vector.Z, axis))
 
 				p2 := projection{
 					Max: r,
@@ -548,7 +548,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 	capsulePosition := invertedTransform.MultVec(capsule.WorldPosition())
 	capsuleLine := capsuleTop.Sub(capsuleBottom)
 	capSpread := capsuleLine.Magnitude() + capsuleRadius
-	capDot := capsuleLine.Dot(capsuleLine)
+	capDot := dot(capsuleLine, capsuleLine)
 
 	var closestCapsulePoint vector.Vector
 
@@ -578,7 +578,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 			// Doing this manually to avoid doing as much as possible~
 
-			t := closest.Sub(capsuleBottom).Dot(capsuleLine) / capDot
+			t := dot(closest.Sub(capsuleBottom), capsuleLine) / capDot
 			t = math.Max(math.Min(t, 1), 0)
 			spherePos := capsuleBottom.Add(capsuleLine.Scale(t))
 
@@ -614,11 +614,11 @@ type projection struct {
 func project(axis vector.Vector, points ...vector.Vector) projection {
 
 	projection := projection{}
-	projection.Min = axis.Dot(points[0])
+	projection.Min = dot(axis, points[0])
 	projection.Max = projection.Min
 
 	for _, point := range points[1:] {
-		p := axis.Dot(point)
+		p := dot(axis, point)
 		if p < projection.Min {
 			projection.Min = p
 		} else if p > projection.Max {

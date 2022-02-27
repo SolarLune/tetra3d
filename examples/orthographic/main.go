@@ -213,15 +213,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		camera.DrawDebugWireframe(screen, g.Scene.Root, color.White)
+		camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorWhite())
 	}
 
 	if g.DrawDebugNormals {
-		camera.DrawDebugNormals(screen, g.Scene.Root, 0.5, color.RGBA{0, 128, 255, 255})
+		camera.DrawDebugNormals(screen, g.Scene.Root, 0.5, tetra3d.ColorBlue())
 	}
 
 	if g.DrawDebugCenters {
-		camera.DrawDebugCenters(screen, g.Scene.Root, color.RGBA{0, 128, 255, 255})
+		camera.DrawDebugCenters(screen, g.Scene.Root, tetra3d.ColorSkyBlue())
 	}
 }
 

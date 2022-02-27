@@ -26,14 +26,17 @@ const (
 )
 
 type Material struct {
-	library          *Library      // library is a reference to the Library that this Material came from.
-	Name             string        // Name is the name of the Material.
-	Color            *Color        // The overall color of the Material.
-	Image            *ebiten.Image // The texture applied to the Material.
-	Tags             *Tags         // Tags is a Tags object, allowing you to specify auxiliary data on the Material. This is loaded from GLTF files if / Blender's Custom Properties if the setting is enabled on the export menu.
-	BackfaceCulling  bool          // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
-	TriangleSortMode int           // TriangleSortMode influences how triangles with this Material are sorted.
-	EnableLighting   bool
+	library           *Library       // library is a reference to the Library that this Material came from.
+	Name              string         // Name is the name of the Material.
+	Color             *Color         // The overall color of the Material.
+	Texture           *ebiten.Image  // The texture applied to the Material.
+	TexturePath       string         // The path to the texture, if it was not packed into the exporter.
+	TextureFilterMode ebiten.Filter  // Texture filtering mode
+	TextureWrapMode   ebiten.Address // Texture wrapping mode
+	Tags              *Tags          // Tags is a Tags object, allowing you to specify auxiliary data on the Material. This is loaded from GLTF files if / Blender's Custom Properties if the setting is enabled on the export menu.
+	BackfaceCulling   bool           // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
+	TriangleSortMode  int            // TriangleSortMode influences how triangles with this Material are sorted.
+	Shadeless         bool           // If the material should be shadeless (unlit) or not
 
 	// VertexProgram is a function that runs on the world position of each vertex position rendered with the material.
 	// One can use this to simply transform the vertices of the mesh (note that this is, of course, not as performant as
@@ -67,9 +70,10 @@ func NewMaterial(name string) *Material {
 		Name:                  name,
 		Color:                 NewColor(1, 1, 1, 1),
 		Tags:                  NewTags(),
+		TextureFilterMode:     ebiten.FilterNearest,
+		TextureWrapMode:       ebiten.AddressRepeat,
 		BackfaceCulling:       true,
 		TriangleSortMode:      TriangleSortBackToFront,
-		EnableLighting:        true,
 		TransparencyMode:      TransparencyModeAuto,
 		FragmentShaderOptions: &ebiten.DrawTrianglesShaderOptions{},
 		FragmentShaderOn:      true,
@@ -81,12 +85,14 @@ func (material *Material) Clone() *Material {
 	newMat := NewMaterial(material.Name)
 	newMat.library = material.library
 	newMat.Color = material.Color.Clone()
-	newMat.Image = material.Image
+	newMat.Texture = material.Texture
 	newMat.Tags = material.Tags.Clone()
 	newMat.BackfaceCulling = material.BackfaceCulling
 	newMat.TriangleSortMode = material.TriangleSortMode
-	newMat.EnableLighting = material.EnableLighting
+	newMat.Shadeless = material.Shadeless
 	newMat.TransparencyMode = material.TransparencyMode
+	newMat.TextureFilterMode = material.TextureFilterMode
+	newMat.TextureWrapMode = material.TextureWrapMode
 
 	newMat.VertexProgram = material.VertexProgram
 	newMat.ClipProgram = material.ClipProgram

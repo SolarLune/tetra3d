@@ -102,7 +102,7 @@ func (capsule *BoundingCapsule) ClosestPoint(point vector.Vector) vector.Vector 
 	end := capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 - capsule.Radius))
 	segment := end.Sub(start)
 
-	t := point.Sub(start).Dot(segment) / segment.Dot(segment)
+	t := dot(point.Sub(start), segment) / dot(segment, segment)
 	t = math.Max(math.Min(t, 1), 0)
 
 	return start.Add(segment.Scale(t))

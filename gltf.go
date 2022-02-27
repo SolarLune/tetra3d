@@ -16,7 +16,6 @@ import (
 )
 
 type GLTFLoadOptions struct {
-	LoadImages                bool // Whether images embedded in the GLTF / GLB file should be loaded or not.
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
 	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying)
 	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
@@ -25,7 +24,6 @@ type GLTFLoadOptions struct {
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
 func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 	return &GLTFLoadOptions{
-		LoadImages:                true,
 		CameraWidth:               1920,
 		CameraHeight:              1080,
 		DefaultToAutoTransparency: true,
@@ -83,7 +81,23 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	images := []*ebiten.Image{}
 
-	if gltfLoadOptions.LoadImages {
+	exportedTextures := false
+
+	if len(doc.Scenes) > 0 {
+
+		if doc.Scenes[0].Extras != nil {
+
+			globalExporterSettings := doc.Scenes[0].Extras.(map[string]interface{})
+
+			if et, exists := globalExporterSettings["t3dPackTextures__"]; exists {
+				exportedTextures = et.(float64) > 0
+			}
+
+		}
+
+	}
+
+	if exportedTextures {
 
 		for _, gltfImage := range doc.Images {
 
@@ -121,16 +135,33 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			newMat.BackfaceCulling = !gltfMat.DoubleSided
 		}
 
-		if gltfLoadOptions.LoadImages {
-			if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
-				newMat.Image = images[*doc.Textures[texture.Index].Source]
+		if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
+			if exportedTextures {
+				newMat.Texture = images[*doc.Textures[texture.Index].Source]
+			} else {
+				newMat.TexturePath = doc.Images[*doc.Textures[texture.Index].Source].URI
 			}
 		}
 
 		if gltfMat.Extras != nil {
 			if dataMap, isMap := gltfMat.Extras.(map[string]interface{}); isMap {
+
+				if c, exists := dataMap["t3dMaterialColor__"]; exists {
+					color := c.([]interface{})
+					newMat.Color.R = float32(color[0].(float64))
+					newMat.Color.G = float32(color[1].(float64))
+					newMat.Color.B = float32(color[2].(float64))
+					newMat.Color.A = float32(color[3].(float64))
+				}
+
+				if s, exists := dataMap["t3dMaterialShadeless__"]; exists {
+					newMat.Shadeless = s.(float64) > 0.5
+				}
+
 				for tagName, data := range dataMap {
-					newMat.Tags.Set(tagName, data)
+					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
+						newMat.Tags.Set(tagName, data)
+					}
 				}
 			}
 		}
@@ -442,6 +473,21 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		}
 
+		if gltfAnim.Extras != nil {
+			m := gltfAnim.Extras.(map[string]interface{})
+			if markerData, exists := m["t3dMarkers__"]; exists {
+				for _, mData := range markerData.([]interface{}) {
+
+					marker := mData.(map[string]interface{})
+
+					anim.Markers = append(anim.Markers, Marker{
+						Name: marker["name"].(string),
+						Time: marker["time"].(float64),
+					})
+				}
+			}
+		}
+
 		anim.Length = animLength
 
 	}
@@ -594,7 +640,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
 							mesh := obj.(*Model).Mesh
 							dim := mesh.Dimensions
-							capsule = NewBoundingCapsule("_bounding capsule", math.Max(dim.Width(), dim.Depth())/2, dim.Height())
+							capsule = NewBoundingCapsule("_bounding capsule", dim.Height(), math.Max(dim.Width(), dim.Depth())/2)
 						}
 
 						if capsule != nil {

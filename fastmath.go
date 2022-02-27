@@ -147,3 +147,8 @@ func (pool *VectorPool) Cross(v0, v1 vector.Vector) vector.Vector {
 
 	return v[:3]
 }
+
+// Fast dot that should never call append() on the input Vectors, regardless of dimensions
+func dot(a, b vector.Vector) float64 {
+	return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+}

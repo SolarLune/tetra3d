@@ -23,6 +23,46 @@ func ColorBlack() *Color {
 	return NewColor(0, 0, 0, 1)
 }
 
+func ColorGray() *Color {
+	return NewColor(0.5, 0.5, 0.5, 1)
+}
+
+func ColorRed() *Color {
+	return NewColor(1, 0, 0, 1)
+}
+
+func ColorOrange() *Color {
+	return NewColor(0.5, 1, 1, 1)
+}
+
+func ColorYellow() *Color {
+	return NewColor(1, 1, 0, 1)
+}
+
+func ColorGreen() *Color {
+	return NewColor(0, 1, 0, 1)
+}
+
+func ColorBlue() *Color {
+	return NewColor(0, 0, 1, 1)
+}
+
+func ColorSkyBlue() *Color {
+	return NewColor(0, 0.5, 1, 1)
+}
+
+func ColorTurquoise() *Color {
+	return NewColor(0, 1, 1, 1)
+}
+
+func ColorPink() *Color {
+	return NewColor(1, 0, 1, 1)
+}
+
+func ColorPurple() *Color {
+	return NewColor(0.5, 0, 1, 1)
+}
+
 // Clone returns a clone of the Color instance.
 func (color *Color) Clone() *Color {
 	return NewColor(color.R, color.G, color.B, color.A)

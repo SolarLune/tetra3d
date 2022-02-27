@@ -10,7 +10,7 @@ bl_info = {
     "blender" : (3, 0, 1),                             # Lowest version to use
     "location" : "View3D",
     "category" : "Gamedev",
-    "version" : (0, 1),
+    "version" : (0, 2),
     "support" : "COMMUNITY",
     "doc_url" : "https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon",
 }
@@ -136,7 +136,7 @@ class OBJECT_OT_tetra3dClearProps(bpy.types.Operator):
 
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
-    bl_label = "Tetra3d Properties"
+    bl_label = "Tetra3d Object Properties"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "object"
@@ -203,6 +203,25 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
         
+class MATERIAL_PT_tetra3d(bpy.types.Panel):
+    bl_idname = "MATERIAL_PT_tetra3d"
+    bl_label = "Tetra3d Material Properties"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "material"
+
+    def draw(self, context):
+        row = self.layout.row()
+        row.prop(context.material, "t3dMaterialColor__")
+        # row = self.layout.row()
+        # row.prop(context.material, "t3dColorTexture0__")
+        # row.operator("image.open")
+        row = self.layout.row()
+        row.prop(context.material, "t3dMaterialShadeless__")
+        row.prop(context.material, "use_backface_culling")
+        row = self.layout.row()
+        row.prop(context.material, "blend_method")
+
         
 # The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
 def globalGet(propName):
@@ -214,68 +233,110 @@ def globalSet(propName, value):
 
 class RENDER_PT_tetra3d(bpy.types.Panel):
     bl_idname = "RENDER_PT_tetra3d"
-    bl_label = "Tetra3D Properties"
+    bl_label = "Tetra3D Render Properties"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
     
     def draw(self, context):
         row = self.layout.row()
+        row.operator(EXPORT_OT_tetra3d.bl_idname)
+        row = self.layout.row()
         row.prop(context.scene, "t3dExportOnSave__")
-        if globalGet("t3dExportOnSave__"):
-            row = self.layout.row()
-            row.prop(context.scene, "t3dExportFilepath__")
-            
-            row = self.layout.row()
-            row.prop(context.scene, "t3dExportFormat__")
-            
-            box = self.layout.box()
-            box.prop(context.scene, "t3dExportCameras__")
-            box.prop(context.scene, "t3dExportLights__")
 
+        row = self.layout.row()
+        row.prop(context.scene, "t3dExportFilepath__")
+        
+        row = self.layout.row()
+        row.prop(context.scene, "t3dExportFormat__")
+        
+        box = self.layout.box()
+        box.prop(context.scene, "t3dPackTextures__")
+        box.prop(context.scene, "t3dExportCameras__")
+        box.prop(context.scene, "t3dExportLights__")
+
+
+def export():
+    scene = bpy.context.scene
+        
+    blendPath = bpy.context.blend_data.filepath
+    if scene.t3dExportFilepath__ != "":
+        blendPath = scene.t3dExportFilepath__
+
+    if blendPath == "":
+        return False
+    
+    if scene.t3dExportFormat__ == "GLB":
+        ending = ".glb"
+    elif scene.t3dExportFormat__ == "GLTF_SEPARATE" or scene.t3dExportFormat__ == "GLTF_EMBEDDED":
+        ending = ".gltf"
+    
+    newPath = os.path.splitext(blendPath)[0] + ending
+
+    for obj in bpy.data.objects:
+        cloning = []
+        if obj.instance_type == "COLLECTION":
+            for o in obj.instance_collection.objects:
+                if o.parent == None:
+                    cloning.append(o.name)
+        if len(cloning) > 0:
+            obj["t3dInstanceCollection__"] = cloning
+
+    for action in bpy.data.actions:
+        markers = []
+        for marker in action.pose_markers:
+            markerInfo = {
+                "name": marker.name,
+                "time": marker.frame / scene.render.fps,
+            }
+            markers.append(markerInfo)
+        if len(markers) > 0:
+            action["t3dMarkers__"] = markers
+    
+    # We force on exporting of Extra values because otherwise, values from Blender would not be able to be exported.
+    # export_apply=True to ensure modifiers are applied.
+    bpy.ops.export_scene.gltf(
+        filepath=newPath, 
+        export_format=scene.t3dExportFormat__, 
+        export_cameras=scene.t3dExportCameras__, 
+        export_lights=scene.t3dExportLights__, 
+        export_keep_originals=not scene.t3dPackTextures__,
+
+        export_extras=True,
+        export_yup=True,
+        export_apply=True,
+    )
+
+    for obj in bpy.data.objects:
+        if "t3dInstanceCollection__" in obj:
+            del(obj["t3dInstanceCollection__"])
+
+    for action in bpy.data.actions:
+        if "t3dMarkers__" in action:
+            del(action["t3dMarkers__"])
+
+    return True
 
 @persistent
 def exportOnSave(dummy):
     
     if globalGet("t3dExportOnSave__"):
-        scene = bpy.context.scene
-        
-        blendPath = bpy.context.blend_data.filepath
-        if scene.t3dExportFilepath__ != "":
-            blendPath = scene.t3dExportFilepath__
-        
-        if scene.t3dExportFormat__ == "GLB":
-            ending = ".glb"
-        elif scene.t3dExportFormat__ == "GLTF_SEPARATE" or scene.t3dExportFormat__ == "GLTF_EMBEDDED":
-            ending = ".gltf"
-        
-        newPath = os.path.splitext(blendPath)[0] + ending
+        export()
 
-        for obj in bpy.data.objects:
-            cloning = []
-            if obj.instance_type == "COLLECTION":
-                for o in obj.instance_collection.objects:
-                    if o.parent == None:
-                        cloning.append(o.name)
-            if len(cloning) > 0:
-                obj["t3dInstanceCollection__"] = cloning
 
-        # We force on exporting of Extra values because otherwise, values from Blender would not be able to be exported.
-        # export_apply=True to ensure modifiers are applied.
-        bpy.ops.export_scene.gltf(
-            filepath=newPath, 
-            export_format=scene.t3dExportFormat__, 
-            export_cameras=scene.t3dExportCameras__, 
-            export_lights=scene.t3dExportLights__, 
-            
-            export_extras=True,
-            export_yup=True,
-            export_apply=True,
-        )
+class EXPORT_OT_tetra3d(bpy.types.Operator):
+   bl_idname = "export.tetra3dgltf"
+   bl_label = "Tetra3D Export"
+   bl_description= "Exports to a GLTF file for use in Tetra3D"
+   bl_options = {'REGISTER', 'UNDO'}
 
-        for obj in bpy.data.objects:
-            if "t3dInstanceCollection__" in obj:
-                del(obj["t3dInstanceCollection__"])
+   def execute(self, context):
+        if export():
+            self.report({"INFO"}, "Tetra3D GLTF data exported properly.")
+        else:
+            self.report({"WARNING"}, "Warning: Tetra3D GLTF file could not be exported; please either specify a filepath or save the blend file.")
+        return {'FINISHED'}
+
 
 objectProps = {
     "t3dVisible__" : bpy.props.BoolProperty(name="Visible", description="Whether the object is visible or not when exported to Tetra3D", default=True),
@@ -343,16 +404,28 @@ def setExportLights(self, value):
     globalSet("t3dExportLights__", value)
 
 
+def getPackTextures(self):
+    l = globalGet("t3dPackTextures__")
+    if l is None:
+        l = False
+    return l
+
+def setPackTextures(self, value):
+    globalSet("t3dPackTextures__", value)
+
+
 
 def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
     bpy.utils.register_class(RENDER_PT_tetra3d)
+    bpy.utils.register_class(MATERIAL_PT_tetra3d)
     bpy.utils.register_class(OBJECT_OT_tetra3dAddProp)
     bpy.utils.register_class(OBJECT_OT_tetra3dDeleteProp)
     bpy.utils.register_class(OBJECT_OT_tetra3dReorderProps)
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyProps)
     bpy.utils.register_class(OBJECT_OT_tetra3dClearProps)
+    bpy.utils.register_class(EXPORT_OT_tetra3d)
     
     bpy.utils.register_class(t3dGamePropertyItem__)
 
@@ -375,23 +448,36 @@ def register():
 
     bpy.types.Scene.t3dExportLights__ = bpy.props.BoolProperty(name="Export Lights", description="Whether Blender should export lights to the GLTF file", default=True,
     get=getExportLights, set=setExportLights)
+
+    bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(name="Pack Textures", description="Whether Blender should pack textures into the GLTF file on export", default=False,
+    get=getPackTextures, set=setPackTextures)    
+
+    bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
     
+    # bpy.types.Material.t3dColorTexture0__ = bpy.props.StringProperty(name="Color Texture 0", description="Color texture", subtype="FILE_PATH")
+
     if not exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.append(exportOnSave)
     
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
     bpy.utils.unregister_class(RENDER_PT_tetra3d)
+    bpy.utils.unregister_class(MATERIAL_PT_tetra3d)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dAddProp)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dDeleteProp)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dReorderProps)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyProps)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dClearProps)
+    bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
     bpy.utils.unregister_class(t3dGamePropertyItem__)
     
     for propName, prop in objectProps.items():
         delattr(bpy.types.Object, propName)
+
+    del bpy.types.Material.t3dMaterialColor__
+    del bpy.types.Material.t3dMaterialShadeless__
     
     del bpy.types.Scene.t3dExportOnSave__
     del bpy.types.Scene.t3dExportFilepath__
@@ -399,7 +485,9 @@ def unregister():
     
     del bpy.types.Scene.t3dExportCameras__
     del bpy.types.Scene.t3dExportLights__
-    # del bpy.types.Scene.t3dExportExtras__
+    del bpy.types.Scene.t3dPackTextures__
+
+    # del bpy.types.Material.t3dColorTexture0__
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)

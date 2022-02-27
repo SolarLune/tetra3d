@@ -179,11 +179,11 @@ func (point *PointLight) Light(tri *Triangle) [9]float32 {
 		eyeFacing := 1.0
 
 		// We don't want the light to be modulated by the eye vector, just turn the light off 100% if you're looking from the other side of the triangle
-		if vert.Normal.Dot(eyeVec) < 0 {
+		if dot(vert.Normal, eyeVec) < 0 {
 			eyeFacing = -1
 		}
 
-		diffuse := vert.Normal.Dot(lightVec) * eyeFacing
+		diffuse := dot(vert.Normal, lightVec) * eyeFacing
 
 		if diffuse < 0 {
 			diffuse = 0
@@ -296,11 +296,11 @@ func (sun *DirectionalLight) Light(tri *Triangle) [9]float32 {
 		eyeFacing := 1.0
 
 		// We don't want the light to be modulated by the eye vector, just turn the light off 100% if you're looking from the other side of the triangle
-		if normal.Dot(eyeVec) < 0 {
+		if dot(normal, eyeVec) < 0 {
 			eyeFacing = -1
 		}
 
-		diffuseFactor := normal.Dot(sun.workingForward) * eyeFacing
+		diffuseFactor := dot(normal, sun.workingForward) * eyeFacing
 		if diffuseFactor < 0 {
 			diffuseFactor = 0
 		}

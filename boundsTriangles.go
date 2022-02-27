@@ -123,7 +123,7 @@ func (plane *collisionPlane) Set(v0, v1, v2 vector.Vector) {
 	first := plane.VectorPool.Sub(v1, v0)
 	second := plane.VectorPool.Sub(v2, v0)
 	normal := plane.VectorPool.Cross(first, second).Unit()
-	distance := normal.Dot(v0)
+	distance := dot(normal, v0)
 
 	plane.Normal = normal
 	plane.Distance = distance
@@ -132,7 +132,7 @@ func (plane *collisionPlane) Set(v0, v1, v2 vector.Vector) {
 
 func (plane *collisionPlane) ClosestPoint(point vector.Vector) vector.Vector {
 
-	dist := plane.Normal.Dot(point) - plane.Distance
+	dist := dot(plane.Normal, point) - plane.Distance
 	return plane.VectorPool.Sub(point, plane.Normal.Scale(dist))[:3]
 
 }
@@ -177,12 +177,12 @@ func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 vector.Vector
 	ba := plane.VectorPool.Sub(v1, v0)[:3]
 	pa := plane.VectorPool.Sub(point, v0)[:3]
 
-	dot00 := ca.Dot(ca)
-	dot01 := ca.Dot(ba)
-	dot02 := ca.Dot(pa)
+	dot00 := dot(ca, ca)
+	dot01 := dot(ca, ba)
+	dot02 := dot(ca, pa)
 
-	dot11 := ba.Dot(ba)
-	dot12 := ba.Dot(pa)
+	dot11 := dot(ba, ba)
+	dot12 := dot(ba, pa)
 
 	invDenom := 1.0 / ((dot00 * dot11) - (dot01 * dot01))
 	u := ((dot11 * dot02) - (dot01 * dot12)) * invDenom
@@ -195,8 +195,8 @@ func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 vector.Vector
 func (plane *collisionPlane) closestPointOnLine(point, start, end vector.Vector) vector.Vector {
 
 	diff := plane.VectorPool.Sub(end, start)
-	dotA := plane.VectorPool.Sub(point, start).Dot(diff)
-	dotB := diff.Dot(diff)
+	dotA := dot(plane.VectorPool.Sub(point, start), diff)
+	dotB := dot(diff, diff)
 	d := math.Min(math.Max(dotA/dotB, 0), 1)
 	return plane.VectorPool.Add(start, diff.Scale(d))
 

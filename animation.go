@@ -175,12 +175,19 @@ func (channel *AnimationChannel) AddTrack(trackType string) *AnimationTrack {
 	return newTrack
 }
 
+// Marker represents a tag as placed in an Animation in a 3D modeler.
+type Marker struct {
+	Time float64
+	Name string
+}
+
 // Animation represents an animation of some description; it can have multiple channels, indicating movement, scale, or rotational change of one or more Nodes in the Animation.
 type Animation struct {
 	library  *Library
 	Name     string
 	Channels map[string]*AnimationChannel
-	Length   float64 // Length of the animation in seconds
+	Length   float64  // Length of the animation in seconds
+	Markers  []Marker // Markers as specified in the Animation from the modeler
 }
 
 // NewAnimation creates a new Animation of the name specified.
@@ -188,6 +195,7 @@ func NewAnimation(name string) *Animation {
 	return &Animation{
 		Name:     name,
 		Channels: map[string]*AnimationChannel{},
+		Markers:  []Marker{},
 	}
 }
 
@@ -221,15 +229,16 @@ type AnimationPlayer struct {
 	ChannelsToNodes        map[*AnimationChannel]INode
 	ChannelsUpdated        bool
 	Animation              *Animation
-	Playhead               float64                    // Playhead of the animation. Setting this to 0 restarts the animation.
-	PlaySpeed              float64                    // Playback speed in percentage - defaults to 1 (100%)
-	Playing                bool                       // Whether the player is playing back or not.
-	FinishMode             int                        // What to do when the player finishes playback. Defaults to looping.
-	OnFinish               func()                     // Callback indicating the Animation has completed
-	animatedProperties     map[INode]*AnimationValues // The properties that have been animated
-	prevAnimatedProperties map[INode]*AnimationValues // The previous properties that have been animated from the previously Play()'d animation
-	BlendTime              float64                    // How much time in seconds to blend between two animations
-	blendStart             time.Time                  // The time that the blend started
+	Playhead               float64                                   // Playhead of the animation. Setting this to 0 restarts the animation.
+	PlaySpeed              float64                                   // Playback speed in percentage - defaults to 1 (100%)
+	Playing                bool                                      // Whether the player is playing back or not.
+	FinishMode             int                                       // What to do when the player finishes playback. Defaults to looping.
+	OnFinish               func()                                    // Callback indicating the Animation has completed
+	OnMarkerTouch          func(marker Marker, animation *Animation) // Callback indicating when the AnimationPlayer has entered a marker
+	animatedProperties     map[INode]*AnimationValues                // The properties that have been animated
+	prevAnimatedProperties map[INode]*AnimationValues                // The previous properties that have been animated from the previously Play()'d animation
+	BlendTime              float64                                   // How much time in seconds to blend between two animations
+	blendStart             time.Time                                 // The time that the blend started
 }
 
 // NewAnimationPlayer returns a new AnimationPlayer for the Node.
@@ -378,7 +387,15 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 			}
 
+			prevPlayhead := ap.Playhead
+
 			ap.Playhead += dt * ap.PlaySpeed
+
+			for _, marker := range ap.Animation.Markers {
+				if prevPlayhead < marker.Time && ap.Playhead >= marker.Time && ap.OnMarkerTouch != nil {
+					ap.OnMarkerTouch(marker, ap.Animation)
+				}
+			}
 
 			if ap.FinishMode == FinishModeLoop && (ap.Playhead >= ap.Animation.Length || ap.Playhead < 0) {
 

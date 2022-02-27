@@ -48,7 +48,6 @@ type Mesh struct {
 	Name       string
 	library    *Library    // A reference to the Library this Mesh came from.
 	MeshParts  []*MeshPart // A slice of mesh parts
-	FilterMode ebiten.Filter
 	Dimensions Dimensions
 	triIndex   int
 	Tags       *Tags
@@ -62,7 +61,6 @@ func NewMesh(name string) *Mesh {
 		Name:      name,
 		MeshParts: []*MeshPart{},
 		// Triangles:  []*Triangle{},
-		FilterMode: ebiten.FilterNearest,
 		Dimensions: Dimensions{{0, 0, 0}, {0, 0, 0}},
 		triIndex:   1,
 		Tags:       NewTags(),

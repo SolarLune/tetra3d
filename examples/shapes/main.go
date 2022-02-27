@@ -65,6 +65,9 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
+	mat := library.Materials["OutdoorStuff"]
+	fmt.Println(mat.Name, mat.Texture, mat.TexturePath)
+
 	g.Scene = library.FindScene("Scene")
 
 	// Cameras are loaded from the GLTF file. By default, there's a correction so that they point in the correct direction
@@ -152,7 +155,11 @@ func (g *Game) Update() error {
 		g.Scene.FogColor.Set(0, 0, 0, 1)
 		g.Scene.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key4) {
+		g.Scene.FogColor = tetra3d.ColorWhite()
+		g.Scene.FogMode = tetra3d.FogOverwrite
+	} else if ebiten.IsKeyPressed(ebiten.Key5) {
 		g.Scene.FogMode = tetra3d.FogOff
+		g.Scene.FogColor = tetra3d.ColorBlack() // Fog being off, this doesn't do anything directly, but the clear color is set below to the fog color
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
@@ -219,11 +226,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		camera.DrawDebugWireframe(screen, g.Scene.Root, color.RGBA{255, 0, 0, 255})
+		camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorRed())
 	}
 
 	if g.DrawDebugNormals {
-		camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, color.RGBA{0, 128, 255, 255})
+		camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, tetra3d.ColorBlue())
 	}
 
 }

@@ -64,33 +64,6 @@ func (g *Game) Init() {
 
 	g.Scene = library.FindScene("Scene")
 
-	for _, object := range g.Scene.Root.ChildrenRecursive() {
-
-		if object.Tags().Has("collision") {
-
-			model := object.(*tetra3d.Model)
-			colType := object.Tags().GetAsString("collision")
-
-			if colType == "sphere" {
-				col := tetra3d.NewBoundingSphere("bounds", model.Mesh.Dimensions.Max()/2)
-				object.AddChildren(col)
-			} else if colType == "aabb" {
-				dimensions := object.(*tetra3d.Model).Mesh.Dimensions
-				col := tetra3d.NewBoundingAABB("bounds", dimensions.Width(), dimensions.Height(), dimensions.Depth())
-				object.AddChildren(col)
-			} else if colType == "triangle" {
-				col := tetra3d.NewBoundingTriangles("bounds", model.Mesh)
-				object.AddChildren(col)
-			} else if colType == "capsule" {
-				dimensions := object.(*tetra3d.Model).Mesh.Dimensions
-				col := tetra3d.NewBoundingCapsule("bounds", dimensions.Height(), dimensions.Width()/2)
-				object.AddChildren(col)
-			}
-
-		}
-
-	}
-
 	g.Controlling = g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
@@ -100,29 +73,6 @@ func (g *Game) Init() {
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 	// g.Scene.Root.Get("Ground").SetVisible(false, false)
-
-}
-
-func (g *Game) ResolveCollisions() {
-
-	bounds := g.Controlling.Get("bounds").(tetra3d.BoundingObject)
-
-	for _, ob := range g.Scene.Root.FindByName("bounds", true) {
-
-		if inter := bounds.Intersection(ob.(tetra3d.BoundingObject)); inter != nil {
-
-			maxMTV := vector.Vector{0, 0, 0}
-			for _, i := range inter.Intersections {
-				if i.MTV.Magnitude() > maxMTV.Magnitude() {
-					maxMTV = i.MTV
-				}
-			}
-
-			g.Controlling.MoveVec(maxMTV)
-
-		}
-
-	}
 
 }
 
@@ -183,13 +133,6 @@ func (g *Game) Update() error {
 		g.Controlling.Move(0, 0, moveSpd)
 	}
 
-	g.ResolveCollisions()
-
-	// Gravity
-	g.Controlling.Move(0, -0.1, 0)
-
-	g.ResolveCollisions()
-
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)
 		capsule := g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
@@ -198,6 +141,30 @@ func (g *Game) Update() error {
 		} else {
 			g.Controlling = sphere
 		}
+	}
+
+	// Gravity
+	g.Controlling.Move(0, -0.1, 0)
+
+	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
+
+	for _, o := range g.Scene.Root.FindByType(tetra3d.NodeTypeBounding) {
+
+		other := o.(tetra3d.BoundingObject)
+
+		if inter := bounds.Intersection(other); inter != nil {
+
+			maxMTV := vector.Vector{0, 0, 0}
+			for _, i := range inter.Intersections {
+				if i.MTV.Magnitude() > maxMTV.Magnitude() {
+					maxMTV = i.MTV
+				}
+			}
+
+			g.Controlling.MoveVec(maxMTV)
+
+		}
+
 	}
 
 	// Rotate and tilt the camera according to mouse movements
@@ -281,15 +248,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, color.White)
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorWhite())
 	}
 
 	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, color.RGBA{0, 128, 255, 255})
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, tetra3d.ColorSkyBlue())
 	}
 
 	if g.DrawDebugBounds {
-		g.Camera.DrawDebugBounds(screen, g.Scene.Root, color.RGBA{0, 255, 0, 128})
+		g.Camera.DrawDebugBoundsColored(screen, g.Scene.Root, tetra3d.ColorWhite(), tetra3d.ColorWhite(), tetra3d.ColorWhite(), tetra3d.ColorGray())
 	}
 
 	if g.DrawDebugText {

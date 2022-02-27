@@ -284,6 +284,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Export GLTF on Save
 - [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
 - [x] -- Bounds node creation
+- [x] -- Collection / group substitution (works, but only when exporting on save currently) 
+- [x] -- Material export
+- [x] -- Option to pack textures or leave them as a path
 - [x] **DAE model loading**
 - [x] -- Vertex colors loading
 - [x] -- UV map loading
@@ -311,12 +314,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 | Capsule        | ✅     | ✅           | ✅         | ✅       |   ❌  |
 | Ray            | ❌     | ❌           | ❌         | ❌       |   ❌  |
 
-- [ ] **3D Sound** (just adjusting panning of sound sources based on 3D location, or something like that)
+- [ ] **3D Sound** (adjusting panning of sound sources based on 3D location) - NOTE: Unsure if I'll implement this; [beep](https://github.com/faiface/beep) allows you to affect sounds playing back, and it is relatively simple to make it pan as necessary.
 - [ ] **Optimization**
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
 - [x] -- Vector pools
-- [ ] -- Matrix pools
+- [ ] -- Matrix pools?
 - [ ] -- Lighting speed improvements 
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
@@ -324,4 +327,13 @@ Again, it's incomplete and jank. However, it's also pretty cool!
 
 ## Shout-out time~
 
-Huge shout-out to the open-source community (i.e. StackOverflow, [fauxgl](https://github.com/fogleman/fauxgl), [tinyrenderer](https://github.com/ssloy/tinyrenderer), [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems), etc) at large for sharing the information and code to make this possible; I would definitely have never made this happen otherwise.
+Huge shout-out to the open-source community: 
+
+- StackOverflow, in general
+- [fauxgl](https://github.com/fogleman/fauxgl)
+- [tinyrenderer](https://github.com/ssloy/tinyrenderer)
+- [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems)
+- [3DCollisions](https://gdbooks.gitbooks.io/3dcollisions/content/)
+- [Simon Rodriguez's "Writing a Small Software Renderer" article](http://blog.simonrodriguez.fr/articles/2017/02/writing_a_small_software_renderer.html)
+	
+... For sharing the information and code to make this possible; I would definitely have never made this happen otherwise.

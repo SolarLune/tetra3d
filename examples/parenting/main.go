@@ -69,7 +69,7 @@ func (g *Game) Init() {
 	g.Scene = tetra3d.NewScene("Test Scene")
 
 	cubeMesh := tetra3d.NewCube()
-	cubeMesh.MeshParts[0].Material.Image = loadImage(testImageData)
+	cubeMesh.MeshParts[0].Material.Texture = loadImage(testImageData)
 
 	parent := tetra3d.NewModel(cubeMesh, "parent")
 	parent.SetLocalPosition(vector.Vector{0, -3, 0})
@@ -141,7 +141,7 @@ func (g *Game) Update() error {
 		if child.Parent() == parent {
 			transform := child.Transform()
 			// After changing parenting, the child's position would change because of a different parent (so now
-			// 0, 0, 0 corresponds to a different location). We counteract this by manually setting the world transform to be the original location.
+			// 0, 0, 0 corresponds to a different location). We counteract this by manually setting the world transform to be the original transform.
 			g.Scene.Root.AddChildren(child)
 			child.SetWorldTransform(transform)
 		} else {
@@ -265,11 +265,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, color.White)
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorWhite())
 	}
 
 	if g.DrawDebugCenters {
-		g.Camera.DrawDebugCenters(screen, g.Scene.Root, color.RGBA{0, 128, 255, 255})
+		g.Camera.DrawDebugCenters(screen, g.Scene.Root, tetra3d.ColorSkyBlue())
 	}
 
 	if g.DrawDebugText {

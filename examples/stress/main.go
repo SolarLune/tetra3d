@@ -91,7 +91,7 @@ func (g *Game) Init() {
 	// shared a single Mesh (which has a single Material (aptly named "Cube")), the MeshParts also
 	// share the same Material. This being the case, we don't need to set the image on all MeshParts'
 	// Materials; just the first one is fine.
-	merged.Mesh.MeshParts[0].Material.Image = ebiten.NewImageFromImage(img)
+	merged.Mesh.MeshParts[0].Material.Texture = ebiten.NewImageFromImage(img)
 
 	// Add the merged result model, and we're done, basically.
 	g.Scene.Root.AddChildren(merged)
@@ -252,11 +252,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, color.RGBA{255, 0, 0, 255})
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, tetra3d.ColorRed())
 	}
 
 	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, color.RGBA{0, 128, 255, 255})
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, tetra3d.ColorBlue())
 	}
 
 	if g.DrawDebugText {

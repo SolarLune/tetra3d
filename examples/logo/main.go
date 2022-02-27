@@ -61,7 +61,7 @@ func (g *Game) Init() {
 	g.Scene = data.Scenes[0]
 
 	// And set its image to the offscreen buffer
-	data.Materials["ScreenTexture"].Image = g.Offscreen
+	data.Materials["ScreenTexture"].Texture = g.Offscreen
 
 	// This is another way to do it
 	// screen := g.Scene.Root.Get("Screen").(*tetra3d.Model)

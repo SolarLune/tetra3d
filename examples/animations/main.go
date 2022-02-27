@@ -231,20 +231,20 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, scene.Root, color.RGBA{255, 0, 0, 255})
+		g.Camera.DrawDebugWireframe(screen, scene.Root, tetra3d.ColorRed())
 	}
 
 	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, scene.Root, 0.5, color.RGBA{0, 128, 255, 255})
+		g.Camera.DrawDebugNormals(screen, scene.Root, 0.5, tetra3d.ColorBlue())
 	}
 
 	if g.DrawDebugCenters {
-		g.Camera.DrawDebugCenters(screen, scene.Root, color.RGBA{0, 128, 255, 255})
+		g.Camera.DrawDebugCenters(screen, scene.Root, tetra3d.ColorSkyBlue())
 	}
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, tetra3d.ColorWhite())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1 Key: Play [SmoothRoll] Animation On Table\n2 Key: Play [StepRoll] Animation on Table\nNote the animations can blend\nF Key: Play Animation on Skinned Mesh\nNote that the bones move as well\nF4: Toggle fullscreen\nF6: Node Debug View\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1 Key: Play [SmoothRoll] Animation On Table\n2 Key: Play [StepRoll] Animation on Table\nNote the animations can blend\nF Key: Play Animation on Skinned Mesh\nNote that the nodes move as well\nF4: Toggle fullscreen\nF6: Node Debug View\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 104, color.RGBA{255, 0, 0, 255})
 	}
 
