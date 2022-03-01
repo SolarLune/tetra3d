@@ -11,7 +11,7 @@ type Intersection struct {
 	// between the two overlapping shapes, rather than the point of contact specifically.
 	ContactPoint vector.Vector
 	MTV          vector.Vector // MTV represents the minimum translation vector to remove the calling object from the intersecting object.
-	Triangle     *Triangle
+	Triangle     *Triangle     // Triangle represents the triangle that was intersected in intersection tests that involve triangle meshes; if no triangle mesh was tested against, then this will be nil.
 	// Normal       vector.Vector
 }
 
@@ -590,6 +590,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 					&Intersection{
 						ContactPoint: triangles.Transform().MultVec(closest),
 						MTV:          transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - mag)),
+						Triangle:     tri,
 					},
 				)
 
