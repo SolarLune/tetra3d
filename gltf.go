@@ -77,9 +77,9 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		Bones      []uint16
 	}
 
-	verticesToVertexData := map[*Vertex]VertexData{}
+	verticesToBones := make(map[*Vertex][]uint16)
 
-	images := []*ebiten.Image{}
+	var images []*ebiten.Image
 
 	exportedTextures := false
 
@@ -98,8 +98,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	}
 
 	if exportedTextures {
-
-		for _, gltfImage := range doc.Images {
+		images = make([]*ebiten.Image, len(doc.Images))
+		for i, gltfImage := range doc.Images {
 
 			imageData, err := modeler.ReadBufferView(doc, doc.BufferViews[*gltfImage.BufferView])
 			if err != nil {
@@ -113,7 +113,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				return nil, err
 			}
 
-			images = append(images, ebiten.NewImageFromImage(img))
+			images[i] = ebiten.NewImageFromImage(img)
 
 		}
 
@@ -206,14 +206,14 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				return nil, err
 			}
 
-			vertexData := []VertexData{}
+			vertexData := make([]VertexData, len(vertPos))
 
-			for _, v := range vertPos {
+			for i, v := range vertPos {
 
-				vertexData = append(vertexData, VertexData{
+				vertexData[i] = VertexData{
 					Pos:   vector.Vector{float64(v[0]), float64(v[1]), float64(v[2])},
 					Color: NewColor(1, 1, 1, 1),
-				})
+				}
 
 			}
 
@@ -310,16 +310,16 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				return nil, err
 			}
 
-			newVerts := []*Vertex{}
+			newVerts := make([]*Vertex, len(indices))
 
 			for i := 0; i < len(indices); i++ {
 				vd := vertexData[indices[i]]
 				newVert := NewVertex(vd.Pos[0], vd.Pos[1], vd.Pos[2], vd.UV[0], vd.UV[1])
 				newVert.Color = vd.Color.Clone()
-				newVert.Weights = append(newVert.Weights, vd.WeightData...)
+				newVert.Weights = vd.WeightData
 				newVert.Normal = vd.Normal
-				newVerts = append(newVerts, newVert)
-				verticesToVertexData[newVert] = vd
+				newVerts[i] = newVert
+				verticesToBones[newVert] = vd.Bones
 			}
 
 			var mat *Material
@@ -777,7 +777,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 					model.bones = append(model.bones, []*Node{})
 
-					for _, boneID := range verticesToVertexData[vertex].Bones {
+					for _, boneID := range verticesToBones[vertex] {
 						model.bones[vertex.ID] = append(model.bones[vertex.ID], allBones[boneID])
 					}
 

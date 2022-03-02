@@ -329,9 +329,9 @@ func (tri *Triangle) SetVertices(verts ...*Vertex) {
 // Clone clones the Triangle, keeping a reference to the same Material.
 func (tri *Triangle) Clone() *Triangle {
 	newTri := NewTriangle(tri.MeshPart)
-	newVerts := []*Vertex{}
-	for _, vertex := range tri.Vertices {
-		newVerts = append(newVerts, vertex.Clone())
+	newVerts := make([]*Vertex, len(tri.Vertices))
+	for i, vertex := range tri.Vertices {
+		newVerts[i] = vertex.Clone()
 	}
 	newTri.SetVertices(newVerts...)
 	newTri.MeshPart = tri.MeshPart
@@ -409,20 +409,21 @@ func NewVertex(x, y, z, u, v float64) *Vertex {
 		Position:    vector.Vector{x, y, z},
 		Color:       NewColor(1, 1, 1, 1),
 		UV:          vector.Vector{u, v},
-		Normal:      vector.Vector{},
-		Weights:     make([]float32, 0, 4),
 		transformed: vector.Vector{0, 0, 0},
 	}
 }
 
 // Clone clones the Vertex.
 func (vertex *Vertex) Clone() *Vertex {
-	newVert := NewVertex(vertex.Position[0], vertex.Position[1], vertex.Position[2], vertex.UV[0], vertex.UV[1])
-	newVert.Color = vertex.Color.Clone()
-
-	for i := range vertex.Weights {
-		newVert.Weights = append(newVert.Weights, vertex.Weights[i])
+	newVert := &Vertex{
+		Position:    vector.Vector{vertex.Position[0], vertex.Position[1], vertex.Position[2]},
+		Color:       vertex.Color.Clone(),
+		UV:          vector.Vector{vertex.UV[0], vertex.UV[1]},
+		Weights:     make([]float32, len(vertex.Weights)),
+		transformed: vector.Vector{0, 0, 0},
 	}
+
+	copy(newVert.Weights, vertex.Weights)
 
 	return newVert
 }
@@ -457,13 +458,17 @@ func NewMeshPart(mesh *Mesh, material *Material) *MeshPart {
 }
 
 func (part *MeshPart) Clone() *MeshPart {
-	newMP := NewMeshPart(part.Mesh, part.Material)
-	newMP.Vertices = []*Vertex{}
-	for _, tri := range part.Triangles {
+	newMP := &MeshPart{
+		Mesh:            part.Mesh,
+		Triangles:       make([]*Triangle, len(part.Triangles)),
+		sortedTriangles: make([]*Triangle, len(part.Triangles)),
+		Material:        part.Material,
+	}
+	for i, tri := range part.Triangles {
 		newTri := tri.Clone()
-		newMP.Triangles = append(newMP.Triangles, newTri)
-		newMP.sortedTriangles = append(newMP.sortedTriangles, newTri)
-		newMP.Vertices = append(newMP.Vertices, tri.Vertices...)
+		newMP.Triangles[i] = newTri
+		newMP.sortedTriangles[i] = newTri
+		newMP.Vertices = tri.Vertices
 	}
 	newMP.Material = part.Material
 	return newMP
@@ -500,14 +505,13 @@ func (part *MeshPart) AddTriangles(verts ...*Vertex) {
 	if len(verts) == 0 || len(verts)%3 != 0 {
 		panic("Error: AddTriangles() has not been given a correct number of vertices to constitute triangles (it needs to be greater than 0 and divisible by 3).")
 	}
-
+	part.Vertices = append(part.Vertices, verts...)
 	for i := 0; i < len(verts); i += 3 {
 
 		tri := NewTriangle(part)
 		tri.ID = part.Mesh.triIndex
 		part.Triangles = append(part.Triangles, tri)
 		part.sortedTriangles = append(part.sortedTriangles, tri)
-		part.Vertices = append(part.Vertices, verts[i], verts[i+1], verts[i+2])
 		tri.SetVertices(verts[i], verts[i+1], verts[i+2])
 		part.Mesh.triIndex++
 
