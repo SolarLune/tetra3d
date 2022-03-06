@@ -959,6 +959,18 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			}
 
+		} else if curve, isCurve := m.(*Path); isCurve {
+
+			points := curve.Children()
+			if curve.Closed {
+				points = append(points, points[0])
+			}
+			for i := 0; i < len(points)-1; i++ {
+				px := camera.WorldToScreen(points[i].WorldPosition())
+				py := camera.WorldToScreen(points[i+1].WorldPosition())
+				ebitenutil.DrawLine(screen, px[0], px[1], py[0], py[1], color.ToRGBA64())
+			}
+
 		}
 
 	}

@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"bytes"
+	"encoding/json"
 	"image"
 	"log"
 	"math"
@@ -19,6 +20,10 @@ type GLTFLoadOptions struct {
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
 	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying)
 	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
+	// DependentLibraries represents libraries that this loading library is dependent on. An example would be loading a level (level.gltf) composed of assets from another file (a GLTF file exported from
+	// assets.blend). In this case, the DependentLibraries map should contain the key and value for "assets.blend" to correspond to the loaded assets.gltf file. (This is done because we can't assume
+	// the GLTF file for assets.blend is absolutely callefd assets.gltf.)
+	DependentLibraries map[string]*Library
 }
 
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
@@ -83,6 +88,14 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	exportedTextures := false
 
+	type Collection struct {
+		Objects []string
+		Offset  []float64
+		Path    string
+	}
+
+	collections := map[string]Collection{}
+
 	if len(doc.Scenes) > 0 {
 
 		if doc.Scenes[0].Extras != nil {
@@ -91,6 +104,22 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			if et, exists := globalExporterSettings["t3dPackTextures__"]; exists {
 				exportedTextures = et.(float64) > 0
+			}
+
+			if col, exists := globalExporterSettings["t3dCollections__"]; exists {
+				data := col.(map[string]interface{})
+
+				jsonData, err := json.Marshal(data)
+				if err != nil {
+					panic(err)
+				}
+
+				err = json.Unmarshal(jsonData, &collections)
+
+				if err != nil {
+					panic(err)
+				}
+
 			}
 
 		}
@@ -506,6 +535,19 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	objToNode := map[INode]*gltf.Node{}
 
+	nodeHasProp := func(node *gltf.Node, propName string) bool {
+
+		if node.Extras == nil {
+			return false
+		}
+
+		if _, exists := node.Extras.(map[string]interface{})[propName]; exists {
+			return true
+		}
+		return false
+
+	}
+
 	for _, node := range doc.Nodes {
 
 		var obj INode
@@ -553,6 +595,24 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			} else {
 				// Unsupported light type, we'll just ignore
 			}
+
+		} else if node.Extras != nil && nodeHasProp(node, "t3dPathPoints__") {
+
+			points := []vector.Vector{}
+			extraMap := node.Extras.(map[string]interface{})
+
+			for _, p := range extraMap["t3dPathPoints__"].([]interface{}) {
+				pointData := p.([]interface{})
+				points = append(points, vector.Vector{pointData[0].(float64), pointData[2].(float64), -pointData[1].(float64)})
+			}
+
+			path := NewPath(node.Name, points...)
+
+			if nodeHasProp(node, "t3dPathCyclic__") {
+				path.Closed = extraMap["t3dPathCyclic__"].(float64) > 0
+			}
+
+			obj = path
 
 		} else {
 			obj = NewNode(node.Name)
@@ -746,12 +806,17 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			model.Skinned = true
 
+			// We should keep a local slice of bones because we can't simply loop through all bones with the matrix index, as
+			// the matrix index resets at 0 for each armature, naturally.
+			localBones := []*Node{}
+
 			for _, b := range skin.Joints {
 				bone := objects[b].(*Node)
 				// This is incorrect, but it gives us a link to any bone in the armature to establish
 				// the true root after parenting is set below
 				model.SkinRoot = bone
 				allBones = append(allBones, bone)
+				localBones = append(localBones, bone)
 			}
 
 			matrices, err := modeler.ReadAccessor(doc, doc.Accessors[*skin.InverseBindMatrices], nil)
@@ -766,8 +831,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					newMat = newMat.SetColumn(rowIndex, vector.Vector{float64(row[0]), float64(row[1]), float64(row[2]), float64(row[3])})
 				}
 
-				allBones[matIndex].inverseBindMatrix = newMat
-				allBones[matIndex].isBone = true
+				localBones[matIndex].inverseBindMatrix = newMat
+				localBones[matIndex].isBone = true
 
 			}
 
@@ -829,22 +894,49 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		return nil
 	}
 
+	findNode := func(objName string) INode {
+		for _, obj := range objects {
+			if obj.Name() == objName {
+				return obj
+			}
+		}
+		return nil
+	}
+
+	// At this point, parenting should be set up.
 	for obj, node := range objToNode {
 
 		if node.Extras != nil {
 			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
 
-				if instancingObjects, exists := dataMap["t3dInstanceCollection__"]; exists {
-					for _, n := range instancingObjects.([]interface{}) {
-						name := n.(string)
-						for _, clone := range objects {
-							if clone.Name() == name {
-								cloned := clone.Clone()
-								obj.AddChildren(cloned)
-								break
+				if c, exists := dataMap["t3dInstanceCollection__"]; exists {
+					collection := collections[c.(string)]
+
+					offset := vector.Vector{-collection.Offset[0], -collection.Offset[2], collection.Offset[1]}
+
+					for _, cloneName := range collection.Objects {
+
+						var clone INode
+
+						if collection.Path == "" {
+							clone = findNode(cloneName).Clone()
+						} else if library := gltfLoadOptions.DependentLibraries[collection.Path]; library != nil {
+							if foundNode := library.FindNode(cloneName); foundNode != nil {
+								clone = foundNode.Clone()
 							}
 						}
+
+						if clone != nil {
+
+							clone.MoveVec(offset)
+							obj.AddChildren(clone)
+
+						} else {
+							log.Println("Error in instantiating linked element:", cloneName, "from:", collection.Path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
+						}
+
 					}
+
 				}
 
 				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {

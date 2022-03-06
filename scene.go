@@ -9,39 +9,6 @@ const (
 
 type FogMode int
 
-// Library represents a collection of Scenes, Meshes, and Animations, as loaded from an intermediary file format (.dae or .gltf / .glb).
-type Library struct {
-	Scenes        []*Scene              // A slice of Scenes
-	ExportedScene *Scene                // The scene that was open when the library was exported from the modeler
-	Meshes        map[string]*Mesh      // A Map of Meshes to their names
-	Animations    map[string]*Animation // A Map of Animations to their names
-	Materials     map[string]*Material  // A Map of Materials to their names
-}
-
-func NewLibrary() *Library {
-	return &Library{
-		Scenes:     []*Scene{},
-		Meshes:     map[string]*Mesh{},
-		Animations: map[string]*Animation{},
-		Materials:  map[string]*Material{},
-	}
-}
-
-func (lib *Library) FindScene(name string) *Scene {
-	for _, scene := range lib.Scenes {
-		if scene.Name == name {
-			return scene
-		}
-	}
-	return nil
-}
-
-func (lib *Library) AddScene(sceneName string) *Scene {
-	newScene := NewScene(sceneName)
-	lib.Scenes = append(lib.Scenes, newScene)
-	return newScene
-}
-
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
 // graph of parents and children. Models (visual instances of Meshes), Cameras, and "empty" NodeBases all are kinds of Nodes.
 type Scene struct {
@@ -76,6 +43,8 @@ func NewScene(name string) *Scene {
 		LightingOn: false,
 	}
 
+	scene.Root.(*Node).scene = scene
+
 	return scene
 }
 
@@ -87,6 +56,7 @@ func (scene *Scene) Clone() *Scene {
 
 	// newScene.Models = append(newScene.Models, scene.Models...)
 	newScene.Root = scene.Root.Clone()
+	newScene.Root.(*Node).scene = newScene
 
 	newScene.FogColor = scene.FogColor.Clone()
 	newScene.FogMode = scene.FogMode

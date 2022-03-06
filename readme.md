@@ -244,6 +244,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
 - [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc). Perhaps these Materials can have a flag that you can toggle to enable this behavior?
 - [ ] -- Texture wrapping (will require rendering with shaders)
+- [ ] -- Draw triangle in 3D space (could be useful for 3D lines, for example)
 - [x] **Culling**
 - [x] -- Backface culling
 - [ ] -- Frustum culling (this is implemented, but just with sphere-checks instead of actual frustum code)
@@ -281,12 +282,15 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Camera loading
 - [ ] -- Separate .bin loading
 - [x] **Blender Add-on**
-- [x] -- Export GLTF on Save
-- [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
+- [x] -- Export GLTF on save / on command via button
 - [x] -- Bounds node creation
-- [x] -- Collection / group substitution (works, but only when exporting on save currently) 
-- [x] -- Material export
+- [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
+- [x] -- Collection / group substitution
+- [ ] -- -- Overwriting properties through collection instance 
+- [x] -- Linking collections from external files
+- [x] -- Material data export
 - [x] -- Option to pack textures or leave them as a path
+- [x] -- Path support
 - [x] **DAE model loading**
 - [x] -- Vertex colors loading
 - [x] -- UV map loading

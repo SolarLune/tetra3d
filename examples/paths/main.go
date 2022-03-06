@@ -22,9 +22,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-//go:embed lighting.gltf
-var gltfData []byte
-
 type Game struct {
 	Width, Height int
 	Library       *tetra3d.Library
@@ -34,19 +31,25 @@ type Game struct {
 	CameraTilt   float64
 	CameraRotate float64
 
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	PrevMousePosition vector.Vector
+	PathFollower *tetra3d.PathFollower
+	AutoAdvance  bool
 
-	Time float64
+	DrawDebugText      bool
+	DrawDebugDepth     bool
+	DrawDebugWireframe bool
+	PrevMousePosition  vector.Vector
 }
+
+//go:embed paths.gltf
+var libraryData []byte
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             1920,
-		Height:            1080,
+		Width:             796,
+		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
+		AutoAdvance:       true,
 	}
 
 	game.Init()
@@ -56,35 +59,29 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	opt := tetra3d.DefaultGLTFLoadOptions()
-	opt.CameraWidth = 1920
-	opt.CameraHeight = 1080
-	opt.LoadBackfaceCulling = true
-	library, err := tetra3d.LoadGLTFData(gltfData, opt)
+	library, err := tetra3d.LoadGLTFData(libraryData, nil)
 	if err != nil {
 		panic(err)
 	}
 
 	g.Library = library
-	g.Scene = library.Scenes[0]
 
-	g.Camera = tetra3d.NewCamera(1920, 1080)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 15})
+	// We clone the scene so we have an original to work from
+	g.Scene = library.ExportedScene.Clone()
+
+	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
+	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
-	ambientLight := tetra3d.NewAmbientLight("ambient", 1, 0.5, 0.25, 1)
-	g.Scene.Root.AddChildren(ambientLight)
-
-	// g.Scene.FogMode = tetra3d.FogMultiply
+	g.PathFollower = tetra3d.NewPathFollower(g.Scene.Root.Get("Path").(*tetra3d.Path))
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+
+	fmt.Println(g.Scene.Root.HierarchyAsString())
 
 }
 
 func (g *Game) Update() error {
-
-	g.Time += 1.0 / 60.0
-
 	var err error
 
 	moveSpd := 0.05
@@ -93,15 +90,6 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	light := g.Scene.Root.Get("Point light").(*tetra3d.Node)
-	light.AnimationPlayer().Play(g.Library.Animations["LightAction"])
-	light.AnimationPlayer().Update(1.0 / 60.0)
-
-	// g.Scene.Root.Get("plane").Rotate(1, 0, 0, 0.04)
-
-	// light := g.Scene.Root.Get("third point light")
-	// light.Move(math.Sin(g.Time*math.Pi)*0.1, 0, math.Cos(g.Time*math.Pi*0.19)*0.03)
-
 	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
@@ -109,8 +97,6 @@ func (g *Game) Update() error {
 	right := g.Camera.LocalRotation().Right()
 
 	pos := g.Camera.LocalPosition()
-
-	// g.Scene.Root.Get("point light").(*tetra3d.PointLight).Distance = 10 + (math.Sin(g.Time*math.Pi) * 5)
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		pos = pos.Add(forward.Scale(moveSpd))
@@ -137,6 +123,23 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
+		g.PathFollower.AdvanceDistance(1)
+	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
+		g.PathFollower.AdvanceDistance(-1)
+	}
+
+	if g.AutoAdvance {
+		g.PathFollower.AdvancePercentage(0.01) // Advance one percent of the path per-frame
+	}
+
+	cube := g.Scene.Root.Get("Cube")
+	cube.SetWorldPosition(g.PathFollower.WorldPosition())
+
+	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+		g.AutoAdvance = !g.AutoAdvance
 	}
 
 	// Rotating the camera with the mouse
@@ -182,12 +185,12 @@ func (g *Game) Update() error {
 		g.DrawDebugText = !g.DrawDebugText
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.Scene.LightingOn = !g.Scene.LightingOn
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
 	return err
@@ -200,7 +203,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the scene
+	// Render the logo first
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
@@ -216,9 +219,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\n1 Key: Toggle lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 150, color.RGBA{255, 0, 0, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how paths work.\nThe cube will follow the path (which is invisible,\nas it is made up of Nodes).\n1 key: Toggle running through path\nLeft, Right keys: Step 1 unit forward or\nback through the path\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
 	}
+
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Gray())
+	}
+
 }
 
 func (g *Game) StartProfiling() {
@@ -242,7 +250,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Lighting Test")
+	ebiten.SetWindowTitle("Tetra3d - Logo Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()

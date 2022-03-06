@@ -177,8 +177,8 @@ func (channel *AnimationChannel) AddTrack(trackType string) *AnimationTrack {
 
 // Marker represents a tag as placed in an Animation in a 3D modeler.
 type Marker struct {
-	Time float64
-	Name string
+	Time float64 // Time of the marker in seconds in the Animation.
+	Name string  // Name of the marker.
 }
 
 // Animation represents an animation of some description; it can have multiple channels, indicating movement, scale, or rotational change of one or more Nodes in the Animation.
@@ -235,7 +235,7 @@ type AnimationPlayer struct {
 	FinishMode             int                                       // What to do when the player finishes playback. Defaults to looping.
 	OnFinish               func()                                    // Callback indicating the Animation has completed
 	OnMarkerTouch          func(marker Marker, animation *Animation) // Callback indicating when the AnimationPlayer has entered a marker
-	animatedProperties     map[INode]*AnimationValues                // The properties that have been animated
+	AnimatedProperties     map[INode]*AnimationValues                // The properties that have been animated
 	prevAnimatedProperties map[INode]*AnimationValues                // The previous properties that have been animated from the previously Play()'d animation
 	BlendTime              float64                                   // How much time in seconds to blend between two animations
 	blendStart             time.Time                                 // The time that the blend started
@@ -247,7 +247,7 @@ func NewAnimationPlayer(node INode) *AnimationPlayer {
 		RootNode:               node,
 		PlaySpeed:              1,
 		FinishMode:             FinishModeLoop,
-		animatedProperties:     map[INode]*AnimationValues{},
+		AnimatedProperties:     map[INode]*AnimationValues{},
 		prevAnimatedProperties: map[INode]*AnimationValues{},
 	}
 }
@@ -293,7 +293,7 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 
 	if ap.BlendTime > 0 {
 		ap.prevAnimatedProperties = map[INode]*AnimationValues{}
-		for n, v := range ap.animatedProperties {
+		for n, v := range ap.AnimatedProperties {
 			ap.prevAnimatedProperties[n] = v
 		}
 		ap.blendStart = time.Now()
@@ -307,7 +307,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 	if ap.Animation != nil {
 
-		ap.animatedProperties = map[INode]*AnimationValues{}
+		ap.AnimatedProperties = map[INode]*AnimationValues{}
 
 		ap.ChannelsToNodes = map[*AnimationChannel]INode{}
 
@@ -317,7 +317,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 			if ap.RootNode.Name() == channel.Name {
 				ap.ChannelsToNodes[channel] = ap.RootNode
-				ap.animatedProperties[ap.RootNode] = &AnimationValues{}
+				ap.AnimatedProperties[ap.RootNode] = &AnimationValues{}
 				continue
 			}
 
@@ -327,7 +327,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 				if n.Name() == channel.Name {
 					ap.ChannelsToNodes[channel] = n
-					ap.animatedProperties[n] = &AnimationValues{}
+					ap.AnimatedProperties[n] = &AnimationValues{}
 					found = true
 					break
 				}
@@ -338,7 +338,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 			if !found {
 				ap.ChannelsToNodes[channel] = ap.RootNode
-				ap.animatedProperties[ap.RootNode] = &AnimationValues{}
+				ap.AnimatedProperties[ap.RootNode] = &AnimationValues{}
 			}
 
 		}
@@ -369,18 +369,18 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 					if track, exists := channel.Tracks[TrackTypePosition]; exists {
 						// node.SetLocalPosition(track.ValueAsVector(ap.Playhead))
-						ap.animatedProperties[node].Position = track.ValueAsVector(ap.Playhead)
+						ap.AnimatedProperties[node].Position = track.ValueAsVector(ap.Playhead)
 					}
 
 					if track, exists := channel.Tracks[TrackTypeScale]; exists {
 						// node.SetLocalScale(track.ValueAsVector(ap.Playhead))
-						ap.animatedProperties[node].Scale = track.ValueAsVector(ap.Playhead)
+						ap.AnimatedProperties[node].Scale = track.ValueAsVector(ap.Playhead)
 					}
 
 					if track, exists := channel.Tracks[TrackTypeRotation]; exists {
 						quat := track.ValueAsQuaternion(ap.Playhead)
 						// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
-						ap.animatedProperties[node].Rotation = quat
+						ap.AnimatedProperties[node].Rotation = quat
 					}
 
 				}
@@ -388,11 +388,10 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 			}
 
 			prevPlayhead := ap.Playhead
-
 			ap.Playhead += dt * ap.PlaySpeed
 
 			for _, marker := range ap.Animation.Markers {
-				if prevPlayhead < marker.Time && ap.Playhead >= marker.Time && ap.OnMarkerTouch != nil {
+				if ap.Playhead >= marker.Time && prevPlayhead < marker.Time && ap.OnMarkerTouch != nil {
 					ap.OnMarkerTouch(marker, ap.Animation)
 				}
 			}
@@ -460,7 +459,11 @@ func (ap *AnimationPlayer) Update(dt float64) {
 		ap.prevAnimatedProperties = map[INode]*AnimationValues{}
 	}
 
-	for node, props := range ap.animatedProperties {
+	if ap.Animation == nil || !ap.Playing {
+		return
+	}
+
+	for node, props := range ap.AnimatedProperties {
 
 		_, prevExists := ap.prevAnimatedProperties[node]
 

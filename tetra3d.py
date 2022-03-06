@@ -174,6 +174,10 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_region_type = 'WINDOW'
     bl_context = "object"
 
+    @classmethod
+    def poll(self,context):
+        return context.object is not None
+
     def draw(self, context):
         row = self.layout.row()
         row.prop(context.object, "t3dVisible__")
@@ -249,6 +253,10 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_region_type = 'WINDOW'
     bl_context = "material"
 
+    @classmethod
+    def poll(self,context):
+        return context.material is not None
+
     def draw(self, context):
         row = self.layout.row()
         row.prop(context.material, "t3dMaterialColor__")
@@ -269,6 +277,9 @@ def globalGet(propName):
 
 def globalSet(propName, value):
     bpy.data.scenes[0][propName] = value
+
+def globalDel(propName):
+    del bpy.data.scenes[0][propName]
 
 class RENDER_PT_tetra3d(bpy.types.Panel):
     bl_idname = "RENDER_PT_tetra3d"
@@ -312,15 +323,56 @@ def export():
     
     newPath = os.path.splitext(blendPath)[0] + ending
 
-    for obj in bpy.data.objects:
-        cloning = []
-        if obj.instance_type == "COLLECTION":
-            for o in obj.instance_collection.objects:
-                if o.parent == None:
-                    cloning.append(o.name)
-        if len(cloning) > 0:
-            obj["t3dInstanceCollection__"] = cloning
+    # Gather collection information
+    ogCollections = {} # What collection an object was originally pointing to
+    collections = {} # What collections exist in the Blend file
 
+    for collection in bpy.data.collections:
+        if len(collection.objects) == 0:
+            continue
+        c = []
+        for o in collection.objects:
+            if o.parent is None:
+                c.append(o.name)
+
+        cd = {
+            "objects": c,
+            "offset" : collection.instance_offset,
+        }
+
+        if collection.library is not None:
+            cd["path"] = collection.library.filepath
+
+        collections[collection.name] = cd
+    
+    globalSet("t3dCollections__", collections)
+
+    for scene in bpy.data.scenes:
+        if scene.users > 0:
+            for layer in scene.view_layers:
+                for obj in layer.objects:
+
+                    # Record relevant information for curves
+                    if obj.type == "CURVE":
+                        points = []
+
+                        for spline in obj.data.splines:
+                            for point in spline.points:
+                                points.append(point.co)
+                            for point in spline.bezier_points:
+                                points.append(point.co)
+
+                        obj["t3dPathPoints__"] = points
+                        obj["t3dPathCyclic__"] = spline.use_cyclic_u or spline.use_cyclic_v
+
+                    if obj.instance_type == "COLLECTION":
+                        obj["t3dInstanceCollection__"] = obj.instance_collection.name
+                        ogCollections[obj] = obj.instance_collection
+                        # We don't want to export a linked collection directly, as that 1) will duplicate mesh data from externally linked blend files to put into the GLTF file, and
+                        # 2) will apply the collection's offset to the object's position for some reason (which is annoying because we use OpenGL's axes for positioning compared to Blender)
+                        obj.instance_collection = None
+
+    # Gather marker information and put them into the actions.
     for action in bpy.data.actions:
         markers = []
         for marker in action.pose_markers:
@@ -331,7 +383,7 @@ def export():
             markers.append(markerInfo)
         if len(markers) > 0:
             action["t3dMarkers__"] = markers
-    
+
     # We force on exporting of Extra values because otherwise, values from Blender would not be able to be exported.
     # export_apply=True to ensure modifiers are applied.
     bpy.ops.export_scene.gltf(
@@ -346,13 +398,30 @@ def export():
         export_apply=True,
     )
 
-    for obj in bpy.data.objects:
-        if "t3dInstanceCollection__" in obj:
-            del(obj["t3dInstanceCollection__"])
+    # Undo changes that we've made after export
+
+    for scene in bpy.data.scenes:
+
+        if scene.users > 0:
+
+            for layer in scene.view_layers:
+
+                for obj in layer.objects:
+
+                    if "t3dInstanceCollection__" in obj:
+                        del(obj["t3dInstanceCollection__"])
+                        if obj in ogCollections:
+                            obj.instance_collection = ogCollections[obj]
+                    if "t3dPathPoints__" in obj:
+                        del(obj["t3dPathPoints__"])
+                    if "t3dPathCyclic__" in obj:
+                        del(obj["t3dPathCyclic__"])
 
     for action in bpy.data.actions:
         if "t3dMarkers__" in action:
             del(action["t3dMarkers__"])
+
+    globalDel("t3dCollections__")
 
     return True
 
@@ -387,6 +456,7 @@ objectProps = {
     "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Height", description="The height of the BoundingCapsule node.", min=0.0, default=2),
     "t3dSphereCustomEnabled__" : bpy.props.BoolProperty(name="Custom Sphere Size", description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)", default=False),
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
+    "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__)
 }
 
 def getExportOnSave(self):
@@ -472,8 +542,6 @@ def register():
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
 
-    bpy.types.Object.t3dGameProperties__ = bpy.props.CollectionProperty(type=t3dGamePropertyItem__)
-
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
     get=getExportOnSave, set=setExportOnSave)
     
@@ -514,8 +582,6 @@ def unregister():
     
     for propName, prop in objectProps.items():
         delattr(bpy.types.Object, propName)
-
-    del bpy.types.Object.t3dGameProperties__
 
     del bpy.types.Scene.t3dExportOnSave__
     del bpy.types.Scene.t3dExportFilepath__

@@ -22,9 +22,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-//go:embed lighting.gltf
-var gltfData []byte
-
 type Game struct {
 	Width, Height int
 	Library       *tetra3d.Library
@@ -36,15 +33,17 @@ type Game struct {
 
 	DrawDebugText     bool
 	DrawDebugDepth    bool
+	DrawDebugBounds   bool
 	PrevMousePosition vector.Vector
-
-	Time float64
 }
+
+//go:embed engine.gltf
+var libraryData []byte
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             1920,
-		Height:            1080,
+		Width:             796,
+		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -56,35 +55,51 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	opt := tetra3d.DefaultGLTFLoadOptions()
-	opt.CameraWidth = 1920
-	opt.CameraHeight = 1080
-	opt.LoadBackfaceCulling = true
-	library, err := tetra3d.LoadGLTFData(gltfData, opt)
+	library, err := tetra3d.LoadGLTFData(libraryData, nil)
 	if err != nil {
 		panic(err)
 	}
 
 	g.Library = library
-	g.Scene = library.Scenes[0]
 
-	g.Camera = tetra3d.NewCamera(1920, 1080)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 15})
+	// We clone the scene so we have an original to work from
+	g.Scene = library.ExportedScene.Clone()
+
+	for _, o := range g.Scene.Root.Children() {
+
+		if o.Tags().Has("gameobject") {
+			g.SetGameObject(o)
+		}
+
+	}
+
+	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
 	g.Scene.Root.AddChildren(g.Camera)
-
-	ambientLight := tetra3d.NewAmbientLight("ambient", 1, 0.5, 0.25, 1)
-	g.Scene.Root.AddChildren(ambientLight)
-
-	// g.Scene.FogMode = tetra3d.FogMultiply
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
 
+func (g *Game) SetGameObject(o tetra3d.INode) {
+
+	switch o.Tags().GetAsString("gameobject") {
+
+	case "player":
+		player := NewPlayer(o)
+		o.SetData(player)
+
+	}
+
+}
+
+func (g *Game) CreateFromTemplate(node tetra3d.INode) {
+	newObj := node.Clone()
+	g.Scene.Root.AddChildren(newObj)
+	g.SetGameObject(newObj)
+}
+
 func (g *Game) Update() error {
-
-	g.Time += 1.0 / 60.0
-
 	var err error
 
 	moveSpd := 0.05
@@ -93,14 +108,9 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	light := g.Scene.Root.Get("Point light").(*tetra3d.Node)
-	light.AnimationPlayer().Play(g.Library.Animations["LightAction"])
-	light.AnimationPlayer().Update(1.0 / 60.0)
-
-	// g.Scene.Root.Get("plane").Rotate(1, 0, 0, 0.04)
-
-	// light := g.Scene.Root.Get("third point light")
-	// light.Move(math.Sin(g.Time*math.Pi)*0.1, 0, math.Cos(g.Time*math.Pi*0.19)*0.03)
+	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+		g.CreateFromTemplate(g.Library.Scenes[0].Root.Get("Player"))
+	}
 
 	// Moving the Camera
 
@@ -109,8 +119,6 @@ func (g *Game) Update() error {
 	right := g.Camera.LocalRotation().Right()
 
 	pos := g.Camera.LocalPosition()
-
-	// g.Scene.Root.Get("point light").(*tetra3d.PointLight).Distance = 10 + (math.Sin(g.Time*math.Pi) * 5)
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		pos = pos.Add(forward.Scale(moveSpd))
@@ -182,12 +190,22 @@ func (g *Game) Update() error {
 		g.DrawDebugText = !g.DrawDebugText
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+		g.DrawDebugBounds = !g.DrawDebugBounds
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.Scene.LightingOn = !g.Scene.LightingOn
+	for _, obj := range g.Scene.Root.ChildrenRecursive() {
+
+		if data := obj.Data(); data != nil {
+			if gObj, ok := data.(GameObject); ok {
+				gObj.Update()
+			}
+		}
+
 	}
 
 	return err
@@ -200,7 +218,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the scene
+	// Render the logo first
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
@@ -216,9 +234,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\n1 Key: Toggle lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 150, color.RGBA{255, 0, 0, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo is a small example showing how one could design a game\nusing a traditional 'class-based' approach with Tetra3D.\n\n1 Key: Spawn player objects.\nArrow keys: Move player(s)\nTouch spikes to destroy player(s)\n\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
 	}
+
+	if g.DrawDebugBounds {
+		g.Camera.DrawDebugBounds(screen, g.Scene.Root, colors.Gray())
+	}
+
 }
 
 func (g *Game) StartProfiling() {
@@ -242,7 +265,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Lighting Test")
+	ebiten.SetWindowTitle("Tetra3d - Logo Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()

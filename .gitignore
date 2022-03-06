@@ -1,3 +1,4 @@
 *.blend1
 *.blend2
 ignore
+settings.json

@@ -189,21 +189,21 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		// armature.AnimationPlayer.FinishMode = tetra3d.FinishModeStop
-		armature.AnimationPlayer.Play(g.Library.Animations["ArmatureAction"])
+		armature.AnimationPlayer().Play(g.Library.Animations["ArmatureAction"])
 	}
 
-	armature.AnimationPlayer.Update(1.0 / 60)
+	armature.AnimationPlayer().Update(1.0 / 60)
 
 	table := scene.Root.Get("Table").(*tetra3d.Model)
-	table.AnimationPlayer.BlendTime = 0.1
+	table.AnimationPlayer().BlendTime = 0.1
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		table.AnimationPlayer.Play(g.Library.Animations["SmoothRoll"])
+		table.AnimationPlayer().Play(g.Library.Animations["SmoothRoll"])
 	}
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		table.AnimationPlayer.Play(g.Library.Animations["StepRoll"])
+		table.AnimationPlayer().Play(g.Library.Animations["StepRoll"])
 	}
 
-	table.AnimationPlayer.Update(1.0 / 60)
+	table.AnimationPlayer().Update(1.0 / 60)
 
 	return err
 }

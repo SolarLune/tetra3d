@@ -16,6 +16,7 @@ const (
 	NodeTypeNode              NodeType = "Node"
 	NodeTypeModel             NodeType = "NodeModel"
 	NodeTypeCamera            NodeType = "NodeCamera"
+	NodeTypePath              NodeType = "NodePath"
 	NodeTypeBounding          NodeType = "NodeBounding"
 	NodeTypeBoundingAABB      NodeType = "NodeBoundingAABB"
 	NodeTypeBoundingCapsule   NodeType = "NodeBoundingCapsule"
@@ -31,6 +32,9 @@ const (
 // contain a more general one, but not vice-versa. For example, a Model (which has type NodeTypeModel) can be
 // said to be a Node (NodeTypeNode), but the reverse is not true (a NodeTypeNode is not a NodeTypeModel).
 func (nt NodeType) Is(other NodeType) bool {
+	if nt == other {
+		return true
+	}
 	return strings.Contains(string(nt), string(other))
 }
 
@@ -52,6 +56,9 @@ type INode interface {
 	setParent(INode)
 	Parent() INode
 	Unparent()
+	// Scene looks for the Node's parents recursively to return what scene it exists in.
+	// If the node is not within a tree (i.e. unparented), this will return nil.
+	Scene() *Scene
 	Root() INode
 	Children() []INode
 	ChildrenRecursive() []INode
@@ -60,6 +67,7 @@ type INode interface {
 	// updateLocalTransform(newParent INode)
 	dirtyTransform()
 
+	ResetLocalTransform()
 	SetWorldTransform(transform Matrix4)
 
 	LocalRotation() Matrix4
@@ -97,6 +105,8 @@ type INode interface {
 
 	IsBone() bool
 	// IsRootBone() bool
+
+	AnimationPlayer() *AnimationPlayer
 }
 
 // Tags is an unordered set of string tags to values, representing a means of identifying Nodes or carrying data on Nodes.
@@ -213,10 +223,11 @@ type Node struct {
 	cachedTransform   Matrix4
 	isTransformDirty  bool
 	tags              *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
-	AnimationPlayer   *AnimationPlayer
+	animationPlayer   *AnimationPlayer
 	inverseBindMatrix Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 	isBone            bool
 	library           *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
+	scene             *Scene
 }
 
 // NewNode returns a new Node.
@@ -231,9 +242,11 @@ func NewNode(name string) *Node {
 		visible:          true,
 		isTransformDirty: true,
 		tags:             NewTags(),
+		// We set this just in case we call a transform property getter before setting it and caching anything
+		cachedTransform: NewMatrix4(),
 	}
 
-	nb.AnimationPlayer = NewAnimationPlayer(nb)
+	nb.animationPlayer = NewAnimationPlayer(nb)
 
 	return nb
 }
@@ -270,13 +283,13 @@ func (node *Node) Clone() INode {
 	newNode.rotation = node.rotation.Clone()
 	newNode.visible = node.visible
 	newNode.data = node.data
-	newNode.isTransformDirty = node.isTransformDirty
+	newNode.isTransformDirty = true
 	newNode.tags = node.tags.Clone()
-	newNode.AnimationPlayer = node.AnimationPlayer.Clone()
+	newNode.animationPlayer = node.animationPlayer.Clone()
 	newNode.library = node.library
 
-	if node.AnimationPlayer.RootNode == node {
-		newNode.AnimationPlayer.SetRoot(newNode)
+	if node.animationPlayer.RootNode == node {
+		newNode.animationPlayer.SetRoot(newNode)
 	}
 
 	for _, child := range node.children {
@@ -416,7 +429,7 @@ func (node *Node) LocalPosition() vector.Vector {
 	return node.position
 }
 
-// ResetLocalTransformProperties resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
+// ResetLocalTransform resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
 // by default, when you parent one Node to another, the local transform properties (position, scale, and rotation) are altered to keep the
 // object in the same absolute location, even though the origin changes.
 func (node *Node) ResetLocalTransform() {
@@ -548,19 +561,14 @@ func (node *Node) SetWorldRotation(rotation Matrix4) {
 }
 
 func (node *Node) Move(x, y, z float64) {
-	localPos := node.LocalPosition()
-	localPos[0] += x
-	localPos[1] += y
-	localPos[2] += z
-	node.SetLocalPosition(localPos)
+	node.position[0] += x
+	node.position[1] += y
+	node.position[2] += z
+	node.dirtyTransform()
 }
 
 func (node *Node) MoveVec(vec vector.Vector) {
-	localPos := node.LocalPosition()
-	localPos[0] += vec[0]
-	localPos[1] += vec[1]
-	localPos[2] += vec[2]
-	node.SetLocalPosition(localPos)
+	node.Move(vec[0], vec[1], vec[2])
 }
 
 func (node *Node) Rotate(x, y, z, angle float64) {
@@ -586,6 +594,16 @@ func (node *Node) Parent() INode {
 // setParent sets the Node's parent.
 func (node *Node) setParent(parent INode) {
 	node.parent = parent
+}
+
+// Scene looks for the Node's parents recursively to return what scene it exists in.
+// If the node is not within a tree (i.e. unparented), this will return nil.
+func (node *Node) Scene() *Scene {
+	root := node.Root()
+	if root != nil {
+		return root.(*Node).scene
+	}
+	return nil
 }
 
 // addChildren adds the children to the parent node, but sets their parent to be the parent node passed. This is done so children have the
@@ -678,22 +696,26 @@ func (node *Node) HierarchyAsString() string {
 
 	printNode = func(node INode, level int) string {
 
-		nodeType := "+"
+		prefix := "+"
 
-		if _, ok := node.(*Model); ok {
-			nodeType = "M"
-		} else if _, ok := node.(Light); ok {
-			nodeType = "L"
-		} else if _, ok := node.(*Camera); ok {
-			nodeType = "C"
-		} else if _, ok := node.(*BoundingSphere); ok {
-			nodeType = "BS"
-		} else if _, ok := node.(*BoundingAABB); ok {
-			nodeType = "AABB"
-		} else if _, ok := node.(*BoundingCapsule); ok {
-			nodeType = "CAP"
-		} else if _, ok := node.(*BoundingTriangles); ok {
-			nodeType = "TRI"
+		nodeType := node.Type()
+
+		if nodeType.Is(NodeTypeModel) {
+			nodeType = "MODEL"
+		} else if nodeType.Is(NodeTypeLight) {
+			nodeType = "LIGHT"
+		} else if nodeType.Is(NodeTypeCamera) {
+			prefix = "CAM"
+		} else if nodeType.Is(NodeTypeBoundingSphere) {
+			prefix = "BS"
+		} else if nodeType.Is(NodeTypeBoundingAABB) {
+			prefix = "AABB"
+		} else if nodeType.Is(NodeTypeBoundingCapsule) {
+			prefix = "CAP"
+		} else if nodeType.Is(NodeTypeBoundingTriangles) {
+			prefix = "TRI"
+		} else if nodeType.Is(NodeTypePath) {
+			prefix = "CURVE"
 		}
 
 		str := ""
@@ -708,7 +730,7 @@ func (node *Node) HierarchyAsString() string {
 			wp := node.LocalPosition()
 			wpStr := "[" + strconv.FormatFloat(wp[0], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[1], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[2], 'f', -1, 64) + "]"
 
-			str += "\\-: [" + nodeType + "] " + node.Name() + " : " + wpStr + "\n"
+			str += "\\-: [" + prefix + "] " + node.Name() + " : " + wpStr + "\n"
 		}
 
 		for _, child := range node.Children() {
@@ -799,7 +821,7 @@ func (node *Node) Path() string {
 
 // FindByName allows you to search the node's recursive children, returning a slice
 // of Nodes with the name given. If wildcard is true, the nodes' names can contain the
-// name provided; othwerise, they have to match exactly. If no matchins Nodes are found,
+// name provided; otherwise, they have to match exactly. If no matching Nodes are found,
 // an empty slice is returned.
 // After finding a Node, you can convert it to a more specific type as necessary via type assertion.
 func (node *Node) FindByName(name string, exactMatch bool) []INode {
@@ -884,3 +906,7 @@ func (node *Node) IsBone() bool {
 // func (node *Node) IsRootBone() bool {
 // 	return node.IsBone() && (node.parent == nil || !node.parent.IsBone())
 // }
+
+func (node *Node) AnimationPlayer() *AnimationPlayer {
+	return node.animationPlayer
+}

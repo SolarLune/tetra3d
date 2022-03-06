@@ -320,6 +320,16 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 }
 
+// isTransparent returns true if the provided MeshPart has a Material with TransparencyModeTransparent, or if it's
+// TransparencyModeAuto with the model or material alpha color being under 0.99. This is a helper function for sorting
+// MeshParts into either transparent or opaque buckets for rendering.
+func (model *Model) isTransparent(meshPart *MeshPart) bool {
+	mat := meshPart.Material
+	return mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || (mat.TransparencyMode == TransparencyModeAuto && (mat.Color.A < 0.99 || model.Color.A < 0.99)))
+}
+
+////////
+
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 // hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
 func (model *Model) AddChildren(children ...INode) {
@@ -337,12 +347,4 @@ func (model *Model) Unparent() {
 // Type returns the NodeType for this object.
 func (model *Model) Type() NodeType {
 	return NodeTypeModel
-}
-
-// isTransparent returns true if the provided MeshPart has a Material with TransparencyModeTransparent, or if it's
-// TransparencyModeAuto with the model or material alpha color being under 0.99. This is a helper function for sorting
-// MeshParts into either transparent or opaque buckets for rendering.
-func (model *Model) isTransparent(meshPart *MeshPart) bool {
-	mat := meshPart.Material
-	return mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || (mat.TransparencyMode == TransparencyModeAuto && (mat.Color.A < 0.99 || model.Color.A < 0.99)))
 }
