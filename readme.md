@@ -290,7 +290,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Linking collections from external files
 - [x] -- Material data export
 - [x] -- Option to pack textures or leave them as a path
-- [x] -- Path support
+- [x] -- Path / 3D Curve support
 - [x] **DAE model loading**
 - [x] -- Vertex colors loading
 - [x] -- UV map loading

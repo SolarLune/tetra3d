@@ -20,10 +20,15 @@ type GLTFLoadOptions struct {
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
 	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying)
 	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
-	// DependentLibraries represents libraries that this loading library is dependent on. An example would be loading a level (level.gltf) composed of assets from another file (a GLTF file exported from
-	// assets.blend). In this case, the DependentLibraries map should contain the key and value for "assets.blend" to correspond to the loaded assets.gltf file. (This is done because we can't assume
-	// the GLTF file for assets.blend is absolutely callefd assets.gltf.)
-	DependentLibraries map[string]*Library
+	// DependentLibraryResolver is a function that takes a relative path (string) to the blend file representing the dependent Library that the loading
+	// Library requires. This function should return a reference to the dependent Library; if it doesn't, the linked objects from the dependent Library
+	// will not be instantiated in the loading Library.
+	// An example would be loading a level (level.gltf) composed of assets from another file (a GLTF file exported from assets.blend, which is a directory up).
+	// In this example, loading level.gltf would require the dependent library, assets.gltf. When loading level.gltf, it will refer to objects linked from the assets
+	// blend file as "../assets.blend".
+	// You could then simply load the assets library first and then code the DependentLibraryResolver function to take the assets library pointer, or code the
+	// function to use the path to load the library on demand, storing the loaded result as necessary if multiple levels use this assets Library.
+	DependentLibraryResolver func(blendPath string) *Library
 }
 
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
@@ -920,9 +925,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 						if collection.Path == "" {
 							clone = findNode(cloneName).Clone()
-						} else if library := gltfLoadOptions.DependentLibraries[collection.Path]; library != nil {
-							if foundNode := library.FindNode(cloneName); foundNode != nil {
-								clone = foundNode.Clone()
+						} else {
+							path := collection.Path
+							path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
+							if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
+								if foundNode := library.FindNode(cloneName); foundNode != nil {
+									clone = foundNode.Clone()
+								}
 							}
 						}
 
