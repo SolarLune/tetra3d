@@ -463,12 +463,13 @@ func (part *MeshPart) Clone() *MeshPart {
 		Triangles:       make([]*Triangle, len(part.Triangles)),
 		sortedTriangles: make([]*Triangle, len(part.Triangles)),
 		Material:        part.Material,
+		Vertices:        make([]*Vertex, 0, len(part.Triangles)*3),
 	}
 	for i, tri := range part.Triangles {
 		newTri := tri.Clone()
 		newMP.Triangles[i] = newTri
 		newMP.sortedTriangles[i] = newTri
-		newMP.Vertices = tri.Vertices
+		newMP.Vertices = append(newMP.Vertices, tri.Vertices...)
 	}
 	newMP.Material = part.Material
 	return newMP
