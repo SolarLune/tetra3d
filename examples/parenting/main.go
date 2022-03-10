@@ -100,7 +100,7 @@ func (g *Game) Update() error {
 	parent := g.Scene.Root.Get("parent")
 	parent.SetLocalRotation(parent.LocalRotation().Rotated(0, 1, 0, 0.05))
 
-	child := g.Scene.Root.FindByName("child", true)[0]
+	child := g.Scene.Root.ChildrenRecursive().ByName("child", true)[0]
 
 	// Moving the Camera
 

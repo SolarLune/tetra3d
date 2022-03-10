@@ -640,16 +640,21 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			if camera.RenderDepth {
 
 				far := camera.Far
+				near := camera.Near
 				if !camera.Perspective {
 					far = 2.0
-
+					near = 0
 				}
 
 				for i, vert := range tri.Vertices {
 
-					depth := vert.transformed[2] / far
+					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
+					// depth can be negative but still be in front of the camera and not behind it.
+					depth := (vert.transformed[2]+near)/far + 0.03
 					if depth < 0 {
 						depth = 0
+					} else if depth > 1 {
+						depth = 1
 					}
 
 					vertexList[vertexListIndex+i].ColorR = float32(depth)

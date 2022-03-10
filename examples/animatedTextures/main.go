@@ -22,14 +22,10 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-//go:embed bounds.gltf
-var gltfData []byte
-
 type Game struct {
 	Width, Height int
+	Library       *tetra3d.Library
 	Scene         *tetra3d.Scene
-
-	Controlling *tetra3d.Model
 
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
@@ -37,16 +33,19 @@ type Game struct {
 
 	DrawDebugText      bool
 	DrawDebugDepth     bool
-	DrawDebugBounds    bool
 	DrawDebugWireframe bool
-	DrawDebugNormals   bool
 	PrevMousePosition  vector.Vector
+
+	AnimatedTexture *tetra3d.TexturePlayer
 }
+
+//go:embed animatedTextures.gltf
+var libraryData []byte
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             1920,
-		Height:            1080,
+		Width:             796,
+		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -58,34 +57,63 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(gltfData, nil)
+	library, err := tetra3d.LoadGLTFData(libraryData, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	g.Scene = library.FindScene("Scene")
+	g.Library = library
 
-	g.Controlling = g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
+	// We clone the scene so we have an original to work from
+	g.Scene = library.ExportedScene.Clone()
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 6, 15})
-	g.Camera.Far = 40
+	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
+	g.Scene.Root.AddChildren(g.Camera)
+
+	// Firstly, we create a TexturePlayer, which animates a collection of vertices' UV values to
+	// animate a texture on them.
+	g.AnimatedTexture = tetra3d.NewTexturePlayer(library.Meshes["Plane"].MeshParts[0].Vertices)
+
+	// We create the animation here; rather than having a function to create the struct, it's simpler to do so
+	// manually, as can be seen below.
+	bloopAnim := &tetra3d.TextureAnimation{
+		FPS: 15,
+		Frames: []vector.Vector{
+			{0, 0},     // UV offset for frame 0
+			{0.5, 0},   // ... For frame 1,
+			{0, 0.5},   // ... For frame 2,
+			{0.5, 0.5}, // ... And for frame 3.
+		},
+	}
+
+	// The above offsets are relative to the starting UV values as they are set when we pass our vertices into the TexturePlayer instance.
+
+	// Begin playing the animation.
+	g.AnimatedTexture.Play(bloopAnim)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	// g.Scene.Root.Get("Ground").SetVisible(false, false)
 
 }
 
 func (g *Game) Update() error {
 
+	// Update the TexturePlayer
+	g.AnimatedTexture.Update(1.0 / 60.0)
+
+	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+		g.AnimatedTexture.Playing = !g.AnimatedTexture.Playing
+	}
+
 	var err error
 
-	moveSpd := 0.1
+	moveSpd := 0.05
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
+
+	// Moving the Camera
 
 	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
 	forward := g.Camera.LocalRotation().Forward().Invert()
@@ -120,53 +148,7 @@ func (g *Game) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		g.Controlling.Move(moveSpd, 0, 0)
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		g.Controlling.Move(-moveSpd, 0, 0)
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		g.Controlling.Move(0, 0, -moveSpd)
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		g.Controlling.Move(0, 0, moveSpd)
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)
-		capsule := g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
-		if g.Controlling == sphere {
-			g.Controlling = capsule
-		} else {
-			g.Controlling = sphere
-		}
-	}
-
-	// Gravity
-	g.Controlling.Move(0, -0.1, 0)
-
-	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
-
-	for _, o := range g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBounding) {
-
-		other := o.(tetra3d.BoundingObject)
-
-		if inter := bounds.Intersection(other); inter != nil {
-
-			maxMTV := vector.Vector{0, 0, 0}
-			for _, i := range inter.Intersections {
-				if i.MTV.Magnitude() > maxMTV.Magnitude() {
-					maxMTV = i.MTV
-				}
-			}
-
-			g.Controlling.MoveVec(maxMTV)
-
-		}
-
-	}
+	// Rotating the camera with the mouse
 
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
@@ -213,15 +195,7 @@ func (g *Game) Update() error {
 		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
-		g.DrawDebugNormals = !g.DrawDebugNormals
-	}
-
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugBounds = !g.DrawDebugBounds
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
@@ -230,17 +204,18 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	// screen.Fill(color.RGBA{20, 25, 30, 255})
-	screen.Fill(color.Black)
+	screen.Fill(color.RGBA{60, 70, 80, 255})
 
+	// Clear the Camera
 	g.Camera.Clear()
 
+	// Render the logo first
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
+	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
+	// we could just draw the images straight.
 	opt := &ebiten.DrawImageOptions{}
 	w, h := g.Camera.ColorTexture.Size()
-
-	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
 	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
 		screen.DrawImage(g.Camera.DepthTexture, opt)
@@ -248,23 +223,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(g.Camera.ColorTexture, opt)
 	}
 
-	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.White())
-	}
-
-	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, colors.SkyBlue())
-	}
-
-	if g.DrawDebugBounds {
-		g.Camera.DrawDebugBoundsColored(screen, g.Scene.Root, colors.White(), colors.White(), colors.White(), colors.Gray())
-	}
-
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		shapeName := g.Controlling.Name()
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nArrow keys: Move " + shapeName + "\nF: switch between capsule and sphere\nF1, F2, F3: Debug views\nF5: Display bounds shapes\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{192, 192, 192, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how animated textures work.\nThere are several planes, but they all share\nthe same mesh, which is animated by the\nTexturePlayer.\n1 key: Toggle playback\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
+	}
+
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Gray())
 	}
 
 }
@@ -290,7 +256,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Shapes Test")
+	ebiten.SetWindowTitle("Tetra3d - Logo Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()

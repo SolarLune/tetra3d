@@ -60,8 +60,8 @@ type INode interface {
 	// If the node is not within a tree (i.e. unparented), this will return nil.
 	Scene() *Scene
 	Root() INode
-	Children() []INode
-	ChildrenRecursive() []INode
+	Children() NodeFilter
+	ChildrenRecursive() NodeFilter
 	AddChildren(...INode)
 	RemoveChildren(...INode)
 	// updateLocalTransform(newParent INode)
@@ -95,9 +95,6 @@ type INode interface {
 	SetVisible(visible, recursive bool)
 
 	Get(path string) INode
-	FindByName(name string, exactMatch bool) []INode
-	FindByTags(tags ...string) []INode
-	FindByType(nodeType NodeType) []INode
 	HierarchyAsString() string
 	Path() string
 
@@ -651,13 +648,12 @@ func (node *Node) Unparent() {
 }
 
 // Children() returns the Node's children.
-func (node *Node) Children() []INode {
-	return append([]INode{}, node.children...)
+func (node *Node) Children() NodeFilter {
+	return newNodeFilter(node.children...)
 }
 
-// ChildrenRecursive returns all related children Nodes underneath this one.
-func (node *Node) ChildrenRecursive() []INode {
-	out := []INode{}
+func (node *Node) ChildrenRecursive() NodeFilter {
+	out := newNodeFilter()
 	for _, child := range node.children {
 		out = append(out, child)
 		out = append(out, child.ChildrenRecursive()...)
@@ -817,62 +813,6 @@ func (node *Node) Path() string {
 
 	return path
 
-}
-
-// FindByName allows you to search the node's recursive children, returning a slice
-// of Nodes with the name given. If wildcard is true, the nodes' names can contain the
-// name provided; otherwise, they have to match exactly. If no matching Nodes are found,
-// an empty slice is returned.
-// After finding a Node, you can convert it to a more specific type as necessary via type assertion.
-func (node *Node) FindByName(name string, exactMatch bool) []INode {
-	out := []INode{}
-	for _, node := range node.ChildrenRecursive() {
-
-		var nameExists bool
-
-		if exactMatch {
-			nameExists = node.Name() == name
-		} else {
-			nameExists = strings.Contains(node.Name(), name)
-		}
-
-		if nameExists {
-			out = append(out, node)
-		}
-	}
-	return out
-}
-
-// FindByType allows you to search the node's recursive children, returning a slice
-// of Nodes with the NodeType given.
-// After finding a Node, you can convert it to a more specific type as necessary via type assertion.
-func (node *Node) FindByType(nodeType NodeType) []INode {
-
-	out := []INode{}
-
-	for _, node := range node.ChildrenRecursive() {
-
-		if node.Type().Is(nodeType) {
-			out = append(out, node)
-		}
-
-	}
-
-	return out
-
-}
-
-// FindBytags allows you to search the node's recursive children, returning a slice
-// of Nodes with the tags given. If none are found, an empty slice is returned.
-// After finding a Node, you can convert it to a more specific type as necessary via type assertion.
-func (node *Node) FindByTags(tagNames ...string) []INode {
-	out := []INode{}
-	for _, node := range node.ChildrenRecursive() {
-		if node.Tags().Has(tagNames...) {
-			out = append(out, node)
-		}
-	}
-	return out
 }
 
 // Root returns the root node in this tree by recursively traversing this node's hierarchy of

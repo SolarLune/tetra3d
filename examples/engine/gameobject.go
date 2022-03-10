@@ -45,11 +45,11 @@ func (player *Player) Update() {
 
 	player.node.MoveVec(move)
 
-	playerBounds := player.node.FindByType(tetra3d.NodeTypeBoundingAABB)[0].(*tetra3d.BoundingAABB)
+	playerBounds := player.node.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingAABB)[0].(*tetra3d.BoundingAABB)
 
 	movementResolution := vector.Vector{0, 0, 0}
 
-	for _, b := range player.node.Root().FindByType(tetra3d.NodeTypeBounding) {
+	for _, b := range player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBounding) {
 		bounds := b.(tetra3d.BoundingObject)
 
 		if result := playerBounds.Intersection(bounds); result != nil {

@@ -923,10 +923,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 						var clone INode
 
-						if collection.Path == "" {
+						path := collection.Path
+
+						if path == "" {
 							clone = findNode(cloneName).Clone()
 						} else {
-							path := collection.Path
 							path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
 							if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
 								if foundNode := library.FindNode(cloneName); foundNode != nil {
@@ -941,7 +942,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							obj.AddChildren(clone)
 
 						} else {
-							log.Println("Error in instantiating linked element:", cloneName, "from:", collection.Path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
+							log.Println("Error in instantiating linked element:", cloneName, "from:", path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
 						}
 
 					}

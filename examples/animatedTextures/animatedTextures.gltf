@@ -1,0 +1,342 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v1.7.33",
+        "version" : "2.0"
+    },
+    "extensionsUsed" : [
+        "KHR_lights_punctual",
+        "KHR_materials_unlit"
+    ],
+    "extensionsRequired" : [
+        "KHR_lights_punctual"
+    ],
+    "extensions" : {
+        "KHR_lights_punctual" : {
+            "lights" : [
+                {
+                    "color" : [
+                        1,
+                        1,
+                        1
+                    ],
+                    "intensity" : 1000,
+                    "type" : "point",
+                    "name" : "Light"
+                }
+            ]
+        }
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "extras" : {
+                "t3dPackTextures__" : 1,
+                "t3dExportFormat__" : 2,
+                "t3dCollections__" : {
+                    "Collection" : {
+                        "objects" : [
+                            "Light",
+                            "Camera",
+                            "Plane",
+                            "Plane.001",
+                            "Plane.002",
+                            "Plane.003",
+                            "Plane.004",
+                            "Plane.005",
+                            "Plane.006",
+                            "Plane.007",
+                            "Plane.008"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                }
+            },
+            "name" : "Scene",
+            "nodes" : [
+                1,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "extensions" : {
+                "KHR_lights_punctual" : {
+                    "light" : 0
+                }
+            },
+            "name" : "Light_Orientation",
+            "rotation" : [
+                -0.7071067690849304,
+                0,
+                0,
+                0.7071067690849304
+            ]
+        },
+        {
+            "children" : [
+                0
+            ],
+            "name" : "Light",
+            "rotation" : [
+                0.16907575726509094,
+                0.7558803558349609,
+                -0.27217137813568115,
+                0.570947527885437
+            ],
+            "translation" : [
+                4.076245307922363,
+                5.903861999511719,
+                -1.0054539442062378
+            ]
+        },
+        {
+            "camera" : 0,
+            "name" : "Camera_Orientation",
+            "rotation" : [
+                -0.7071067690849304,
+                0,
+                0,
+                0.7071067690849304
+            ]
+        },
+        {
+            "children" : [
+                2
+            ],
+            "name" : "Camera",
+            "rotation" : [
+                0.483536034822464,
+                0.33687159419059753,
+                -0.20870360732078552,
+                0.7804827094078064
+            ],
+            "translation" : [
+                7.358891487121582,
+                4.958309173583984,
+                6.925790786743164
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane"
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane.001",
+            "translation" : [
+                2,
+                0,
+                0
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane.002",
+            "translation" : [
+                2,
+                0,
+                -2
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane.003",
+            "translation" : [
+                0,
+                0,
+                -2
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane.004",
+            "translation" : [
+                -2,
+                0,
+                -2
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane.005",
+            "translation" : [
+                -2,
+                0,
+                0
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane.006",
+            "translation" : [
+                -2,
+                0,
+                2
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane.007",
+            "translation" : [
+                0,
+                0,
+                2
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Plane.008",
+            "translation" : [
+                2,
+                0,
+                2
+            ]
+        }
+    ],
+    "cameras" : [
+        {
+            "name" : "Camera",
+            "perspective" : {
+                "aspectRatio" : 1.7777777777777777,
+                "yfov" : 0.39959652046304894,
+                "zfar" : 100,
+                "znear" : 0.10000000149011612
+            },
+            "type" : "perspective"
+        }
+    ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "extensions" : {
+                "KHR_materials_unlit" : {}
+            },
+            "name" : "Lava",
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 0
+                },
+                "metallicFactor" : 0,
+                "roughnessFactor" : 0.9
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Plane",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1,
+                        "TEXCOORD_0" : 2
+                    },
+                    "indices" : 3,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "textures" : [
+        {
+            "sampler" : 0,
+            "source" : 0
+        }
+    ],
+    "images" : [
+        {
+            "bufferView" : 4,
+            "mimeType" : "image/png",
+            "name" : "lava"
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 4,
+            "max" : [
+                1,
+                0,
+                1
+            ],
+            "min" : [
+                -1,
+                0,
+                -1
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 4,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 4,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5123,
+            "count" : 6,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 48,
+            "byteOffset" : 0
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 48,
+            "byteOffset" : 48
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 32,
+            "byteOffset" : 96
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 12,
+            "byteOffset" : 128
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 295,
+            "byteOffset" : 140
+        }
+    ],
+    "samplers" : [
+        {
+            "magFilter" : 9729,
+            "minFilter" : 9987
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 436,
+            "uri" : "data:application/octet-stream;base64,AACAvwAAAAAAAIA/AACAPwAAAAAAAIA/AACAvwAAAAAAAIC/AACAPwAAAAAAAIC/AAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAAD8AAAA/AAAAPwAAAAAAAAAAAAAAPwAAAAAAAAEAAwAAAAMAAgCJUE5HDQoaCgAAAA1JSERSAAAAIAAAACAIBgAAAHN6evQAAAABc1JHQgCuzhzpAAAA4UlEQVRYhe1XwRGEIAwMzj2sga992A1VWZw/a+DnvWCQS87Awnhzw74cdZNIdgOafV1OehDTk8lHAT9RwKtlMOt8vD62WcUxqQvSACVBOK6Wb4YNpQfckiKwzrMx1SsgBUARNWCdZ0Uj3W+FuALHNn98Ye/kRIwLaryM8IcN/6uAGptebJijVoQp785JZl+XE5kBofBaPtwCdE5MIQgyhBD+5UCCznpIhL0haaX7bpgmDsnTOKoCQj+5Xt8h5+TaULfgm9249/J3JX5TDZQOISLmWI5ux6Vo+l+Q93ucBzR4A2mFkumGGKPvAAAAAElFTkSuQmCCAA=="
+        }
+    ]
+}

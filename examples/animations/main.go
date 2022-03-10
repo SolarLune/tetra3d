@@ -184,7 +184,7 @@ func (g *Game) Update() error {
 
 	scene := g.Library.Scenes[0]
 
-	armature := scene.Root.FindByName("Armature", true)[0].(*tetra3d.Node)
+	armature := scene.Root.ChildrenRecursive().ByName("Armature", true)[0].(*tetra3d.Node)
 	armature.Rotate(0, 1, 0, 0.01)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
