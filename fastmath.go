@@ -79,10 +79,10 @@ type VectorPool struct {
 
 func NewVectorPool(vectorCount int) *VectorPool {
 	pool := &VectorPool{
-		Vectors: []vector.Vector{},
+		Vectors: make([]vector.Vector, vectorCount),
 	}
 	for i := 0; i < vectorCount; i++ {
-		pool.Vectors = append(pool.Vectors, vector.Vector{0, 0, 0, 0})
+		pool.Vectors[i] = vector.Vector{0, 0, 0, 0}
 	}
 	return pool
 }
