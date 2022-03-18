@@ -3,10 +3,10 @@
 [Ebiten Discord](https://discord.gg/fXM7VYASTu)
 
 ![Tetra3D Logo](https://thumbs.gfycat.com/DifferentZealousFowl-size_restricted.gif)
-![Dark exploration](https://thumbs.gfycat.com/ScalySlimCrayfish-size_restricted.gif)
-![Transparency](https://i.imgur.com/4DhJomC.jpg)
 
-[Vertex Lighting GIF (6mb GIF)](https://gfycat.com/deliriousfemalejunebug)
+![It Breeds Fear - Construction Worker](https://thumbs.gfycat.com/ThoughtfulChubbyBunny-size_restricted.gif)
+
+![Dark exploration](https://thumbs.gfycat.com/ScalySlimCrayfish-size_restricted.gif)
 
 [Tetra3D Docs](https://pkg.go.dev/github.com/solarlune/tetra3d) / [Tetra3D Wiki](https://github.com/SolarLune/Tetra3d/wiki)
 
@@ -15,7 +15,7 @@
 If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune). I also have a [Discord server here](https://discord.gg/cepcpfV). Thanks~!
 ## What is Tetra3D?
 
-Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing (by use of shaders to compare and write depth and composite the result onto the finished texture). Depth testing can be turned off for a performance increase in exchange for no inter-object intersection.
+Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing (by use of shaders to compare and write depth and composite the result onto the finished texture). Depth testing can be turned off for a performance increase in exchange for no visual inter-object intersection.
 
 Tetra's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a largely-software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively simple fully 3D game (i.e. something on the level of a PS1 or N64 game). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
@@ -41,7 +41,7 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed. 
 
-The Blender add-on is not required, but is provided as well, and can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). For the "why" of the add-on, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
+The Blender add-on is not required, but is provided as well, and can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). The add-on provides some useful helper functionality that makes using Tetra3D simpler - for more information, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
 
 ## How do you use it?
 
@@ -242,8 +242,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
 - [x] -- Offscreen Rendering
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
-- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc). Perhaps these Materials can have a flag that you can toggle to enable this behavior?
-- [ ] -- Texture wrapping (will require rendering with shaders)
+- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior?
+- [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
 - [ ] -- Draw triangle in 3D space (could be useful for 3D lines, for example)
 - [x] **Culling**
 - [x] -- Backface culling
@@ -280,6 +280,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Transform / full scene loading
 - [x] -- Animation loading
 - [x] -- Camera loading
+- [x] -- Loading world color in as ambient lighting
 - [ ] -- Separate .bin loading
 - [x] **Blender Add-on**
 - [x] -- Export GLTF on save / on command via button
@@ -321,10 +322,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location) - NOTE: Unsure if I'll implement this; [beep](https://github.com/faiface/beep) allows you to affect sounds playing back, and it is relatively simple to make it pan as necessary.
 - [ ] **Optimization**
 - [ ] -- Multithreading (particularly for vertex transformations)
+- [ ] -- Armature animation improvements? 
 - [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
 - [x] -- Vector pools
 - [ ] -- Matrix pools?
-- [ ] -- Lighting speed improvements 
+- [ ] -- Lighting speed improvements
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!
