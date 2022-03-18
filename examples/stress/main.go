@@ -92,7 +92,9 @@ func (g *Game) Init() {
 	// shared a single Mesh (which has a single Material (aptly named "Cube")), the MeshParts also
 	// share the same Material. This being the case, we don't need to set the image on all MeshParts'
 	// Materials; just the first one is fine.
-	merged.Mesh.MeshParts[0].Material.Texture = ebiten.NewImageFromImage(img)
+	mat := merged.Mesh.MeshParts[0].Material
+	mat.Shadeless = true
+	mat.Texture = ebiten.NewImageFromImage(img)
 
 	// Add the merged result model, and we're done, basically.
 	g.Scene.Root.AddChildren(merged)

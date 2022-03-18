@@ -74,7 +74,7 @@ func (g *Game) Init() {
 	}
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
+	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)

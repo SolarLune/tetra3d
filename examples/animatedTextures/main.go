@@ -67,6 +67,9 @@ func (g *Game) Init() {
 	// We clone the scene so we have an original to work from
 	g.Scene = library.ExportedScene.Clone()
 
+	// Turn off lighting
+	g.Scene.LightingOn = false
+
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)

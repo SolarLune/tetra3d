@@ -24,20 +24,29 @@ import (
 
 type Game struct {
 	Width, Height int
+	Library       *tetra3d.Library
 	Scene         *tetra3d.Scene
 
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
 	CameraRotate float64
 
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	Time              float64
-	PrevMousePosition vector.Vector
+	DrawDebugText      bool
+	DrawDebugDepth     bool
+	DrawDebugWireframe bool
+	PrevMousePosition  vector.Vector
+
+	FlashingVertices []*tetra3d.Vertex
+
+	Time float64
+
+	Cube *tetra3d.Model
 }
 
-func NewGame() *Game {
+//go:embed vertexSelection.gltf
+var libraryData []byte
 
+func NewGame() *Game {
 	game := &Game{
 		Width:             796,
 		Height:            448,
@@ -52,55 +61,50 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	g.Scene = tetra3d.NewScene("shader test scene")
-
-	mesh := tetra3d.NewCube()
-
-	_, err := mesh.MeshParts[0].Material.SetShader([]byte(`
-	package main
-
-	func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
-		scrSize := imageDstTextureSize()
-		return vec4(position.x / scrSize.x, position.y / scrSize.y, 0, 1)
-	}`))
-
+	library, err := tetra3d.LoadGLTFData(libraryData, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	model := tetra3d.NewModel(mesh, "fragmentcube")
-	model.Move(-2, 0, 0)
-	g.Scene.Root.AddChildren(model)
+	g.Library = library
 
-	vertCube := tetra3d.NewCube()
-	mat := vertCube.MeshParts[0].Material
-	mat.Shadeless = true
-	mat.VertexProgram = func(v vector.Vector) vector.Vector {
-		waveHeight := 0.1
-		v[1] += math.Sin(g.Time*math.Pi+v[0])*waveHeight + (waveHeight / 2)
-		return v
-	}
-	model = tetra3d.NewModel(vertCube, "vertexcube")
-	model.Move(2, 0, 0)
-	g.Scene.Root.AddChildren(model)
+	// We clone the scene so we have an original to work from
+	g.Scene = library.ExportedScene.Clone()
+
+	g.Cube = g.Scene.Root.Get("Cube").(*tetra3d.Model)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
+	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
+
+	g.FlashingVertices = []*tetra3d.Vertex{}
+
+	for _, vert := range g.Cube.Mesh.MeshParts[0].Vertices {
+		if vert.Colors[g.Cube.Mesh.VertexColorChannelNames["Flash"]].R > 0.5 {
+			g.FlashingVertices = append(g.FlashingVertices, vert)
+		}
+	}
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
 
 func (g *Game) Update() error {
-	var err error
 
-	g.Time += 1.0 / 60.0
+	var err error
 
 	moveSpd := 0.05
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
+	}
+
+	g.Time += 1.0 / 60.0
+
+	glow := tetra3d.NewColorFromHSV(g.Time/10, 1, 1)
+
+	for _, vert := range g.FlashingVertices {
+		vert.Colors[0] = glow
 	}
 
 	// Moving the Camera
@@ -181,6 +185,10 @@ func (g *Game) Update() error {
 		g.DrawDebugText = !g.DrawDebugText
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+		g.DrawDebugWireframe = !g.DrawDebugWireframe
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
@@ -211,9 +219,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis demo shows how custom shaders work.\nThere are two kinds: fragment shaders and vertex programs.\nFragment shaders are written in Kage, while\nvertex programs are written in pure Go and are\ndone on the CPU.\nThe cube on the left is running a fragment shader,\nwhile the cube on the right runs a vertex program.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{255, 0, 0, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how to easily select specific\nvertices using vertex color in Tetra3D.\nIn this example, the glowing faces are colored in the 'Flash'\nvertex color channel in Blender (which\nbecomes channel 1 in Tetra3D as it's in the second slot).\nThe vertices that have a non-black color\nin the \"Flash\" channel are then assigned\na flashing color here in Tetra3D.\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
 	}
+
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Gray())
+	}
+
 }
 
 func (g *Game) StartProfiling() {

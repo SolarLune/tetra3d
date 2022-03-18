@@ -13,7 +13,41 @@
                 "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
                 "t3dPackTextures__" : 1,
-                "t3dExportLights__" : 0
+                "t3dExportLights__" : 1,
+                "t3dCollections__" : {
+                    "Collection" : {
+                        "objects" : [
+                            "Cube",
+                            "Suzanne",
+                            "Sphere",
+                            "Crates",
+                            "Triangle",
+                            "Hallway",
+                            "Plane",
+                            "Ground",
+                            "Camera",
+                            "Cube.006"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Collection 1" : {
+                        "objects" : [
+                            "Cube.002",
+                            "Cube.003",
+                            "Cube.004",
+                            "Cube.005"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                }
             },
             "name" : "Another",
             "nodes" : [
@@ -231,6 +265,9 @@
             "extensions" : {
                 "KHR_materials_unlit" : {}
             },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
+            },
             "name" : "VertexPainting",
             "pbrMetallicRoughness" : {
                 "metallicFactor" : 0,
@@ -240,6 +277,9 @@
         {
             "extensions" : {
                 "KHR_materials_unlit" : {}
+            },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
             },
             "name" : "OutdoorStuff",
             "pbrMetallicRoughness" : {
@@ -251,36 +291,51 @@
             }
         },
         {
-            "doubleSided" : true,
+            "extensions" : {
+                "KHR_materials_unlit" : {}
+            },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
+            },
             "name" : "Green",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
-                    0.24082158505916595,
-                    0.8000000715255737,
+                    0.24228109419345856,
+                    0.7991030216217041,
                     0,
                     1
                 ],
                 "metallicFactor" : 0,
-                "roughnessFactor" : 0.5
+                "roughnessFactor" : 0.9
             }
         },
         {
-            "doubleSided" : true,
+            "extensions" : {
+                "KHR_materials_unlit" : {}
+            },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
+            },
             "name" : "Dark Gray",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
-                    0.02197927050292492,
-                    0.02197927050292492,
-                    0.02197927050292492,
+                    0.022173896431922913,
+                    0.02217387966811657,
+                    0.022173885256052017,
                     1
                 ],
                 "metallicFactor" : 0,
-                "roughnessFactor" : 0.5
+                "roughnessFactor" : 0.9
             }
         }
     ],
     "meshes" : [
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube.001",
             "primitives" : [
                 {
@@ -296,6 +351,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube",
             "primitives" : [
                 {
@@ -311,6 +371,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Suzanne",
             "primitives" : [
                 {
@@ -326,6 +391,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Sphere",
             "primitives" : [
                 {
@@ -341,6 +411,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Crates",
             "primitives" : [
                 {
@@ -356,6 +431,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Triangle",
             "primitives" : [
                 {
@@ -371,6 +451,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Hallway",
             "primitives" : [
                 {
@@ -386,6 +471,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Plane",
             "primitives" : [
                 {
@@ -401,6 +491,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Ground",
             "primitives" : [
                 {
@@ -416,6 +511,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube.002",
             "primitives" : [
                 {

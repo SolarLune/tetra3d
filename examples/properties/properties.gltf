@@ -12,7 +12,29 @@
             "extras" : {
                 "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
-                "t3dExportLights__" : 0
+                "t3dExportLights__" : 0,
+                "t3dCollections__" : {
+                    "Collection" : {
+                        "objects" : [
+                            "Cube",
+                            "Cube.001",
+                            "Cube.002",
+                            "Cube.003",
+                            "Cube.004",
+                            "Cube.005",
+                            "Cube.006",
+                            "Cube.007",
+                            "Cube.008",
+                            "Cube.009",
+                            "Parent"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                }
             },
             "name" : "Scene",
             "nodes" : [
@@ -287,9 +309,11 @@
     ],
     "materials" : [
         {
-            "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_unlit" : {}
+            },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
             },
             "name" : "Material",
             "pbrMetallicRoughness" : {
@@ -300,6 +324,11 @@
     ],
     "meshes" : [
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube",
             "primitives" : [
                 {

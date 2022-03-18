@@ -12,7 +12,74 @@
             "extras" : {
                 "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
-                "t3dPackTextures__" : 1
+                "t3dPackTextures__" : 1,
+                "t3dCollections__" : {
+                    "Collection" : {
+                        "objects" : [
+                            "Cube",
+                            "Plane",
+                            "Cube.001",
+                            "Cube.002",
+                            "Cube.003",
+                            "Cube.004",
+                            "Cube.005",
+                            "Cube.006",
+                            "Cube.007",
+                            "Cube.008",
+                            "Cube.009",
+                            "CameraHandle",
+                            "Cube.010",
+                            "Cube.011",
+                            "Cube.012",
+                            "Cube.013",
+                            "Cube.014",
+                            "Cube.015",
+                            "Cube.016",
+                            "Cube.017",
+                            "Cube.018",
+                            "Cube.019",
+                            "Cube.020",
+                            "Cube.021",
+                            "Cube.022",
+                            "Cube.023",
+                            "Cube.024",
+                            "Cube.025",
+                            "Cube.026",
+                            "Cube.027",
+                            "Cube.028",
+                            "Cube.029",
+                            "Cube.030",
+                            "Cube.031",
+                            "Cube.032",
+                            "Cube.033",
+                            "Cube.034",
+                            "Cube.035",
+                            "Cube.036",
+                            "Cube.037",
+                            "Cube.038",
+                            "Cube.039",
+                            "Cube.040",
+                            "Cube.041",
+                            "Cube.042",
+                            "Cube.043",
+                            "Cube.044",
+                            "Cube.045",
+                            "Cube.046",
+                            "Cube.047",
+                            "Cube.048",
+                            "Cube.049",
+                            "Cube.050",
+                            "Cube.051",
+                            "Cube.052",
+                            "Cube.053"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                }
             },
             "name" : "Scene",
             "nodes" : [
@@ -617,6 +684,9 @@
             "extensions" : {
                 "KHR_materials_unlit" : {}
             },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
+            },
             "name" : "TestImage",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
@@ -630,7 +700,10 @@
             "extensions" : {
                 "KHR_materials_unlit" : {}
             },
-            "name" : "Cube",
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
+            },
+            "name" : "Plane",
             "pbrMetallicRoughness" : {
                 "metallicFactor" : 0,
                 "roughnessFactor" : 0.9
@@ -639,6 +712,9 @@
     ],
     "meshes" : [
         {
+            "extras" : {
+                "t3dVertexColorNames__" : []
+            },
             "name" : "Cube",
             "primitives" : [
                 {
@@ -653,6 +729,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Plane",
             "primitives" : [
                 {

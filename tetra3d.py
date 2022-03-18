@@ -304,6 +304,7 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box.prop(context.scene, "t3dPackTextures__")
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
+        box.prop(context.scene, "t3dExportWorldAmbientColor__")
 
 
 def export():
@@ -349,8 +350,27 @@ def export():
 
     for scene in bpy.data.scenes:
         if scene.users > 0:
+            
+            if getExportWorldColor(None):
+                if scene.world:
+                    worldNodes = scene.world.node_tree.nodes
+                    if ("Background" in worldNodes or "Emission" in worldNodes) and scene.world.use_nodes:
+                        if "Background"in worldNodes:
+                            bgNode = worldNodes["Background"]
+                        else:
+                            bgNode = worldNodes["Emission"]
+                        scene["t3dWorldColor__"] = list(bgNode.inputs[0].default_value)
+                        scene["t3dWorldEnergy__"] = bgNode.inputs[1].default_value
+                    else:
+                        scene["t3dWorldColor__"] = list(scene.world.color)
+                        scene["t3dWorldEnergy__"] = 1
+
             for layer in scene.view_layers:
                 for obj in layer.objects:
+
+                    if obj.type == "MESH":
+                        vertexColors = [layer.name for layer in obj.data.vertex_colors]
+                        obj.data["t3dVertexColorNames__"] = vertexColors
 
                     # Record relevant information for curves
                     if obj.type == "CURVE":
@@ -404,6 +424,11 @@ def export():
 
         if scene.users > 0:
 
+            if "t3dWorldColor__" in scene:
+                del(scene["t3dWorldColor__"])
+            if "t3dWorldEnergy__" in scene:
+                del(scene["t3dWorldEnergy__"])
+
             for layer in scene.view_layers:
 
                 for obj in layer.objects:
@@ -416,6 +441,8 @@ def export():
                         del(obj["t3dPathPoints__"])
                     if "t3dPathCyclic__" in obj:
                         del(obj["t3dPathCyclic__"])
+                    if obj.type == "MESH" and "t3dVertexColorNames__" in obj.data:
+                        del(obj.data["t3dVertexColorNames__"])
 
     for action in bpy.data.actions:
         if "t3dMarkers__" in action:
@@ -523,6 +550,15 @@ def setPackTextures(self, value):
     globalSet("t3dPackTextures__", value)
 
 
+def getExportWorldColor(self):
+    l = globalGet("t3dExportWorldColor__")
+    if l is None:
+        l = True
+    return l
+
+def setExportWorldColor(self, value):
+    globalSet("t3dExportWorldColor__", value)
+
 
 def register():
     
@@ -560,6 +596,9 @@ def register():
     bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(name="Pack Textures", description="Whether Blender should pack textures into the GLTF file on export", default=False,
     get=getPackTextures, set=setPackTextures)    
 
+    bpy.types.Scene.t3dExportWorldAmbientColor__ = bpy.props.BoolProperty(name="Export World Color As Ambient Light", description="Whether Blender should export the world color (assuming it uses Background as the color) as an ambient light", default=False,
+    get=getExportWorldColor, set=setExportWorldColor)    
+
     bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
     
@@ -589,6 +628,7 @@ def unregister():
     del bpy.types.Scene.t3dExportCameras__
     del bpy.types.Scene.t3dExportLights__
     del bpy.types.Scene.t3dPackTextures__
+    del bpy.types.Scene.t3dExportWorldAmbientColor__
 
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__

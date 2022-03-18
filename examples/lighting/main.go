@@ -72,9 +72,6 @@ func (g *Game) Init() {
 	g.Camera.SetLocalPosition(vector.Vector{0, 2, 15})
 	g.Scene.Root.AddChildren(g.Camera)
 
-	ambientLight := tetra3d.NewAmbientLight("ambient", 1, 0.5, 0.25, 1)
-	g.Scene.Root.AddChildren(ambientLight)
-
 	// g.Scene.FogMode = tetra3d.FogMultiply
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -92,6 +89,9 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
+
+	spin := g.Scene.Root.Get("Spin").(*tetra3d.Model)
+	spin.Rotate(0, 1, 0, 0.025)
 
 	light := g.Scene.Root.Get("Point light").(*tetra3d.Node)
 	light.AnimationPlayer().Play(g.Library.Animations["LightAction"])
@@ -194,8 +194,12 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	// Clear, but with a color
-	screen.Fill(color.RGBA{60, 70, 80, 255})
+	// Clear, but with a color - we can use the world lighting color for this.
+	light := g.Scene.Root.Get("World Ambient").(*tetra3d.AmbientLight)
+	energy := light.Energy
+	bgColor := light.Color.Clone()
+	bgColor.MultiplyRGBA(energy, energy, energy, 1)
+	screen.Fill(bgColor.ToRGBA64())
 
 	// Clear the Camera
 	g.Camera.Clear()

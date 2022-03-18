@@ -68,7 +68,8 @@ func (g *Game) Init() {
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Move(0, 0, 10)
 	scene := g.Library.Scenes[0]
-
+	// Turn off lighting
+	scene.LightingOn = false
 	scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)

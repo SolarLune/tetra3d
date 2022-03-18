@@ -18,15 +18,13 @@ type Scene struct {
 	// scene graph by simply adding them into the tree via parenting anywhere under the Root. For them to be removed from rendering,
 	// they simply need to be removed from the tree.
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
-	Root INode
-
+	Root     INode
 	FogColor *Color  // The Color of any fog present in the Scene.
 	FogMode  FogMode // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
 	// ranging from 0 to 1. The first indicates the start of the fog, and the second the end, in
 	// terms of total depth of the near / far clipping plane. The default is [0, 1].
-	FogRange []float32
-
+	FogRange   []float32
 	LightingOn bool // If lighting is enabled when rendering the scene.
 }
 
@@ -34,13 +32,11 @@ type Scene struct {
 func NewScene(name string) *Scene {
 
 	scene := &Scene{
-		Name: name,
-		// Models:   []*Model{},
-		Root:     NewNode("Root"),
-		FogColor: NewColor(0, 0, 0, 0),
-		FogRange: []float32{0, 1},
-
-		LightingOn: false,
+		Name:       name,
+		Root:       NewNode("Root"),
+		FogColor:   NewColor(0, 0, 0, 0),
+		FogRange:   []float32{0, 1},
+		LightingOn: true,
 	}
 
 	scene.Root.(*Node).scene = scene
@@ -53,6 +49,7 @@ func (scene *Scene) Clone() *Scene {
 
 	newScene := NewScene(scene.Name)
 	newScene.library = scene.library
+	newScene.LightingOn = scene.LightingOn
 
 	// newScene.Models = append(newScene.Models, scene.Models...)
 	newScene.Root = scene.Root.Clone()

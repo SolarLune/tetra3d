@@ -13,7 +13,22 @@
                 "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
                 "t3dExportLights__" : 0,
-                "t3dExportCameras__" : 0
+                "t3dExportCameras__" : 0,
+                "t3dCollections__" : {
+                    "Collection" : {
+                        "objects" : [
+                            "Player",
+                            "Plane",
+                            "SpikeBase",
+                            "SpikeBase.001"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                }
             },
             "name" : "Scene",
             "nodes" : [
@@ -127,7 +142,10 @@
             "extensions" : {
                 "KHR_materials_unlit" : {}
             },
-            "name" : "Material",
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
+            },
+            "name" : "Vertex Coloring",
             "pbrMetallicRoughness" : {
                 "metallicFactor" : 0,
                 "roughnessFactor" : 0.9
@@ -136,6 +154,11 @@
     ],
     "meshes" : [
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube",
             "primitives" : [
                 {
@@ -151,6 +174,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Plane",
             "primitives" : [
                 {
@@ -166,6 +194,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube.002",
             "primitives" : [
                 {
@@ -181,6 +214,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube.001",
             "primitives" : [
                 {

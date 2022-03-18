@@ -32,6 +32,7 @@
             "extras" : {
                 "t3dPackTextures__" : 1,
                 "t3dExportFormat__" : 2,
+                "t3dExportOnSave__" : 1,
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
@@ -225,6 +226,9 @@
             "extensions" : {
                 "KHR_materials_unlit" : {}
             },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
+            },
             "name" : "Lava",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
@@ -237,6 +241,9 @@
     ],
     "meshes" : [
         {
+            "extras" : {
+                "t3dVertexColorNames__" : []
+            },
             "name" : "Plane",
             "primitives" : [
                 {

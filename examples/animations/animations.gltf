@@ -13,7 +13,30 @@
                 "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
                 "t3dPackTextures__" : 1,
-                "t3dExportLights__" : 0
+                "t3dExportLights__" : 0,
+                "t3dCollections__" : {
+                    "Collection" : {
+                        "objects" : [
+                            "Table"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Skinned" : {
+                        "objects" : [
+                            "Armature",
+                            "SkinnedMesh"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                }
             },
             "name" : "Scene",
             "nodes" : [
@@ -250,9 +273,11 @@
             }
         },
         {
-            "doubleSided" : true,
             "extensions" : {
                 "KHR_materials_unlit" : {}
+            },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
             },
             "name" : "Material",
             "pbrMetallicRoughness" : {
@@ -263,6 +288,9 @@
     ],
     "meshes" : [
         {
+            "extras" : {
+                "t3dVertexColorNames__" : []
+            },
             "name" : "SkinnedMesh",
             "primitives" : [
                 {
@@ -279,6 +307,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Sphere",
             "primitives" : [
                 {
@@ -294,6 +327,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Table",
             "primitives" : [
                 {

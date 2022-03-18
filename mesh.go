@@ -45,12 +45,13 @@ func (dim Dimensions) Depth() float64 {
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one
 // manually if you want to construct a Mesh via code).
 type Mesh struct {
-	Name       string
-	library    *Library    // A reference to the Library this Mesh came from.
-	MeshParts  []*MeshPart // A slice of mesh parts
-	Dimensions Dimensions
-	triIndex   int
-	Tags       *Tags
+	Name                    string
+	library                 *Library    // A reference to the Library this Mesh came from.
+	MeshParts               []*MeshPart // A slice of mesh parts
+	VertexColorChannelNames map[string]int
+	Dimensions              Dimensions
+	triIndex                int
+	Tags                    *Tags
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,
@@ -58,16 +59,34 @@ type Mesh struct {
 func NewMesh(name string) *Mesh {
 
 	mesh := &Mesh{
-		Name:      name,
-		MeshParts: []*MeshPart{},
-		// Triangles:  []*Triangle{},
-		Dimensions: Dimensions{{0, 0, 0}, {0, 0, 0}},
-		triIndex:   1,
-		Tags:       NewTags(),
+		Name:                    name,
+		MeshParts:               []*MeshPart{},
+		Dimensions:              Dimensions{{0, 0, 0}, {0, 0, 0}},
+		VertexColorChannelNames: map[string]int{},
+		triIndex:                0,
+		Tags:                    NewTags(),
 	}
 
 	return mesh
 
+}
+
+// Clone clones the Mesh, creating a new Mesh that has cloned MeshParts.
+func (mesh *Mesh) Clone() *Mesh {
+	newMesh := NewMesh(mesh.Name)
+	newMesh.library = mesh.library
+	newMesh.Tags = mesh.Tags.Clone()
+	for _, part := range mesh.MeshParts {
+		newPart := part.Clone()
+		newMesh.MeshParts = append(newMesh.MeshParts, newPart)
+		newPart.Mesh = mesh
+	}
+
+	for channelName, index := range mesh.VertexColorChannelNames {
+		newMesh.VertexColorChannelNames[channelName] = index
+	}
+
+	return newMesh
 }
 
 // TotalVertexCount returns the total number of vertices in the Mesh by adding up the number of vertices of each MeshPart.
@@ -103,19 +122,6 @@ func (mesh *Mesh) GetMeshPart(materialName string) *MeshPart {
 		}
 	}
 	return nil
-}
-
-// Clone clones the Mesh, creating a new Mesh that has cloned MeshParts.
-func (mesh *Mesh) Clone() *Mesh {
-	newMesh := NewMesh(mesh.Name)
-	newMesh.library = mesh.library
-	newMesh.Tags = mesh.Tags.Clone()
-	for _, part := range mesh.MeshParts {
-		newPart := part.Clone()
-		newMesh.MeshParts = append(newMesh.MeshParts, newPart)
-		newPart.Mesh = mesh
-	}
-	return newMesh
 }
 
 // Library returns the Library from which this Mesh was loaded. If it was created through code, this function will return nil.
@@ -288,6 +294,7 @@ func NewPlane() *Mesh {
 
 // A Triangle represents the smallest renderable object in Tetra3D.
 type Triangle struct {
+	ID       int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
 	Vertices []*Vertex
 	MaxSpan  float64
 	Normal   vector.Vector
@@ -295,7 +302,6 @@ type Triangle struct {
 	Center   vector.Vector
 	visible  bool
 	depth    float64
-	ID       int // Unique identifier number (index) in the Mesh. Each Triangle has a unique ID to assist with the triangle sorting process (see Model.TransformedVertices()).
 }
 
 // NewTriangle creates a new Triangle, and requires a reference to its owning Mesh.
@@ -308,24 +314,6 @@ func NewTriangle(meshPart *MeshPart) *Triangle {
 	return tri
 }
 
-// SetVertices sets the vertices on the Triangle given; if the Triangle receives fewer than 3 vertices, it will panic.
-func (tri *Triangle) SetVertices(verts ...*Vertex) {
-
-	if len(verts) < 3 {
-		panic("Error: Triangle.AddVertices() received less than 3 vertices.")
-	}
-
-	tri.Vertices = verts
-	for i, v := range verts {
-		v.triangle = tri
-		v.ID = ((tri.ID - 1) * 3) + i
-	}
-
-	tri.RecalculateCenter()
-	tri.RecalculateNormal()
-
-}
-
 // Clone clones the Triangle, keeping a reference to the same Material.
 func (tri *Triangle) Clone() *Triangle {
 	newTri := NewTriangle(tri.MeshPart)
@@ -336,7 +324,26 @@ func (tri *Triangle) Clone() *Triangle {
 	newTri.SetVertices(newVerts...)
 	newTri.MeshPart = tri.MeshPart
 	newTri.RecalculateCenter()
+	newTri.ID = tri.ID
 	return newTri
+}
+
+// SetVertices sets the vertices on the Triangle given; if the Triangle receives fewer than 3 vertices, it will panic.
+func (tri *Triangle) SetVertices(verts ...*Vertex) {
+
+	if len(verts) < 3 {
+		panic("Error: Triangle.AddVertices() received less than 3 vertices.")
+	}
+
+	tri.Vertices = verts
+	for i, v := range verts {
+		v.triangle = tri
+		v.ID = (tri.ID * 3) + i
+	}
+
+	tri.RecalculateCenter()
+	tri.RecalculateNormal()
+
 }
 
 // RecalculateCenter recalculates the center for the Triangle. Note that this should only be called if you manually change a vertex's
@@ -393,21 +400,22 @@ func (tri *Triangle) RecalculateNormal() {
 
 // Vertex represents a vertex. Vertices are not shared between Triangles.
 type Vertex struct {
-	Position    vector.Vector
-	Color       *Color
-	UV          vector.Vector
-	transformed vector.Vector
-	Normal      vector.Vector
-	triangle    *Triangle
-	Weights     []float32
-	ID          int
+	Position                  vector.Vector
+	VisibleVertexColorChannel int      // Indicates the visible vertex color channel index for this vertex; a value less than 0 means no vertex color will be used to modulate the color.
+	Colors                    []*Color // Colors indicates a series of vertex colors, one for each vertex color created in your 3D modeler.
+	UV                        vector.Vector
+	transformed               vector.Vector
+	Normal                    vector.Vector
+	triangle                  *Triangle
+	Weights                   []float32
+	ID                        int
 }
 
 // NewVertex creates a new Vertex with the provided position (x, y, z) and UV values (u, v).
 func NewVertex(x, y, z, u, v float64) *Vertex {
 	return &Vertex{
 		Position:    vector.Vector{x, y, z},
-		Color:       NewColor(1, 1, 1, 1),
+		Colors:      []*Color{NewColor(1, 1, 1, 1)},
 		UV:          vector.Vector{u, v},
 		transformed: vector.Vector{0, 0, 0},
 	}
@@ -416,11 +424,18 @@ func NewVertex(x, y, z, u, v float64) *Vertex {
 // Clone clones the Vertex.
 func (vertex *Vertex) Clone() *Vertex {
 	newVert := &Vertex{
-		Position:    vector.Vector{vertex.Position[0], vertex.Position[1], vertex.Position[2]},
-		Color:       vertex.Color.Clone(),
-		UV:          vector.Vector{vertex.UV[0], vertex.UV[1]},
-		Weights:     make([]float32, len(vertex.Weights)),
-		transformed: vector.Vector{0, 0, 0},
+		Position:                  vertex.Position.Clone(),
+		UV:                        vertex.UV.Clone(),
+		transformed:               vector.Vector{0, 0, 0},
+		Normal:                    vertex.Normal.Clone(),
+		triangle:                  vertex.triangle,
+		Weights:                   make([]float32, len(vertex.Weights)),
+		ID:                        vertex.ID,
+		VisibleVertexColorChannel: vertex.VisibleVertexColorChannel,
+	}
+
+	for _, color := range vertex.Colors {
+		newVert.Colors = append(newVert.Colors, color.Clone())
 	}
 
 	copy(newVert.Weights, vertex.Weights)
@@ -436,6 +451,18 @@ func calculateNormal(p1, p2, p3 vector.Vector) vector.Vector {
 	cross, _ := v0.Cross(v1)
 	return cross.Unit()
 
+}
+
+// ColorExistsInChannel returns true if the vertex has a color in a channel by the name given, and the Red value
+// is greater than 0.5 (indicating there is some data there / the vertex has been highlighted in some way).
+func (vertex *Vertex) ColorExistsInChannel(channelName string) bool {
+	mesh := vertex.triangle.MeshPart.Mesh
+	if channelIndex, exists := mesh.VertexColorChannelNames[channelName]; exists {
+		if channelIndex < len(vertex.Colors) {
+			return vertex.Colors[channelIndex].R > 0.5
+		}
+	}
+	return false
 }
 
 // MeshPart represents a collection of vertices and triangles, which are all rendered at once, as a single part, with a single material.
@@ -476,12 +503,12 @@ func (part *MeshPart) Clone() *MeshPart {
 }
 
 // SetVertexColor sets the vertex color of all vertices in the Mesh to the color values provided.
-func (part *MeshPart) SetVertexColor(color Color) {
+func (part *MeshPart) SetVertexColor(channel int, color Color) {
 	for _, v := range part.Vertices {
-		v.Color.R = color.R
-		v.Color.G = color.G
-		v.Color.B = color.B
-		v.Color.A = color.A
+		v.Colors[channel].R = color.R
+		v.Colors[channel].G = color.G
+		v.Colors[channel].B = color.B
+		v.Colors[channel].A = color.A
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -18,7 +19,7 @@ import (
 
 type GLTFLoadOptions struct {
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
-	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying)
+	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying, and so may be bypassed here).
 	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
 	// DependentLibraryResolver is a function that takes a relative path (string) to the blend file representing the dependent Library that the loading
 	// Library requires. This function should return a reference to the dependent Library; if it doesn't, the linked objects from the dependent Library
@@ -37,6 +38,7 @@ func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 		CameraWidth:               1920,
 		CameraHeight:              1080,
 		DefaultToAutoTransparency: true,
+		LoadBackfaceCulling:       true,
 	}
 }
 
@@ -82,7 +84,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		Pos        vector.Vector
 		UV         vector.Vector
 		Normal     vector.Vector
-		Color      *Color
+		Colors     [8]*Color
 		WeightData []float32
 		Bones      []uint16
 	}
@@ -223,10 +225,21 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		newMesh.library = library
 
 		if mesh.Extras != nil {
+
 			if dataMap, isMap := mesh.Extras.(map[string]interface{}); isMap {
-				for tagName, data := range dataMap {
-					newMesh.Tags.Set(tagName, data)
+
+				if vcNames, exists := dataMap["t3dVertexColorNames__"]; exists {
+					for index, name := range vcNames.([]interface{}) {
+						newMesh.VertexColorChannelNames[name.(string)] = index
+					}
 				}
+
+				for tagName, data := range dataMap {
+					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
+						newMesh.Tags.Set(tagName, data)
+					}
+				}
+
 			}
 
 		}
@@ -245,9 +258,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			for i, v := range vertPos {
 
 				vertexData[i] = VertexData{
-					Pos:   vector.Vector{float64(v[0]), float64(v[1]), float64(v[2])},
-					Color: NewColor(1, 1, 1, 1),
+					Pos: vector.Vector{float64(v[0]), float64(v[1]), float64(v[2])},
 				}
+
+				vertexData[i].Colors[0] = NewColor(1, 1, 1, 1)
 
 			}
 
@@ -283,26 +297,39 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
-			if vertexColorAccessor, vcExists := v.Attributes[gltf.COLOR_0]; vcExists {
+			// Blender max is 8 vertex color channels
+			for colorChannelIndex := 0; colorChannelIndex < 8; colorChannelIndex++ {
 
-				vcBuffer := [][4]uint16{}
+				colorChannelName := "COLOR_" + strconv.Itoa(colorChannelIndex)
 
-				colors, err := modeler.ReadColor64(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
+				if vertexColorAccessor, vcExists := v.Attributes[colorChannelName]; vcExists {
 
-				if err != nil {
-					return nil, err
-				}
+					vcBuffer := [][4]uint16{}
 
-				for i, v := range colors {
+					colors, err := modeler.ReadColor64(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
 
-					// colors are exported from Blender as linear, but display as sRGB so we'll convert them here
+					if err != nil {
+						return nil, err
+					}
 
-					vertexData[i].Color.R = float32(v[0]) / math.MaxUint16
-					vertexData[i].Color.G = float32(v[1]) / math.MaxUint16
-					vertexData[i].Color.B = float32(v[2]) / math.MaxUint16
-					vertexData[i].Color.A = float32(v[3]) / math.MaxUint16
-					vertexData[i].Color.ConvertTosRGB()
+					for i, v := range colors {
 
+						if vertexData[i].Colors[colorChannelIndex] == nil {
+							vertexData[i].Colors[colorChannelIndex] = NewColor(1, 1, 1, 1)
+						}
+
+						// colors are exported from Blender as linear, but display as sRGB so we'll convert them here
+						color := vertexData[i].Colors[colorChannelIndex]
+						color.R = float32(v[0]) / math.MaxUint16
+						color.G = float32(v[1]) / math.MaxUint16
+						color.B = float32(v[2]) / math.MaxUint16
+						color.A = float32(v[3]) / math.MaxUint16
+						color.ConvertTosRGB()
+
+					}
+
+				} else {
+					break
 				}
 
 			}
@@ -349,7 +376,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			for i := 0; i < len(indices); i++ {
 				vd := vertexData[indices[i]]
 				newVert := NewVertex(vd.Pos[0], vd.Pos[1], vd.Pos[2], vd.UV[0], vd.UV[1])
-				newVert.Color = vd.Color.Clone()
+				for colorIndex, color := range vd.Colors {
+					if len(newVert.Colors) <= colorIndex {
+						newVert.Colors = append(newVert.Colors, color)
+					} else {
+						newVert.Colors[colorIndex] = color
+					}
+				}
 				newVert.Weights = vd.WeightData
 				newVert.Normal = vd.Normal
 				newVerts[i] = newVert
@@ -536,8 +569,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	objects := []INode{}
 
-	defaultLightingEnable := false
-
 	objToNode := map[INode]*gltf.Node{}
 
 	nodeHasProp := func(node *gltf.Node, propName string) bool {
@@ -582,23 +613,22 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			obj = newCam
 
 		} else if lighting := node.Extensions["KHR_lights_punctual"]; lighting != nil {
-			defaultLightingEnable = true
-			// lightspuntual.Unmarshal()
 			lights := doc.Extensions["KHR_lights_punctual"].(lightspuntual.Lights)
 			lightData := lights[lighting.(lightspuntual.LightIndex)]
 
-			if lightData.Type == lightspuntual.TypePoint {
+			if lightData.Type == lightspuntual.TypeDirectional {
+				directionalLight := NewDirectionalLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity)
+				obj = directionalLight
+			} else if lightData.Type == lightspuntual.TypePoint {
 				pointLight := NewPointLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/1000)
 				if !math.IsInf(float64(*lightData.Range), 0) {
 					pointLight.Distance = float64(*lightData.Range)
 				}
 				obj = pointLight
-			} else if lightData.Type == lightspuntual.TypeDirectional {
-				directionalLight := NewDirectionalLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity)
-				directionalLight.Color.Set(lightData.Color[0], lightData.Color[1], lightData.Color[2], 1)
-				obj = directionalLight
 			} else {
-				// Unsupported light type, we'll just ignore
+				// Any unsupported light type just gets turned into an ambient light
+				pointLight := NewAmbientLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/1000)
+				obj = pointLight
 			}
 
 		} else if node.Extras != nil && nodeHasProp(node, "t3dPathPoints__") {
@@ -1015,10 +1045,20 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		scene.library = library
 
-		scene.LightingOn = defaultLightingEnable
-
 		for _, n := range s.Nodes {
 			scene.Root.AddChildren(objects[n])
+		}
+
+		if s.Extras != nil {
+			dataMap := s.Extras.(map[string]interface{})
+			if wc, exists := dataMap["t3dWorldColor__"]; exists {
+				wcc := wc.([]interface{})
+				worldColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1)
+				worldColor.ConvertTosRGB()
+				ambientLight := NewAmbientLight("World Ambient", 1, 1, 1, float32(dataMap["t3dWorldEnergy__"].(float64)))
+				ambientLight.Color = worldColor
+				scene.Root.AddChildren(ambientLight)
+			}
 		}
 
 	}

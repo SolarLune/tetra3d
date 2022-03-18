@@ -20,11 +20,12 @@ type Model struct {
 	BoundingSphere    *BoundingSphere
 	BoundingAABB      *BoundingAABB
 
-	Skinned    bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
-	SkinRoot   INode // The root node of the armature skinning this Model.
-	skinMatrix Matrix4
-	bones      [][]*Node
-	vectorPool *VectorPool
+	Skinned        bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
+	SkinRoot       INode // The root node of the armature skinning this Model.
+	skinMatrix     Matrix4
+	bones          [][]*Node
+	vectorPool     *VectorPool
+	skinVectorPool *VectorPool
 }
 
 var defaultColorBlendingFunc = func(model *Model, meshPart *MeshPart) ebiten.ColorM {
@@ -52,6 +53,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 
 	if mesh != nil {
 		model.vectorPool = NewVectorPool(mesh.TotalVertexCount())
+		model.skinVectorPool = NewVectorPool(mesh.TotalVertexCount())
 	}
 
 	radius := 0.0
@@ -161,6 +163,7 @@ func (model *Model) Merge(models ...*Model) {
 	model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
 
 	model.vectorPool = NewVectorPool(model.Mesh.TotalVertexCount())
+	model.skinVectorPool = NewVectorPool(model.Mesh.TotalVertexCount())
 
 }
 
@@ -219,7 +222,7 @@ func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
 
 	}
 
-	vertOut := model.skinMatrix.MultVecW(vertex.Position)
+	vertOut := model.skinVectorPool.MultVecW(model.skinMatrix, vertex.Position)
 
 	return vertOut
 
@@ -235,7 +238,11 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 		transformFunc = meshPart.Material.VertexProgram
 	}
 
+	interimVertexPosition := vector.Vector{0, 0, 0}
+
 	if model.Skinned {
+
+		model.skinVectorPool.Reset()
 
 		t := time.Now()
 
@@ -278,15 +285,17 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 			tri.depth = math.MaxFloat64
 
 			for _, vert := range tri.Vertices {
-				v := vert.Position
+				interimVertexPosition[0] = vert.Position[0]
+				interimVertexPosition[1] = vert.Position[1]
+				interimVertexPosition[2] = vert.Position[2]
 				if transformFunc != nil {
-					v = transformFunc(v)
-					if v == nil {
+					interimVertexPosition = transformFunc(interimVertexPosition)
+					if interimVertexPosition == nil {
 						tri.visible = false
 						break
 					}
 				}
-				vert.transformed = model.vectorPool.MultVecW(mvp, v)
+				vert.transformed = model.vectorPool.MultVecW(mvp, interimVertexPosition)
 
 				if vert.transformed[3] < tri.depth {
 					tri.depth = vert.transformed[3]

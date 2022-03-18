@@ -94,6 +94,9 @@
             "extensions" : {
                 "KHR_materials_unlit" : {}
             },
+            "extras" : {
+                "t3dMaterialShadeless__" : 1
+            },
             "name" : "Material",
             "pbrMetallicRoughness" : {
                 "metallicFactor" : 0,
@@ -103,6 +106,11 @@
     ],
     "meshes" : [
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube.003",
             "primitives" : [
                 {
@@ -118,6 +126,11 @@
             ]
         },
         {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Plane.001",
             "primitives" : [
                 {

@@ -746,11 +746,19 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				// Vertex colors
 
-				vertexList[index].ColorR = vert.Color.R
-				vertexList[index].ColorG = vert.Color.G
-				vertexList[index].ColorB = vert.Color.B
-
-				vertexList[index].ColorA = vert.Color.A
+				// TODO: This slows down the stress test from ~25FPS to ~20FPS, so it would be good to get rid of this somehow, though the upside
+				// is the ability to color different vertices as necessary
+				if vert.VisibleVertexColorChannel >= 0 {
+					vertexList[index].ColorR = vert.Colors[vert.VisibleVertexColorChannel].R
+					vertexList[index].ColorG = vert.Colors[vert.VisibleVertexColorChannel].G
+					vertexList[index].ColorB = vert.Colors[vert.VisibleVertexColorChannel].B
+					vertexList[index].ColorA = vert.Colors[vert.VisibleVertexColorChannel].A
+				} else {
+					vertexList[index].ColorR = 1
+					vertexList[index].ColorG = 1
+					vertexList[index].ColorB = 1
+					vertexList[index].ColorA = 1
+				}
 
 				index++
 

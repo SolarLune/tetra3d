@@ -278,10 +278,10 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 				vert := NewVertex(x, y, z, u, v)
 
-				vert.Color.R = r
-				vert.Color.G = g
-				vert.Color.B = b
-				vert.Color.A = a
+				vert.Colors[0].R = r
+				vert.Colors[0].G = g
+				vert.Colors[0].B = b
+				vert.Colors[0].A = a
 
 				verts = append(verts, vert)
 

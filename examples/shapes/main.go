@@ -66,14 +66,11 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	mat := library.Materials["OutdoorStuff"]
-	fmt.Println(mat.Name, mat.Texture, mat.TexturePath)
-
 	g.Scene = library.FindScene("Scene")
 
 	// Cameras are loaded from the GLTF file. By default, there's a correction so that they point in the correct direction
 	// when compared with Blender.
-	g.Camera = g.Scene.Root.Get("Camera").(tetra3d.INode)
+	g.Camera = g.Scene.Root.Get("Camera")
 
 	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
 	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
