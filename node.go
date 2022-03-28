@@ -104,6 +104,8 @@ type INode interface {
 	// IsRootBone() bool
 
 	AnimationPlayer() *AnimationPlayer
+
+	setOriginalLocalPosition(vector.Vector)
 }
 
 // Tags is an unordered set of string tags to values, representing a means of identifying Nodes or carrying data on Nodes.
@@ -209,22 +211,23 @@ func (tags *Tags) GetAsInt(tagName string) int {
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
 // into their structs to automatically easily implement Node.
 type Node struct {
-	name              string
-	position          vector.Vector
-	scale             vector.Vector
-	rotation          Matrix4
-	visible           bool
-	data              interface{} // A place to store a pointer to something if you need it
-	children          []INode
-	parent            INode
-	cachedTransform   Matrix4
-	isTransformDirty  bool
-	tags              *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
-	animationPlayer   *AnimationPlayer
-	inverseBindMatrix Matrix4 // Specifically for bones in an armature used for animating skinned meshes
-	isBone            bool
-	library           *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
-	scene             *Scene
+	name                  string
+	position              vector.Vector
+	scale                 vector.Vector
+	rotation              Matrix4
+	originalLocalPosition vector.Vector
+	visible               bool
+	data                  interface{} // A place to store a pointer to something if you need it
+	children              []INode
+	parent                INode
+	cachedTransform       Matrix4
+	isTransformDirty      bool
+	tags                  *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
+	animationPlayer       *AnimationPlayer
+	inverseBindMatrix     Matrix4 // Specifically for bones in an armature used for animating skinned meshes
+	isBone                bool
+	library               *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
+	scene                 *Scene
 }
 
 // NewNode returns a new Node.
@@ -240,12 +243,17 @@ func NewNode(name string) *Node {
 		isTransformDirty: true,
 		tags:             NewTags(),
 		// We set this just in case we call a transform property getter before setting it and caching anything
-		cachedTransform: NewMatrix4(),
+		cachedTransform:       NewMatrix4(),
+		originalLocalPosition: vector.Vector{0, 0, 0},
 	}
 
 	nb.animationPlayer = NewAnimationPlayer(nb)
 
 	return nb
+}
+
+func (node *Node) setOriginalLocalPosition(position vector.Vector) {
+	node.originalLocalPosition = position
 }
 
 // Name returns the object's name.
@@ -649,13 +657,13 @@ func (node *Node) Unparent() {
 
 // Children() returns the Node's children.
 func (node *Node) Children() NodeFilter {
-	return newNodeFilter(node.children...)
+	return append(make(NodeFilter, 0, len(node.children)), node.children...)
 }
 
 func (node *Node) ChildrenRecursive() NodeFilter {
-	out := newNodeFilter()
+	out := node.Children()
+
 	for _, child := range node.children {
-		out = append(out, child)
 		out = append(out, child.ChildrenRecursive()...)
 	}
 	return out
@@ -715,19 +723,15 @@ func (node *Node) HierarchyAsString() string {
 		}
 
 		str := ""
-		if level == 0 {
-			str = "-: [+] " + node.Name() + "\n"
-		} else {
 
-			for i := 0; i < level; i++ {
-				str += "    "
-			}
-
-			wp := node.LocalPosition()
-			wpStr := "[" + strconv.FormatFloat(wp[0], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[1], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[2], 'f', -1, 64) + "]"
-
-			str += "\\-: [" + prefix + "] " + node.Name() + " : " + wpStr + "\n"
+		for i := 0; i < level; i++ {
+			str += "    "
 		}
+
+		wp := node.LocalPosition()
+		wpStr := "[" + strconv.FormatFloat(wp[0], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[1], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[2], 'f', -1, 64) + "]"
+
+		str += "\\-: [" + prefix + "] " + node.Name() + " : " + wpStr + "\n"
 
 		for _, child := range node.Children() {
 			str += printNode(child, level+1)

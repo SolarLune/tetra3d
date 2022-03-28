@@ -239,6 +239,11 @@ type AnimationPlayer struct {
 	prevAnimatedProperties map[INode]*AnimationValues                // The previous properties that have been animated from the previously Play()'d animation
 	BlendTime              float64                                   // How much time in seconds to blend between two animations
 	blendStart             time.Time                                 // The time that the blend started
+	// If the AnimationPlayer should play the last frame or not. For example, if you have an animation that starts on frame 1 and goes to frame 10,
+	// then if PlayLastFrame is on, it will play all frames, INCLUDING frame 10, and only then repeat (if it's set to repeat).
+	// Otherwise, it will only play frames 1 - 9, which can be good if your last frame is a repeat of the first to make a cyclical animation.
+	// The default for PlayLastFrame is false.
+	PlayLastFrame bool
 }
 
 // NewAnimationPlayer returns a new AnimationPlayer for the Node.
@@ -249,6 +254,7 @@ func NewAnimationPlayer(node INode) *AnimationPlayer {
 		FinishMode:             FinishModeLoop,
 		AnimatedProperties:     map[INode]*AnimationValues{},
 		prevAnimatedProperties: map[INode]*AnimationValues{},
+		PlayLastFrame:          false,
 	}
 }
 
@@ -268,6 +274,7 @@ func (ap *AnimationPlayer) Clone() *AnimationPlayer {
 	newAP.FinishMode = ap.FinishMode
 	newAP.OnFinish = ap.OnFinish
 	newAP.Playing = ap.Playing
+	newAP.PlayLastFrame = ap.PlayLastFrame
 	return newAP
 }
 
@@ -391,18 +398,24 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 			ap.Playhead += dt * ap.PlaySpeed
 
 			for _, marker := range ap.Animation.Markers {
-				if ap.Playhead >= marker.Time && prevPlayhead < marker.Time && ap.OnMarkerTouch != nil {
+				if ap.Playhead >= marker.Time && prevPlayhead <= marker.Time && ap.OnMarkerTouch != nil {
 					ap.OnMarkerTouch(marker, ap.Animation)
 				}
 			}
 
-			if ap.FinishMode == FinishModeLoop && (ap.Playhead >= ap.Animation.Length || ap.Playhead < 0) {
+			ph := ap.Playhead
 
-				for ap.Playhead > ap.Animation.Length {
+			if !ap.PlayLastFrame {
+				ph += dt * ap.PlaySpeed
+			}
+
+			if ap.FinishMode == FinishModeLoop && (ph >= ap.Animation.Length || ph < 0) {
+
+				if ph > ap.Animation.Length {
 					ap.Playhead -= ap.Animation.Length
 				}
 
-				for ap.Playhead < 0 {
+				if ph < 0 {
 					ap.Playhead += ap.Animation.Length
 				}
 
@@ -410,14 +423,14 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 					ap.OnFinish()
 				}
 
-			} else if ap.FinishMode == FinishModePingPong && (ap.Playhead > ap.Animation.Length || ap.Playhead < 0) {
+			} else if ap.FinishMode == FinishModePingPong && (ph > ap.Animation.Length || ph < 0) {
 
-				for ap.Playhead > ap.Animation.Length {
-					ap.Playhead -= ap.Playhead - ap.Animation.Length
+				if ph > ap.Animation.Length {
+					ap.Playhead -= ph - ap.Animation.Length
 				}
 
 				finishedLoop := false
-				for ap.Playhead < 0 {
+				if ph < 0 {
 					ap.Playhead *= -1
 					finishedLoop = true
 				}
@@ -428,11 +441,11 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 				ap.PlaySpeed *= -1
 
-			} else if ap.FinishMode == FinishModeStop && ((ap.Playhead > ap.Animation.Length && ap.PlaySpeed > 0) || (ap.Playhead < 0 && ap.PlaySpeed < 0)) {
+			} else if ap.FinishMode == FinishModeStop && ((ph > ap.Animation.Length && ap.PlaySpeed > 0) || (ph < 0 && ap.PlaySpeed < 0)) {
 
-				if ap.Playhead > ap.Animation.Length {
+				if ph > ap.Animation.Length {
 					ap.Playhead = ap.Animation.Length
-				} else if ap.Playhead < 0 {
+				} else if ph < 0 {
 					ap.Playhead = 0
 				}
 

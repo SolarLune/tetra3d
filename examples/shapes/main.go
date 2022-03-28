@@ -166,7 +166,7 @@ func (g *Game) Update() error {
 			fmt.Println(err)
 		}
 		defer f.Close()
-		png.Encode(f, camera.ColorTexture)
+		png.Encode(f, camera.ColorTexture())
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyR) {
@@ -207,14 +207,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	opt := &ebiten.DrawImageOptions{}
-	w, h := camera.ColorTexture.Size()
+	w, h := camera.ColorTexture().Size()
 
 	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
 	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
-		screen.DrawImage(camera.DepthTexture, opt)
+		screen.DrawImage(camera.DepthTexture(), opt)
 	} else {
-		screen.DrawImage(camera.ColorTexture, opt)
+		screen.DrawImage(camera.ColorTexture(), opt)
 	}
 
 	if g.DrawDebugText {

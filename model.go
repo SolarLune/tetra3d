@@ -58,7 +58,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 
 	radius := 0.0
 	if mesh != nil {
-		radius = mesh.Dimensions.Max() / 2
+		radius = mesh.Dimensions.MaxSpan() / 2
 	}
 	model.BoundingSphere = NewBoundingSphere("bounding sphere", radius)
 
@@ -85,14 +85,37 @@ func (model *Model) Clone() INode {
 		child.setParent(newModel)
 	}
 
+	newModel.originalLocalPosition = model.originalLocalPosition.Clone()
+
 	return newModel
 
 }
 
 func (model *Model) Transform() Matrix4 {
 
-	model.BoundingSphere.SetLocalPosition(model.WorldPosition().Add(model.Mesh.Dimensions.Center()))
-	model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
+	if model.isTransformDirty {
+
+		wp := model.WorldPosition()
+
+		// Skinned models have their positions at 0, 0, 0, and vertices offset according to wherever they were when exported.
+		// To combat this, we save the original local positions of the mesh on export to position the bounding sphere in the
+		// correct location.
+		if model.SkinRoot != nil && model.Skinned {
+			wp[0] -= model.originalLocalPosition[0]
+			wp[1] -= model.originalLocalPosition[1]
+			wp[2] -= model.originalLocalPosition[2]
+			model.BoundingSphere.SetLocalPosition(wp)
+		} else {
+			center := model.Mesh.Dimensions.Center()
+			wp[0] += center[0]
+			wp[1] += center[1]
+			wp[2] += center[2]
+			model.BoundingSphere.SetLocalPosition(wp)
+		}
+
+	}
+
+	model.BoundingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
 
 	return model.Node.Transform()
 
@@ -105,6 +128,10 @@ func (model *Model) Transform() Matrix4 {
 func (model *Model) Merge(models ...*Model) {
 
 	for _, other := range models {
+
+		if model == other {
+			continue
+		}
 
 		p, s, r := model.Transform().Decompose()
 		op, os, or := other.Transform().Decompose()
@@ -160,7 +187,7 @@ func (model *Model) Merge(models ...*Model) {
 	model.Mesh.UpdateBounds()
 
 	model.BoundingSphere.SetLocalPosition(model.Mesh.Dimensions.Center())
-	model.BoundingSphere.Radius = model.Mesh.Dimensions.Max() / 2
+	model.BoundingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
 
 	model.vectorPool = NewVectorPool(model.Mesh.TotalVertexCount())
 	model.skinVectorPool = NewVectorPool(model.Mesh.TotalVertexCount())
@@ -307,7 +334,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 	}
 
-	sortMode := TriangleSortBackToFront
+	sortMode := TriangleSortModeBackToFront
 
 	if meshPart.Material != nil {
 		sortMode = meshPart.Material.TriangleSortMode
@@ -315,11 +342,11 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 	// Preliminary tests indicate sort.SliceStable is faster than sort.Slice for our purposes
 
-	if sortMode == TriangleSortBackToFront {
+	if sortMode == TriangleSortModeBackToFront {
 		sort.SliceStable(meshPart.sortedTriangles, func(i, j int) bool {
 			return meshPart.sortedTriangles[i].depth > meshPart.sortedTriangles[j].depth
 		})
-	} else if sortMode == TriangleSortFrontToBack {
+	} else if sortMode == TriangleSortModeFrontToBack {
 		sort.SliceStable(meshPart.sortedTriangles, func(i, j int) bool {
 			return meshPart.sortedTriangles[i].depth < meshPart.sortedTriangles[j].depth
 		})
@@ -334,7 +361,7 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 // MeshParts into either transparent or opaque buckets for rendering.
 func (model *Model) isTransparent(meshPart *MeshPart) bool {
 	mat := meshPart.Material
-	return mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || (mat.TransparencyMode == TransparencyModeAuto && (mat.Color.A < 0.99 || model.Color.A < 0.99)))
+	return mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || mat.CompositeMode != ebiten.CompositeModeSourceOver || (mat.TransparencyMode == TransparencyModeAuto && (mat.Color.A < 0.99 || model.Color.A < 0.99)))
 }
 
 ////////

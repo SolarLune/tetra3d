@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"image/color"
@@ -24,32 +25,31 @@ import (
 
 type Game struct {
 	Width, Height int
-	Library       *tetra3d.Library
 	Scene         *tetra3d.Scene
 
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
 	CameraRotate float64
 
-	PathFollower *tetra3d.PathFollower
-	AutoAdvance  bool
+	DrawDebugText     bool
+	DrawDebugDepth    bool
+	PrevMousePosition vector.Vector
 
-	DrawDebugText      bool
-	DrawDebugDepth     bool
-	DrawDebugWireframe bool
-	PrevMousePosition  vector.Vector
+	BG *ebiten.Image
 }
 
-//go:embed paths.gltf
-var libraryData []byte
+//go:embed alpha-ordering.gltf
+var alphaOrdering []byte
+
+//go:embed bg.png
+var bgPng []byte
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             796,
-		Height:            448,
+		Width:             398 * 2,
+		Height:            224 * 2,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
-		AutoAdvance:       true,
 	}
 
 	game.Init()
@@ -58,26 +58,29 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
-
-	library, err := tetra3d.LoadGLTFData(libraryData, nil)
+	data, err := tetra3d.LoadGLTFData(alphaOrdering, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	g.Library = library
+	g.Scene = data.Scenes[0]
 
-	// We clone the scene so we have an original to work from
-	g.Scene = library.ExportedScene.Clone()
+	br := bytes.NewReader(bgPng)
+	img, err := png.Decode(br)
+	if err != nil {
+		panic(err)
+	}
+	g.BG = ebiten.NewImageFromImage(img)
+
+	// This is another way to do it
+	// screen := g.Scene.Root.Get("Screen").(*tetra3d.Model)
+	// screen.Mesh.FindMeshPartByMaterialName("ScreenTexture").Material.Image = g.Offscreen
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 5})
 	g.Scene.Root.AddChildren(g.Camera)
 
-	g.PathFollower = tetra3d.NewPathFollower(g.Scene.Root.Get("Path").(*tetra3d.Path))
-
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	fmt.Println(g.Scene.Root.HierarchyAsString())
 
 }
 
@@ -125,23 +128,6 @@ func (g *Game) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
-		g.PathFollower.AdvanceDistance(1)
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
-		g.PathFollower.AdvanceDistance(-1)
-	}
-
-	if g.AutoAdvance {
-		g.PathFollower.AdvancePercentage(0.01) // Advance one percent of the path per-frame
-	}
-
-	cube := g.Scene.Root.Get("Cube")
-	cube.SetWorldPosition(g.PathFollower.WorldPosition())
-
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.AutoAdvance = !g.AutoAdvance
-	}
-
 	// Rotating the camera with the mouse
 
 	// Rotate and tilt the camera according to mouse movements
@@ -185,10 +171,6 @@ func (g *Game) Update() error {
 		g.DrawDebugText = !g.DrawDebugText
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.DrawDebugWireframe = !g.DrawDebugWireframe
-	}
-
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
@@ -197,19 +179,24 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	// Clear, but with a color
-	screen.Fill(color.RGBA{60, 70, 80, 255})
+
+	screen.Clear()
+
+	// Draw BG
+	opt := &ebiten.DrawImageOptions{}
+	w, h := g.BG.Size()
+	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
+	screen.DrawImage(g.BG, opt)
 
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the logo first
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
-	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture().Size()
+	opt = &ebiten.DrawImageOptions{}
+	w, h = g.Camera.ColorTexture().Size()
 	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
 		screen.DrawImage(g.Camera.DepthTexture(), opt)
@@ -219,14 +206,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how paths work.\nThe cube will follow the path (which is invisible,\nas it is made up of Nodes).\n1 key: Toggle running through path\nLeft, Right keys: Step 1 unit forward or\nback through the path\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis demo shows how composite modes work.\nThe blue plane is opaque.\nThe red one is additive.\nThe green one is transparent.\nThe closest plane cuts out all objects to show the background.\n\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
 	}
-
-	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Gray())
-	}
-
 }
 
 func (g *Game) StartProfiling() {

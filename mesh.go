@@ -12,10 +12,15 @@ import (
 // Dimensions represents the minimum and maximum spatial dimensions of a Mesh arranged in a 2-space Vector slice.
 type Dimensions []vector.Vector
 
-// Max returns the maximum value from all of the axes in the Dimensions. For example, if the Dimensions have a min of [-1, -2, -2],
+// MaxDimension returns the maximum value from all of the axes in the Dimensions. For example, if the Dimensions have a min of [-1, -2, -2],
 // and a max of [6, 1.5, 1], Max() will return 7, as it's the largest distance between all axes.
-func (dim Dimensions) Max() float64 {
+func (dim Dimensions) MaxDimension() float64 {
 	return math.Max(math.Max(dim.Width(), dim.Height()), dim.Depth())
+}
+
+// MaxSpan returns the maximum span between the corners of the dimension set.
+func (dim Dimensions) MaxSpan() float64 {
+	return dim[1].Sub(dim[0]).Magnitude()
 }
 
 // Center returns the center point inbetween the two corners of the dimension set.
@@ -386,7 +391,7 @@ func (tri *Triangle) RecalculateCenter() {
 
 	}
 
-	tri.MaxSpan = dim.Max()
+	tri.MaxSpan = dim.MaxSpan()
 
 }
 
@@ -413,18 +418,24 @@ type Vertex struct {
 
 // NewVertex creates a new Vertex with the provided position (x, y, z) and UV values (u, v).
 func NewVertex(x, y, z, u, v float64) *Vertex {
-	return &Vertex{
+	vertex := &Vertex{
 		Position:    vector.Vector{x, y, z},
-		Colors:      []*Color{NewColor(1, 1, 1, 1)},
+		Colors:      make([]*Color, 0, 8),
 		UV:          vector.Vector{u, v},
 		transformed: vector.Vector{0, 0, 0},
 	}
+
+	vertex.Colors = append(vertex.Colors, NewColor(1, 1, 1, 1))
+
+	return vertex
+
 }
 
 // Clone clones the Vertex.
 func (vertex *Vertex) Clone() *Vertex {
 	newVert := &Vertex{
 		Position:                  vertex.Position.Clone(),
+		Colors:                    make([]*Color, 0, len(vertex.Colors)),
 		UV:                        vertex.UV.Clone(),
 		transformed:               vector.Vector{0, 0, 0},
 		Normal:                    vertex.Normal.Clone(),

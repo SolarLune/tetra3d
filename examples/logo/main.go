@@ -152,7 +152,7 @@ func (g *Game) Update() error {
 			fmt.Println(err)
 		}
 		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture)
+		png.Encode(f, g.Camera.ColorTexture())
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyR) {
@@ -186,7 +186,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Clear the Offscreen, then draw the camera's color texture output to it as well.
 	g.Offscreen.Fill(color.Black)
-	g.Offscreen.DrawImage(g.Camera.ColorTexture, nil)
+	g.Offscreen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("Screen"))
@@ -194,12 +194,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
 	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture.Size()
+	w, h := g.Camera.ColorTexture().Size()
 	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture, opt)
+		screen.DrawImage(g.Camera.DepthTexture(), opt)
 	} else {
-		screen.DrawImage(g.Camera.ColorTexture, opt)
+		screen.DrawImage(g.Camera.ColorTexture(), opt)
 	}
 
 	if g.DrawDebugText {

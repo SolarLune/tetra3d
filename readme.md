@@ -288,6 +288,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
 - [x] -- Collection / group substitution
 - [ ] -- -- Overwriting properties through collection instance 
+- [ ] -- Optional camera size export
 - [x] -- Linking collections from external files
 - [x] -- Material data export
 - [x] -- Option to pack textures or leave them as a path

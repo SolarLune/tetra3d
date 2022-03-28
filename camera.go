@@ -31,30 +31,52 @@ type DebugInfo struct {
 	ActiveLightCount int // Total active number of lights
 }
 
+const (
+	AccumlateColorModeNone            = iota // No accumulation buffer rendering
+	AccumlateColorModeBelow                  // Accumulation buffer is on and applies over time, renders ColorTexture after the accumulation result (which is, then, below)
+	AccumlateColorModeAbove                  // Accumulation buffer is on and applies over time, renders ColorTexture before the accumulation result (which is on top)
+	AccumlateColorModeSingleLastFrame        // Accumulation buffer is on and renders just the previous frame's ColorTexture result
+)
+
 // Camera represents a camera (where you look from) in Tetra3D.
 type Camera struct {
 	*Node
-	ColorTexture          *ebiten.Image // ColorTexture holds the color results of rendering any models.
-	DepthTexture          *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
-	ColorIntermediate     *ebiten.Image
-	DepthIntermediate     *ebiten.Image
-	ClipAlphaIntermediate *ebiten.Image
 
 	RenderDepth bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture will hold the depth texture render results.
 
-	DepthShader              *ebiten.Shader
-	ClipAlphaCompositeShader *ebiten.Shader
-	ClipAlphaRenderShader    *ebiten.Shader
-	ColorShader              *ebiten.Shader
-	Near, Far                float64 // The near and far clipping plane.
-	Perspective              bool    // If the Camera has a perspective projection. If not, it would be orthographic
-	FieldOfView              float64 // Vertical field of view in degrees for a perspective projection camera
-	OrthoScale               float64 // Scale of the view for an orthographic projection camera in units horizontally
+	resultColorTexture    *ebiten.Image // ColorTexture holds the color results of rendering any models.
+	resultDepthTexture    *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
+	colorIntermediate     *ebiten.Image
+	depthIntermediate     *ebiten.Image
+	clipAlphaIntermediate *ebiten.Image
+	clipBehind            *ebiten.Image
+
+	resultAccumulatedColorTexture *ebiten.Image // ResultAccumulatedColorTexture holds the previous frame's render result of rendering any models.
+	accumulatedBackBuffer         *ebiten.Image
+	AccumulateColorMode           int                      // The mode to use when rendering previous frames to the accumulation buffer. Defaults to AccumulateColorModeNone.
+	AccumulateDrawOptions         *ebiten.DrawImageOptions // Draw image options to use when rendering frames to the accumulation buffer; use this to fade out or color previous frames.
+
+	Near, Far   float64 // The near and far clipping plane.
+	Perspective bool    // If the Camera has a perspective projection. If not, it would be orthographic
+	FieldOfView float64 // Vertical field of view in degrees for a perspective projection camera
+	OrthoScale  float64 // Scale of the view for an orthographic projection camera in units horizontally
 
 	DebugInfo DebugInfo
 
-	FrustumSphere *BoundingSphere
-	backfacePool  *VectorPool
+	backfacePool             *VectorPool
+	depthShader              *ebiten.Shader
+	clipAlphaCompositeShader *ebiten.Shader
+	clipAlphaRenderShader    *ebiten.Shader
+	colorShader              *ebiten.Shader
+
+	// Visibility check variables
+	cameraForward          vector.Vector
+	cameraRight            vector.Vector
+	cameraUp               vector.Vector
+	sphereFactorY          float64
+	sphereFactorX          float64
+	sphereFactorTang       float64
+	sphereFactorCalculated bool
 }
 
 // NewCamera creates a new Camera with the specified width and height.
@@ -66,8 +88,8 @@ func NewCamera(w, h int) *Camera {
 		Near:        0.1,
 		Far:         100,
 
-		FrustumSphere: NewBoundingSphere("camera frustum sphere", 0),
-		backfacePool:  NewVectorPool(3),
+		backfacePool:          NewVectorPool(3),
+		AccumulateDrawOptions: &ebiten.DrawImageOptions{},
 	}
 
 	depthShaderText := []byte(
@@ -101,13 +123,13 @@ func NewCamera(w, h int) *Camera {
 
 	var err error
 
-	cam.DepthShader, err = ebiten.NewShader(depthShaderText)
+	cam.depthShader, err = ebiten.NewShader(depthShaderText)
 
 	if err != nil {
 		panic(err)
 	}
 
-	clipRenderText := []byte(
+	clipAlphaShaderText := []byte(
 		`package main
 
 		func encodeDepth(depth float) vec4 {
@@ -128,7 +150,7 @@ func NewCamera(w, h int) *Camera {
 		`,
 	)
 
-	cam.ClipAlphaRenderShader, err = ebiten.NewShader(clipRenderText)
+	cam.clipAlphaRenderShader, err = ebiten.NewShader(clipAlphaShaderText)
 
 	if err != nil {
 		panic(err)
@@ -157,7 +179,7 @@ func NewCamera(w, h int) *Camera {
 		`,
 	)
 
-	cam.ClipAlphaCompositeShader, err = ebiten.NewShader(clipCompositeShaderText)
+	cam.clipAlphaCompositeShader, err = ebiten.NewShader(clipCompositeShaderText)
 
 	if err != nil {
 		panic(err)
@@ -193,6 +215,7 @@ func NewCamera(w, h int) *Camera {
 				return colorTex
 			}
 
+			// This should be discard as well, rather than alpha 0
 			return vec4(0.0, 0.0, 0.0, 0.0)
 
 		}
@@ -200,7 +223,7 @@ func NewCamera(w, h int) *Camera {
 		`,
 	)
 
-	cam.ColorShader, err = ebiten.NewShader(colorShaderText)
+	cam.colorShader, err = ebiten.NewShader(colorShaderText)
 
 	if err != nil {
 		panic(err)
@@ -217,7 +240,7 @@ func NewCamera(w, h int) *Camera {
 
 func (camera *Camera) Clone() INode {
 
-	w, h := camera.ColorTexture.Size()
+	w, h := camera.resultColorTexture.Size()
 	clone := NewCamera(w, h)
 
 	clone.RenderDepth = camera.RenderDepth
@@ -225,6 +248,9 @@ func (camera *Camera) Clone() INode {
 	clone.Far = camera.Far
 	clone.Perspective = camera.Perspective
 	clone.FieldOfView = camera.FieldOfView
+
+	clone.AccumulateColorMode = camera.AccumulateColorMode
+	clone.AccumulateDrawOptions = camera.AccumulateDrawOptions
 
 	clone.Node = camera.Node.Clone().(*Node)
 	for _, child := range camera.children {
@@ -237,19 +263,32 @@ func (camera *Camera) Clone() INode {
 
 func (camera *Camera) Resize(w, h int) {
 
-	if camera.ColorTexture != nil {
-		camera.ColorTexture.Dispose()
-		camera.DepthTexture.Dispose()
-		camera.ColorIntermediate.Dispose()
-		camera.DepthIntermediate.Dispose()
-		camera.ClipAlphaIntermediate.Dispose()
+	if camera.resultColorTexture != nil {
+
+		origW, origH := camera.resultColorTexture.Size()
+		if w == origW && h == origH {
+			return
+		}
+
+		camera.resultColorTexture.Dispose()
+		camera.resultAccumulatedColorTexture.Dispose()
+		camera.accumulatedBackBuffer.Dispose()
+		camera.resultDepthTexture.Dispose()
+		camera.colorIntermediate.Dispose()
+		camera.depthIntermediate.Dispose()
+		camera.clipAlphaIntermediate.Dispose()
+		camera.clipBehind.Dispose()
 	}
 
-	camera.ColorTexture = ebiten.NewImage(w, h)
-	camera.DepthTexture = ebiten.NewImage(w, h)
-	camera.ColorIntermediate = ebiten.NewImage(w, h)
-	camera.DepthIntermediate = ebiten.NewImage(w, h)
-	camera.ClipAlphaIntermediate = ebiten.NewImage(w, h)
+	camera.resultAccumulatedColorTexture = ebiten.NewImage(w, h)
+	camera.accumulatedBackBuffer = ebiten.NewImage(w, h)
+	camera.resultColorTexture = ebiten.NewImage(w, h)
+	camera.resultDepthTexture = ebiten.NewImage(w, h)
+	camera.colorIntermediate = ebiten.NewImage(w, h)
+	camera.depthIntermediate = ebiten.NewImage(w, h)
+	camera.clipAlphaIntermediate = ebiten.NewImage(w, h)
+	camera.clipBehind = ebiten.NewImage(w, h)
+	camera.sphereFactorCalculated = false
 
 }
 
@@ -267,10 +306,19 @@ func (camera *Camera) ViewMatrix() Matrix4 {
 
 // Projection returns the Camera's projection matrix.
 func (camera *Camera) Projection() Matrix4 {
-	if camera.Perspective {
-		return NewProjectionPerspective(camera.FieldOfView, camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx()), float64(camera.ColorTexture.Bounds().Dy()))
+
+	if !camera.sphereFactorCalculated {
+		angle := camera.FieldOfView * 3.1415 / 360
+		camera.sphereFactorTang = math.Tan(angle)
+		camera.sphereFactorY = 1.0 / math.Cos(angle)
+		camera.sphereFactorX = 1.0 / math.Cos(math.Atan(camera.sphereFactorTang*camera.AspectRatio()))
+		camera.sphereFactorCalculated = true
 	}
-	w, h := camera.ColorTexture.Size()
+
+	if camera.Perspective {
+		return NewProjectionPerspective(camera.FieldOfView, camera.Near, camera.Far, float64(camera.resultColorTexture.Bounds().Dx()), float64(camera.resultColorTexture.Bounds().Dy()))
+	}
+	w, h := camera.resultColorTexture.Size()
 	asr := float64(h) / float64(w)
 
 	return NewProjectionOrthographic(camera.Near, camera.Far, 1*camera.OrthoScale, -1*camera.OrthoScale, asr*camera.OrthoScale, -asr*camera.OrthoScale)
@@ -281,12 +329,14 @@ func (camera *Camera) Projection() Matrix4 {
 func (camera *Camera) SetPerspective(fovY float64) {
 	camera.FieldOfView = fovY
 	camera.Perspective = true
+	camera.sphereFactorCalculated = false
 }
 
 // SetOrthographic sets the Camera's projection to be an orthographic projection. orthoScale indicates the scale of the camera in units horizontally.
 func (camera *Camera) SetOrthographic(orthoScale float64) {
 	camera.Perspective = false
 	camera.OrthoScale = orthoScale
+	camera.sphereFactorCalculated = false
 }
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
@@ -309,8 +359,8 @@ func (camera *Camera) clipToScreen(vert, outVec vector.Vector, mat *Material, wi
 
 	outVec[0] = (vert[0]/v3)*width + (width / 2)
 	outVec[1] = (vert[1]/v3*-1)*height + (height / 2)
-	outVec[2] = vert[2]
-	outVec[3] = vert[3]
+	outVec[2] = vert[2] / v3
+	outVec[3] = 1
 
 	if mat != nil && mat.ClipProgram != nil {
 		outVec = mat.ClipProgram(outVec)
@@ -322,7 +372,7 @@ func (camera *Camera) clipToScreen(vert, outVec vector.Vector, mat *Material, wi
 
 // ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
 func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
-	width, height := camera.ColorTexture.Size()
+	width, height := camera.resultColorTexture.Size()
 	return camera.clipToScreen(vert, vector.Vector{0, 0, 0, 0}, nil, float64(width), float64(height))
 }
 
@@ -338,11 +388,144 @@ func (camera *Camera) WorldToClip(vert vector.Vector) vector.Vector {
 	return v.MultVecW(vector.Vector{0, 0, 0})
 }
 
-// Clear should be called at the beginning of a single rendered frame. It clears the backing textures before rendering.
+// PointInFrustum returns true if the point is visible through the camera frustum.
+func (camera *Camera) PointInFrustum(point vector.Vector) bool {
+
+	diff := fastVectorSub(point, camera.WorldPosition())
+	pcZ := diff.Dot(camera.cameraForward)
+	aspectRatio := camera.AspectRatio()
+
+	if pcZ > camera.Far || pcZ < camera.Near {
+		return false
+	}
+
+	if camera.Perspective {
+
+		h := pcZ * math.Tan(camera.FieldOfView/2)
+
+		pcY := diff.Dot(camera.cameraUp)
+
+		if -h > pcY || pcY > h {
+			return false
+		}
+
+		w := h * aspectRatio
+
+		pcX := diff.Dot(camera.cameraRight)
+
+		if -w > pcX || pcX > w {
+			return false
+		}
+
+	} else {
+
+		width := camera.OrthoScale / 2
+		height := width / camera.AspectRatio()
+
+		pcY := diff.Dot(camera.cameraUp)
+
+		if -height > pcY || pcY > height {
+			return false
+		}
+
+		pcX := diff.Dot(camera.cameraRight)
+
+		if -width > pcX || pcX > width {
+			return false
+		}
+
+	}
+
+	return true
+
+}
+
+// SphereInFrustum returns true if the sphere would be visible through the camera frustum.
+func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
+
+	radius := sphere.WorldRadius()
+
+	diff := fastVectorSub(sphere.WorldPosition(), camera.WorldPosition())
+	pcZ := diff.Dot(camera.cameraForward)
+
+	if pcZ > camera.Far+radius || pcZ < camera.Near-radius {
+		return false
+	}
+
+	if camera.Perspective {
+
+		d := camera.sphereFactorY * radius
+		pcZ *= camera.sphereFactorTang
+
+		pcY := diff.Dot(camera.cameraUp)
+
+		if pcY > pcZ+d || pcY < -pcZ-d {
+			return false
+		}
+
+		pcZ *= camera.AspectRatio()
+		d = camera.sphereFactorX * radius
+
+		pcX := diff.Dot(camera.cameraRight)
+
+		if pcX > pcZ+d || pcX < -pcZ-d {
+			return false
+		}
+
+	} else {
+
+		width := camera.OrthoScale
+		height := width / camera.AspectRatio()
+
+		pcY := diff.Dot(camera.cameraUp)
+
+		if -height/2-radius > pcY || pcY > height/2+radius {
+			return false
+		}
+
+		pcX := diff.Dot(camera.cameraRight)
+
+		if -width/2-radius > pcX || pcX > width/2+radius {
+			return false
+		}
+
+	}
+
+	return true
+
+}
+
+// AspectRatio returns the camera's aspect ratio (width / height).
+func (camera *Camera) AspectRatio() float64 {
+	w, h := camera.resultColorTexture.Size()
+	return float64(w) / float64(h)
+}
+
+// Clear should be called at the beginning of a single rendered frame and clears the Camera's backing textures before rendering.
+// It also resets the debug values.
 func (camera *Camera) Clear() {
 
-	camera.ColorTexture.Clear()
-	camera.DepthTexture.Clear()
+	if camera.AccumulateColorMode != AccumlateColorModeNone {
+		camera.accumulatedBackBuffer.Clear()
+		camera.accumulatedBackBuffer.DrawImage(camera.resultAccumulatedColorTexture, nil)
+		camera.resultAccumulatedColorTexture.Clear()
+		switch camera.AccumulateColorMode {
+		case AccumlateColorModeBelow:
+			camera.resultAccumulatedColorTexture.DrawImage(camera.accumulatedBackBuffer, camera.AccumulateDrawOptions)
+			camera.resultAccumulatedColorTexture.DrawImage(camera.resultColorTexture, nil)
+		case AccumlateColorModeAbove:
+			camera.resultAccumulatedColorTexture.DrawImage(camera.resultColorTexture, nil)
+			camera.resultAccumulatedColorTexture.DrawImage(camera.accumulatedBackBuffer, camera.AccumulateDrawOptions)
+		case AccumlateColorModeSingleLastFrame:
+			camera.resultAccumulatedColorTexture.DrawImage(camera.resultColorTexture, nil)
+		}
+	}
+
+	camera.resultColorTexture.Clear()
+
+	if camera.RenderDepth {
+		camera.resultDepthTexture.Clear()
+	}
 
 	if camera.DebugInfo.tickTime.IsZero() || time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 		camera.DebugInfo.tickTime = time.Now()
@@ -359,6 +542,12 @@ func (camera *Camera) Clear() {
 	camera.DebugInfo.DrawnTris = 0
 	camera.DebugInfo.LightCount = 0
 	camera.DebugInfo.ActiveLightCount = 0
+
+	cameraRot := camera.WorldRotation()
+	camera.cameraForward = cameraRot.Forward().Invert()
+	camera.cameraRight = cameraRot.Right()
+	camera.cameraUp = cameraRot.Up()
+
 }
 
 // RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example). Note that if Camera.RenderDepth
@@ -384,23 +573,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 }
 
-// func (camera *Camera) RenderNodes(scene *Scene, nodes ...Node) {
-
-// 	meshes := []*Model{}
-
-// 	for _, node := range nodes {
-
-// 		if model, isModel := node.(*Model); isModel {
-// 			meshes = append(meshes, model)
-// 		}
-
-// 	}
-
-// 	camera.Render(scene, meshes...)
-
-// }
-
-type RenderPair struct {
+type renderPair struct {
 	Model    *Model
 	MeshPart *MeshPart
 }
@@ -433,16 +606,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	// Update the camera's frustum sphere
-	dist := (camera.Far - camera.Near) / 2
-	forward := camera.WorldRotation().Forward().Invert()
-
-	camera.FrustumSphere.SetWorldPosition(camera.WorldPosition().Add(forward.Scale(camera.Near + dist)))
-	camera.FrustumSphere.Radius = dist * 1.5
-
 	rectShaderOptions := &ebiten.DrawRectShaderOptions{}
-	rectShaderOptions.Images[0] = camera.ColorIntermediate
-	rectShaderOptions.Images[1] = camera.DepthIntermediate
+	rectShaderOptions.Images[0] = camera.colorIntermediate
+	rectShaderOptions.Images[1] = camera.depthIntermediate
 
 	if scene != nil {
 
@@ -465,16 +631,16 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	p1 := vector.Vector{0, 0, 0, 0}
 	p2 := vector.Vector{0, 0, 0, 0}
 
-	solids := []RenderPair{}
-	transparents := []RenderPair{}
+	solids := []renderPair{}
+	transparents := []renderPair{}
 
 	for _, model := range models {
 		if model.Mesh != nil {
 			for _, mp := range model.Mesh.MeshParts {
 				if model.isTransparent(mp) {
-					transparents = append(transparents, RenderPair{model, mp})
+					transparents = append(transparents, renderPair{model, mp})
 				} else {
-					solids = append(solids, RenderPair{model, mp})
+					solids = append(solids, renderPair{model, mp})
 				}
 			}
 		}
@@ -484,17 +650,17 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	if len(solids) > 0 && !camera.RenderDepth {
 
 		sort.SliceStable(solids, func(i, j int) bool {
-			return fastVectorDistanceSquared(solids[i].Model.WorldPosition(), camera.WorldPosition()) > fastVectorDistanceSquared(solids[j].Model.WorldPosition(), camera.WorldPosition())
+			return camera.WorldToScreen(solids[i].Model.WorldPosition())[2] > camera.WorldToScreen(solids[j].Model.WorldPosition())[2]
 		})
 
 	}
 
-	camWidth, camHeight := camera.ColorTexture.Size()
+	camWidth, camHeight := camera.resultColorTexture.Size()
 
-	render := func(renderPair RenderPair) {
+	render := func(rp renderPair) {
 
-		model := renderPair.Model
-		meshPart := renderPair.MeshPart
+		model := rp.Model
+		meshPart := rp.MeshPart
 
 		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
 		if model.Mesh == nil {
@@ -510,12 +676,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		if model.FrustumCulling {
 
-			// We simply call this to update the bounding sphere as necessary. Skinned meshes don't actually call this for Model.TransformedVertices(), and rather than putting it there,
-			// it seems better to put it here to ensure the sphere is in the right position since it's possible FrustumCulling is on but the model has never been rendered, it never updates
-			// BoundingSphere, and so remains invisible.
 			model.Transform()
-
-			if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
+			if !camera.SphereInFrustum(model.BoundingSphere) {
 				return
 			}
 
@@ -712,28 +874,28 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				transparencyMode = meshPart.Material.TransparencyMode
 			}
 
-			camera.DepthIntermediate.Clear()
+			camera.depthIntermediate.Clear()
 
 			if transparencyMode == TransparencyModeAlphaClip {
 
-				camera.ClipAlphaIntermediate.Clear()
+				camera.clipAlphaIntermediate.Clear()
 
-				camera.ClipAlphaIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.ClipAlphaRenderShader, &ebiten.DrawTrianglesShaderOptions{Images: [4]*ebiten.Image{img}})
+				camera.clipAlphaIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.clipAlphaRenderShader, &ebiten.DrawTrianglesShaderOptions{Images: [4]*ebiten.Image{img}})
 
-				w, h := camera.DepthIntermediate.Size()
+				w, h := camera.depthIntermediate.Size()
 
-				camera.DepthIntermediate.DrawRectShader(w, h, camera.ClipAlphaCompositeShader, &ebiten.DrawRectShaderOptions{Images: [4]*ebiten.Image{camera.DepthTexture, camera.ClipAlphaIntermediate}})
+				camera.depthIntermediate.DrawRectShader(w, h, camera.clipAlphaCompositeShader, &ebiten.DrawRectShaderOptions{Images: [4]*ebiten.Image{camera.resultDepthTexture, camera.clipAlphaIntermediate}})
 
 			} else {
 				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
-					Images: [4]*ebiten.Image{camera.DepthTexture},
+					Images: [4]*ebiten.Image{camera.resultDepthTexture},
 				}
 
-				camera.DepthIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.DepthShader, shaderOpt)
+				camera.depthIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.depthShader, shaderOpt)
 			}
 
 			if !model.isTransparent(meshPart) {
-				camera.DepthTexture.DrawImage(camera.DepthIntermediate, nil)
+				camera.resultDepthTexture.DrawImage(camera.depthIntermediate, nil)
 			}
 
 		}
@@ -818,32 +980,42 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		hasFragShader := meshPart.Material != nil && meshPart.Material.fragmentShader != nil && meshPart.Material.FragmentShaderOn
-		w, h := camera.ColorTexture.Size()
+		w, h := camera.resultColorTexture.Size()
 
 		// If rendering depth, and rendering through a custom fragment shader, we'll need to render the tris to the ColorIntermediate buffer using the custom shader.
 		// If we're not rendering through a custom shader, we can render to ColorIntermediate and then composite that onto the finished ColorTexture.
-
 		// If we're not rendering depth, but still rendering through the shader, we can render to the intermediate texture, and then from there composite.
-		// Otherwise
+		// Otherwise, we can just draw the triangles normally.
+
+		t.CompositeMode = ebiten.CompositeModeSourceOver
+		rectShaderOptions.CompositeMode = ebiten.CompositeModeSourceOver
 
 		if camera.RenderDepth {
 
-			camera.ColorIntermediate.Clear()
+			camera.colorIntermediate.Clear()
 
-			if hasFragShader {
-				camera.ColorIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], meshPart.Material.fragmentShader, meshPart.Material.FragmentShaderOptions)
-			} else {
-				camera.ColorIntermediate.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+			if meshPart.Material != nil {
+				rectShaderOptions.CompositeMode = meshPart.Material.CompositeMode
 			}
 
-			camera.ColorTexture.DrawRectShader(w, h, camera.ColorShader, rectShaderOptions)
+			if hasFragShader {
+				camera.colorIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], meshPart.Material.fragmentShader, meshPart.Material.FragmentShaderOptions)
+			} else {
+				camera.colorIntermediate.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+			}
+
+			camera.resultColorTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
 
 		} else {
 
+			if meshPart.Material != nil {
+				t.CompositeMode = meshPart.Material.CompositeMode
+			}
+
 			if hasFragShader {
-				camera.ColorTexture.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], meshPart.Material.fragmentShader, meshPart.Material.FragmentShaderOptions)
+				camera.resultColorTexture.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], meshPart.Material.fragmentShader, meshPart.Material.FragmentShaderOptions)
 			} else {
-				camera.ColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+				camera.resultColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
 			}
 
 		}
@@ -859,7 +1031,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	if len(transparents) > 0 {
 
 		sort.SliceStable(transparents, func(i, j int) bool {
-			return fastVectorDistanceSquared(transparents[i].Model.WorldPosition(), camera.WorldPosition()) > fastVectorDistanceSquared(transparents[j].Model.WorldPosition(), camera.WorldPosition())
+			return camera.WorldToScreen(transparents[i].Model.WorldPosition())[2] > camera.WorldToScreen(transparents[j].Model.WorldPosition())[2]
 		})
 
 		for _, renderPair := range transparents {
@@ -932,7 +1104,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
 
-	camWidth, camHeight := camera.ColorTexture.Size()
+	camWidth, camHeight := camera.resultColorTexture.Size()
 
 	for _, m := range allModels {
 
@@ -940,8 +1112,9 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			if model.FrustumCulling {
 
-				if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
-					continue
+				model.Transform()
+				if !camera.SphereInFrustum(model.BoundingSphere) {
+					return
 				}
 
 			}
@@ -1004,8 +1177,9 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 			if model.FrustumCulling {
 
-				if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
-					continue
+				model.Transform()
+				if !camera.SphereInFrustum(model.BoundingSphere) {
+					return
 				}
 
 			}
@@ -1047,8 +1221,9 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 			if model.FrustumCulling {
 
-				if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
-					continue
+				model.Transform()
+				if !camera.SphereInFrustum(model.BoundingSphere) {
+					return
 				}
 
 			}
@@ -1080,8 +1255,9 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 
 			if model.FrustumCulling {
 
-				if !model.BoundingSphere.Intersecting(camera.FrustumSphere) {
-					continue
+				model.Transform()
+				if !camera.SphereInFrustum(model.BoundingSphere) {
+					return
 				}
 
 			}
@@ -1128,13 +1304,36 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 }
 
+// ColorTexture returns the camera's final result color texture from any previous Render() or RenderNodes() calls.
+func (camera *Camera) ColorTexture() *ebiten.Image {
+	return camera.resultColorTexture
+}
+
+// DepthTexture returns the camera's final result depth texture from any previous Render() or RenderNodes() calls. If Camera.RenderDepth is set to false,
+// the function will return nil instead.
+func (camera *Camera) DepthTexture() *ebiten.Image {
+	if !camera.RenderDepth {
+		return nil
+	}
+	return camera.resultDepthTexture
+}
+
+// AccumulationColorTexture returns the camera's final result accumulation color texture from previous renders. If the Camera's AccumulateColorMode
+// property is set to AccumulateColorModeNone, the function will return nil instead.
+func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
+	if camera.AccumulateColorMode == AccumlateColorModeNone {
+		return nil
+	}
+	return camera.resultAccumulatedColorTexture
+}
+
 // DrawDebugBoundsColored will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
 // be drawn in the color provided for each kind of bounding object to the screen image provided.
 func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor *Color) {
 
 	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
 
-	camWidth, camHeight := camera.ColorTexture.Size()
+	camWidth, camHeight := camera.resultColorTexture.Size()
 
 	for _, n := range allModels {
 

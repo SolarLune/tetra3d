@@ -36,7 +36,7 @@ func (nf NodeFilter) Get(index int) INode {
 // and returns a boolean, indicating whether or not to add that Node to the resulting NodeFilter).
 // If no matching Nodes are found, an empty NodeFilter is returned.
 func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
-	out := make([]INode, len(nf))
+	out := make([]INode, 0, len(nf))
 	i := 0
 	for _, node := range nf {
 		if filterFunc(node) {
@@ -44,14 +44,14 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 			i++
 		}
 	}
-	return newNodeFilter(out...)
+	return NodeFilter(out)
 }
 
 // ByName allows you to filter a given selection of nodes by the given name. If wildcard is true,
 // the nodes' names can contain the name provided; otherwise, they have to match exactly.
 // If no matching Nodes are found, an empty NodeFilter is returned.
 func (nf NodeFilter) ByName(name string, exactMatch bool) NodeFilter {
-	out := []INode{}
+	out := make([]INode, 0, len(nf))
 	for _, node := range nf {
 
 		var nameExists bool
@@ -66,14 +66,14 @@ func (nf NodeFilter) ByName(name string, exactMatch bool) NodeFilter {
 			out = append(out, node)
 		}
 	}
-	return newNodeFilter(out...)
+	return NodeFilter(out)
 }
 
 // ByType allows you to filter a given selection of nodes by the provided NodeType.
 // If no matching Nodes are found, an empty NodeFilter is returned.
 func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 
-	out := []INode{}
+	out := make([]INode, 0, len(nf))
 
 	for _, node := range nf {
 
@@ -83,20 +83,20 @@ func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 
 	}
 
-	return newNodeFilter(out...)
+	return NodeFilter(out)
 
 }
 
 // ByTags allows you to filter a given selection of nodes by the provided set of tag names.
 // If no matching Nodes are found, an empty NodeFilter is returned.
 func (nf NodeFilter) ByTags(tagNames ...string) NodeFilter {
-	out := []INode{}
+	out := make([]INode, 0, len(nf))
 	for _, node := range nf {
 		if node.Tags().Has(tagNames...) {
 			out = append(out, node)
 		}
 	}
-	return newNodeFilter(out...)
+	return NodeFilter(out)
 }
 
 // Empty returns true if the NodeFilter contains no Nodes.

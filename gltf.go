@@ -194,6 +194,21 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					newMat.Shadeless = s.(float64) > 0.5
 				}
 
+				if s, exists := dataMap["t3dCompositeMode__"]; exists {
+					switch int(s.(float64)) {
+					case 0:
+						newMat.CompositeMode = ebiten.CompositeModeSourceOver
+					case 1:
+						newMat.CompositeMode = ebiten.CompositeModeLighter
+					// case 2:
+					// 	newMat.CompositeMode = ebiten.CompositeModeMultiply // Multiply doesn't work right currently
+					case 3:
+						newMat.CompositeMode = ebiten.CompositeModeDestinationOut
+						// newMat.CompositeMode = ebiten.CompositeModeClear
+					}
+
+				}
+
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
 						newMat.Tags.Set(tagName, data)
@@ -376,13 +391,17 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			for i := 0; i < len(indices); i++ {
 				vd := vertexData[indices[i]]
 				newVert := NewVertex(vd.Pos[0], vd.Pos[1], vd.Pos[2], vd.UV[0], vd.UV[1])
-				for colorIndex, color := range vd.Colors {
-					if len(newVert.Colors) <= colorIndex {
-						newVert.Colors = append(newVert.Colors, color)
+				for index, color := range vd.Colors {
+					if color == nil {
+						continue
+					}
+					if index < len(newVert.Colors) {
+						newVert.Colors[index] = color
 					} else {
-						newVert.Colors[colorIndex] = color
+						newVert.Colors = append(newVert.Colors, color)
 					}
 				}
+
 				newVert.Weights = vd.WeightData
 				newVert.Normal = vd.Normal
 				newVerts[i] = newVert
@@ -689,6 +708,19 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					return defaultValues
 				}
 
+				getOrDefaultVector3D := func(path string, defaultX, defaultY, defaultZ float64) vector.Vector {
+					if value, exists := dataMap[path]; exists {
+						floats := []float64{}
+						for _, v := range value.([]interface{}) {
+							floats = append(floats, v.(float64))
+						}
+						return vector.Vector{floats[0], floats[2], -floats[1]}
+					}
+					return vector.Vector{defaultX, defaultY, defaultZ}
+				}
+
+				obj.setOriginalLocalPosition(getOrDefaultVector3D("t3dOriginalLocalPosition__", 0, 0, 0))
+
 				obj.SetVisible(getOrDefaultBool("t3dVisible__", true), false)
 
 				if bt, exists := dataMap["t3dBoundsType__"]; exists {
@@ -758,7 +790,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							radius := getOrDefaultFloat("t3dSphereCustomRadius__", 1)
 							sphere = NewBoundingSphere("_bounding sphere", radius)
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-							sphere = NewBoundingSphere("_bounding sphere", obj.(*Model).Mesh.Dimensions.Max()/2)
+							sphere = NewBoundingSphere("_bounding sphere", obj.(*Model).Mesh.Dimensions.MaxSpan()/2)
 						}
 
 						if sphere != nil {

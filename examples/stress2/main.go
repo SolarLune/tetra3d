@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"image"
 	"image/color"
 	"image/png"
 	"math"
@@ -15,41 +17,35 @@ import (
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
-	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
+
+//go:embed testimage.png
+var testImage []byte
 
 type Game struct {
 	Width, Height int
-	Library       *tetra3d.Library
 	Scene         *tetra3d.Scene
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-
-	PathFollower *tetra3d.PathFollower
-	AutoAdvance  bool
+	Camera            *tetra3d.Camera
+	CameraTilt        float64
+	CameraRotate      float64
+	PrevMousePosition vector.Vector
 
 	DrawDebugText      bool
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
-	PrevMousePosition  vector.Vector
+	DrawDebugNormals   bool
 }
 
-//go:embed paths.gltf
-var libraryData []byte
-
 func NewGame() *Game {
+
 	game := &Game{
-		Width:             796,
-		Height:            448,
+		Width:             398,
+		Height:            224,
 		PrevMousePosition: vector.Vector{},
-		DrawDebugText:     true,
-		AutoAdvance:       true,
 	}
 
 	game.Init()
@@ -59,32 +55,42 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(libraryData, nil)
+	g.Scene = tetra3d.NewScene("Test Scene")
+
+	img, _, err := image.Decode(bytes.NewReader(testImage))
 	if err != nil {
 		panic(err)
 	}
 
-	g.Library = library
+	// We can reuse the mesh for all of the models.
+	cubeMesh := tetra3d.NewCube()
 
-	// We clone the scene so we have an original to work from
-	g.Scene = library.ExportedScene.Clone()
+	mat := cubeMesh.MeshParts[0].Material
+	mat.Shadeless = true
+	mat.Texture = ebiten.NewImageFromImage(img)
+
+	for i := 0; i < 21; i++ {
+		for j := 0; j < 21; j++ {
+			// Create a new Model, position it, and add it to the cubes slice.
+			cube := tetra3d.NewModel(cubeMesh, "Cube")
+			cube.SetLocalPosition(vector.Vector{float64(i * 3), 0, float64(-j * 3)})
+			g.Scene.Root.AddChildren(cube)
+		}
+	}
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
-	g.Scene.Root.AddChildren(g.Camera)
-
-	g.PathFollower = tetra3d.NewPathFollower(g.Scene.Root.Get("Path").(*tetra3d.Path))
+	g.Camera.Far = 120
+	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	fmt.Println(g.Scene.Root.HierarchyAsString())
 
 }
 
 func (g *Game) Update() error {
+
 	var err error
 
-	moveSpd := 0.05
+	moveSpd := 0.1
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
@@ -123,23 +129,6 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
-		g.PathFollower.AdvanceDistance(1)
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
-		g.PathFollower.AdvanceDistance(-1)
-	}
-
-	if g.AutoAdvance {
-		g.PathFollower.AdvancePercentage(0.01) // Advance one percent of the path per-frame
-	}
-
-	cube := g.Scene.Root.Get("Cube")
-	cube.SetWorldPosition(g.PathFollower.WorldPosition())
-
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.AutoAdvance = !g.AutoAdvance
 	}
 
 	// Rotating the camera with the mouse
@@ -189,21 +178,48 @@ func (g *Game) Update() error {
 		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
+		g.DrawDebugNormals = !g.DrawDebugNormals
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
 	return err
+
+}
+
+func (g *Game) StartProfiling() {
+
+	outFile, err := os.Create("./cpu.pprof")
+
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	fmt.Println("Beginning CPU profiling...")
+	pprof.StartCPUProfile(outFile)
+	go func() {
+		time.Sleep(10 * time.Second)
+		pprof.StopCPUProfile()
+		fmt.Println("CPU profiling finished.")
+	}()
+
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+
 	// Clear, but with a color
 	screen.Fill(color.RGBA{60, 70, 80, 255})
 
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the logo first
+	// Render the non-screen Models
+	// g.Camera.Render(g.Scene, g.Scene.Models...)
+
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
@@ -217,32 +233,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(g.Camera.ColorTexture(), opt)
 	}
 
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Red())
+	}
+
+	if g.DrawDebugNormals {
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, colors.Blue())
+	}
+
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how paths work.\nThe cube will follow the path (which is invisible,\nas it is made up of Nodes).\n1 key: Toggle running through path\nLeft, Right keys: Step 1 unit forward or\nback through the path\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
 	}
 
-	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Gray())
-	}
-
-}
-
-func (g *Game) StartProfiling() {
-	outFile, err := os.Create("./cpu.pprof")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(2 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
@@ -250,7 +252,8 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Logo Test")
+
+	ebiten.SetWindowTitle("Tetra3d Test - Stress Test")
 	ebiten.SetWindowResizable(true)
 
 	game := NewGame()
@@ -258,4 +261,5 @@ func main() {
 	if err := ebiten.RunGame(game); err != nil {
 		panic(err)
 	}
+
 }

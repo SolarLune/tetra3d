@@ -464,11 +464,6 @@ func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float64) Ma
 	r := t * aspect
 	l := -r
 
-	// l := -viewWidth / 2
-	// r := viewWidth / 2
-	// t := -viewHeight / 2
-	// b := viewHeight / 2
-
 	return Matrix4{
 		{(2 * near) / (r - l), 0, (r + l) / (r - l), 0},
 		{0, (2 * near) / (t - b), (t + b) / (t - b), 0},

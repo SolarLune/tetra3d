@@ -27,7 +27,14 @@ gltfExportTypes = [
     ("GLB", ".glb", "Exports a single file, with all data packed in binary form. Most efficient and portable, but more difficult to edit later", 0, 0),
     ("GLTF_SEPARATE", ".gltf + .bin + textures", "Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later - Note that Tetra3D doesn't support this properly currently", 0, 1),
     ("GLTF_EMBEDDED", ".gltf", "Exports a single file, with all data packed in JSON. Less efficient than binary, but easier to edit later", 0, 2),
- ]
+]
+
+materialCompositeModes = [
+    ("DEFAULT", "Default", "Blends the destination by the material's color modulated by the material's alpha value. The default alpha-blending composite mode. Also known as CompositeModeSourceOver", 0, 0),
+    ("ADDITIVE", "Additive", "Adds the material's color to the destination. Also known as CompositeModeLighter", 0, 1),
+    # ("MULTIPLY", "Multiply", "Multiplies the material's color by the destination. Also known as CompositeModeMultiply", 0, 2),
+    ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as CompositeModeClear", 0, 3),
+]
 
 GamePropTypeBool = 1
 GamePropTypeFloat = 2
@@ -268,7 +275,8 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.prop(context.material, "use_backface_culling")
         row = self.layout.row()
         row.prop(context.material, "blend_method")
-
+        row = self.layout.row()
+        row.prop(context.material, "t3dCompositeMode__")
         
 # The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
 def globalGet(propName):
@@ -368,6 +376,8 @@ def export():
             for layer in scene.view_layers:
                 for obj in layer.objects:
 
+                    obj["t3dOriginalLocalPosition__"] = obj.location
+
                     if obj.type == "MESH":
                         vertexColors = [layer.name for layer in obj.data.vertex_colors]
                         obj.data["t3dVertexColorNames__"] = vertexColors
@@ -433,6 +443,9 @@ def export():
 
                 for obj in layer.objects:
 
+                    if "t3dOriginalLocalPosition__" in obj:
+                        del(obj["t3dOriginalLocalPosition__"])
+                        
                     if "t3dInstanceCollection__" in obj:
                         del(obj["t3dInstanceCollection__"])
                         if obj in ogCollections:
@@ -601,6 +614,7 @@ def register():
 
     bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
+    bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     
     if not exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.append(exportOnSave)
@@ -632,6 +646,7 @@ def unregister():
 
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__
+    del bpy.types.Material.t3dCompositeMode__
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)
