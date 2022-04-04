@@ -30,7 +30,8 @@ func (bt *BoundingTriangles) Transform() Matrix4 {
 
 	if transformDirty {
 		bt.BoundingAABB.SetWorldTransform(transform)
-		bt.BoundingAABB.MoveVec(bt.Mesh.Dimensions.Center())
+		rot := bt.WorldRotation().MultVec(bt.Mesh.Dimensions.Center())
+		bt.BoundingAABB.MoveVec(rot)
 		bt.BoundingAABB.Transform()
 	}
 
