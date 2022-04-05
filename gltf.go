@@ -976,41 +976,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		if node.Extras != nil {
 			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
 
-				if c, exists := dataMap["t3dInstanceCollection__"]; exists {
-					collection := collections[c.(string)]
-
-					offset := vector.Vector{-collection.Offset[0], -collection.Offset[2], collection.Offset[1]}
-
-					for _, cloneName := range collection.Objects {
-
-						var clone INode
-
-						path := collection.Path
-
-						if path == "" {
-							clone = findNode(cloneName).Clone()
-						} else {
-							path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
-							if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
-								if foundNode := library.FindNode(cloneName); foundNode != nil {
-									clone = foundNode.Clone()
-								}
-							}
-						}
-
-						if clone != nil {
-
-							clone.MoveVec(offset)
-							obj.AddChildren(clone)
-
-						} else {
-							log.Println("Error in instantiating linked element:", cloneName, "from:", path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
-						}
-
-					}
-
-				}
-
 				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {
 					for _, p := range gameProps.([]interface{}) {
 
@@ -1047,6 +1012,51 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						obj.Tags().Set(name, value)
 
 					}
+				}
+
+			}
+
+		}
+	}
+
+	for obj, node := range objToNode {
+
+		if node.Extras != nil {
+			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
+
+				if c, exists := dataMap["t3dInstanceCollection__"]; exists {
+					collection := collections[c.(string)]
+
+					offset := vector.Vector{-collection.Offset[0], -collection.Offset[2], collection.Offset[1]}
+
+					for _, cloneName := range collection.Objects {
+
+						var clone INode
+
+						path := collection.Path
+
+						if path == "" {
+							clone = findNode(cloneName).Clone()
+						} else {
+							path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
+							if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
+								if foundNode := library.FindNode(cloneName); foundNode != nil {
+									clone = foundNode.Clone()
+								}
+							}
+						}
+
+						if clone != nil {
+
+							clone.MoveVec(offset)
+							obj.AddChildren(clone)
+
+						} else {
+							log.Println("Error in instantiating linked element:", cloneName, "from:", path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
+						}
+
+					}
+
 				}
 
 			}

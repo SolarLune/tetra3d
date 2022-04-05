@@ -667,12 +667,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			return
 		}
 
-		camera.DebugInfo.TotalParts++
-		camera.DebugInfo.TotalTris += len(meshPart.Triangles)
-
 		if !model.visible {
 			return
 		}
+
+		camera.DebugInfo.TotalParts++
+		camera.DebugInfo.TotalTris += len(meshPart.Triangles)
 
 		if model.FrustumCulling {
 
