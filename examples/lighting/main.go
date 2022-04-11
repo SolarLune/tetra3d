@@ -43,8 +43,8 @@ type Game struct {
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             1920,
-		Height:            1080,
+		Width:             796,
+		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -57,8 +57,8 @@ func NewGame() *Game {
 func (g *Game) Init() {
 
 	opt := tetra3d.DefaultGLTFLoadOptions()
-	opt.CameraWidth = 1920
-	opt.CameraHeight = 1080
+	opt.CameraWidth = g.Width
+	opt.CameraHeight = g.Height
 	opt.LoadBackfaceCulling = true
 	library, err := tetra3d.LoadGLTFData(gltfData, opt)
 	if err != nil {
@@ -68,7 +68,7 @@ func (g *Game) Init() {
 	g.Library = library
 	g.Scene = library.Scenes[0]
 
-	g.Camera = tetra3d.NewCamera(1920, 1080)
+	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 2, 15})
 	g.Scene.Root.AddChildren(g.Camera)
 
@@ -194,6 +194,7 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+
 	// Clear, but with a color - we can use the world lighting color for this.
 	light := g.Scene.Root.Get("World Ambient").(*tetra3d.AmbientLight)
 	energy := light.Energy

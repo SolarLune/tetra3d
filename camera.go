@@ -22,6 +22,7 @@ type DebugInfo struct {
 	animationTime    time.Duration
 	lightTime        time.Duration
 	frameTime        time.Duration
+	frameCount       int
 	tickTime         time.Time
 	DrawnParts       int // Number of draw calls, excluding those invisible or culled based on distance
 	TotalParts       int // Total number of objects
@@ -527,15 +528,25 @@ func (camera *Camera) Clear() {
 		camera.resultDepthTexture.Clear()
 	}
 
-	if camera.DebugInfo.tickTime.IsZero() || time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
+	if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
+
+		if !camera.DebugInfo.tickTime.IsZero() {
+
+			camera.DebugInfo.AvgFrameTime = camera.DebugInfo.frameTime / time.Duration(camera.DebugInfo.frameCount)
+
+			camera.DebugInfo.AvgAnimationTime = camera.DebugInfo.animationTime / time.Duration(camera.DebugInfo.frameCount)
+
+			camera.DebugInfo.AvgLightTime = camera.DebugInfo.lightTime / time.Duration(camera.DebugInfo.frameCount)
+
+		}
+
 		camera.DebugInfo.tickTime = time.Now()
-		camera.DebugInfo.AvgFrameTime = camera.DebugInfo.frameTime
-		camera.DebugInfo.AvgAnimationTime = camera.DebugInfo.animationTime
-		camera.DebugInfo.AvgLightTime = camera.DebugInfo.lightTime
+		camera.DebugInfo.frameTime = 0
+		camera.DebugInfo.animationTime = 0
+		camera.DebugInfo.lightTime = 0
+		camera.DebugInfo.frameCount = 0
+
 	}
-	camera.DebugInfo.frameTime = 0
-	camera.DebugInfo.animationTime = 0
-	camera.DebugInfo.lightTime = 0
 	camera.DebugInfo.DrawnParts = 0
 	camera.DebugInfo.TotalParts = 0
 	camera.DebugInfo.TotalTris = 0
@@ -634,7 +645,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	solids := []renderPair{}
 	transparents := []renderPair{}
 
+	depths := map[*Model]float64{}
+
+	sorting := len(solids) > 0 && !camera.RenderDepth
+
 	for _, model := range models {
+
 		if model.Mesh != nil {
 			for _, mp := range model.Mesh.MeshParts {
 				if model.isTransparent(mp) {
@@ -643,24 +659,42 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					solids = append(solids, renderPair{model, mp})
 				}
 			}
+
+			if sorting {
+				depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
+			}
+
 		}
+
 	}
 
 	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
-	if len(solids) > 0 && !camera.RenderDepth {
+	if sorting {
 
 		sort.SliceStable(solids, func(i, j int) bool {
-			return camera.WorldToScreen(solids[i].Model.WorldPosition())[2] > camera.WorldToScreen(solids[j].Model.WorldPosition())[2]
+			return depths[solids[i].Model] > depths[solids[j].Model]
 		})
 
 	}
 
 	camWidth, camHeight := camera.resultColorTexture.Size()
 
+	far := camera.Far
+	near := camera.Near
+	if !camera.Perspective {
+		far = 2.0
+		near = 0
+	}
+
 	render := func(rp renderPair) {
 
 		model := rp.Model
 		meshPart := rp.MeshPart
+
+		lighting := scene.LightingOn
+		if meshPart.Material != nil {
+			lighting = scene.LightingOn && !meshPart.Material.Shadeless
+		}
 
 		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
 		if model.Mesh == nil {
@@ -711,6 +745,20 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		if img == nil {
 			img = defaultImg
 		}
+
+		if lighting {
+
+			t := time.Now()
+
+			for _, light := range lights {
+				light.beginModel(model, camera)
+			}
+
+			camera.DebugInfo.lightTime += time.Since(t)
+
+		}
+
+		lightColors := [9]float32{}
 
 		for _, tri := range tris {
 
@@ -790,25 +838,43 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			triList[t] = tri
 
-			vertexList[vertexListIndex].DstX = float32(math.Round(p0[0]))
-			vertexList[vertexListIndex].DstY = float32(math.Round(p0[1]))
+			colorVertexList[vertexListIndex].DstX = float32(p0[0])
+			colorVertexList[vertexListIndex].DstY = float32(p0[1])
+			colorVertexList[vertexListIndex+1].DstX = float32(p1[0])
+			colorVertexList[vertexListIndex+1].DstY = float32(p1[1])
+			colorVertexList[vertexListIndex+2].DstX = float32(p2[0])
+			colorVertexList[vertexListIndex+2].DstY = float32(p2[1])
 
-			vertexList[vertexListIndex+1].DstX = float32(math.Round(p1[0]))
-			vertexList[vertexListIndex+1].DstY = float32(math.Round(p1[1]))
+			depthVertexList[vertexListIndex].DstX = float32(p0[0])
+			depthVertexList[vertexListIndex].DstY = float32(p0[1])
+			depthVertexList[vertexListIndex+1].DstX = float32(p1[0])
+			depthVertexList[vertexListIndex+1].DstY = float32(p1[1])
+			depthVertexList[vertexListIndex+2].DstX = float32(p2[0])
+			depthVertexList[vertexListIndex+2].DstY = float32(p2[1])
 
-			vertexList[vertexListIndex+2].DstX = float32(math.Round(p2[0]))
-			vertexList[vertexListIndex+2].DstY = float32(math.Round(p2[1]))
+			for i, vert := range tri.Vertices {
 
-			if camera.RenderDepth {
+				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
+				colorVertexList[vertexListIndex+i].SrcX = float32(vert.UV[0] * srcW)
 
-				far := camera.Far
-				near := camera.Near
-				if !camera.Perspective {
-					far = 2.0
-					near = 0
+				// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
+				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
+				colorVertexList[vertexListIndex+i].SrcY = float32((1 - vert.UV[1]) * srcH)
+
+				// Vertex colors
+				if vert.VisibleVertexColorChannel >= 0 {
+					colorVertexList[vertexListIndex+i].ColorR = vert.Colors[vert.VisibleVertexColorChannel].R
+					colorVertexList[vertexListIndex+i].ColorG = vert.Colors[vert.VisibleVertexColorChannel].G
+					colorVertexList[vertexListIndex+i].ColorB = vert.Colors[vert.VisibleVertexColorChannel].B
+					colorVertexList[vertexListIndex+i].ColorA = vert.Colors[vert.VisibleVertexColorChannel].A
+				} else {
+					colorVertexList[vertexListIndex+i].ColorR = 1
+					colorVertexList[vertexListIndex+i].ColorG = 1
+					colorVertexList[vertexListIndex+i].ColorB = 1
+					colorVertexList[vertexListIndex+i].ColorA = 1
 				}
 
-				for i, vert := range tri.Vertices {
+				if camera.RenderDepth {
 
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
@@ -819,17 +885,64 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 						depth = 1
 					}
 
-					vertexList[vertexListIndex+i].ColorR = float32(depth)
-					vertexList[vertexListIndex+i].ColorG = float32(depth)
-					vertexList[vertexListIndex+i].ColorB = float32(depth)
-					vertexList[vertexListIndex+i].ColorA = 1
+					depthVertexList[vertexListIndex+i].ColorR = float32(depth)
+					depthVertexList[vertexListIndex+i].ColorG = float32(depth)
+					depthVertexList[vertexListIndex+i].ColorB = float32(depth)
+					depthVertexList[vertexListIndex+i].ColorA = 1
 
 					// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
-					vertexList[vertexListIndex+i].SrcX = float32(vert.UV[0] * srcW)
+					depthVertexList[vertexListIndex+i].SrcX = float32(vert.UV[0] * srcW)
 
 					// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
 					// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
-					vertexList[vertexListIndex+i].SrcY = float32((1 - vert.UV[1]) * srcH)
+					depthVertexList[vertexListIndex+i].SrcY = float32((1 - vert.UV[1]) * srcH)
+
+				} else {
+
+					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
+					// depth can be negative but still be in front of the camera and not behind it.
+					depth := float32((vert.transformed[2]+near)/far + 0.03)
+					if depth < 0 {
+						depth = 0
+					} else if depth > 1 {
+						depth = 1
+					}
+
+					// depth = 1 - depth
+
+					depth = scene.FogRange[0] + ((scene.FogRange[1]-scene.FogRange[0])*1 - depth)
+
+					if scene.FogMode == FogAdd {
+						colorVertexList[vertexListIndex+i].ColorR += scene.FogColor.R * depth
+						colorVertexList[vertexListIndex+i].ColorG += scene.FogColor.G * depth
+						colorVertexList[vertexListIndex+i].ColorB += scene.FogColor.B * depth
+					} else if scene.FogMode == FogMultiply {
+						colorVertexList[vertexListIndex+i].ColorR *= scene.FogColor.R * depth
+						colorVertexList[vertexListIndex+i].ColorG *= scene.FogColor.G * depth
+						colorVertexList[vertexListIndex+i].ColorB *= scene.FogColor.B * depth
+					}
+
+				}
+
+				if lighting {
+
+					t := time.Now()
+
+					for i := range lightColors {
+						lightColors[i] = 0
+					}
+
+					for _, light := range lights {
+						for i, v := range light.Light(tri) {
+							lightColors[i] += v
+						}
+					}
+
+					colorVertexList[vertexListIndex+i].ColorR *= lightColors[i*3]
+					colorVertexList[vertexListIndex+i].ColorG *= lightColors[i*3+1]
+					colorVertexList[vertexListIndex+i].ColorB *= lightColors[i*3+2]
+
+					camera.DebugInfo.lightTime += time.Since(t)
 
 				}
 
@@ -880,7 +993,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				camera.clipAlphaIntermediate.Clear()
 
-				camera.clipAlphaIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.clipAlphaRenderShader, &ebiten.DrawTrianglesShaderOptions{Images: [4]*ebiten.Image{img}})
+				camera.clipAlphaIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.clipAlphaRenderShader, &ebiten.DrawTrianglesShaderOptions{Images: [4]*ebiten.Image{img}})
 
 				w, h := camera.depthIntermediate.Size()
 
@@ -891,84 +1004,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					Images: [4]*ebiten.Image{camera.resultDepthTexture},
 				}
 
-				camera.depthIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], camera.depthShader, shaderOpt)
+				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.depthShader, shaderOpt)
 			}
 
 			if !model.isTransparent(meshPart) {
 				camera.resultDepthTexture.DrawImage(camera.depthIntermediate, nil)
 			}
-
-		}
-
-		index := 0
-
-		for _, tri := range triList[:vertexListIndex/3] {
-
-			for _, vert := range tri.Vertices {
-
-				// Vertex colors
-
-				// TODO: This slows down the stress test from ~25FPS to ~20FPS, so it would be good to get rid of this somehow, though the upside
-				// is the ability to color different vertices as necessary
-				if vert.VisibleVertexColorChannel >= 0 {
-					vertexList[index].ColorR = vert.Colors[vert.VisibleVertexColorChannel].R
-					vertexList[index].ColorG = vert.Colors[vert.VisibleVertexColorChannel].G
-					vertexList[index].ColorB = vert.Colors[vert.VisibleVertexColorChannel].B
-					vertexList[index].ColorA = vert.Colors[vert.VisibleVertexColorChannel].A
-				} else {
-					vertexList[index].ColorR = 1
-					vertexList[index].ColorG = 1
-					vertexList[index].ColorB = 1
-					vertexList[index].ColorA = 1
-				}
-
-				index++
-
-			}
-
-		}
-
-		lighting := scene.LightingOn
-		if meshPart.Material != nil {
-			lighting = scene.LightingOn && !meshPart.Material.Shadeless
-		}
-
-		if lighting {
-
-			index = 0
-
-			t := time.Now()
-
-			for _, light := range lights {
-				light.beginModel(model, camera)
-			}
-
-			lightColors := [9]float32{}
-
-			for _, tri := range triList[:vertexListIndex/3] {
-
-				for i := range lightColors {
-					lightColors[i] = 0
-				}
-
-				for _, light := range lights {
-					for i, v := range light.Light(tri) {
-						lightColors[i] += v
-					}
-				}
-
-				for vertIndex := range tri.Vertices {
-
-					vertexList[index].ColorR *= lightColors[(vertIndex)*3]
-					vertexList[index].ColorG *= lightColors[(vertIndex)*3+1]
-					vertexList[index].ColorB *= lightColors[(vertIndex)*3+2]
-					index++
-
-				}
-
-			}
-
-			camera.DebugInfo.lightTime += time.Since(t)
 
 		}
 
@@ -999,9 +1040,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 
 			if hasFragShader {
-				camera.colorIntermediate.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], meshPart.Material.fragmentShader, meshPart.Material.FragmentShaderOptions)
+				camera.colorIntermediate.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:vertexListIndex], meshPart.Material.fragmentShader, meshPart.Material.FragmentShaderOptions)
 			} else {
-				camera.colorIntermediate.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+				camera.colorIntermediate.DrawTriangles(colorVertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
 			}
 
 			camera.resultColorTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
@@ -1013,9 +1054,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 
 			if hasFragShader {
-				camera.resultColorTexture.DrawTrianglesShader(vertexList[:vertexListIndex], indexList[:vertexListIndex], meshPart.Material.fragmentShader, meshPart.Material.FragmentShaderOptions)
+				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:vertexListIndex], meshPart.Material.fragmentShader, meshPart.Material.FragmentShaderOptions)
 			} else {
-				camera.resultColorTexture.DrawTriangles(vertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
+				camera.resultColorTexture.DrawTriangles(colorVertexList[:vertexListIndex], indexList[:vertexListIndex], img, t)
 			}
 
 		}
@@ -1031,7 +1072,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	if len(transparents) > 0 {
 
 		sort.SliceStable(transparents, func(i, j int) bool {
-			return camera.WorldToScreen(transparents[i].Model.WorldPosition())[2] > camera.WorldToScreen(transparents[j].Model.WorldPosition())[2]
+			return depths[transparents[i].Model] > depths[transparents[j].Model]
 		})
 
 		for _, renderPair := range transparents {
@@ -1041,6 +1082,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	}
 
 	camera.DebugInfo.frameTime += time.Since(frametimeStart)
+
+	camera.DebugInfo.frameCount++
 
 }
 
@@ -1081,7 +1124,8 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64, col
 	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
 
 	text.DrawWithOptions(screen, fmt.Sprintf(
-		"FPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d\nRendered triangles: %d/%d\nActive Lights: %d/%d",
+		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d\nRendered triangles: %d/%d\nActive Lights: %d/%d",
+		ebiten.CurrentTPS(),
 		ebiten.CurrentFPS(),
 		ft,
 		at,
@@ -1114,7 +1158,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 				model.Transform()
 				if !camera.SphereInFrustum(model.BoundingSphere) {
-					return
+					continue
 				}
 
 			}
@@ -1179,7 +1223,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 				model.Transform()
 				if !camera.SphereInFrustum(model.BoundingSphere) {
-					return
+					continue
 				}
 
 			}
@@ -1223,7 +1267,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 				model.Transform()
 				if !camera.SphereInFrustum(model.BoundingSphere) {
-					return
+					continue
 				}
 
 			}
@@ -1257,7 +1301,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 
 				model.Transform()
 				if !camera.SphereInFrustum(model.BoundingSphere) {
-					return
+					continue
 				}
 
 			}

@@ -19,6 +19,7 @@ import (
 
 type GLTFLoadOptions struct {
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
+	CameraDepth               bool // If cameras should render depth or not
 	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying, and so may be bypassed here).
 	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
 	// DependentLibraryResolver is a function that takes a relative path (string) to the blend file representing the dependent Library that the loading
@@ -37,6 +38,7 @@ func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 	return &GLTFLoadOptions{
 		CameraWidth:               1920,
 		CameraHeight:              1080,
+		CameraDepth:               true,
 		DefaultToAutoTransparency: true,
 		LoadBackfaceCulling:       true,
 	}
@@ -616,6 +618,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			newCam := NewCamera(gltfLoadOptions.CameraWidth, gltfLoadOptions.CameraHeight)
 			newCam.name = node.Name
+			newCam.RenderDepth = gltfLoadOptions.CameraDepth
 
 			if gltfCam.Perspective != nil {
 				newCam.Near = float64(gltfCam.Perspective.Znear)
@@ -1019,6 +1022,23 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		}
 	}
 
+	// Set up SkinRoot for skinned Models; this should be the root node of a hierarchy of bone Nodes.
+	for _, n := range objects {
+
+		if model, isModel := n.(*Model); isModel && model.Skinned {
+
+			parent := model.SkinRoot
+
+			for parent.IsBone() && parent.Parent() != nil {
+				parent = parent.Parent()
+			}
+
+			model.SkinRoot = parent
+
+		}
+
+	}
+
 	for obj, node := range objToNode {
 
 		if node.Extras != nil {
@@ -1062,23 +1082,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			}
 
 		}
-	}
-
-	// Set up SkinRoot for skinned Models; this should be the root node of a hierarchy of bone Nodes.
-	for _, n := range objects {
-
-		if model, isModel := n.(*Model); isModel && model.Skinned {
-
-			parent := model.SkinRoot
-
-			for parent.IsBone() && parent.Parent() != nil {
-				parent = parent.Parent()
-			}
-
-			model.SkinRoot = parent
-
-		}
-
 	}
 
 	for _, s := range doc.Scenes {

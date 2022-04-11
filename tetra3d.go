@@ -10,7 +10,8 @@ import (
 
 var defaultImg *ebiten.Image
 
-var vertexList = make([]ebiten.Vertex, 0, ebiten.MaxIndicesNum)
+var colorVertexList = make([]ebiten.Vertex, 0, ebiten.MaxIndicesNum)
+var depthVertexList = make([]ebiten.Vertex, 0, ebiten.MaxIndicesNum)
 var indexList = make([]uint16, 0, ebiten.MaxIndicesNum)
 var triList = make([]*Triangle, 0, ebiten.MaxIndicesNum/3)
 
@@ -19,8 +20,9 @@ func init() {
 	defaultImg = ebiten.NewImage(4, 4)
 	defaultImg.Fill(color.White)
 
-	for i := 0; i < cap(vertexList); i++ {
-		vertexList = append(vertexList, ebiten.Vertex{})
+	for i := 0; i < cap(colorVertexList); i++ {
+		colorVertexList = append(colorVertexList, ebiten.Vertex{})
+		depthVertexList = append(depthVertexList, ebiten.Vertex{})
 		indexList = append(indexList, 0)
 	}
 
