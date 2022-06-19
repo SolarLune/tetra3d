@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image/color"
 	"image/png"
-	"math"
 	"os"
 	"runtime/pprof"
 	"time"
@@ -20,17 +19,15 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	examples "github.com/solarlune/tetra3d/examples"
 )
 
 type Game struct {
-	Width, Height int
-	Library       *tetra3d.Library
+	examples.ExampleGame
 
-	Time              float64
-	Camera            *tetra3d.Camera
-	CameraTilt        float64
-	CameraRotate      float64
-	PrevMousePosition vector.Vector
+	Library *tetra3d.Library
+
+	Time float64
 
 	DrawDebugText      bool
 	DrawDebugDepth     bool
@@ -45,10 +42,8 @@ var gltf []byte
 func NewGame() *Game {
 
 	game := &Game{
-		Width:             796,
-		Height:            448,
-		PrevMousePosition: vector.Vector{},
-		DrawDebugText:     true,
+		ExampleGame:   examples.NewExampleGame(796, 448),
+		DrawDebugText: true,
 	}
 
 	game.Init()
@@ -65,12 +60,12 @@ func (g *Game) Init() {
 
 	g.Library = library
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.Move(0, 0, 10)
-	scene := g.Library.Scenes[0]
+	g.Scene = g.Library.Scenes[0]
 	// Turn off lighting
-	scene.LightingOn = false
-	scene.Root.AddChildren(g.Camera)
+	g.Scene.LightingOn = false
+
+	g.SetupCameraAt(vector.Vector{0, 0, 0})
+	g.Camera.Move(0, 0, 10)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -83,68 +78,15 @@ func (g *Game) Init() {
 func (g *Game) Update() error {
 	var err error
 
-	moveSpd := 0.05
-
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
 
-	// Moving the Camera
-
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
-	}
-
-	g.Camera.SetLocalPosition(pos)
+	g.ProcessCameraInputs()
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
-
-	// Rotating the camera with the mouse
-
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
-
-	mv := vector.Vector{float64(mx), float64(my)}
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	g.PrevMousePosition = mv.Clone()
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
@@ -218,8 +160,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the logo first
-	scene := g.Library.Scenes[0]
-	g.Camera.RenderNodes(scene, scene.Root)
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
@@ -233,15 +174,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, scene.Root, colors.Red())
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Red())
 	}
 
 	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, scene.Root, 0.5, colors.Blue())
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.5, colors.Blue())
 	}
 
 	if g.DrawDebugCenters {
-		g.Camera.DrawDebugCenters(screen, scene.Root, colors.SkyBlue())
+		g.Camera.DrawDebugCenters(screen, g.Scene.Root, colors.SkyBlue())
 	}
 
 	if g.DrawDebugText {

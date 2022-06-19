@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image/color"
 	"image/png"
-	"math"
 	"os"
 	"runtime/pprof"
 	"time"
@@ -20,16 +19,13 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	examples "github.com/solarlune/tetra3d/examples"
 )
 
 type Game struct {
-	Width, Height int
-	Library       *tetra3d.Library
-	Scene         *tetra3d.Scene
+	examples.ExampleGame
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
+	Library *tetra3d.Library
 
 	PathFollower *tetra3d.PathFollower
 	AutoAdvance  bool
@@ -37,7 +33,6 @@ type Game struct {
 	DrawDebugText      bool
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
-	PrevMousePosition  vector.Vector
 }
 
 //go:embed paths.gltf
@@ -45,11 +40,9 @@ var libraryData []byte
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             796,
-		Height:            448,
-		PrevMousePosition: vector.Vector{},
-		DrawDebugText:     true,
-		AutoAdvance:       true,
+		ExampleGame:   examples.NewExampleGame(796, 448),
+		DrawDebugText: true,
+		AutoAdvance:   true,
 	}
 
 	game.Init()
@@ -69,9 +62,7 @@ func (g *Game) Init() {
 	// We clone the scene so we have an original to work from
 	g.Scene = library.ExportedScene.Clone()
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
-	g.Scene.Root.AddChildren(g.Camera)
+	g.SetupCameraAt(vector.Vector{0, 5, 10})
 
 	g.PathFollower = tetra3d.NewPathFollower(g.Scene.Root.Get("Path").(*tetra3d.Path))
 
@@ -84,42 +75,11 @@ func (g *Game) Init() {
 func (g *Game) Update() error {
 	var err error
 
-	moveSpd := 0.05
-
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
 	}
 
-	// Moving the Camera
-
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
-	}
-
-	g.Camera.SetLocalPosition(pos)
+	g.ProcessCameraInputs()
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
@@ -141,28 +101,6 @@ func (g *Game) Update() error {
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		g.AutoAdvance = !g.AutoAdvance
 	}
-
-	// Rotating the camera with the mouse
-
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
-
-	mv := vector.Vector{float64(mx), float64(my)}
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	g.PrevMousePosition = mv.Clone()
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
