@@ -700,14 +700,18 @@ func (node *Node) HierarchyAsString() string {
 
 	printNode = func(node INode, level int) string {
 
-		prefix := "+"
+		prefix := ""
 
 		nodeType := node.Type()
 
 		if nodeType.Is(NodeTypeModel) {
-			nodeType = "MODEL"
-		} else if nodeType.Is(NodeTypeLight) {
-			nodeType = "LIGHT"
+			prefix = "MODEL"
+		} else if nodeType.Is(NodeTypeAmbientLight) {
+			prefix = "AMB"
+		} else if nodeType.Is(NodeTypeDirectionalLight) {
+			prefix = "DIR"
+		} else if nodeType.Is(NodeTypePointLight) {
+			prefix = "POINT"
 		} else if nodeType.Is(NodeTypeCamera) {
 			prefix = "CAM"
 		} else if nodeType.Is(NodeTypeBoundingSphere) {
@@ -720,6 +724,8 @@ func (node *Node) HierarchyAsString() string {
 			prefix = "TRI"
 		} else if nodeType.Is(NodeTypePath) {
 			prefix = "CURVE"
+		} else {
+			prefix = "NODE"
 		}
 
 		str := ""
