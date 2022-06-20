@@ -82,7 +82,7 @@ func (g *Game) Update() error {
 	spin := g.Scene.Root.Get("Spin").(*tetra3d.Model)
 	spin.Rotate(0, 1, 0, 0.025)
 
-	light := g.Scene.Root.Get("Point light").(*tetra3d.Node)
+	light := g.Scene.Root.Get("Point light").(*tetra3d.PointLight)
 	light.AnimationPlayer().Play(g.Library.Animations["LightAction"])
 	light.AnimationPlayer().Update(1.0 / 60.0)
 

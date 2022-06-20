@@ -852,6 +852,24 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			depthVertexList[vertexListIndex+2].DstX = float32(p2[0])
 			depthVertexList[vertexListIndex+2].DstY = float32(p2[1])
 
+			if lighting {
+
+				t := time.Now()
+
+				for i := range lightColors {
+					lightColors[i] = 0
+				}
+
+				for _, light := range lights {
+					for i, v := range light.Light(tri) {
+						lightColors[i] += v
+					}
+				}
+
+				camera.DebugInfo.lightTime += time.Since(t)
+
+			}
+
 			for i, vert := range tri.Vertices {
 
 				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
@@ -927,16 +945,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				if lighting {
 
 					t := time.Now()
-
-					for i := range lightColors {
-						lightColors[i] = 0
-					}
-
-					for _, light := range lights {
-						for i, v := range light.Light(tri) {
-							lightColors[i] += v
-						}
-					}
 
 					colorVertexList[vertexListIndex+i].ColorR *= lightColors[i*3]
 					colorVertexList[vertexListIndex+i].ColorG *= lightColors[i*3+1]
