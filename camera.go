@@ -142,7 +142,11 @@ func NewCamera(w, h int) *Camera {
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 			tex := imageSrc0At(texCoord)
-			return vec4(encodeDepth(color.r).rgb, tex.a)
+			if (tex.a == 0) {
+				return vec4(0.0, 0.0, 0.0, 0.0)
+			} else {
+				return vec4(encodeDepth(color.r).rgb, tex.a)
+			}
 			// TODO: This shader needs to discard if tex.a is transparent. We can't sample the texture to return 
 			// what's underneath here, so discard is basically necessary. We need to implement it once the dicard
 			// keyword / function is implemented (if it ever is; hopefully it will be).
