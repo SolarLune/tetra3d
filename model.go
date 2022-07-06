@@ -14,17 +14,15 @@ import (
 type Model struct {
 	*Node
 	Mesh              *Mesh
-	FrustumCulling    bool   // Whether the Model is culled when it leaves the frustum.
-	Color             *Color // The overall color of the Model.
-	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM
+	FrustumCulling    bool                                                 // Whether the Model is culled when it leaves the frustum.
+	Color             *Color                                               // The overall multiplicative color of the Model.
+	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM // The blending function used to color the Model; by default, it basically modulates the model by the color.
 	BoundingSphere    *BoundingSphere
-	BoundingAABB      *BoundingAABB
 
 	Skinned        bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
 	SkinRoot       INode // The root node of the armature skinning this Model.
 	skinMatrix     Matrix4
-	bones          [][]*Node
-	vectorPool     *VectorPool
+	bones          [][]*Node // The bones (nodes) of the Model, assuming it has been skinned. A Mesh's bones slice will point to indices indicating bones in the Model.
 	skinVectorPool *VectorPool
 }
 
@@ -52,8 +50,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 	}
 
 	if mesh != nil {
-		model.vectorPool = NewVectorPool(mesh.TotalVertexCount())
-		model.skinVectorPool = NewVectorPool(mesh.TotalVertexCount())
+		model.skinVectorPool = NewVectorPool(mesh.VertexCount)
 	}
 
 	radius := 0.0
@@ -91,6 +88,8 @@ func (model *Model) Clone() INode {
 
 }
 
+// Transform returns the global transform of the Model, taking into account any transforms its parents or grandparents have that
+// would impact the Model.
 func (model *Model) Transform() Matrix4 {
 
 	if model.isTransformDirty {
@@ -113,9 +112,19 @@ func (model *Model) Transform() Matrix4 {
 			model.BoundingSphere.SetLocalPosition(wp)
 		}
 
-	}
+		dim := model.Mesh.Dimensions.Clone()
+		scale := model.WorldScale()
+		dim[0][0] *= scale[0]
+		dim[0][1] *= scale[1]
+		dim[0][2] *= scale[2]
 
-	model.BoundingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
+		dim[1][0] *= scale[0]
+		dim[1][1] *= scale[1]
+		dim[1][2] *= scale[2]
+
+		model.BoundingSphere.Radius = dim.MaxSpan() / 2
+
+	}
 
 	return model.Node.Transform()
 
@@ -125,7 +134,24 @@ func (model *Model) Transform() Matrix4 {
 // thereby saving on draw calls. Note that models are merged into MeshParts (saving draw calls) based on maximum vertex count and shared materials (so to get any
 // benefit from merging, ensure the merged models share materials; if they all have unique materials, they will be turned into individual MeshParts, thereby forcing multiple
 // draw calls).
+
 func (model *Model) Merge(models ...*Model) {
+
+	totalSize := 0
+	for _, other := range models {
+		if model == other {
+			continue
+		}
+		totalSize += len(other.Mesh.VertexPositions)
+	}
+
+	if totalSize == 0 {
+		return
+	}
+
+	if model.Mesh.triIndex*3+totalSize > model.Mesh.VertexMax {
+		model.Mesh.allocateVertexBuffers(model.Mesh.VertexMax + totalSize)
+	}
 
 	for _, other := range models {
 
@@ -151,7 +177,7 @@ func (model *Model) Merge(models ...*Model) {
 			var targetPart *MeshPart
 
 			for _, mp := range model.Mesh.MeshParts {
-				if mp.Material == otherPart.Material && len(mp.Triangles)+len(otherPart.Triangles) < ebiten.MaxIndicesNum/3 {
+				if mp.Material == otherPart.Material && mp.TriangleCount()+otherPart.TriangleCount() < ebiten.MaxIndicesNum/3 {
 					targetPart = mp
 					break
 				}
@@ -159,23 +185,21 @@ func (model *Model) Merge(models ...*Model) {
 
 			if targetPart == nil {
 				targetPart = model.Mesh.AddMeshPart(otherPart.Material)
+				// targetPart.allocateSortingBuffer(ebiten.MaxIndicesNum)
 			}
 
-			verts := []*Vertex{}
+			verts := []VertexInfo{}
 
-			for _, tri := range otherPart.Triangles {
-
-				v0 := tri.Vertices[0].Clone()
-				v0.Position = inverted.MultVec(v0.Position)
-
-				v1 := tri.Vertices[1].Clone()
-				v1.Position = inverted.MultVec(v1.Position)
-
-				v2 := tri.Vertices[2].Clone()
-				v2.Position = inverted.MultVec(v2.Position)
-
-				verts = append(verts, v0, v1, v2)
-
+			for triIndex := otherPart.TriangleStart; triIndex < otherPart.TriangleEnd; triIndex++ {
+				for i := 0; i < 3; i++ {
+					vertInfo := otherPart.Mesh.GetVertexInfo(triIndex*3 + i)
+					vec := vector.Vector{vertInfo.X, vertInfo.Y, vertInfo.Z}
+					x, y, z := fastMatrixMultVec(inverted, vec)
+					vertInfo.X = x
+					vertInfo.Y = y
+					vertInfo.Z = z
+					verts = append(verts, vertInfo)
+				}
 			}
 
 			targetPart.AddTriangles(verts...)
@@ -189,8 +213,7 @@ func (model *Model) Merge(models ...*Model) {
 	model.BoundingSphere.SetLocalPosition(model.Mesh.Dimensions.Center())
 	model.BoundingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
 
-	model.vectorPool = NewVectorPool(model.Mesh.TotalVertexCount())
-	model.skinVectorPool = NewVectorPool(model.Mesh.TotalVertexCount())
+	model.skinVectorPool = NewVectorPool(len(model.Mesh.VertexPositions))
 
 }
 
@@ -228,44 +251,47 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 
 }
 
-func (model *Model) skinVertex(vertex *Vertex) vector.Vector {
+func (model *Model) skinVertex(vertID int) vector.Vector {
 
 	// Avoid reallocating a new matrix for every vertex; that's wasteful
 	model.skinMatrix.Clear()
 
-	for boneIndex, bone := range model.bones[vertex.ID] {
+	for boneIndex, bone := range model.bones[vertID] {
 
-		weightPerc := float64(vertex.Weights[boneIndex])
+		weightPerc := float64(model.Mesh.VertexWeights[vertID][boneIndex])
 
-		// The correct way to do this according to GLTF is to multiply the bone by the inverse of the model matrix, but
-		// we don't have to because we simply don't multiply the vertex by the model matrix in the first place if it's skinned.
-		influence := fastMatrixMult(bone.inverseBindMatrix, bone.Transform())
+		if weightPerc == 0 {
+			continue
+		}
+
+		// We don't actually have to calculate the bone influence; it's automatically
+		// cached in the bone (Node) when the transform changes.
+		bone.Transform()
 
 		if weightPerc == 1 {
-			model.skinMatrix = influence
+			model.skinMatrix = bone.boneInfluence
+			break // I think we can end here if the weight percentage is 100%, right?
 		} else {
-			model.skinMatrix = model.skinMatrix.Add(influence.ScaleByScalar(weightPerc))
+			model.skinMatrix = model.skinMatrix.Add(bone.boneInfluence.ScaleByScalar(weightPerc))
 		}
 
 	}
 
-	vertOut := model.skinVectorPool.MultVecW(model.skinMatrix, vertex.Position)
+	vertOut := model.skinVectorPool.MultVecW(model.skinMatrix, model.Mesh.VertexPositions[vertID])
 
 	return vertOut
 
 }
 
-func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart) []*Triangle {
+// ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
+// matrix, a camera, and the MeshPart being rendered.
+func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart) {
 
-	model.vectorPool.Reset()
+	var transformFunc func(vertPos vector.Vector, index int) vector.Vector
 
-	var transformFunc func(vector.Vector) vector.Vector
-
-	if meshPart.Material != nil && meshPart.Material.VertexProgram != nil {
-		transformFunc = meshPart.Material.VertexProgram
+	if meshPart.Material != nil && meshPart.Material.VertexTransformFunction != nil {
+		transformFunc = meshPart.Material.VertexTransformFunction
 	}
-
-	interimVertexPosition := vector.Vector{0, 0, 0}
 
 	if model.Skinned {
 
@@ -274,27 +300,31 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 		t := time.Now()
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
-		for _, tri := range meshPart.Triangles {
+		for i := 0; i < len(meshPart.sortingTriangles); i++ {
 
-			tri.visible = true
+			tri := meshPart.sortingTriangles[i]
 
-			tri.depth = math.MaxFloat64
+			depth := math.MaxFloat32
 
-			for _, vert := range tri.Vertices {
+			for v := 0; v < 3; v++ {
 
-				v := model.skinVertex(vert)
+				vertPos := model.skinVertex(tri.ID*3 + v)
 				if transformFunc != nil {
-					v = transformFunc(v)
-					if v == nil {
-						tri.visible = false
-						break
-					}
+					vertPos = transformFunc(vertPos, tri.ID*3+v)
 				}
-				vert.transformed = model.vectorPool.MultVecW(vpMatrix, v)
-				if vert.transformed[3] < tri.depth {
-					tri.depth = vert.transformed[3]
+				transformed := model.Mesh.vertexTransforms[tri.ID*3+v]
+				x, y, z, w := fastMatrixMultVecW(vpMatrix, vertPos)
+				transformed[0] = x
+				transformed[1] = y
+				transformed[2] = z
+				transformed[3] = w
+
+				if w < depth {
+					depth = w
 				}
 			}
+
+			meshPart.sortingTriangles[i].depth = float32(depth)
 
 		}
 
@@ -302,33 +332,46 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 
 	} else {
 
-		mvp := model.Transform().Mult(vpMatrix)
+		mat := meshPart.Material
 
-		for _, tri := range meshPart.Triangles {
+		var base Matrix4
+		if mat == nil || mat.BillboardMode == BillboardModeNone {
+			base = model.Transform()
+		} else if mat.BillboardMode == BillboardModeXZ {
+			base = NewLookAtMatrix(camera.WorldPosition(), model.WorldPosition(), vector.Y)
+			base = base.SetRow(1, vector.Vector{0, 1, 0, 0})
+			base = base.Mult(model.Transform())
+		} else if mat.BillboardMode == BillboardModeAll {
+			base = NewLookAtMatrix(camera.WorldPosition(), model.WorldPosition(), vector.Y).Mult(model.Transform())
+		}
 
-			tri.visible = true
+		mvp := fastMatrixMult(base, vpMatrix)
 
-			// tri.depth = 0
-			tri.depth = math.MaxFloat64
+		for i := 0; i < len(meshPart.sortingTriangles); i++ {
 
-			for _, vert := range tri.Vertices {
-				interimVertexPosition[0] = vert.Position[0]
-				interimVertexPosition[1] = vert.Position[1]
-				interimVertexPosition[2] = vert.Position[2]
+			tri := meshPart.sortingTriangles[i]
+			depth := math.MaxFloat64
+
+			for i := 0; i < 3; i++ {
+				v0 := model.Mesh.VertexPositions[tri.ID*3+i]
+
 				if transformFunc != nil {
-					interimVertexPosition = transformFunc(interimVertexPosition)
-					if interimVertexPosition == nil {
-						tri.visible = false
-						break
-					}
-				}
-				vert.transformed = model.vectorPool.MultVecW(mvp, interimVertexPosition)
-
-				if vert.transformed[3] < tri.depth {
-					tri.depth = vert.transformed[3]
+					v0 = transformFunc(v0.Clone(), tri.ID*3+i)
 				}
 
+				t0 := model.Mesh.vertexTransforms[tri.ID*3+i]
+				x, y, z, w := fastMatrixMultVecW(mvp, v0)
+				t0[0] = x
+				t0[1] = y
+				t0[2] = z
+				t0[3] = w
+
+				if w < depth {
+					depth = w
+				}
 			}
+
+			meshPart.sortingTriangles[i].depth = float32(depth)
 
 		}
 
@@ -343,16 +386,14 @@ func (model *Model) TransformedVertices(vpMatrix Matrix4, camera *Camera, meshPa
 	// Preliminary tests indicate sort.SliceStable is faster than sort.Slice for our purposes
 
 	if sortMode == TriangleSortModeBackToFront {
-		sort.SliceStable(meshPart.sortedTriangles, func(i, j int) bool {
-			return meshPart.sortedTriangles[i].depth > meshPart.sortedTriangles[j].depth
+		sort.SliceStable(meshPart.sortingTriangles, func(i, j int) bool {
+			return meshPart.sortingTriangles[i].depth > meshPart.sortingTriangles[j].depth
 		})
 	} else if sortMode == TriangleSortModeFrontToBack {
-		sort.SliceStable(meshPart.sortedTriangles, func(i, j int) bool {
-			return meshPart.sortedTriangles[i].depth < meshPart.sortedTriangles[j].depth
+		sort.SliceStable(meshPart.sortingTriangles, func(i, j int) bool {
+			return meshPart.sortingTriangles[i].depth < meshPart.sortingTriangles[j].depth
 		})
 	}
-
-	return meshPart.sortedTriangles
 
 }
 

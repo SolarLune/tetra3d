@@ -103,6 +103,7 @@ func (g *Game) Init() {
 	g.Camera.Far = 180
 	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
 
+	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMaximum)
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
@@ -275,7 +276,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 func main() {
 
 	ebiten.SetWindowTitle("Tetra3d Test - Stress Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

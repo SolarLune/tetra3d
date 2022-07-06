@@ -289,7 +289,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 func main() {
 
 	ebiten.SetWindowTitle("Tetra3d - Parenting Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

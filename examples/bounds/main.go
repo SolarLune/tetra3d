@@ -45,8 +45,8 @@ type Game struct {
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             1920,
-		Height:            1080,
+		Width:             796,
+		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -249,7 +249,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.White())
+		g.Camera.DrawDebugFrustums(screen, g.Scene.Root, colors.White())
+		// g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.White())
 	}
 
 	if g.DrawDebugNormals {
@@ -291,7 +292,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 
 func main() {
 	ebiten.SetWindowTitle("Tetra3d - Shapes Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

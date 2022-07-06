@@ -111,11 +111,15 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *In
 
 	for _, meshPart := range triangles.Mesh.MeshParts {
 
-		for _, tri := range meshPart.Triangles {
+		mesh := meshPart.Mesh
 
-			v0 := tri.Vertices[0].Position
-			v1 := tri.Vertices[1].Position
-			v2 := tri.Vertices[2].Position
+		for i := meshPart.TriangleStart; i < meshPart.TriangleEnd; i++ {
+
+			tri := mesh.Triangles[i]
+
+			v0 := mesh.VertexPositions[tri.ID*3]
+			v1 := mesh.VertexPositions[tri.ID*3+1]
+			v2 := mesh.VertexPositions[tri.ID*3+2]
 
 			// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
 			// only has to check triangles in the nearby cells.
@@ -267,11 +271,15 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Intersect
 
 	for _, meshPart := range triangles.Mesh.MeshParts {
 
-		for _, tri := range meshPart.Triangles {
+		mesh := meshPart.Mesh
 
-			v0 := transform.MultVec(tri.Vertices[0].Position).Sub(boxPos)
-			v1 := transform.MultVec(tri.Vertices[1].Position).Sub(boxPos)
-			v2 := transform.MultVec(tri.Vertices[2].Position).Sub(boxPos)
+		for i := meshPart.TriangleStart; i < meshPart.TriangleEnd; i++ {
+
+			tri := mesh.Triangles[i]
+
+			v0 := transform.MultVec(mesh.VertexPositions[tri.ID*3]).Sub(boxPos)
+			v1 := transform.MultVec(mesh.VertexPositions[tri.ID*3+1]).Sub(boxPos)
+			v2 := transform.MultVec(mesh.VertexPositions[tri.ID*3+2]).Sub(boxPos)
 			// tc := v0.Add(v1).Add(v2).Scale(1.0 / 3.0)
 
 			ab := v1.Sub(v0).Unit()
@@ -375,11 +383,15 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Intersecti
 
 	for _, meshPart := range trianglesA.Mesh.MeshParts {
 
-		for _, tri := range meshPart.Triangles {
+		mesh := meshPart.Mesh
 
-			v0 := transformA.MultVec(tri.Vertices[0].Position)
-			v1 := transformA.MultVec(tri.Vertices[1].Position)
-			v2 := transformA.MultVec(tri.Vertices[2].Position)
+		for i := meshPart.TriangleStart; i < meshPart.TriangleEnd; i++ {
+
+			tri := mesh.Triangles[i]
+
+			v0 := transformA.MultVec(mesh.VertexPositions[tri.ID*3])
+			v1 := transformA.MultVec(mesh.VertexPositions[tri.ID*3+1])
+			v2 := transformA.MultVec(mesh.VertexPositions[tri.ID*3+2])
 
 			transformedA = append(transformedA,
 				[]vector.Vector{
@@ -399,11 +411,15 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Intersecti
 
 	for _, meshPart := range trianglesB.Mesh.MeshParts {
 
-		for _, tri := range meshPart.Triangles {
+		mesh := meshPart.Mesh
 
-			v0 := transformB.MultVec(tri.Vertices[0].Position)
-			v1 := transformB.MultVec(tri.Vertices[1].Position)
-			v2 := transformB.MultVec(tri.Vertices[2].Position)
+		for i := meshPart.TriangleStart; i < meshPart.TriangleEnd; i++ {
+
+			tri := mesh.Triangles[i]
+
+			v0 := transformB.MultVec(mesh.VertexPositions[tri.ID*3])
+			v1 := transformB.MultVec(mesh.VertexPositions[tri.ID*3+1])
+			v2 := transformB.MultVec(mesh.VertexPositions[tri.ID*3+2])
 
 			bTris = append(bTris, tri)
 
@@ -556,7 +572,11 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	for _, meshPart := range triangles.Mesh.MeshParts {
 
-		for _, tri := range meshPart.Triangles {
+		mesh := meshPart.Mesh
+
+		for i := meshPart.TriangleStart; i < meshPart.TriangleEnd; i++ {
+
+			tri := mesh.Triangles[i]
 
 			// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
 			// only has to check triangles in the nearby cells.
@@ -570,9 +590,9 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 				closestCapsulePoint = capsuleBottom
 			}
 
-			v0 := tri.Vertices[0].Position
-			v1 := tri.Vertices[1].Position
-			v2 := tri.Vertices[2].Position
+			v0 := mesh.VertexPositions[tri.ID*3]
+			v1 := mesh.VertexPositions[tri.ID*3+1]
+			v2 := mesh.VertexPositions[tri.ID*3+2]
 
 			closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
 

@@ -432,6 +432,7 @@ func (matrix Matrix4) Column(columnIndex int) vector.Vector {
 
 // SetRow returns a clone of the Matrix4 with the row in rowIndex set to the 4D vector passed.
 func (matrix Matrix4) SetRow(rowIndex int, vec vector.Vector) Matrix4 {
+	// TODO: Would probably be better to make this simply functions that alter a Matrix4, rather than making a copy of the Matrix4 and returning that copy.
 	for i := range matrix[rowIndex] {
 		matrix[rowIndex][i] = vec[i]
 	}

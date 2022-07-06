@@ -34,9 +34,10 @@ type Game struct {
 	CameraTilt   float64
 	CameraRotate float64
 
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	PrevMousePosition vector.Vector
+	DrawDebugText      bool
+	DrawDebugWireframe bool
+	DrawDebugDepth     bool
+	PrevMousePosition  vector.Vector
 
 	Time float64
 }
@@ -85,8 +86,8 @@ func (g *Game) Init() {
 
 	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
 
-	water.Mesh.MeshParts[0].Material.VertexProgram = func(v vector.Vector) vector.Vector {
-		v[1] += math.Sin((g.Time*math.Pi)+(v[0]*1.2)+(v[2]*0.739)) * 0.007
+	water.Mesh.MeshParts[0].Material.VertexTransformFunction = func(v vector.Vector, vertID int) vector.Vector {
+		v[1] += math.Sin((g.Time*math.Pi)+(v[0]*1.2)+(v[2]*0.739)) * 0.1
 		return v
 	}
 
@@ -196,7 +197,11 @@ func (g *Game) Update() error {
 		g.DrawDebugText = !g.DrawDebugText
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+		g.DrawDebugWireframe = !g.DrawDebugWireframe
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
@@ -224,6 +229,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(g.Camera.ColorTexture(), opt)
 	}
 
+	if g.DrawDebugWireframe {
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Blue())
+	}
+
 	if g.DrawDebugText {
 
 		g.Camera.DrawDebugText(screen, 1, colors.Black())
@@ -239,9 +248,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			"They can overlap (bad), but also show things\n" +
 			"underneath (good).\n" +
 			"1 Key: Toggle transparency, currently: " + transparencyOn +
-			"\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+			"\nF2: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{255, 0, 0, 255})
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{0, 0, 40, 255})
 
 	}
 }
@@ -267,8 +276,8 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Lighting Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowTitle("Tetra3d - Transparency Test")
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

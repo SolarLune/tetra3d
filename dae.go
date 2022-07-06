@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/kvartborg/vector"
 )
 
 type daeSource struct {
@@ -188,8 +186,6 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 	scene.library = scenes
 	scenes.ExportedScene = scene
 
-	toYUp := NewMatrix4Rotate(1, 0, 0, math.Pi/2)
-
 	daeURLsToMeshes := map[string]*Mesh{}
 	daeURLsToMaterials := map[string]*Material{}
 
@@ -235,12 +231,13 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 		}
 
-		verts := []*Vertex{}
-		normals := map[*Vertex]vector.Vector{}
+		verts := []VertexInfo{}
+		// normals := map[*Vertex]vector.Vector{}
 
 		x, y, z := 0.0, 0.0, 0.0
 		u, v := 0.0, 0.0
 		r, g, b, a := float32(1.0), float32(1.0), float32(1.0), float32(1.0)
+		hasColor := false
 		nx, ny, nz := 0.0, 0.0, 0.0
 
 		for i := 0; i < len(triangleIndices); i++ {
@@ -265,6 +262,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 				g = float32(sourceData["color"][(tv*4)+1])
 				b = float32(sourceData["color"][(tv*4)+2])
 				a = float32(sourceData["color"][(tv*4)+3])
+				hasColor = true
 
 			case "normal":
 
@@ -278,14 +276,19 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 				vert := NewVertex(x, y, z, u, v)
 
-				vert.Colors[0].R = r
-				vert.Colors[0].G = g
-				vert.Colors[0].B = b
-				vert.Colors[0].A = a
+				if hasColor {
+					col := NewColor(r, g, b, a)
+					vert.Colors = append(vert.Colors, col)
+					vert.ActiveColorChannel = 0
+				}
+
+				vert.NormalX = nx
+				vert.NormalY = ny
+				vert.NormalZ = nz
 
 				verts = append(verts, vert)
 
-				normals[vert] = vector.Vector{nx, ny, nz}
+				// normals[vert] = vector.Vector{nx, ny, nz}
 
 			}
 
@@ -296,32 +299,47 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 		mesh.AddMeshPart(mat).AddTriangles(verts...)
 		mesh.library = scenes
 
-		if len(normals) > 0 {
+		// if len(normals) > 0 {
 
-			for _, part := range mesh.MeshParts {
+		// 	for _, part := range mesh.MeshParts {
 
-				for _, tri := range part.Triangles {
+		// 		for _, tri := range part.Triangles {
 
-					normal := vector.Vector{0, 0, 0}
-					for _, vert := range tri.Vertices {
-						normal = normal.Add(normals[vert])
-					}
-					normal = normal.Scale(1.0 / 3.0).Unit()
+		// 			normal := vector.Vector{0, 0, 0}
+		// 			for _, vert := range tri.Vertices {
+		// 				normal = normal.Add(normals[vert])
+		// 			}
+		// 			normal = normal.Scale(1.0 / 3.0).Unit()
 
-					normal = toYUp.MultVec(normal)
-					normal[2] *= -1
-					normal[1] *= -1
-					tri.Normal = normal
+		// 			normal = toYUp.MultVec(normal)
+		// 			normal[2] *= -1
+		// 			normal[1] *= -1
+		// 			tri.Normal = normal
 
-				}
+		// 		}
 
-				if options.CorrectYUp {
-					part.ApplyMatrix(NewMatrix4Rotate(1, 0, 0, -math.Pi/2))
-					mesh.UpdateBounds()
-				}
+		// 		if options.CorrectYUp {
+		// 			part.ApplyMatrix(NewMatrix4Rotate(1, 0, 0, -math.Pi/2))
+		// 			mesh.UpdateBounds()
+		// 		}
 
+		// 	}
+
+		// }
+
+		if options.CorrectYUp {
+			// for _, part := range mesh.MeshParts {
+			// 	part.ApplyMatrix(NewMatrix4Rotate(1, 0, 0, -math.Pi/2))
+			// 	mesh.UpdateBounds()
+			// }
+
+			rotate := NewMatrix4Rotate(1, 0, 0, -math.Pi/2)
+			for i := range mesh.VertexPositions {
+				x, y, z := fastMatrixMultVec(rotate, mesh.VertexPositions[i])
+				mesh.VertexPositions[i][0] = x
+				mesh.VertexPositions[i][1] = y
+				mesh.VertexPositions[i][2] = z
 			}
-
 		}
 
 		scenes.Meshes[geo.Name] = mesh

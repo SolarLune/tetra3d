@@ -38,7 +38,7 @@ func (sphere *BoundingSphere) AddChildren(children ...INode) {
 func (sphere *BoundingSphere) WorldRadius() float64 {
 	maxScale := 1.0
 	if sphere.Node != nil {
-		scale := sphere.Node.LocalScale()
+		scale := sphere.Node.WorldScale()
 		maxScale = math.Max(math.Max(math.Abs(scale[0]), math.Abs(scale[1])), math.Abs(scale[2]))
 	}
 	return sphere.Radius * maxScale

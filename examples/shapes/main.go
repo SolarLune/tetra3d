@@ -29,7 +29,7 @@ type Game struct {
 	Width, Height int
 	Scene         *tetra3d.Scene
 
-	Camera       tetra3d.INode
+	Camera       *tetra3d.Camera
 	CameraTilt   float64
 	CameraRotate float64
 
@@ -42,8 +42,8 @@ type Game struct {
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             398,
-		Height:            224,
+		Width:             796,
+		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -68,12 +68,11 @@ func (g *Game) Init() {
 
 	g.Scene = library.FindScene("Scene")
 
-	// Cameras are loaded from the GLTF file. By default, there's a correction so that they point in the correct direction
-	// when compared with Blender.
-	g.Camera = g.Scene.Root.Get("Camera")
+	// Cameras are loaded from the GLTF file.
+	g.Camera = g.Scene.Root.Get("Camera").(*tetra3d.Camera)
 
 	// g.Camera.RenderDepth = false // You can turn off depth rendering if your computer doesn't do well with shaders or rendering to offscreen buffers,
-	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to camera.
+	// but this will turn off inter-object depth sorting. Instead, Tetra's Camera will render objects in order of distance to g.Camera.
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -88,9 +87,7 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	camera := g.Camera.Get("Camera_Orientation").(*tetra3d.Camera)
-
-	forward := g.Camera.LocalRotation().Up().Invert()
+	forward := g.Camera.LocalRotation().Forward().Invert()
 	right := g.Camera.LocalRotation().Right()
 
 	pos := g.Camera.LocalPosition()
@@ -122,7 +119,7 @@ func (g *Game) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
-	// Rotate and tilt the camera according to mouse movements
+	// Rotate and tilt the g.Camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
 	mv := vector.Vector{float64(mx), float64(my)}
@@ -132,7 +129,8 @@ func (g *Game) Update() error {
 	g.CameraTilt -= diff[1] * 0.005
 	g.CameraRotate -= diff[0] * 0.005
 
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi-0.1), -0.1)
+	// Limit camera tilting
+	g.CameraTilt = math.Max(math.Min(g.CameraTilt, tetra3d.ToRadians(80)), tetra3d.ToRadians(-80))
 
 	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
 	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
@@ -157,7 +155,7 @@ func (g *Game) Update() error {
 		g.Scene.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key5) {
 		g.Scene.FogMode = tetra3d.FogOff
-		g.Scene.FogColor = colors.Black() // Fog being off, this doesn't do anything directly, but the clear color is set below to the fog color
+		g.Scene.FogColor = colors.Black() // With the fog being off, setting the color doesn't do anything directly, but the clear color is set below to the fog color
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
@@ -166,7 +164,7 @@ func (g *Game) Update() error {
 			fmt.Println(err)
 		}
 		defer f.Close()
-		png.Encode(f, camera.ColorTexture())
+		png.Encode(f, g.Camera.ColorTexture())
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyR) {
@@ -200,35 +198,33 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
 	screen.Fill(g.Scene.FogColor.ToRGBA64())
 
-	camera := g.Camera.Get("Camera_Orientation").(*tetra3d.Camera)
+	g.Camera.Clear()
 
-	camera.Clear()
-
-	camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	opt := &ebiten.DrawImageOptions{}
-	w, h := camera.ColorTexture().Size()
+	w, h := g.Camera.ColorTexture().Size()
 
 	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
 	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
-		screen.DrawImage(camera.DepthTexture(), opt)
+		screen.DrawImage(g.Camera.DepthTexture(), opt)
 	} else {
-		screen.DrawImage(camera.ColorTexture(), opt)
+		screen.DrawImage(g.Camera.ColorTexture(), opt)
 	}
 
 	if g.DrawDebugText {
-		camera.DrawDebugText(screen, 1, tetra3d.NewColor(0, 0.5, 1, 1))
+		g.Camera.DrawDebugText(screen, 1, tetra3d.NewColor(0, 0.5, 1, 1))
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1, 2, 3, 4: Change fog\nF1, F2, F3, F5: Debug views\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{255, 0, 0, 255})
 	}
 
 	if g.DrawDebugWireframe {
-		camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Red())
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Red())
 	}
 
 	if g.DrawDebugNormals {
-		camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, colors.Blue())
+		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, colors.Blue())
 	}
 
 }
@@ -255,7 +251,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 
 func main() {
 	ebiten.SetWindowTitle("Tetra3d - Shapes Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

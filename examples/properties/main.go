@@ -215,8 +215,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how game properties work with\nthe Tetra3D Blender add-on.\nGame properties are set in the blend file, and\nexported from there to a GLTF file.\nThey become tags here in Tetra3D,\ninfluencing whether the cubes rotate or float.\n\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how game properties work with\nthe Tetra3D Blender add-on.\nGame properties are set in the blend file, and\nexported from there to a GLTF file.\nThey become tags here in Tetra3D,\ninfluencing whether the cubes rotate or float,\nand at what speed.\n\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{200, 200, 200, 255})
 	}
 }
 
@@ -241,8 +241,8 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Logo Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowTitle("Tetra3d - Properties Test")
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

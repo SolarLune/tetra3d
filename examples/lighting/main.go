@@ -71,6 +71,11 @@ func (g *Game) Init() {
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 2, 15})
 	g.Scene.Root.AddChildren(g.Camera)
+	light := tetra3d.NewPointLight("camera light", 1, 1, 1, 2)
+	light.Distance = 10
+	light.Move(0, 1, -2)
+	light.On = false
+	g.Camera.AddChildren(light)
 
 	// g.Scene.FogMode = tetra3d.FogMultiply
 
@@ -190,6 +195,11 @@ func (g *Game) Update() error {
 		g.Scene.LightingOn = !g.Scene.LightingOn
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+		pointLight := g.Camera.Get("camera light").(*tetra3d.PointLight)
+		pointLight.On = !pointLight.On
+	}
+
 	return err
 }
 
@@ -221,7 +231,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\n1 Key: Toggle lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\nThere are six lights in this scene:\nan ambient light, three point lights, \na single directional (sun) light,\nand one more point light parented to the camera.\n1 Key: Toggle all lighting\n2 Key: Toggle camera light\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 150, color.RGBA{255, 0, 0, 255})
 	}
 }
@@ -248,7 +258,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 
 func main() {
 	ebiten.SetWindowTitle("Tetra3d - Lighting Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

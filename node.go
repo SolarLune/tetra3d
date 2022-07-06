@@ -226,6 +226,7 @@ type Node struct {
 	animationPlayer       *AnimationPlayer
 	inverseBindMatrix     Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 	isBone                bool
+	boneInfluence         Matrix4
 	library               *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 	scene                 *Scene
 }
@@ -348,6 +349,10 @@ func (node *Node) Transform() Matrix4 {
 
 	node.cachedTransform = transform
 	node.isTransformDirty = false
+
+	if node.isBone {
+		node.boneInfluence = node.inverseBindMatrix.Mult(transform)
+	}
 
 	// We want to call child.Transform() here to ensure the children also rebuild their transforms as necessary; otherwise,
 	// children (i.e. BoundingAABBs) may not be rotating along with their owning Nodes (as they don't get rendered).

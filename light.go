@@ -16,8 +16,8 @@ type Light interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model, camera *Camera)
 
-	Light(tri *Triangle) [9]float32 // Light() returns the R, G, and B colors used to light the three vertices of the given triangle (and so, it returns a 9 length float32 array)
-	isOn() bool                     // isOn() is simply used to tell if a "generic" Light is on or not.
+	Light(triIndex int, model *Model) [9]float32 // Light() returns the R, G, and B colors used to light the given triangle
+	isOn() bool                                  // isOn() is simply used to tell if a "generic" Light is on or not.
 }
 
 //---------------//
@@ -61,12 +61,11 @@ func (amb *AmbientLight) beginRender() {}
 func (amb *AmbientLight) beginModel(model *Model, camera *Camera) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(tri *Triangle) [9]float32 {
-	return [9]float32{
-		amb.Color.R * amb.Energy, amb.Color.G * amb.Energy, amb.Color.B * amb.Energy,
-		amb.Color.R * amb.Energy, amb.Color.G * amb.Energy, amb.Color.B * amb.Energy,
-		amb.Color.R * amb.Energy, amb.Color.G * amb.Energy, amb.Color.B * amb.Energy,
-	}
+func (amb *AmbientLight) Light(triIndex int, model *Model) [9]float32 {
+	r := amb.Color.R * amb.Energy
+	g := amb.Color.G * amb.Energy
+	b := amb.Color.B * amb.Energy
+	return [9]float32{r, g, b, r, g, b, r, g, b}
 }
 
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
@@ -108,7 +107,6 @@ type PointLight struct {
 	// If the light is on and contributing to the scene.
 	On bool
 
-	vectorPool      *VectorPool
 	workingPosition vector.Vector
 	cameraPosition  vector.Vector
 }
@@ -116,12 +114,11 @@ type PointLight struct {
 // NewPointLight creates a new Point light.
 func NewPointLight(name string, r, g, b, energy float32) *PointLight {
 	return &PointLight{
-		Node:       NewNode(name),
-		Distance:   0,
-		Energy:     energy,
-		Color:      NewColor(r, g, b, 1),
-		vectorPool: NewVectorPool(6),
-		On:         true,
+		Node:     NewNode(name),
+		Distance: 0,
+		Energy:   energy,
+		Color:    NewColor(r, g, b, 1),
+		On:       true,
 	}
 }
 
@@ -159,53 +156,60 @@ func (point *PointLight) beginModel(model *Model, camera *Camera) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (point *PointLight) Light(tri *Triangle) [9]float32 {
+func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 
-	point.vectorPool.Reset()
-
-	vertColors := [9]float32{}
+	light := [9]float32{}
 
 	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
-	eyeVec := fastVectorSub(point.cameraPosition, tri.Center).Unit()
+	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
+	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
+	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-	for i, vert := range tri.Vertices {
+	triCenter := model.Mesh.Triangles[triIndex].Center
+	dist := fastVectorSub(point.cameraPosition, triCenter)
+	eyeVec := dist.Unit()
 
-		lightVec := fastVectorSub(point.workingPosition, vert.Position).Unit()
+	distanceSquared := math.Pow(point.Distance, 2)
 
-		// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
-		// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
-		// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
-		eyeFacing := 1.0
+	// If the light is too far from the vertex, just assume it's not visible.
+	if point.Distance > 0 && dist.Magnitude() > distanceSquared {
+		return light
+	}
 
-		// We don't want the light to be modulated by the eye vector, just turn the light off 100% if you're looking from the other side of the triangle
-		if dot(vert.Normal, eyeVec) < 0 {
-			eyeFacing = -1
-		}
+	// If you're on the other side of the plane, just assume it's not visible.
+	if dot(model.Mesh.Triangles[triIndex].Normal, eyeVec) < 0 {
+		return light
+	}
 
-		diffuse := dot(vert.Normal, lightVec) * eyeFacing
+	for i := 0; i < 3; i++ {
+
+		vertPos := model.Mesh.VertexPositions[triIndex*3+i]
+		vertNormal := model.Mesh.VertexNormals[triIndex*3+i]
+
+		lightVec := vector.In(fastVectorSub(point.workingPosition, vertPos)).Unit()
+		diffuse := dot(vertNormal, vector.Vector(lightVec))
 
 		if diffuse < 0 {
 			diffuse = 0
 		}
 
 		var diffuseFactor float64
-		distance := fastVectorDistanceSquared(point.workingPosition, vert.Position)
+		distance := fastVectorDistanceSquared(point.workingPosition, vertPos)
 
 		if point.Distance == 0 {
 			diffuseFactor = diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
 		} else {
-			pd := math.Pow(point.Distance, 2)
-			diffuseFactor = diffuse * math.Max(math.Min(1.0-(math.Pow((distance/pd), 4)), 1), 0)
+			diffuseFactor = diffuse * math.Max(math.Min(1.0-(math.Pow((distance/distanceSquared), 4)), 1), 0)
 		}
 
-		vertColors[(i * 3)] = point.Color.R * float32(diffuseFactor) * point.Energy
-		vertColors[(i*3)+1] = point.Color.G * float32(diffuseFactor) * point.Energy
-		vertColors[(i*3)+2] = point.Color.B * float32(diffuseFactor) * point.Energy
+		light[(i * 3)] = point.Color.R * float32(diffuseFactor) * point.Energy
+		light[(i*3)+1] = point.Color.G * float32(diffuseFactor) * point.Energy
+		light[(i*3)+2] = point.Color.B * float32(diffuseFactor) * point.Energy
 
 	}
 
-	return vertColors
+	return light
 
 }
 
@@ -281,26 +285,26 @@ func (sun *DirectionalLight) beginModel(model *Model, camera *Camera) {
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(tri *Triangle) [9]float32 {
+func (sun *DirectionalLight) Light(triIndex int, model *Model) [9]float32 {
 
-	// TODO: Directional lights should also be able to be "dark" if the camera is behind the triangle, like Point lights
-	colors := [9]float32{}
+	light := [9]float32{}
 
-	for i, vert := range tri.Vertices {
+	for i := 0; i < 3; i++ {
 
-		normal := sun.workingModelRotation.MultVec(vert.Normal)
-		eyeFacing := 1.0
+		normal := sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[triIndex*3+i])
 
-		diffuseFactor := dot(normal, sun.workingForward) * eyeFacing
+		diffuseFactor := dot(normal, sun.workingForward)
 		if diffuseFactor < 0 {
 			diffuseFactor = 0
 		}
-		colors[i*3] = sun.Color.R * float32(diffuseFactor) * sun.Energy
-		colors[i*3+1] = sun.Color.G * float32(diffuseFactor) * sun.Energy
-		colors[i*3+2] = sun.Color.B * float32(diffuseFactor) * sun.Energy
+
+		light[i*3] = sun.Color.R * float32(diffuseFactor) * sun.Energy
+		light[i*3+1] = sun.Color.G * float32(diffuseFactor) * sun.Energy
+		light[i*3+2] = sun.Color.B * float32(diffuseFactor) * sun.Energy
+
 	}
 
-	return colors
+	return light
 
 }
 

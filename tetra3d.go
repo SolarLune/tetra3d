@@ -8,26 +8,12 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-var defaultImg *ebiten.Image
+var defaultImg = ebiten.NewImage(1, 1)
 
-var colorVertexList = make([]ebiten.Vertex, 0, ebiten.MaxIndicesNum)
-var depthVertexList = make([]ebiten.Vertex, 0, ebiten.MaxIndicesNum)
-var indexList = make([]uint16, 0, ebiten.MaxIndicesNum)
-var triList = make([]*Triangle, 0, ebiten.MaxIndicesNum/3)
+var colorVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesNum)
+var depthVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesNum)
+var indexList = make([]uint16, ebiten.MaxIndicesNum)
 
 func init() {
-
-	defaultImg = ebiten.NewImage(4, 4)
 	defaultImg.Fill(color.White)
-
-	for i := 0; i < cap(colorVertexList); i++ {
-		colorVertexList = append(colorVertexList, ebiten.Vertex{})
-		depthVertexList = append(depthVertexList, ebiten.Vertex{})
-		indexList = append(indexList, 0)
-	}
-
-	for i := 0; i < cap(triList); i++ {
-		triList = append(triList, nil)
-	}
-
 }

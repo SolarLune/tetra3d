@@ -36,6 +36,12 @@ materialCompositeModes = [
     ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as CompositeModeClear", 0, 3),
 ]
 
+materialBillboardModes = [
+    ("NONE", "None", "No billboarding - the (unskinned) object with this material does not rotate to face the camera.", 0, 0),
+    ("XZ", "X/Z", "X/Z billboarding - the (unskinned) object with this material rotates to the face the camera only on the X and Z axes (not the Y axis).", 0, 1),
+    ("FULL", "Full", "Full billboarding - the (unskinned) object rotates fully to face the camera.", 0, 2),
+]
+
 GamePropTypeBool = 1
 GamePropTypeFloat = 2
 GamePropTypeString = 3
@@ -277,6 +283,8 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.prop(context.material, "blend_method")
         row = self.layout.row()
         row.prop(context.material, "t3dCompositeMode__")
+        row = self.layout.row()
+        row.prop(context.material, "t3dBillboardMode__")
         
 # The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
 def globalGet(propName):
@@ -615,6 +623,7 @@ def register():
     bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
     bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
+    bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
     
     if not exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.append(exportOnSave)
@@ -647,6 +656,7 @@ def unregister():
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__
     del bpy.types.Material.t3dCompositeMode__
+    del bpy.types.Material.t3dBillboardMode__
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)

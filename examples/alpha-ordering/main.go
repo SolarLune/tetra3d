@@ -207,7 +207,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis demo shows how composite modes work.\nThe blue plane is opaque.\nThe red one is additive.\nThe green one is transparent.\nThe closest plane cuts out all objects to show the background.\n\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 130, color.RGBA{255, 0, 0, 255})
 	}
 }
 
@@ -232,8 +232,8 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Logo Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowTitle("Tetra3d - Alpha Ordering Test")
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

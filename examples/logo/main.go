@@ -64,6 +64,8 @@ func (g *Game) Init() {
 	// And set its image to the offscreen buffer
 	data.Materials["ScreenTexture"].Texture = g.Offscreen
 
+	g.Scene.LightingOn = false
+
 	// This is another way to do it
 	// screen := g.Scene.Root.Get("Screen").(*tetra3d.Model)
 	// screen.Mesh.FindMeshPartByMaterialName("ScreenTexture").Material.Image = g.Offscreen
@@ -231,7 +233,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 
 func main() {
 	ebiten.SetWindowTitle("Tetra3d - Logo Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

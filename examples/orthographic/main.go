@@ -40,8 +40,8 @@ type Game struct {
 func NewGame() *Game {
 
 	game := &Game{
-		Width:         398,
-		Height:        224,
+		Width:         398 * 2,
+		Height:        224 * 2,
 		DrawDebugText: true,
 	}
 
@@ -52,26 +52,21 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(sceneData, nil)
+	// Because we're loading a GLTF file that contains a camera, we'll specify the camera width and height
+	// below in loadOptions - any camera instantiated from a GLTF scene will have the specified size variables.
+
+	loadOptions := tetra3d.DefaultGLTFLoadOptions()
+	loadOptions.CameraWidth = g.Width
+	loadOptions.CameraHeight = g.Height
+
+	library, err := tetra3d.LoadGLTFData(sceneData, loadOptions)
 	if err != nil {
 		panic(err)
 	}
 
 	g.Scene = library.Scenes[0]
 
-	camera := tetra3d.NewCamera(g.Width, g.Height)
-	camera.SetOrthographic(40)
-	camera.Far = 60
-
 	g.CamHandle = g.Scene.Root.Get("CameraHandle")
-
-	placeholder := g.CamHandle.Get("CameraPlaceholder")
-
-	g.CamHandle.AddChildren(camera)
-	camera.SetWorldPosition(placeholder.WorldPosition())
-	camera.SetWorldRotation(placeholder.WorldRotation().BlenderToTetra()) // We have to flip around the axes to have the camera match the rotation of the scene's Camera Node
-
-	placeholder.Unparent() // We don't need the placeholder to be there
 
 }
 
@@ -103,15 +98,14 @@ func (g *Game) Update() error {
 		g.CamHandle.Move(-moveSpd, 0, 0)
 	}
 
-	// Note that adjusting the ortho scale makes it so you can see more or less, so the far clipping distance should also
-	// be adjusted to compensate. I'll forego that for now for simplicity.
-
+	// Adjusting orthoscale changes how much you can see from an orthographic camera - this is both zooming and FOV changes.
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
 		camera.OrthoScale += 0.5
 	} else if ebiten.IsKeyPressed(ebiten.KeyW) {
 		camera.OrthoScale -= 0.5
 	}
 
+	// Limit orthoscale to size.
 	camera.OrthoScale = math.Max(math.Min(camera.OrthoScale, 80), 10)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
@@ -199,8 +193,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
 	opt := &ebiten.DrawImageOptions{}
-	w, h := camera.ColorTexture().Size()
-	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
 		screen.DrawImage(camera.DepthTexture(), opt)
 	} else {
@@ -233,7 +225,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 func main() {
 
 	ebiten.SetWindowTitle("Tetra3d Test - Orthographic Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

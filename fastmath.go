@@ -1,6 +1,10 @@
 package tetra3d
 
-import "github.com/kvartborg/vector"
+import (
+	"math"
+
+	"github.com/kvartborg/vector"
+)
 
 // The goal of fastmath.go is to provide vector operations that don't clone the vector to use. This means the main usage is not to use the results
 // directly, but rather as intermediary steps (i.e. use fastVectorSub to compare distances, or fastMatrixMult to multiply a vector by that final matrix).
@@ -49,12 +53,25 @@ func fastMatrixMult(matrix, other Matrix4) Matrix4 {
 
 }
 
-func fastMatrixMultVec(matrix Matrix4, vect vector.Vector) vector.Vector {
+func fastMatrixMultVec(matrix Matrix4, vect vector.Vector) (x, y, z float64) {
 
-	standinVector[0] = matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0]
-	standinVector[1] = matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1]
-	standinVector[2] = matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2]
-	return standinVector
+	x = matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0]
+	y = matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1]
+	z = matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2]
+
+	return
+
+}
+
+func fastMatrixMultVecW(matrix Matrix4, vect vector.Vector) (x, y, z, w float64) {
+
+	x = matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0]
+	y = matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1]
+	z = matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2]
+	w = matrix[0][3]*vect[0] + matrix[1][3]*vect[1] + matrix[2][3]*vect[2] + matrix[3][3]
+
+	return
+
 }
 
 func vectorCross(vecA, vecB, failsafeVec vector.Vector) vector.Vector {
@@ -151,4 +168,9 @@ func (pool *VectorPool) Cross(v0, v1 vector.Vector) vector.Vector {
 // Fast dot that should never call append() on the input Vectors, regardless of dimensions
 func dot(a, b vector.Vector) float64 {
 	return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+}
+
+// ToRadians is a helper function to easily convert degrees to radians (which is what the rotation-oriented functions in Tetra3D use).
+func ToRadians(degrees float64) float64 {
+	return math.Pi * degrees / 180
 }

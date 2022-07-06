@@ -82,17 +82,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	library := NewLibrary()
 
-	type VertexData struct {
-		Pos        vector.Vector
-		UV         vector.Vector
-		Normal     vector.Vector
-		Colors     [8]*Color
-		WeightData []float32
-		Bones      []uint16
-	}
-
-	verticesToBones := make(map[*Vertex][]uint16)
-
 	var images []*ebiten.Image
 
 	exportedTextures := false
@@ -105,6 +94,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	collections := map[string]Collection{}
 
+	t3dExport := false
+
 	if len(doc.Scenes) > 0 {
 
 		if doc.Scenes[0].Extras != nil {
@@ -112,10 +103,12 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			globalExporterSettings := doc.Scenes[0].Extras.(map[string]interface{})
 
 			if et, exists := globalExporterSettings["t3dPackTextures__"]; exists {
+				t3dExport = true
 				exportedTextures = et.(float64) > 0
 			}
 
 			if col, exists := globalExporterSettings["t3dCollections__"]; exists {
+				t3dExport = true
 				data := col.(map[string]interface{})
 
 				jsonData, err := json.Marshal(data)
@@ -161,13 +154,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		newMat := NewMaterial(gltfMat.Name)
 		newMat.library = library
-		color := gltfMat.PBRMetallicRoughness.BaseColorFactor
-
-		newMat.Color.R = float32(color[0])
-		newMat.Color.G = float32(color[1])
-		newMat.Color.B = float32(color[2])
-		newMat.Color.A = float32(color[3])
-		newMat.Color.ConvertTosRGB()
 
 		if gltfLoadOptions.LoadBackfaceCulling {
 			newMat.BackfaceCulling = !gltfMat.DoubleSided
@@ -211,6 +197,18 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				}
 
+				if s, exists := dataMap["t3dBillboardMode__"]; exists {
+					switch int(s.(float64)) {
+					case 0:
+						newMat.BillboardMode = BillboardModeNone
+					case 1:
+						newMat.BillboardMode = BillboardModeXZ
+					case 2:
+						newMat.BillboardMode = BillboardModeAll
+					}
+
+				}
+
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
 						newMat.Tags.Set(tagName, data)
@@ -218,6 +216,17 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				}
 			}
 		}
+
+		// If it's not exported through the Tetra addon, then just load the default GLTF material color value
+		if !t3dExport {
+			color := gltfMat.PBRMetallicRoughness.BaseColorFactor
+			newMat.Color.R = float32(color[0])
+			newMat.Color.G = float32(color[1])
+			newMat.Color.B = float32(color[2])
+			newMat.Color.A = float32(color[3])
+		}
+
+		newMat.Color.ConvertTosRGB()
 
 		if gltfMat.AlphaMode == gltf.AlphaOpaque {
 			if gltfLoadOptions.DefaultToAutoTransparency {
@@ -270,15 +279,16 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				return nil, err
 			}
 
-			vertexData := make([]VertexData, len(vertPos))
+			vertexData := make([]VertexInfo, len(vertPos))
 
 			for i, v := range vertPos {
 
-				vertexData[i] = VertexData{
-					Pos: vector.Vector{float64(v[0]), float64(v[1]), float64(v[2])},
-				}
-
-				vertexData[i].Colors[0] = NewColor(1, 1, 1, 1)
+				vertexData[i] = NewVertex(
+					float64(v[0]),
+					float64(v[1]),
+					float64(v[2]),
+					0, 0,
+				)
 
 			}
 
@@ -293,7 +303,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				}
 
 				for i, v := range texCoords {
-					vertexData[i].UV = vector.Vector{float64(v[0]), -(float64(v[1]) - 1)}
+					vertexData[i].U = float64(v[0])
+					vertexData[i].V = -(float64(v[1]) - 1)
 				}
 
 			}
@@ -309,7 +320,9 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				}
 
 				for i, v := range normals {
-					vertexData[i].Normal = vector.Vector{float64(v[0]), float64(v[1]), float64(v[2])}
+					vertexData[i].NormalX = float64(v[0])
+					vertexData[i].NormalY = float64(v[1])
+					vertexData[i].NormalZ = float64(v[2])
 				}
 
 			}
@@ -329,19 +342,18 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						return nil, err
 					}
 
-					for i, v := range colors {
-
-						if vertexData[i].Colors[colorChannelIndex] == nil {
-							vertexData[i].Colors[colorChannelIndex] = NewColor(1, 1, 1, 1)
-						}
+					for i, colorData := range colors {
 
 						// colors are exported from Blender as linear, but display as sRGB so we'll convert them here
-						color := vertexData[i].Colors[colorChannelIndex]
-						color.R = float32(v[0]) / math.MaxUint16
-						color.G = float32(v[1]) / math.MaxUint16
-						color.B = float32(v[2]) / math.MaxUint16
-						color.A = float32(v[3]) / math.MaxUint16
+						color := NewColor(
+							float32(colorData[0])/math.MaxUint16,
+							float32(colorData[1])/math.MaxUint16,
+							float32(colorData[2])/math.MaxUint16,
+							float32(colorData[3])/math.MaxUint16,
+						)
 						color.ConvertTosRGB()
+						vertexData[i].Colors = append(vertexData[i].Colors, color)
+						vertexData[i].ActiveColorChannel = 0
 
 					}
 
@@ -372,7 +384,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					vWeights := weights[w]
 					for i := range vWeights {
 						if vWeights[i] > 0 {
-							vertexData[w].WeightData = append(vertexData[w].WeightData, vWeights[i])
+							vertexData[w].Weights = append(vertexData[w].Weights, vWeights[i])
 							vertexData[w].Bones = append(vertexData[w].Bones, bones[w][i])
 						}
 					}
@@ -388,26 +400,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				return nil, err
 			}
 
-			newVerts := make([]*Vertex, len(indices))
+			newVerts := make([]VertexInfo, len(indices))
 
 			for i := 0; i < len(indices); i++ {
-				vd := vertexData[indices[i]]
-				newVert := NewVertex(vd.Pos[0], vd.Pos[1], vd.Pos[2], vd.UV[0], vd.UV[1])
-				for index, color := range vd.Colors {
-					if color == nil {
-						continue
-					}
-					if index < len(newVert.Colors) {
-						newVert.Colors[index] = color
-					} else {
-						newVert.Colors = append(newVert.Colors, color)
-					}
-				}
-
-				newVert.Weights = vd.WeightData
-				newVert.Normal = vd.Normal
-				newVerts[i] = newVert
-				verticesToBones[newVert] = vd.Bones
+				newVerts[i] = vertexData[indices[i]]
 			}
 
 			var mat *Material
@@ -420,27 +416,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			mp := newMesh.AddMeshPart(mat)
 
 			mp.AddTriangles(newVerts...)
-
-			for _, tri := range mp.Triangles {
-				tri.Normal = tri.Vertices[0].Normal.Add(tri.Vertices[1].Normal).Add(tri.Vertices[2].Normal).Unit()
-			}
-
-			// if vertexData[0].Normal != nil {
-
-			// 	normals := []vector.Vector{}
-
-			// 	for i := 0; i < len(indices); i += 3 {
-			// 		normal := vertexData[indices[i]].Normal
-			// 		normal = normal.Add(vertexData[indices[i+1]].Normal)
-			// 		normal = normal.Add(vertexData[indices[i+2]].Normal)
-			// 		normals = append(normals, normal.Unit())
-			// 	}
-
-			// 	for triIndex, tri := range newMesh.Triangles {
-			// 		tri.Normal = normals[triIndex]
-			// 	}
-
-			// }
 
 			newMesh.UpdateBounds()
 
@@ -793,7 +768,19 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							radius := getOrDefaultFloat("t3dSphereCustomRadius__", 1)
 							sphere = NewBoundingSphere("_bounding sphere", radius)
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-							sphere = NewBoundingSphere("_bounding sphere", obj.(*Model).Mesh.Dimensions.MaxSpan()/2)
+
+							model := obj.(*Model)
+							dim := model.Mesh.Dimensions.Clone()
+							scale := model.WorldScale()
+							dim[0][0] *= scale[0]
+							dim[0][1] *= scale[1]
+							dim[0][2] *= scale[2]
+
+							dim[1][0] *= scale[0]
+							dim[1][1] *= scale[1]
+							dim[1][2] *= scale[2]
+
+							sphere = NewBoundingSphere("_bounding sphere", dim.MaxSpan()/2)
 						}
 
 						if sphere != nil {
@@ -906,19 +893,29 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
-			for _, part := range model.Mesh.MeshParts {
+			for vertIndex, boneIndices := range model.Mesh.VertexBones {
+				model.bones = append(model.bones, []*Node{})
 
-				for _, vertex := range part.Vertices {
-
-					model.bones = append(model.bones, []*Node{})
-
-					for _, boneID := range verticesToBones[vertex] {
-						model.bones[vertex.ID] = append(model.bones[vertex.ID], allBones[boneID])
-					}
-
+				for _, boneID := range boneIndices {
+					model.bones[vertIndex] = append(model.bones[vertIndex], allBones[boneID])
 				}
 
+				// model.Mesh.VertexBones[i] = append(model.Mesh.VertexBones[i], )
 			}
+
+			// for _, part := range model.Mesh.MeshParts {
+
+			// 	for _, vertex := range part.Vertices {
+
+			// 		model.bones = append(model.bones, []*Node{})
+
+			// 		for _, boneID := range verticesToBones[vertex] {
+			// 			model.bones[vertex.ID] = append(model.bones[vertex.ID], allBones[boneID])
+			// 		}
+
+			// 	}
+
+			// }
 
 		}
 

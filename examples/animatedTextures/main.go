@@ -34,9 +34,12 @@ type Game struct {
 	DrawDebugText      bool
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
+	DrawDebugCenters   bool
 	PrevMousePosition  vector.Vector
 
 	AnimatedTexture *tetra3d.TexturePlayer
+
+	Character *tetra3d.Model
 }
 
 //go:embed animatedTextures.gltf
@@ -76,21 +79,40 @@ func (g *Game) Init() {
 
 	// Firstly, we create a TexturePlayer, which animates a collection of vertices' UV values to
 	// animate a texture on them.
-	g.AnimatedTexture = tetra3d.NewTexturePlayer(library.Meshes["Plane"].MeshParts[0].Vertices)
 
-	// We create the animation here; rather than having a function to create the struct, it's simpler to do so
-	// manually, as can be seen below.
-	bloopAnim := &tetra3d.TextureAnimation{
-		FPS: 15,
-		Frames: []vector.Vector{
-			{0, 0},     // UV offset for frame 0
-			{0.5, 0},   // ... For frame 1,
-			{0, 0.5},   // ... For frame 2,
-			{0.5, 0.5}, // ... And for frame 3.
-		},
-	}
+	// We can select all vertices
 
-	// The above offsets are relative to the starting UV values as they are set when we pass our vertices into the TexturePlayer instance.
+	mesh := library.Meshes["Plane"]
+	selection := mesh.SelectVertices().SelectAll()
+
+	g.AnimatedTexture = tetra3d.NewTexturePlayer(mesh, selection)
+
+	g.Character = g.Scene.Root.Get("Character").(*tetra3d.Model)
+
+	// We create the texture animation here. We can do so manually, like so:
+
+	// bloopAnim := &tetra3d.TextureAnimation{
+	// 	FPS: 15,
+	// 	Frames: []vector.Vector{
+	// 		{0, 0},     // UV offset for frame 0
+	// 		{0.5, 0},   // ... For frame 1,
+	// 		{0, 0.5},   // ... For frame 2,
+	// 		{0.5, 0.5}, // ... And for frame 3.
+	// 	},
+	// }
+
+	// (With the above offsets being relative to the starting UV values as they are set when we pass our vertices into the TexturePlayer instance.)
+
+	// Or, we can use a helper function, if given the pixel positions of each frame:
+
+	bloopAnim := tetra3d.NewTextureAnimationPixels(15, mesh.MeshParts[0].Material.Texture,
+		0, 0, // UV offset for frame 0,
+		16, 0, // Frame 1,
+		0, 16, // Frame 2,
+		16, 16, // And frame 3.
+	)
+
+	// Note that we want to pass 2 values (x and y position) for each frame. Otherwise, NewTextureAnimationPixels will panic.
 
 	// Begin playing the animation.
 	g.AnimatedTexture.Play(bloopAnim)
@@ -101,7 +123,7 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	// Update the TexturePlayer
+	// Update the TexturePlayer with the time that's passed since the previous frame.
 	g.AnimatedTexture.Update(1.0 / 60.0)
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
@@ -198,6 +220,10 @@ func (g *Game) Update() error {
 		g.DrawDebugWireframe = !g.DrawDebugWireframe
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
+		g.DrawDebugCenters = !g.DrawDebugCenters
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
@@ -228,12 +254,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how animated textures work.\nThere are several planes, but they all share\nthe same mesh, which is animated by the\nTexturePlayer.\n1 key: Toggle playback\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how animated textures and billboarding work.\nThere are several lava planes, but they all share\nthe same mesh, which is animated by the\nTexturePlayer.\n\nThe character faces the camera because his\nmaterial has its BillboardMode set to X/Z (so\nit faces the camera, but doesn't tilt horizontally).\n1 key: Toggle playback\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{200, 200, 200, 255})
 	}
 
 	if g.DrawDebugWireframe {
 		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Gray())
+	}
+
+	if g.DrawDebugCenters {
+		g.Camera.DrawDebugCenters(screen, g.Scene.Root, colors.SkyBlue())
 	}
 
 }
@@ -259,8 +289,8 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Logo Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowTitle("Tetra3d - Animated Textures Test")
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

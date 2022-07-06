@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v1.7.33",
+        "generator" : "Khronos glTF Blender I/O v3.2.40",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -13,6 +13,7 @@
                 "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
                 "t3dPackTextures__" : 1,
+                "t3dExport__" : 1,
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
@@ -79,7 +80,14 @@
                             0.0
                         ]
                     }
-                }
+                },
+                "t3dWorldColor__" : [
+                    0.05087608844041824,
+                    0.05087608844041824,
+                    0.05087608844041824,
+                    1.0
+                ],
+                "t3dWorldEnergy__" : 1.0
             },
             "name" : "Scene",
             "nodes" : [
@@ -94,6 +102,7 @@
                 8,
                 9,
                 10,
+                12,
                 13,
                 14,
                 15,
@@ -137,13 +146,19 @@
                 53,
                 54,
                 55,
-                56,
-                57
+                56
             ]
         }
     ],
     "nodes" : [
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    0.0,
+                    0.0,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube",
             "translation" : [
@@ -153,10 +168,24 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
             "mesh" : 1,
             "name" : "Plane"
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -2.0,
+                    4.0,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.001",
             "translation" : [
@@ -166,6 +195,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    4.0,
+                    7.0,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.002",
             "translation" : [
@@ -175,6 +211,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    2.0,
+                    4.0,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.003",
             "translation" : [
@@ -184,6 +227,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    5.0,
+                    -2.0,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.004",
             "translation" : [
@@ -193,6 +243,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -1.0,
+                    -5.0,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.005",
             "translation" : [
@@ -202,6 +259,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -6.0,
+                    -1.0,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.006",
             "translation" : [
@@ -211,6 +275,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -7.0,
+                    5.0,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.007",
             "translation" : [
@@ -220,6 +291,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -0.15543651580810547,
+                    0.9048517346382141,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.008",
             "translation" : [
@@ -229,6 +307,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -1.959215521812439,
+                    1.6558959484100342,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.009",
             "translation" : [
@@ -239,23 +324,18 @@
         },
         {
             "camera" : 0,
-            "name" : "CameraPlaceholder_Orientation",
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    12.24513053894043,
+                    -12.254621505737305,
+                    17.087017059326172
+                ]
+            },
+            "name" : "Camera",
             "rotation" : [
-                -0.7071067690849304,
-                0,
-                0,
-                0.7071067690849304
-            ]
-        },
-        {
-            "children" : [
-                11
-            ],
-            "name" : "CameraPlaceholder",
-            "rotation" : [
-                0.3535534143447876,
-                0.3535534143447876,
-                -0.1464466005563736,
+                -0.3535533547401428,
+                0.3535533845424652,
+                0.1464466154575348,
                 0.8535534143447876
             ],
             "translation" : [
@@ -266,11 +346,25 @@
         },
         {
             "children" : [
-                12
+                11
             ],
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
             "name" : "CameraHandle"
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    4.416183948516846,
+                    -6.5643815994262695,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.010",
             "translation" : [
@@ -280,6 +374,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    8.821342468261719,
+                    1.6621198654174805,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.011",
             "translation" : [
@@ -289,6 +390,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    8.184452056884766,
+                    8.031023979187012,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.012",
             "translation" : [
@@ -298,6 +406,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    2.080918788909912,
+                    13.019998550415039,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.013",
             "translation" : [
@@ -307,6 +422,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -2.483462333679199,
+                    9.570175170898438,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.014",
             "translation" : [
@@ -316,6 +438,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -4.606430530548096,
+                    13.922259330749512,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.015",
             "translation" : [
@@ -325,6 +454,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -8.374698638916016,
+                    10.313213348388672,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.016",
             "translation" : [
@@ -334,6 +470,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -13.045228958129883,
+                    6.120351791381836,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.017",
             "translation" : [
@@ -343,6 +486,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -12.832932472229004,
+                    1.4498224258422852,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.018",
             "translation" : [
@@ -352,6 +502,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -12.036819458007812,
+                    -3.910672187805176,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.019",
             "translation" : [
@@ -361,6 +518,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -8.53392219543457,
+                    -0.9385168552398682,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.020",
             "translation" : [
@@ -370,6 +534,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -8.852367401123047,
+                    -8.740424156188965,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.021",
             "translation" : [
@@ -379,6 +550,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -1.1035337448120117,
+                    -7.519717216491699,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.022",
             "translation" : [
@@ -388,6 +566,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -2.5365371704101562,
+                    -11.765653610229492,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.023",
             "translation" : [
@@ -397,6 +582,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    3.3016247749328613,
+                    -11.128763198852539,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.024",
             "translation" : [
@@ -406,6 +598,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    10.732011795043945,
+                    -7.6789398193359375,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.025",
             "translation" : [
@@ -415,6 +614,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    11.20967960357666,
+                    -0.08932924270629883,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.026",
             "translation" : [
@@ -424,6 +630,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    12.11194133758545,
+                    7.50028133392334,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.027",
             "translation" : [
@@ -433,6 +646,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    9.352083206176758,
+                    11.16240119934082,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.028",
             "translation" : [
@@ -442,6 +662,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    7.069892883300781,
+                    6.54494571685791,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.029",
             "translation" : [
@@ -451,6 +678,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    6.8045220375061035,
+                    8.349468231201172,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.030",
             "translation" : [
@@ -460,6 +694,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    7.97215461730957,
+                    9.4109525680542,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.031",
             "translation" : [
@@ -469,6 +710,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    5.5307416915893555,
+                    12.966923713684082,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.032",
             "translation" : [
@@ -478,6 +726,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    4.734628677368164,
+                    17.00056266784668,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.033",
             "translation" : [
@@ -487,6 +742,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -0.3074207305908203,
+                    18.592788696289062,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.034",
             "translation" : [
@@ -496,6 +758,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -5.561766624450684,
+                    16.8944149017334,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.035",
             "translation" : [
@@ -505,6 +774,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -8.215476989746094,
+                    17.00056266784668,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.036",
             "translation" : [
@@ -514,6 +790,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -14.265935897827148,
+                    11.42777156829834,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.037",
             "translation" : [
@@ -523,6 +806,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -16.654273986816406,
+                    5.271164417266846,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.038",
             "translation" : [
@@ -532,6 +822,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -16.44197654724121,
+                    -2.9022631645202637,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.039",
             "translation" : [
@@ -541,6 +838,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -15.115121841430664,
+                    -8.20968246459961,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.040",
             "translation" : [
@@ -550,6 +854,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -10.179221153259277,
+                    -13.835548400878906,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.041",
             "translation" : [
@@ -559,6 +870,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -3.863391399383545,
+                    -16.064664840698242,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.042",
             "translation" : [
@@ -568,6 +886,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    2.133993625640869,
+                    -15.905442237854004,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.043",
             "translation" : [
@@ -577,6 +902,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    1.709399938583374,
+                    -14.26014232635498,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.044",
             "translation" : [
@@ -586,6 +918,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    6.910671234130859,
+                    -15.427774429321289,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.045",
             "translation" : [
@@ -595,6 +934,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    9.723604202270508,
+                    -11.234912872314453,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.046",
             "translation" : [
@@ -604,6 +950,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    15.402544021606445,
+                    -14.26014232635498,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.047",
             "translation" : [
@@ -613,6 +966,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    16.517101287841797,
+                    -6.245937347412109,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.048",
             "translation" : [
@@ -622,6 +982,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    16.3048038482666,
+                    -0.4608492851257324,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.049",
             "translation" : [
@@ -631,6 +998,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    15.827136039733887,
+                    5.165016174316406,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.050",
             "translation" : [
@@ -640,6 +1014,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    14.234910011291504,
+                    8.720987319946289,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.051",
             "translation" : [
@@ -649,6 +1030,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    13.226500511169434,
+                    9.941694259643555,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.052",
             "translation" : [
@@ -658,6 +1046,13 @@
             ]
         },
         {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    11.793497085571289,
+                    15.196040153503418,
+                    3.0
+                ]
+            },
             "mesh" : 0,
             "name" : "Cube.053",
             "translation" : [
@@ -670,13 +1065,13 @@
     "cameras" : [
         {
             "name" : "Camera",
-            "perspective" : {
-                "aspectRatio" : 1.7777777777777777,
-                "yfov" : 0.6280287869355033,
+            "orthographic" : {
+                "xmag" : 40,
+                "ymag" : 40,
                 "zfar" : 100,
                 "znear" : 0.10000000149011612
             },
-            "type" : "perspective"
+            "type" : "orthographic"
         }
     ],
     "materials" : [
@@ -690,7 +1085,8 @@
             "name" : "TestImage",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
-                    "index" : 0
+                    "index" : 0,
+                    "texCoord" : 0
                 },
                 "metallicFactor" : 0,
                 "roughnessFactor" : 0.9
@@ -900,7 +1296,7 @@
     "buffers" : [
         {
             "byteLength" : 3628,
-            "uri" : "data:application/octet-stream;base64,AAAAPwAAAMAAAAC/AAAAPwAAAMAAAAC/AAAAPwAAAMAAAAC/AAAAPwAAAMAAAAC/AAAAPwAAAMAAAAC/AAAAPwAAQMAAAAC/AAAAPwAAQMAAAAC/AAAAPwAAQMAAAAC/AAAAPwAAAMAAAAA/AAAAPwAAAMAAAAA/AAAAPwAAAMAAAAA/AAAAPwAAAMAAAAA/AAAAPwAAAMAAAAA/AAAAPwAAQMAAAAA/AAAAPwAAQMAAAAA/AAAAPwAAQMAAAAA/AAAAvwAAQMAAAAC/AAAAvwAAQMAAAAC/AAAAvwAAQMAAAAC/AAAAvwAAAMAAAAA/AAAAvwAAAMAAAAA/AAAAvwAAAMAAAAA/AAAAvwAAAMAAAAA/AAAAvwAAAMAAAAA/AAAAvwAAQMAAAAA/AAAAvwAAQMAAAAA/AAAAvwAAQMAAAAA/AAAAPwAAAAAAAAC/AAAAPwAAAAAAAAC/AAAAPwAAAAAAAAC/AAAAvwAAAAAAAAC/AAAAvwAAAAAAAAC/AAAAvwAAAAAAAAC/AAAAvwAAAAAAAAA/AAAAvwAAAAAAAAA/AAAAvwAAAAAAAAA/AAAAPwAAgL8AAAA/AAAAPwAAgL8AAAA/AAAAPwAAgL8AAAA/AAAAPwAAgL8AAAA/AAAAPwAAgL8AAAA/AAAAvwAAAMAAAAC/AAAAvwAAAMAAAAC/AAAAvwAAAMAAAAC/AAAAvwAAAMAAAAC/AAAAvwAAAMAAAAC/AAAAPwAAgL8AAAC/AAAAPwAAgL8AAAC/AAAAPwAAgL8AAAC/AAAAPwAAgL8AAAC/AAAAPwAAgL8AAAC/AAAAPwAAAAAAAAA/AAAAPwAAAAAAAAA/AAAAPwAAAAAAAAA/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAA/AAAAvwAAgL8AAAA/AAAAvwAAgL8AAAA/AAAAvwAAgL8AAAA/AAAAvwAAgL8AAAA/AAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AACAvwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIC/AAAAAAAAgD8AAAAAAACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAAAAAACAvwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAAAAAACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAgD8AAAAAAAAwPwAAoD4AAHA/AACgPgAAgD8AAIA/AAAAAAAAAAAAADA/AACgPgAAgD8AAAAAAACAPQAAcD8AAKA+AABwPwAAMD8AAIA9AABwPwAAgD0AAIA/AAAAAAAAgD0AAHA/AAAwPwAAgD0AAAAAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAAAAAACAPwAAgD8AAIA/AAAAAAAAAAAAAIA9AAAwPwAAoD4AADA/AAAAAAAAgD8AAAAAAAAAAAAAgD0AADA/AACAPwAAAAAAAIA9AACgPgAAcD8AAKA+AACAPwAAAAAAAIA/AACAPwAAoD4AAKA+AACAPwAAgD8AAKA+AAAwPwAAoD4AAIA9AACAPwAAAAAAAIA9AABwPwAAoD4AAHA/AAAwPwAAgD0AAHA/AACAPQAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AACAPwAAgD8AAIA/AACAPwAAAAAAAAAAAACAPwAAAAAAADA/AACgPgAAcD8AAKA+AACgPgAAcD8AAIA9AACAPQAAcD8AAIA9AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AACAPwAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAgD0AADA/AACgPgAAMD8JACYAPwAJAD8AFgAOAAoAFwAOABcAGgAYABQAKgAYACoAEAARAAUADQARAA0AGQAHAAQADAAHAAwADwASAC0AAgASAAIABgAcACAAIwAcACMANAATADwANwATADcAKQArAAAACAArAAgAFQADADIAKAADACgACwAsADoAMAAsADAAAQAlADMAIgAlACIAPgA7ACEAHgA7AB4ANgA4AC4AJAA4ACQAPQAxAB0ANQAxADUAJwA5AB8AGwA5ABsALwCJUE5HDQoaCgAAAA1JSERSAAAAEAAAABAIBgAAAB/z/2EAAAABc1JHQgCuzhzpAAAAfUlEQVQ4jWNkZWH+z0ABYIIx3iTIMLxJkCGoofHQdIbGQ9NRDUDWiM8QZI0wNhMuxcQCJgYGBgaRBU/gAshsdFBvl4nBZqRaII4aQAUDUpLqGVKS6glq2P9WjWH/WzVUA5A14jMEWSOMTR0vzJnXCBdAZqMDR+FbGGyKUyIArMwn8VdQfecAAAAASUVORK5CYIIAAACgwQAAAAAAAKBBAACgQQAAAAAAAKBBAACgwQAAAAAAAKDBAACgQQAAAAAAAKDBAACgwQAAAAAAAACAAAAAAAAAAAAAAKBBAACgQQAAAAAAAACAAAAAAAAAAAAAAKDBAAAAAAAAAAAAAACAAACgwQAAAAAAACBBAAAgQQAAAAAAAKBBAACgQQAAAAAAACDBAAAgwQAAAAAAAKDBAACgwQAAAAAAACDBAAAgwQAAAAAAAKBBAACgQQAAAAAAACBBAAAgQQAAAAAAAKDBAAAAAAAAAAAAACDBAAAAAAAAAAAAACBBAAAgwQAAAAAAAACAAAAgQQAAAAAAAACAAAAgQQAAAAAAACBBAAAgwQAAAAAAACBBAAAgwQAAAAAAACDBAAAgQQAAAAAAACDBAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAIA/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAPwAAAD8AAIA/AACAPwAAAD8AAAA/AAAAAAAAAD8AAAA/AAAAAAAAQD8AAEA/AACAPwAAgD8AAIA+AACAPgAAAAAAAAAAAACAPgAAgD4AAIA/AACAPwAAQD8AAEA/AAAAAAAAAD8AAIA+AAAAPwAAQD8AAIA+AAAAPwAAQD8AAAA/AABAPwAAQD8AAIA+AABAPwAAgD4AAIA+AABAPwAAgD4VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xgACwADABgAAwAQABcAEQAHABcABwAMABYAEgAIABYACAATABUADwAGABUABgAUABIAFQAUABIAFAAIAAUACgAVAAUAFQASAAoAAQAPAAoADwAVAAkAFgATAAkAEwAEAAAADgAWAAAAFgAJAA4ABQASAA4AEgAWAA0AFwAMAA0ADAACAAQAEwAXAAQAFwANABMACAARABMAEQAXABEAGAAQABEAEAAHAAgAFAAYAAgAGAARABQABgALABQACwAYAA=="
+            "uri" : "data:application/octet-stream;base64,AAAAPwAAAMAAAAC/AAAAPwAAAMAAAAC/AAAAPwAAAMAAAAC/AAAAPwAAAMAAAAC/AAAAPwAAAMAAAAC/AAAAPwAAQMAAAAC/AAAAPwAAQMAAAAC/AAAAPwAAQMAAAAC/AAAAPwAAAMAAAAA/AAAAPwAAAMAAAAA/AAAAPwAAAMAAAAA/AAAAPwAAAMAAAAA/AAAAPwAAAMAAAAA/AAAAPwAAQMAAAAA/AAAAPwAAQMAAAAA/AAAAPwAAQMAAAAA/AAAAvwAAQMAAAAC/AAAAvwAAQMAAAAC/AAAAvwAAQMAAAAC/AAAAvwAAAMAAAAA/AAAAvwAAAMAAAAA/AAAAvwAAAMAAAAA/AAAAvwAAAMAAAAA/AAAAvwAAAMAAAAA/AAAAvwAAQMAAAAA/AAAAvwAAQMAAAAA/AAAAvwAAQMAAAAA/AAAAPwAAAAAAAAC/AAAAPwAAAAAAAAC/AAAAPwAAAAAAAAC/AAAAvwAAAAAAAAC/AAAAvwAAAAAAAAC/AAAAvwAAAAAAAAC/AAAAvwAAAAAAAAA/AAAAvwAAAAAAAAA/AAAAvwAAAAAAAAA/AAAAPwAAgL8AAAA/AAAAPwAAgL8AAAA/AAAAPwAAgL8AAAA/AAAAPwAAgL8AAAA/AAAAPwAAgL8AAAA/AAAAvwAAAMAAAAC/AAAAvwAAAMAAAAC/AAAAvwAAAMAAAAC/AAAAvwAAAMAAAAC/AAAAvwAAAMAAAAC/AAAAPwAAgL8AAAC/AAAAPwAAgL8AAAC/AAAAPwAAgL8AAAC/AAAAPwAAgL8AAAC/AAAAPwAAgL8AAAC/AAAAPwAAAAAAAAA/AAAAPwAAAAAAAAA/AAAAPwAAAAAAAAA/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAC/AAAAvwAAgL8AAAA/AAAAvwAAgL8AAAA/AAAAvwAAgL8AAAA/AAAAvwAAgL8AAAA/AAAAvwAAgL8AAAA/AAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAACAvwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAvwAAAAAAAACAAACAvwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AACAvwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIC/AAAAAAAAgD8AAACAAACAPwAAAAAAAACAAACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAACAAACAvwAAAAAAAACAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAACAPwAAAAAAAACAAACAvwAAAAAAAACAAACAvwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAACAPwAAAAAAAACAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAACAAACAPwAAAAAAAACAAACAvwAAAAAAAACAAACAvwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AACAvwAAAAAAAACAAACAvwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAgD8AAAAAAAAwPwAAoD4AAHA/AACgPgAAgD8AAIA/AAAAAAAAAAAAADA/AACgPgAAgD8AAAAAAACAPQAAcD8AAKA+AABwPwAAMD8AAIA9AABwPwAAgD0AAIA/AAAAAAAAgD0AAHA/AAAwPwAAgD0AAAAAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAAAAAACAPwAAgD8AAIA/AAAAAAAAAAAAAIA9AAAwPwAAoD4AADA/AAAAAAAAgD8AAAAAAAAAAAAAgD0AADA/AACAPwAAAAAAAIA9AACgPgAAcD8AAKA+AACAPwAAAAAAAIA/AACAPwAAoD4AAKA+AACAPwAAgD8AAKA+AAAwPwAAoD4AAIA9AACAPwAAAAAAAIA9AABwPwAAoD4AAHA/AAAwPwAAgD0AAHA/AACAPQAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AACAPwAAgD8AAIA/AACAPwAAAAAAAAAAAACAPwAAAAAAADA/AACgPgAAcD8AAKA+AACgPgAAcD8AAIA9AACAPQAAcD8AAIA9AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AACAPwAAAAAAAIA/AACAPwAAgD8AAAAAAAAAAAAAgD0AADA/AACgPgAAMD8JACYAPwAJAD8AFgAOAAoAFwAOABcAGgAYABQAKgAYACoAEAARAAUADQARAA0AGQAHAAQADAAHAAwADwASAC0AAgASAAIABgAcACAAIwAcACMANAATADwANwATADcAKQArAAAACAArAAgAFQADADIAKAADACgACwAsADoAMAAsADAAAQAlADMAIgAlACIAPgA7ACEAHgA7AB4ANgA4AC4AJAA4ACQAPQAxAB0ANQAxADUAJwA5AB8AGwA5ABsALwCJUE5HDQoaCgAAAA1JSERSAAAAEAAAABAIBgAAAB/z/2EAAAABc1JHQgCuzhzpAAAAfUlEQVQ4jWNkZWH+z0ABYIIx3iTIMLxJkCGoofHQdIbGQ9NRDUDWiM8QZI0wNhMuxcQCJgYGBgaRBU/gAshsdFBvl4nBZqRaII4aQAUDUpLqGVKS6glq2P9WjWH/WzVUA5A14jMEWSOMTR0vzJnXCBdAZqMDR+FbGGyKUyIArMwn8VdQfecAAAAASUVORK5CYIIAAACgwQAAAAAAAKBBAACgQQAAAAAAAKBBAACgwQAAAAAAAKDBAACgQQAAAAAAAKDBAACgwQAAAAAAAACAAAAAAAAAAAAAAKBBAACgQQAAAAAAAACAAAAAAAAAAAAAAKDBAAAAAAAAAAAAAACAAACgwQAAAAAAACBBAAAgQQAAAAAAAKBBAACgQQAAAAAAACDBAAAgwQAAAAAAAKDBAACgwQAAAAAAACDBAAAgwQAAAAAAAKBBAACgQQAAAAAAACBBAAAgQQAAAAAAAKDBAAAAAAAAAAAAACDBAAAAAAAAAAAAACBBAAAgwQAAAAAAAACAAAAgQQAAAAAAAACAAAAgQQAAAAAAACBBAAAgwQAAAAAAACBBAAAgwQAAAAAAACDBAAAgQQAAAAAAACDBAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAIA/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAAAAPwAAAD8AAIA/AACAPwAAAD8AAAA/AAAAAAAAAD8AAAA/AAAAAAAAQD8AAEA/AACAPwAAgD8AAIA+AACAPgAAAAAAAAAAAACAPgAAgD4AAIA/AACAPwAAQD8AAEA/AAAAAAAAAD8AAIA+AAAAPwAAQD8AAIA+AAAAPwAAQD8AAAA/AABAPwAAQD8AAIA+AABAPwAAgD4AAIA+AABAPwAAgD4VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xUw7WL/////FTDtYv////8VMO1i/////xgACwADABgAAwAQABcAEQAHABcABwAMABYAEgAIABYACAATABUADwAGABUABgAUABIAFQAUABIAFAAIAAUACgAVAAUAFQASAAoAAQAPAAoADwAVAAkAFgATAAkAEwAEAAAADgAWAAAAFgAJAA4ABQASAA4AEgAWAA0AFwAMAA0ADAACAAQAEwAXAAQAFwANABMACAARABMAEQAXABEAGAAQABEAEAAHAAgAFAAYAAgAGAARABQABgALABQACwAYAA=="
         }
     ]
 }

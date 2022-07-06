@@ -56,6 +56,7 @@ func (g *Game) Init() {
 
 	mesh := tetra3d.NewCube()
 
+	// Here we specify a fragment shader
 	_, err := mesh.MeshParts[0].Material.SetShader([]byte(`
 	package main
 
@@ -75,7 +76,10 @@ func (g *Game) Init() {
 	vertCube := tetra3d.NewCube()
 	mat := vertCube.MeshParts[0].Material
 	mat.Shadeless = true
-	mat.VertexProgram = func(v vector.Vector) vector.Vector {
+
+	// ... And here we specify a "vertex program" - in truth, this operates on CPU, rather than the GPU, but it still is useful.
+	// Much like a Fragment shader, it operates on all vertices that render with the material.
+	mat.VertexTransformFunction = func(v vector.Vector, id int) vector.Vector {
 		waveHeight := 0.1
 		v[1] += math.Sin(g.Time*math.Pi+v[0])*waveHeight + (waveHeight / 2)
 		return v
@@ -237,8 +241,8 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Logo Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowTitle("Tetra3d - Shader Test")
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 

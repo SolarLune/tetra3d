@@ -36,7 +36,7 @@ type Game struct {
 	DrawDebugWireframe bool
 	PrevMousePosition  vector.Vector
 
-	FlashingVertices []*tetra3d.Vertex
+	FlashingVertices *tetra3d.VertexSelection
 
 	Time float64
 
@@ -77,13 +77,19 @@ func (g *Game) Init() {
 	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
-	g.FlashingVertices = []*tetra3d.Vertex{}
+	// So, the easiest way to select vertices is to just use Mesh.SelectVertices() - it allows us to select vertices that fulfill a set of
+	// criteria, returning a *VertexSelection instance that is our vertex capture.
 
-	for _, vert := range g.Cube.Mesh.MeshParts[0].Vertices {
-		if vert.ColorExistsInChannel("Flash") {
-			g.FlashingVertices = append(g.FlashingVertices, vert)
-		}
-	}
+	// Internally, the vertices are simply index numbers, with their properties (position, UV, normals, etc.) stored on the Mesh as a series of
+	// slices (i.e. Mesh.VertexPositions[], Mesh.VertexNormals[], Mesh.VertexUVs[], etc).
+
+	// Oh, and by default, when we export a mesh with vertex colors, the first channel is active.
+
+	// Select our vertices.
+	mesh := g.Cube.Mesh
+	g.FlashingVertices = mesh.SelectVertices().SelectColorInChannel("Flash")
+
+	// Once we know which vertices are not black in the "Flash" channel in Blender, we're good to go.
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -103,9 +109,10 @@ func (g *Game) Update() error {
 
 	glow := tetra3d.NewColorFromHSV(g.Time/10, 1, 1)
 
-	for _, vert := range g.FlashingVertices {
-		vert.Colors[0] = glow
-	}
+	// Once we've gotten our indices, we can use the helper SetColor() function to set the color of all vertices at the same time.
+	// If we wanted to do something else a bit more special, we could do so manually by looping through the indices in the *VertexSelection
+	// instance and modifying the mesh's vertex properties.
+	g.FlashingVertices.SetColor("Color", glow)
 
 	// Moving the Camera
 
@@ -220,7 +227,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.DrawDebugText {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how to easily select specific\nvertices using vertex color in Tetra3D.\nIn this example, the glowing faces are colored in the 'Flash'\nvertex color channel in Blender (which\nbecomes channel 1 in Tetra3D as it's in the second slot).\nThe vertices that have a non-black color\nin the \"Flash\" channel are then assigned\na flashing color here in Tetra3D.\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 108, color.RGBA{255, 0, 0, 255})
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{255, 0, 0, 255})
 	}
 
 	if g.DrawDebugWireframe {
@@ -251,7 +258,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 
 func main() {
 	ebiten.SetWindowTitle("Tetra3d - Logo Test")
-	ebiten.SetWindowResizable(true)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()
 
