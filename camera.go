@@ -655,7 +655,34 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	for _, model := range models {
 
-		if model.Mesh != nil {
+		if len(model.DynamicBatchModels) > 0 {
+
+			dynamicDepths := map[*Model]float64{}
+
+			transparent := false
+
+			for _, child := range model.DynamicBatchModels {
+
+				dynamicDepths[child] = camera.WorldToScreen(child.WorldPosition())[2]
+
+				for _, mp := range child.Mesh.MeshParts {
+					if child.isTransparent(mp) {
+						transparent = true
+					}
+				}
+			}
+
+			sort.SliceStable(model.DynamicBatchModels, func(i, j int) bool {
+				return dynamicDepths[model.DynamicBatchModels[i]] > dynamicDepths[model.DynamicBatchModels[j]]
+			})
+
+			if transparent {
+				transparents = append(transparents, renderPair{model, model.Mesh.MeshParts[0]})
+			} else {
+				solids = append(solids, renderPair{model, model.Mesh.MeshParts[0]})
+			}
+
+		} else if model.DynamicBatchOwner == nil && model.Mesh != nil {
 
 			for _, mp := range model.Mesh.MeshParts {
 				if model.isTransparent(mp) {
@@ -693,6 +720,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	render := func(rp renderPair) {
 
+		startingVertexListIndex := vertexListIndex
+
 		model := rp.Model
 		meshPart := rp.MeshPart
 		mat := meshPart.Material
@@ -727,8 +756,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		camera.DebugInfo.DrawnParts++
 
 		model.ProcessVertices(vpMatrix, camera, meshPart)
-
-		vertexListIndex := 0
 
 		backfaceCulling := true
 		if mat != nil {
@@ -820,7 +847,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			// Enforce maximum vertex count; note that this is lazy, which is NOT really a good way of doing this, as you can't really know ahead of time how many triangles may render.
 			if vertexListIndex/3 >= ebiten.MaxIndicesNum/3 {
-				panic("error in rendering mesh [" + model.Mesh.Name + "] of model [" + model.name + "]. At " + fmt.Sprintf("%d", len(model.Mesh.Triangles)) + " triangles, it exceeds the maximum of 21845 rendered triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into models")
+				if model.DynamicBatchOwner == nil {
+					panic("error in rendering mesh [" + model.Mesh.Name + "] of model [" + model.name + "]. At " + fmt.Sprintf("%d", len(model.Mesh.Triangles)) + " triangles, it exceeds the maximum of 21845 rendered triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into models")
+				} else {
+					panic("error in rendering mesh [" + model.Mesh.Name + "] of model [" + model.name + "] underneath Dynamic merging owner " + model.DynamicBatchOwner.name + ". At " + fmt.Sprintf("%d", model.DynamicBatchOwner.DynamicBatchTriangleCount()) + " triangles, it exceeds the maximum of 21845 rendered triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into models")
+				}
 			}
 
 			colorVertexList[vertexListIndex].DstX = float32(p0[0])
@@ -843,11 +874,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		}
 
-		if vertexListIndex == 0 {
+		if vertexListIndex == startingVertexListIndex {
 			return
 		}
 
-		vertexListIndex = 0
+		vertexListIndex = startingVertexListIndex
 
 		for _, tri := range meshPart.sortingTriangles {
 
@@ -965,6 +996,28 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			indexList[i] = uint16(i)
 		}
 
+	}
+
+	flush := func(rp renderPair) {
+
+		if vertexListIndex == 0 {
+			return
+		}
+
+		model := rp.Model
+		meshPart := rp.MeshPart
+		mat := meshPart.Material
+
+		var img *ebiten.Image
+
+		if mat != nil {
+			img = mat.Texture
+		}
+
+		if img == nil {
+			img = defaultImg
+		}
+
 		// Render the depth map here
 		if camera.RenderDepth {
 
@@ -1068,10 +1121,30 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		camera.DebugInfo.DrawnTris += vertexListIndex / 3
 
+		vertexListIndex = 0
+
 	}
 
-	for _, renderPair := range solids {
-		render(renderPair)
+	for _, pair := range solids {
+
+		// Internally, the idea behind dynamic batching is that we simply hold off on flushing until the
+		// end - this saves a lot of time if we're rendering singular low-poly objects, at the cost of each
+		// object sharing the same material / object-level properties (color / material blending mode, for
+		// example).
+		if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
+
+			for _, merged := range dyn {
+				for _, part := range merged.Mesh.MeshParts {
+					render(renderPair{Model: merged, MeshPart: part})
+				}
+			}
+
+			flush(pair)
+		} else {
+			render(pair)
+			flush(pair)
+		}
+
 	}
 
 	if len(transparents) > 0 {
@@ -1080,8 +1153,22 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			return depths[transparents[i].Model] > depths[transparents[j].Model]
 		})
 
-		for _, renderPair := range transparents {
-			render(renderPair)
+		for _, pair := range transparents {
+
+			if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
+
+				for _, merged := range dyn {
+					for _, part := range merged.Mesh.MeshParts {
+						render(renderPair{Model: merged, MeshPart: part})
+					}
+				}
+
+				flush(pair)
+			} else {
+				render(pair)
+				flush(pair)
+			}
+
 		}
 
 	}

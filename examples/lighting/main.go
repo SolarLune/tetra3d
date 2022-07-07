@@ -59,7 +59,6 @@ func (g *Game) Init() {
 	opt := tetra3d.DefaultGLTFLoadOptions()
 	opt.CameraWidth = g.Width
 	opt.CameraHeight = g.Height
-	opt.LoadBackfaceCulling = true
 	library, err := tetra3d.LoadGLTFData(gltfData, opt)
 	if err != nil {
 		panic(err)

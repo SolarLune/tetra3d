@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"errors"
 	"math"
 	"sort"
 	"time"
@@ -18,6 +19,9 @@ type Model struct {
 	Color             *Color                                               // The overall multiplicative color of the Model.
 	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM // The blending function used to color the Model; by default, it basically modulates the model by the color.
 	BoundingSphere    *BoundingSphere
+
+	DynamicBatchModels []*Model // Models that are dynamically merged into this one.
+	DynamicBatchOwner  *Model
 
 	Skinned        bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
 	SkinRoot       INode // The root node of the armature skinning this Model.
@@ -41,12 +45,13 @@ var defaultColorBlendingFunc = func(model *Model, meshPart *MeshPart) ebiten.Col
 func NewModel(mesh *Mesh, name string) *Model {
 
 	model := &Model{
-		Node:              NewNode(name),
-		Mesh:              mesh,
-		FrustumCulling:    true,
-		Color:             NewColor(1, 1, 1, 1),
-		ColorBlendingFunc: defaultColorBlendingFunc,
-		skinMatrix:        NewMatrix4(),
+		Node:               NewNode(name),
+		Mesh:               mesh,
+		FrustumCulling:     true,
+		Color:              NewColor(1, 1, 1, 1),
+		ColorBlendingFunc:  defaultColorBlendingFunc,
+		skinMatrix:         NewMatrix4(),
+		DynamicBatchModels: []*Model{},
 	}
 
 	if mesh != nil {
@@ -70,6 +75,8 @@ func (model *Model) Clone() INode {
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.visible = model.visible
 	newModel.Color = model.Color.Clone()
+	newModel.DynamicBatchModels = append(newModel.DynamicBatchModels, model.DynamicBatchModels...)
+	newModel.DynamicBatchOwner = model.DynamicBatchOwner
 
 	newModel.Skinned = model.Skinned
 	newModel.SkinRoot = model.SkinRoot
@@ -91,6 +98,10 @@ func (model *Model) Clone() INode {
 // Transform returns the global transform of the Model, taking into account any transforms its parents or grandparents have that
 // would impact the Model.
 func (model *Model) Transform() Matrix4 {
+
+	if model.Mesh == nil {
+		return NewEmptyMatrix4()
+	}
 
 	if model.isTransformDirty {
 
@@ -130,11 +141,92 @@ func (model *Model) Transform() Matrix4 {
 
 }
 
-// Merge merges the provided models into the calling Model. You can use this to merge several objects initially dynamically placed into the calling Model's mesh,
-// thereby saving on draw calls. Note that models are merged into MeshParts (saving draw calls) based on maximum vertex count and shared materials (so to get any
-// benefit from merging, ensure the merged models share materials; if they all have unique materials, they will be turned into individual MeshParts, thereby forcing multiple
-// draw calls).
+func (model *Model) modelAlreadyDynamicallyBatched(batchedModel *Model) bool {
+	for _, m := range model.DynamicBatchModels {
+		if m == batchedModel {
+			return true
+		}
+	}
+	return false
+}
 
+// DynamicBatchAdd adds the provided models to the calling Model's dynamic batch. Note that unlike StaticMerge(), DynamicBatchAdd works by simply
+// rendering the batched models using the calling Model's first MeshPart's material. By dynamically batching models together, this allows us to
+// not flush between rendering multiple Models, saving a lot of render time, particularly if rendering many low-poly, individual models that have
+// very little variance (i.e. if they all share a single texture).
+// For more information, see this Wiki page on batching / merging: https://github.com/SolarLune/Tetra3d/wiki/Merging-and-Batching-Draw-Calls
+func (model *Model) DynamicBatchAdd(batchedModels ...*Model) error {
+
+	for _, other := range batchedModels {
+
+		if model == other || model.modelAlreadyDynamicallyBatched(other) {
+			continue
+		}
+
+		triCount := model.DynamicBatchTriangleCount()
+
+		if triCount+len(other.Mesh.Triangles) > maxTriangleCount {
+			return errors.New("too many triangles in dynamic merge")
+		}
+
+		// for _, otherPart := range other.Mesh.MeshParts {
+
+		// 	var targetPart *MeshPart
+
+		// 	for _, mp := range model.Mesh.MeshParts {
+		// 		if mp.Material == otherPart.Material && mp.TriangleCount()+otherPart.TriangleCount() < maxTriangleCount {
+		// 			targetPart = mp
+		// 			break
+		// 		}
+		// 	}
+
+		// 	if targetPart == nil {
+		// 		targetPart = model.Mesh.AddMeshPart(otherPart.Material)
+		// 	}
+
+		// 	// Here, we'll batch meshparts together, using its existing mesh parts if the materials match
+		// 	// and if adding in the triangles wouldn't exceed the maximum triangle count (21845 in a single draw call).
+
+		// }
+
+		model.DynamicBatchModels = append(model.DynamicBatchModels, other)
+		other.DynamicBatchOwner = model
+
+	}
+
+	return nil
+
+}
+
+// DynamicBatchRemove removes the specified batched Models from the calling Model's dynamic batch slice.
+func (model *Model) DynamicBatchRemove(batched ...*Model) {
+	for _, m := range batched {
+		for i, existing := range model.DynamicBatchModels {
+			if existing == m {
+				model.DynamicBatchModels[i] = nil
+				model.DynamicBatchModels = append(model.DynamicBatchModels[:i], model.DynamicBatchModels[i+1:]...)
+				m.DynamicBatchOwner = nil
+				break
+			}
+		}
+	}
+}
+
+// DynamicBatchTriangleCount returns the total number of triangles of Models in the calling Model's dynamic batch.
+func (model *Model) DynamicBatchTriangleCount() int {
+	count := 0
+	for _, child := range model.DynamicBatchModels {
+		count += len(child.Mesh.Triangles)
+	}
+	return count
+}
+
+// Merge statically merges the provided models into the calling Model's mesh, such that their vertex properties (position, normal, UV, etc) are part of the calling Model's Mesh.
+// You can use this to merge several objects initially dynamically placed into the calling Model's mesh, thereby pulling back to a single draw call. Note that models are merged into MeshParts
+// (saving draw calls) based on maximum vertex count and shared materials (so to get any benefit from merging, ensure the merged models share materials; if they all have unique
+// materials, they will be turned into individual MeshParts, thereby forcing multiple draw calls). Also note that as the name suggests, this is static merging, which means that
+// after merging, the new vertices are static - part of the merging Model.
+// For more information, see this Wiki page on batching / merging: https://github.com/SolarLune/Tetra3d/wiki/Merging-and-Batching-Draw-Calls
 func (model *Model) Merge(models ...*Model) {
 
 	totalSize := 0
@@ -177,7 +269,7 @@ func (model *Model) Merge(models ...*Model) {
 			var targetPart *MeshPart
 
 			for _, mp := range model.Mesh.MeshParts {
-				if mp.Material == otherPart.Material && mp.TriangleCount()+otherPart.TriangleCount() < ebiten.MaxIndicesNum/3 {
+				if mp.Material == otherPart.Material && mp.TriangleCount()+otherPart.TriangleCount() < maxTriangleCount {
 					targetPart = mp
 					break
 				}
@@ -185,7 +277,6 @@ func (model *Model) Merge(models ...*Model) {
 
 			if targetPart == nil {
 				targetPart = model.Mesh.AddMeshPart(otherPart.Material)
-				// targetPart.allocateSortingBuffer(ebiten.MaxIndicesNum)
 			}
 
 			verts := []VertexInfo{}

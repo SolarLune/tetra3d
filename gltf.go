@@ -20,7 +20,6 @@ import (
 type GLTFLoadOptions struct {
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
 	CameraDepth               bool // If cameras should render depth or not
-	LoadBackfaceCulling       bool // If backface culling settings for materials should be loaded. Backface culling defaults to off in Blender (which is annoying, and so may be bypassed here).
 	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
 	// DependentLibraryResolver is a function that takes a relative path (string) to the blend file representing the dependent Library that the loading
 	// Library requires. This function should return a reference to the dependent Library; if it doesn't, the linked objects from the dependent Library
@@ -40,7 +39,6 @@ func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 		CameraHeight:              1080,
 		CameraDepth:               true,
 		DefaultToAutoTransparency: true,
-		LoadBackfaceCulling:       true,
 	}
 }
 
@@ -155,9 +153,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		newMat := NewMaterial(gltfMat.Name)
 		newMat.library = library
 
-		if gltfLoadOptions.LoadBackfaceCulling {
-			newMat.BackfaceCulling = !gltfMat.DoubleSided
-		}
+		newMat.BackfaceCulling = !gltfMat.DoubleSided
 
 		if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
 			if exportedTextures {
