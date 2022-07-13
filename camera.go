@@ -755,7 +755,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		camera.DebugInfo.DrawnParts++
 
-		model.ProcessVertices(vpMatrix, camera, meshPart)
+		model.ProcessVertices(vpMatrix, camera, meshPart, scene)
 
 		backfaceCulling := true
 		if mat != nil {
@@ -1257,7 +1257,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			for _, meshPart := range model.Mesh.MeshParts {
 
-				model.ProcessVertices(vpMatrix, camera, meshPart)
+				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
 
 				for i := 0; i < len(model.Mesh.vertexTransforms); i += 3 {
 
@@ -1322,7 +1322,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 			for _, meshPart := range model.Mesh.MeshParts {
 
-				model.ProcessVertices(vpMatrix, camera, meshPart)
+				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
 
 				triangles := model.Mesh.Triangles
 

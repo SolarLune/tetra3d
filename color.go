@@ -20,7 +20,7 @@ func (color *Color) Clone() *Color {
 	return NewColor(color.R, color.G, color.B, color.A)
 }
 
-// Set sets the RGBA components of the Color to the r, g, b, and a arguments provided.
+// Set sets the RGBA components of the Color to the r, g, b, and a arguments provided. The components are expected to range from 0 to 1.
 func (color *Color) Set(r, g, b, a float32) {
 	color.R = r
 	color.G = g
@@ -28,7 +28,7 @@ func (color *Color) Set(r, g, b, a float32) {
 	color.A = a
 }
 
-// AddRGBA adds the provided R, G, B, and A values to the color as provided.
+// AddRGBA adds the provided R, G, B, and A values to the color as provided. The components are expected to range from 0 to 1.
 func (color *Color) AddRGBA(r, g, b, a float32) {
 	color.R += r
 	color.G += g

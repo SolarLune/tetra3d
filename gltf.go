@@ -15,6 +15,8 @@ import (
 	"github.com/qmuntal/gltf"
 	"github.com/qmuntal/gltf/ext/lightspuntual"
 	"github.com/qmuntal/gltf/modeler"
+
+	_ "image/png"
 )
 
 type GLTFLoadOptions struct {
@@ -1052,6 +1054,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							clone = findNode(cloneName).Clone()
 						} else {
 							path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
+
+							if gltfLoadOptions.DependentLibraryResolver == nil {
+								panic("Error in instantiating linked element " + cloneName + " as the Dependent Library Resolver function is nil.")
+							}
+
 							if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
 								if foundNode := library.FindNode(cloneName); foundNode != nil {
 									clone = foundNode.Clone()

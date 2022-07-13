@@ -149,9 +149,13 @@ func (point *PointLight) beginModel(model *Model, camera *Camera) {
 	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
 
-	point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
-
-	point.workingPosition = r.MultVec(point.WorldPosition()).Add(p)
+	if model.Skinned {
+		point.cameraPosition = camera.WorldPosition()
+		point.workingPosition = point.WorldPosition()
+	} else {
+		point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
+		point.workingPosition = r.MultVec(point.WorldPosition()).Add(p)
+	}
 
 }
 
@@ -166,26 +170,41 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-	triCenter := model.Mesh.Triangles[triIndex].Center
-	dist := fastVectorSub(point.cameraPosition, triCenter)
-	eyeVec := dist.Unit()
+	var triCenter vector.Vector
+
+	if model.Skinned {
+		v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
+		v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
+		v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
+		triCenter = vector.Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
+	} else {
+		triCenter = model.Mesh.Triangles[triIndex].Center
+	}
+
+	dist := fastVectorSub(point.workingPosition, triCenter)
 
 	distanceSquared := math.Pow(point.Distance, 2)
 
-	// If the light is too far from the vertex, just assume it's not visible.
 	if point.Distance > 0 && dist.Magnitude() > distanceSquared {
 		return light
 	}
 
 	// If you're on the other side of the plane, just assume it's not visible.
-	if dot(model.Mesh.Triangles[triIndex].Normal, eyeVec) < 0 {
-		return light
-	}
+	// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
+	// 	return light
+	// }
+
+	var vertPos, vertNormal vector.Vector
 
 	for i := 0; i < 3; i++ {
 
-		vertPos := model.Mesh.VertexPositions[triIndex*3+i]
-		vertNormal := model.Mesh.VertexNormals[triIndex*3+i]
+		if model.Skinned {
+			vertPos = model.Mesh.vertexSkinnedPositions[triIndex*3+i]
+			vertNormal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+		} else {
+			vertPos = model.Mesh.VertexPositions[triIndex*3+i]
+			vertNormal = model.Mesh.VertexNormals[triIndex*3+i]
+		}
 
 		lightVec := vector.In(fastVectorSub(point.workingPosition, vertPos)).Unit()
 		diffuse := dot(vertNormal, vector.Vector(lightVec))
@@ -281,7 +300,9 @@ func (sun *DirectionalLight) beginRender() {
 }
 
 func (sun *DirectionalLight) beginModel(model *Model, camera *Camera) {
-	sun.workingModelRotation = model.WorldRotation().Inverted().Transposed()
+	if !model.Skinned {
+		sun.workingModelRotation = model.WorldRotation().Inverted().Transposed()
+	}
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
@@ -291,7 +312,13 @@ func (sun *DirectionalLight) Light(triIndex int, model *Model) [9]float32 {
 
 	for i := 0; i < 3; i++ {
 
-		normal := sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[triIndex*3+i])
+		var normal vector.Vector
+		if model.Skinned {
+			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
+			normal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+		} else {
+			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[triIndex*3+i])
+		}
 
 		diffuseFactor := dot(normal, sun.workingForward)
 		if diffuseFactor < 0 {

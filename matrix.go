@@ -598,6 +598,15 @@ func (matrix Matrix4) IsZero() bool {
 	return true
 }
 
+// HasValidRotation returns if the first three vectors in the Matrix are non-zero
+func (matrix Matrix4) HasValidRotation() bool {
+
+	return matrix[0][0] != 0 || matrix[0][1] != 0 || matrix[0][2] != 0 &&
+		matrix[1][0] != 0 || matrix[1][1] != 0 || matrix[1][2] != 0 &&
+		matrix[2][0] != 0 || matrix[2][1] != 0 || matrix[2][2] != 0
+
+}
+
 func (matrix Matrix4) String() string {
 	s := "{"
 	for i, y := range matrix {

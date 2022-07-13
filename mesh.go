@@ -70,6 +70,8 @@ type Mesh struct {
 	vertexTransforms         []vector.Vector
 	VertexPositions          []vector.Vector
 	VertexNormals            []vector.Vector
+	vertexSkinnedNormals     []vector.Vector
+	vertexSkinnedPositions   []vector.Vector
 	VertexUVs                []vector.Vector
 	VertexColors             [][]*Color
 	VertexActiveColorChannel []int
@@ -99,6 +101,8 @@ func NewMesh(name string) *Mesh {
 		vertexTransforms:         []vector.Vector{},
 		VertexPositions:          []vector.Vector{},
 		VertexNormals:            []vector.Vector{},
+		vertexSkinnedNormals:     []vector.Vector{},
+		vertexSkinnedPositions:   []vector.Vector{},
 		VertexUVs:                []vector.Vector{},
 		VertexColors:             [][]*Color{},
 		VertexActiveColorChannel: []int{},
@@ -117,7 +121,6 @@ func (mesh *Mesh) Clone() *Mesh {
 	newMesh.Tags = mesh.Tags.Clone()
 	newMesh.triIndex = mesh.triIndex
 
-	// newMesh.VertexPositions = append(newMesh.VertexPositions, mesh.VertexPositions...)
 	newMesh.allocateVertexBuffers(mesh.VertexMax)
 	copy(newMesh.VertexPositions, mesh.VertexPositions)
 	copy(newMesh.VertexNormals, mesh.VertexNormals)
@@ -178,6 +181,14 @@ func (mesh *Mesh) allocateVertexBuffers(size int) {
 	newTransforms := make([]vector.Vector, size)
 	copy(newTransforms, mesh.vertexTransforms)
 	mesh.vertexTransforms = newTransforms
+
+	newNormals := make([]vector.Vector, size)
+	copy(newNormals, mesh.vertexSkinnedNormals)
+	mesh.vertexSkinnedNormals = newNormals
+
+	newPositions := make([]vector.Vector, size)
+	copy(newPositions, mesh.vertexSkinnedPositions)
+	mesh.vertexSkinnedPositions = newPositions
 
 	mesh.VertexMax = size
 
@@ -692,6 +703,8 @@ func (part *MeshPart) AddTriangles(verts ...VertexInfo) {
 			mesh.VertexWeights[index] = vertInfo.Weights
 
 			mesh.vertexTransforms[index] = vector.Vector{0, 0, 0, 0}
+			mesh.vertexSkinnedNormals[index] = vector.Vector{0, 0, 0}
+			mesh.vertexSkinnedPositions[index] = vector.Vector{0, 0, 0}
 		}
 
 		newTri := NewTriangle(part, mesh.triIndex)

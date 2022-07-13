@@ -55,7 +55,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 	}
 
 	if mesh != nil {
-		model.skinVectorPool = NewVectorPool(mesh.VertexCount)
+		model.skinVectorPool = NewVectorPool(mesh.VertexCount * 2) // Both position and normal
 	}
 
 	radius := 0.0
@@ -110,18 +110,23 @@ func (model *Model) Transform() Matrix4 {
 		// Skinned models have their positions at 0, 0, 0, and vertices offset according to wherever they were when exported.
 		// To combat this, we save the original local positions of the mesh on export to position the bounding sphere in the
 		// correct location.
-		if model.SkinRoot != nil && model.Skinned {
-			wp[0] -= model.originalLocalPosition[0]
-			wp[1] -= model.originalLocalPosition[1]
-			wp[2] -= model.originalLocalPosition[2]
-			model.BoundingSphere.SetLocalPosition(wp)
+
+		var center vector.Vector
+
+		// We do this because if a model is skinned and we've parented the model to the armature, then the center is
+		// now from origin relative to the base of the armature on scene export.
+		if model.SkinRoot != nil && model.Skinned && model.parent == model.SkinRoot {
+			parent := model.parent.(*Node)
+			center = model.Mesh.Dimensions.Center().Sub(parent.originalLocalPosition)
 		} else {
-			center := model.Mesh.Dimensions.Center()
-			wp[0] += center[0]
-			wp[1] += center[1]
-			wp[2] += center[2]
-			model.BoundingSphere.SetLocalPosition(wp)
+			center = model.Mesh.Dimensions.Center()
 		}
+
+		wp[0] += center[0]
+		wp[1] += center[1]
+		wp[2] += center[2]
+
+		model.BoundingSphere.SetLocalPosition(wp)
 
 		dim := model.Mesh.Dimensions.Clone()
 		scale := model.WorldScale()
@@ -342,10 +347,12 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 
 }
 
-func (model *Model) skinVertex(vertID int) vector.Vector {
+func (model *Model) skinVertex(vertID int, transformNormal bool) (vector.Vector, vector.Vector) {
 
 	// Avoid reallocating a new matrix for every vertex; that's wasteful
 	model.skinMatrix.Clear()
+
+	var normal vector.Vector
 
 	for boneIndex, bone := range model.bones[vertID] {
 
@@ -370,13 +377,22 @@ func (model *Model) skinVertex(vertID int) vector.Vector {
 
 	vertOut := model.skinVectorPool.MultVecW(model.skinMatrix, model.Mesh.VertexPositions[vertID])
 
-	return vertOut
+	if transformNormal {
+		model.skinMatrix[3][0] = 0
+		model.skinMatrix[3][1] = 0
+		model.skinMatrix[3][2] = 0
+		model.skinMatrix[3][3] = 1
+
+		normal = model.skinVectorPool.MultVecW(model.skinMatrix, model.Mesh.VertexNormals[vertID])
+	}
+
+	return vertOut, normal
 
 }
 
 // ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
 // matrix, a camera, and the MeshPart being rendered.
-func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart) {
+func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, scene *Scene) {
 
 	var transformFunc func(vertPos vector.Vector, index int) vector.Vector
 
@@ -385,6 +401,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	if model.Skinned {
+
+		lightingOn := false
+		if scene != nil {
+			lightingOn = scene.LightingOn && (meshPart.Material == nil || !meshPart.Material.Shadeless)
+		}
 
 		model.skinVectorPool.Reset()
 
@@ -399,9 +420,13 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			for v := 0; v < 3; v++ {
 
-				vertPos := model.skinVertex(tri.ID*3 + v)
+				vertPos, vertNormal := model.skinVertex(tri.ID*3+v, lightingOn)
 				if transformFunc != nil {
 					vertPos = transformFunc(vertPos, tri.ID*3+v)
+				}
+				if vertNormal != nil {
+					model.Mesh.vertexSkinnedNormals[tri.ID*3+v] = vertNormal
+					model.Mesh.vertexSkinnedPositions[tri.ID*3+v] = vertPos
 				}
 				transformed := model.Mesh.vertexTransforms[tri.ID*3+v]
 				x, y, z, w := fastMatrixMultVecW(vpMatrix, vertPos)
