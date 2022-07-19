@@ -49,14 +49,14 @@ func (capsule *BoundingCapsule) WorldRadius() float64 {
 	return capsule.Radius * maxScale
 }
 
-// Intersecting returns true if the BoundingCapsule is intersecting the other BoundingObject.
-func (capsule *BoundingCapsule) Intersecting(other BoundingObject) bool {
-	return capsule.Intersection(other) != nil
+// Colliding returns true if the BoundingCapsule is intersecting the other BoundingObject.
+func (capsule *BoundingCapsule) Colliding(other BoundingObject) bool {
+	return capsule.Collision(other) != nil
 }
 
-// Intersection returns an IntersectionResult if the BoundingCapsule is intersecting another BoundingObject. If
-// no intersection is reported, Intersection returns nil.
-func (capsule *BoundingCapsule) Intersection(other BoundingObject) *IntersectionResult {
+// Collision returns a Collision struct if the BoundingCapsule is intersecting another BoundingObject. If
+// no intersection is reported, Collision returns nil.
+func (capsule *BoundingCapsule) Collision(other BoundingObject) *Collision {
 
 	if other == capsule {
 		return nil
@@ -72,7 +72,9 @@ func (capsule *BoundingCapsule) Intersection(other BoundingObject) *Intersection
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
+				vector.In(inter.Normal).Invert()
 			}
+			intersection.CollidedObject = otherBounds
 		}
 		return intersection
 
@@ -88,13 +90,27 @@ func (capsule *BoundingCapsule) Intersection(other BoundingObject) *Intersection
 
 }
 
+// CollisionTest performs an collision test if the bounding object were to move in the given direction in world space.
+// It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+// distance. If no Collisions occurred, it will return an empty slice.
+func (capsule *BoundingCapsule) CollisionTest(dx, dy, dz float64, others ...BoundingObject) []*Collision {
+	return commonCollisionTest(capsule, dx, dy, dz, others...)
+}
+
+// CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space
+// using a vector. It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+// distance. If no Collisions occurred, it will return an empty slice.
+func (capsule *BoundingCapsule) CollisionTestVec(moveVec vector.Vector, others ...BoundingObject) []*Collision {
+	return commonCollisionTest(capsule, moveVec[0], moveVec[1], moveVec[2], others...)
+}
+
 // PointInside returns true if the point provided is within the capsule.
 func (capsule *BoundingCapsule) PointInside(point vector.Vector) bool {
 	return capsule.ClosestPoint(point).Sub(point).Magnitude() < capsule.WorldRadius()
 }
 
 // ClosestPoint returns the closest point on the capsule's "central line" to the point provided. Essentially, ClosestPoint returns a point
-// along the capsule's line, somewhere between BoundingCapsule.Bottom() and BoundingCapsule.Top().
+// along the capsule's line in world coordinates, capped between its bottom and top.
 func (capsule *BoundingCapsule) ClosestPoint(point vector.Vector) vector.Vector {
 
 	up := capsule.Node.WorldRotation().Up()
@@ -109,16 +125,30 @@ func (capsule *BoundingCapsule) ClosestPoint(point vector.Vector) vector.Vector 
 
 }
 
+// lineTop returns the world position of the internal top end of the BoundingCapsule's line (i.e. this subtracts the
+// capsule's radius).
+func (capsule *BoundingCapsule) lineTop() vector.Vector {
+	up := capsule.Node.WorldRotation().Up()
+	return capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 - capsule.Radius))
+}
+
 // Top returns the world position of the top of the BoundingCapsule.
 func (capsule *BoundingCapsule) Top() vector.Vector {
 	up := capsule.Node.WorldRotation().Up()
-	return capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 - capsule.Radius))
+	return capsule.Node.WorldPosition().Add(up.Scale(capsule.Height / 2))
+}
+
+// lineBottom returns the world position of the internal bottom end of the BoundingCapsule's line (i.e. this subtracts the
+// capsule's radius).
+func (capsule *BoundingCapsule) lineBottom() vector.Vector {
+	up := capsule.Node.WorldRotation().Up()
+	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 + capsule.Radius))
 }
 
 // Bottom returns the world position of the bottom of the BoundingCapsule.
 func (capsule *BoundingCapsule) Bottom() vector.Vector {
 	up := capsule.Node.WorldRotation().Up()
-	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 + capsule.Radius))
+	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height / 2))
 }
 
 // Type returns the NodeType for this object.

@@ -542,11 +542,13 @@ type sortingTriangle struct {
 
 // A Triangle represents the smallest renderable object in Tetra3D. A triangle contains very little data, and is mainly used to help identify triads of vertices.
 type Triangle struct {
-	ID       int // Unique identifier number (index) in the Mesh. Using the ID tells you which vertices belong to it.
-	MaxSpan  float64
-	Center   vector.Vector
+	ID int // Unique identifier number (index) in the Mesh. You can use the ID to find a triangle's vertices
+	// using the formula: Mesh.VertexPositions[TriangleIndex*3+i], with i being the index of the vertex in the triangle
+	// (so either 0, 1, or 2).
+	MaxSpan  float64       // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
+	Center   vector.Vector // The untransformed center of the Triangle.
 	Normal   vector.Vector // The physical normal of the triangle (i.e. the direction the triangle is facing). This is different from the visual normals of a triangle's vertices (i.e. a selection of vertices can have inverted normals to be see through, for example).
-	MeshPart *MeshPart
+	MeshPart *MeshPart     // The specific MeshPart this Triangle belongs to.
 }
 
 // NewTriangle creates a new Triangle, and requires a reference to its owning MeshPart, along with its id within that MeshPart.

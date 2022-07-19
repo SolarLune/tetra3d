@@ -45,7 +45,7 @@ The Blender add-on is not required, but is provided as well, and can be download
 
 ## How do you use it?
 
-Make a camera, load a scene, render it. A simple 3D framework means a simple 3D API.
+Load a scene, render it. A simple 3D framework means a simple 3D API.
 
 Here's an example:
 
@@ -62,8 +62,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-const ScreenWidth = 398
-const ScreenHeight = 224
+const ScreenWidth = 786
+const ScreenHeight = 448
 
 type Game struct {
 	GameScene    *tetra3d.Scene
@@ -76,9 +76,14 @@ func NewGame() *Game {
 
 	// First, we load a scene from a .gltf or .glb file. LoadGLTFFile takes a filepath and
 	// any loading options (nil is taken as a default), and returns a *Library 
-	// and an error if it was unsuccessful. 
+	// and an error if it was unsuccessful. We can also use tetra3d.LoadGLTFData() if we don't
+	// have access to the host OS's filesystem (like on web, or if the assets are embedded).
 
-	library, err := tetra3d.LoadGLTFFile("example.gltf", nil) 
+	options := tetra3d.DefaultGLTFLoadOptions()
+	options.CameraWidth = ScreenWidth
+	options.CameraHeight = ScreenHeight
+
+	library, err := tetra3d.LoadGLTFFile("example.gltf", options) 
 
 	if err != nil {
 		panic(err)
@@ -88,24 +93,31 @@ func NewGame() *Game {
 	// all of the scenes, meshes, materials, and animations.
 
 	// The ExportedScene of a Library is the scene that was active when the file was exported.
-	g.GameScene = library.ExportedScene
 
-	// Tetra uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
+	// We'll clone the ExportedScene so we don't edit it irreversibly.
+	g.GameScene = library.ExportedScene.Clone()
+
+	// Tetra3D uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
 	// in comparison to Blender's coordinate system (+X = Right, +Y = Forward, 
 	// +Z = Up). Note that when loading models in via GLTF or DAE, models are
 	// converted automatically (so up is +Z in Blender and +Y in Tetra3D automatically).
 
-	// Here, we'll create a new Camera. We pass the size of the screen to the 
+	// We could create a new Camera as below - we would pass the size of the screen to the 
 	// Camera so it can create its own buffer textures (which are *ebiten.Images).
 
-	// If we were to load a camera in from the GLTF file, the loading options struct would 
-	// specify the camera's backing texture size (defaulting to 1920x1080).
+	// g.Camera = tetra3d.NewCamera(ScreenWidth, ScreenHeight)
 
-	g.Camera = tetra3d.NewCamera(ScreenWidth, ScreenHeight)
+	// However, we can also just grab an existing camera from the scene if it 
+	// were exported from the GLTF file. The loading options struct would 
+	// specify the camera's backing texture size (defaulting to 1920x1080 if either
+	// no loading options are passed, or the default loading options struct is used
+	// unaltered).
+
+	g.Camera = g.GameScene.Root.Get("Camera").(*tetra3d.Camera)
 
 	// A Camera implements the tetra3d.INode interface, which means it can be placed
 	// in 3D space and can be parented to another Node somewhere in the scene tree.
-	// Models and Nodes (which are essentially "empties" one can
+	// Models, Lights, and Nodes (which are essentially "empties" one can
 	// use for positioning and parenting) can, as well.
 
 	// We can place Models, Cameras, and other Nodes with Node.SetWorldPosition() or 
@@ -114,15 +126,12 @@ func NewGame() *Game {
 	
 	// The *World variants position Nodes in absolute space; the Local variants
 	// position Nodes relative to their parents' positioning and transforms.
-	// You can also move Nodes using Node.Move(x, y, z).
-	
-	// Cameras look forward down the local -Z axis, so we'll move the Camera back 
-	// 12 units to look towards [0, 0, 0].
-	g.Camera.Move(0, 0, 12)
+	// You can also move Nodes using Node.Move(x, y, z) / Node.MoveVec(vector).
 
 	// Each Scene has a tree that starts with the Root Node. To add Nodes to the Scene, 
-	// parent them to the Scene's base.
-	g.GameScene.Root.AddChildren(g.Camera)
+	// parent them to the Scene's base, like so:
+	
+	// g.GameScene.Root.AddChildren(object)
 
 	// For Cameras, we don't actually need to have them in the scene to view it, since
 	// the presence of the Camera in the Scene node tree doesn't impact what it would see.
@@ -145,15 +154,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// hold the result. 
 	
 	// Below, we'll pass both the Scene and the scene root because 1) the Scene influences
-	// how Models draw (fog, for example), and 2) we may not want to render
-	// all Models. 
+	// how Models draw (fog, for example), and 2) we may not want to render all Models. 
 	
 	// Camera.RenderNodes() renders all Nodes in a tree, starting with the 
 	// Node specified. You can also use Camera.Render() to simply render a selection of
-	// Models.
+	// individual Models.
 	g.Camera.RenderNodes(g.GameScene, g.GameScene.Root) 
 
-	// Before drawing the result, clear the screen first.
+	// Before drawing the result, clear the screen first; in this case, with a color.
 	screen.Fill(color.RGBA{20, 30, 40, 255})
 
 	// Draw the resulting texture to the screen, and you're done! You can 
@@ -183,7 +191,7 @@ func main() {
 
 ```
 
-You can also do intersection testing between BoundingObjects, a category of nodes designed for collision / intersection testing. As a simplified example:
+You can also do collision testing between BoundingObjects, a category of nodes designed for this purpose. As a simplified example:
 
 ```go
 
@@ -203,6 +211,8 @@ func NewGame() *Game {
 
 	// Create a new BoundingAABB, of 0.5 width, height, and depth (in that order).
 	g.Cube = tetra3d.NewBoundingAABB("block", 0.5, 0.5, 0.5)
+
+	// Move it over on the X axis by 4 units.
 	g.Cube.Move(4, 0, 0)
 
 	return g
@@ -211,10 +221,11 @@ func NewGame() *Game {
 
 func (g *Game) Update() {
 
+	// Move the capsule 0.2 units to the right every frame.
 	g.Capsule.Move(0.2, 0, 0)
 
-	// Will print the result of the intersection (an IntersectionResult), or nil, if there was no intersection.
-	fmt.Println(g.Capsule.Intersection(g.Cube))
+	// Will print the result of the Collision, or nil, if there was no intersection.
+	fmt.Println(g.Capsule.Collision(g.Cube))
 
 }
 
@@ -242,12 +253,14 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
 - [x] -- Offscreen Rendering
 - [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
-- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior?
+- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
 - [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
 - [ ] -- Draw triangle in 3D space (could be useful for 3D lines, for example)
+- [ ] -- Easy dynamic 3D Text (the current idea is to render the text to texture from a font, and then map it to a plane)
+- [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
 - [x] **Culling**
 - [x] -- Backface culling
-- [ ] -- Frustum culling (this is implemented, but just with sphere-checks instead of actual frustum code)
+- [x] -- Frustum culling
 - [x] -- Far triangle culling
 - [ ] -- Triangle clipping to view (this isn't implemented, but not having it doesn't seem to be too much of a problem for now)
 - [x] **Debug**
@@ -258,7 +271,6 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Basic Texturing
 - [x] -- Multitexturing / Per-triangle Materials
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
-- [ ] Easy dynamic 3D Text (the current idea is to render the text to texture from a font, and then map it to a plane)
 - [x] **Animations**
 - [x] -- Armature-based animations
 - [x] -- Object transform-based animations
@@ -308,9 +320,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] **Shaders**
 - [x] -- Custom fragment shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)
-- [x] **Intersection Testing**
-- [ ] -- Normal reporting
+- [x] **Collision Testing**
+- [x] -- Normal reporting
+- [x] -- Slope reporting
+- [x] -- Contact point reporting
 - [x] -- Varying collision shapes
+- [x] -- Checking multiple collisions at the same time
 
 | Collision Type | Sphere | AABB         | Triangle   | Capsule  | Ray (not implemented yet) |
 | ------         | ----   | ----         | --------   | -------- | ---- |
@@ -323,7 +338,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location) - NOTE: Unsure if I'll implement this; [beep](https://github.com/faiface/beep) allows you to affect sounds playing back, and it is relatively simple to make it pan as necessary.
 - [ ] **Optimization**
 - [ ] -- Multithreading (particularly for vertex transformations)
-- [ ] -- Armature animation improvements? 
+- [x] -- Armature animation improvements? 
 - [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
 - [x] -- Vector pools
 - [ ] -- Matrix pools?

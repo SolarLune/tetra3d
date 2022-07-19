@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.2.40",
+        "generator" : "Khronos glTF Blender I/O v3.2.43",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -14,7 +14,6 @@
                 "t3dExportFormat__" : 2,
                 "t3dPackTextures__" : 0,
                 "t3dExportLights__" : 0,
-                "t3dExport__" : 1,
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
@@ -29,7 +28,8 @@
                             "YellowCapsule",
                             "Cube.001",
                             "Cube.002",
-                            "StaticCapsule"
+                            "StaticCapsule",
+                            "Cube.004"
                         ],
                         "offset" : [
                             0.0,
@@ -59,7 +59,8 @@
                 8,
                 9,
                 10,
-                11
+                11,
+                12
             ]
         }
     ],
@@ -302,6 +303,28 @@
                 -9.80000114440918,
                 2.0500006675720215,
                 3.0000016689300537
+            ]
+        },
+        {
+            "extras" : {
+                "t3dBoundsType__" : 1,
+                "t3dOriginalLocalPosition__" : [
+                    31.0,
+                    21.0,
+                    1.0
+                ]
+            },
+            "mesh" : 0,
+            "name" : "Cube.004",
+            "scale" : [
+                16,
+                1,
+                4
+            ],
+            "translation" : [
+                31,
+                1,
+                -21
             ]
         }
     ],

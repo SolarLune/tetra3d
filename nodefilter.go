@@ -1,6 +1,8 @@
 package tetra3d
 
-import "strings"
+import (
+	"strings"
+)
 
 type NodeFilter []INode
 
@@ -99,7 +101,38 @@ func (nf NodeFilter) ByTags(tagNames ...string) NodeFilter {
 	return NodeFilter(out)
 }
 
+// Children filters out a selection of Nodes, returning a NodeFilter composed strictly of that selection's children.
+func (nf NodeFilter) Children() NodeFilter {
+	out := make([]INode, 0, len(nf))
+	for _, node := range nf {
+		out = append(out, node.Children()...)
+	}
+	return NodeFilter(out)
+}
+
+// ChildrenRecursive filters out a selection of Nodes, returning a NodeFilter composed strictly of that selection's
+// recursive children.
+func (nf NodeFilter) ChildrenRecursive() NodeFilter {
+	out := make([]INode, 0, len(nf))
+	for _, node := range nf {
+		out = append(out, node.ChildrenRecursive()...)
+	}
+	return NodeFilter(out)
+}
+
 // Empty returns true if the NodeFilter contains no Nodes.
 func (nf NodeFilter) Empty() bool {
 	return len(nf) == 0
+}
+
+// AsBoundingObjects returns the NodeFilter as a slice of BoundingObjects. This is particularly useful when you're using
+// NodeFilters to filter down a selection of Nodes that you then need to pass into BoundingObject.CollisionTest().
+func (nc NodeFilter) AsBoundingObjects() []BoundingObject {
+	boundings := make([]BoundingObject, 0, len(nc))
+	for _, n := range nc {
+		if b, ok := n.(BoundingObject); ok {
+			boundings = append(boundings, b)
+		}
+	}
+	return boundings
 }

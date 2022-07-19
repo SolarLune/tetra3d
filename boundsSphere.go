@@ -44,14 +44,14 @@ func (sphere *BoundingSphere) WorldRadius() float64 {
 	return sphere.Radius * maxScale
 }
 
-// Intersecting returns true if the BoundingSphere is intersecting the other BoundingObject.
-func (sphere *BoundingSphere) Intersecting(other BoundingObject) bool {
-	return sphere.Intersection(other) != nil
+// Colliding returns true if the BoundingSphere is intersecting the other BoundingObject.
+func (sphere *BoundingSphere) Colliding(other BoundingObject) bool {
+	return sphere.Collision(other) != nil
 }
 
-// Intersection returns an IntersectionResult if the BoundingSphere is intersecting another BoundingObject. If
-// no intersection is reported, Intersection returns nil.
-func (sphere *BoundingSphere) Intersection(other BoundingObject) *IntersectionResult {
+// Collision returns a Collision if the BoundingSphere is intersecting another BoundingObject. If
+// no intersection is reported, Collision returns nil.
+func (sphere *BoundingSphere) Collision(other BoundingObject) *Collision {
 
 	if other == sphere {
 		return nil
@@ -75,6 +75,20 @@ func (sphere *BoundingSphere) Intersection(other BoundingObject) *IntersectionRe
 
 	panic("Unimplemented bounds type")
 
+}
+
+// CollisionTest performs an collision test if the bounding object were to move in the given direction in world space.
+// It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+// distance. If no Collisions occurred, it will return an empty slice.
+func (sphere *BoundingSphere) CollisionTest(dx, dy, dz float64, others ...BoundingObject) []*Collision {
+	return commonCollisionTest(sphere, dx, dy, dz, others...)
+}
+
+// CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space
+// using a vector. It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+// distance. If no Collisions occurred, it will return an empty slice.
+func (sphere *BoundingSphere) CollisionTestVec(moveVec vector.Vector, others ...BoundingObject) []*Collision {
+	return commonCollisionTest(sphere, moveVec[0], moveVec[1], moveVec[2], others...)
 }
 
 // PointInside returns whether the given point is inside of the sphere or not.

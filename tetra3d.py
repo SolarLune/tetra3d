@@ -42,6 +42,13 @@ materialBillboardModes = [
     ("FULL", "Full", "Full billboarding - the (unskinned) object rotates fully to face the camera.", 0, 2),
 ]
 
+worldFogCompositeModes = [
+    ("OFF", "Off", "No fog. Object colors aren't changed with distance from the camera", 0, 0),
+    ("ADDITIVE", "Additive", "Additive fog - this fog mode brightens objects in the distance, with full effect being adding the color given to the object's color at maximum distance (according to the camera's far range)", 0, 1),
+    ("MULTIPLY", "Multiply", "Multiplicative fog - this fog mode darkens objects in the distance, with full effect being multiplying the object's color by the fog color at maximum distance (according to the camera's far range)", 0, 2),
+    ("OVERWRITE", "Overwrite", "Overwrite fog - this fog mode overwrites the object's color with the fog color, with maximum distance being the camera's far distance", 0, 3),
+]
+
 GamePropTypeBool = 1
 GamePropTypeFloat = 2
 GamePropTypeString = 3
@@ -285,6 +292,32 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.prop(context.material, "t3dCompositeMode__")
         row = self.layout.row()
         row.prop(context.material, "t3dBillboardMode__")
+
+class WORLD_PT_tetra3d(bpy.types.Panel):
+    bl_idname = "WORLD_PT_tetra3d"
+    bl_label = "Tetra3d World Properties"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "world"
+
+    @classmethod
+    def poll(self,context):
+        return context.world is not None
+
+    def draw(self, context):
+        row = self.layout.row()
+        row.prop(context.world, "t3dClearColor__")
+        box = self.layout.box()
+        row = box.row()
+        row.label(text="Fog Mode:")
+        row.prop(context.world, "t3dFogMode__", text="Fog Mode:", expand=True)
+
+        if context.world.t3dFogMode__ != "OFF":
+            # box = self.layout.row()
+            box.prop(context.world, "t3dFogColor__")
+            
+            box.prop(context.world, "t3dFogRangeStart__", slider=True)
+            box.prop(context.world, "t3dFogRangeEnd__", slider=True)
         
 # The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
 def globalGet(propName):
@@ -381,6 +414,19 @@ def export():
                         scene["t3dWorldColor__"] = list(scene.world.color)
                         scene["t3dWorldEnergy__"] = 1
 
+            if scene.world:
+                
+                if "t3dClearColor__" in scene.world:
+                    scene["t3dClearColor__"] = scene.world.t3dClearColor__
+                if "t3dFogMode__" in scene.world:
+                    scene["t3dFogMode__"] = scene.world.t3dFogMode__
+                if "t3dFogColor__" in scene.world:
+                    scene["t3dFogColor__"] = scene.world.t3dFogColor__
+                if "t3dFogRangeStart__" in scene.world:
+                    scene["t3dFogRangeStart__"] = scene.world.t3dFogRangeStart__
+                if "t3dFogRangeEnd__" in scene.world:
+                    scene["t3dFogRangeEnd__"] = scene.world.t3dFogRangeEnd__
+
             for layer in scene.view_layers:
                 for obj in layer.objects:
 
@@ -439,6 +485,18 @@ def export():
     # Undo changes that we've made after export
 
     for scene in bpy.data.scenes:
+
+        if scene.world:
+            if "t3dClearColor__" in scene.world:
+                del(scene["t3dClearColor__"])
+            if "t3dFogMode__" in scene.world:
+                del(scene["t3dFogMode__"])
+            if "t3dFogColor__" in scene.world:
+                del(scene["t3dFogColor__"])
+            if "t3dFogRangeStart__" in scene.world:
+                del(scene["t3dFogRangeStart__"])
+            if "t3dFogRangeEnd" in scene.world:
+                del(scene["t3dFogRangeEnd__"])
 
         if scene.users > 0:
 
@@ -581,11 +639,32 @@ def setExportWorldColor(self, value):
     globalSet("t3dExportWorldColor__", value)
 
 
+def fogRangeStartSet(self, value):
+    if value > bpy.context.world.t3dFogRangeEnd__:
+        value = bpy.context.world.t3dFogRangeEnd__
+    self["t3dFogRangeStart__"] = value
+
+def fogRangeStartGet(self):
+    if "t3dFogRangeStart__" in self:
+        return self["t3dFogRangeStart__"]
+    return 0
+
+def fogRangeEndSet(self, value):
+    if value < bpy.context.world.t3dFogRangeStart__:
+        value = bpy.context.world.t3dFogRangeStart__
+    self["t3dFogRangeEnd__"] = value
+
+def fogRangeEndGet(self):
+    if "t3dFogRangeEnd__" in self:
+        return self["t3dFogRangeEnd__"]
+    return 1
+
 def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
     bpy.utils.register_class(RENDER_PT_tetra3d)
     bpy.utils.register_class(MATERIAL_PT_tetra3d)
+    bpy.utils.register_class(WORLD_PT_tetra3d)
     bpy.utils.register_class(OBJECT_OT_tetra3dAddProp)
     bpy.utils.register_class(OBJECT_OT_tetra3dDeleteProp)
     bpy.utils.register_class(OBJECT_OT_tetra3dReorderProps)
@@ -625,6 +704,13 @@ def register():
     bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
     
+    bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="Fog color", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")
+
+    bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
+    bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
+
     if not exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.append(exportOnSave)
     
@@ -632,6 +718,7 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
     bpy.utils.unregister_class(RENDER_PT_tetra3d)
     bpy.utils.unregister_class(MATERIAL_PT_tetra3d)
+    bpy.utils.unregister_class(WORLD_PT_tetra3d)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dAddProp)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dDeleteProp)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dReorderProps)
@@ -657,6 +744,12 @@ def unregister():
     del bpy.types.Material.t3dMaterialShadeless__
     del bpy.types.Material.t3dCompositeMode__
     del bpy.types.Material.t3dBillboardMode__
+
+    del bpy.types.World.t3dClearColor__
+    del bpy.types.World.t3dFogColor__
+    del bpy.types.World.t3dFogMode__
+    del bpy.types.World.t3dFogRangeStart__
+    del bpy.types.World.t3dFogRangeEnd__
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)

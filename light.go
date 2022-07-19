@@ -16,7 +16,7 @@ type Light interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model, camera *Camera)
 
-	Light(triIndex int, model *Model) [9]float32 // Light() returns the R, G, and B colors used to light the given triangle
+	Light(triIndex int, model *Model) [9]float32 // Light() returns the R, G, and B colors used to light the vertices of the given triangle.
 	isOn() bool                                  // isOn() is simply used to tell if a "generic" Light is on or not.
 }
 

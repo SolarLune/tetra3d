@@ -1201,10 +1201,6 @@ func (camera *Camera) drawCircle(screen *ebiten.Image, position vector.Vector, r
 // DrawDebugText draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
 // at the top-left of the provided screen *ebiten.Image, using the textScale and color provided.
 func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64, color *Color) {
-	dr := &ebiten.DrawImageOptions{}
-	dr.ColorM.Scale(color.ToFloat64s())
-	dr.GeoM.Translate(0, textScale*16)
-	dr.GeoM.Scale(textScale, textScale)
 
 	m := camera.DebugInfo.AvgFrameTime.Round(time.Microsecond).Microseconds()
 	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
@@ -1215,7 +1211,7 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64, col
 	m = camera.DebugInfo.AvgLightTime.Round(time.Microsecond).Microseconds()
 	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
 
-	text.DrawWithOptions(screen, fmt.Sprintf(
+	debugText := fmt.Sprintf(
 		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d\nRendered triangles: %d/%d\nActive Lights: %d/%d",
 		ebiten.CurrentTPS(),
 		ebiten.CurrentFPS(),
@@ -1227,8 +1223,9 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64, col
 		camera.DebugInfo.DrawnTris,
 		camera.DebugInfo.TotalTris,
 		camera.DebugInfo.ActiveLightCount,
-		camera.DebugInfo.LightCount),
-		basicfont.Face7x13, dr)
+		camera.DebugInfo.LightCount)
+
+	camera.DebugDrawText(screen, debugText, 0, textScale*16, textScale, color)
 
 }
 
@@ -1330,12 +1327,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 					screenPos := camera.WorldToScreen(model.Transform().MultVec(triangles[sortingTri.ID].Center))
 
-					dr := &ebiten.DrawImageOptions{}
-					dr.ColorM.Scale(color.ToFloat64s())
-					dr.GeoM.Translate(screenPos[0], screenPos[1]+(textScale*16))
-					dr.GeoM.Scale(textScale, textScale)
-
-					text.DrawWithOptions(screen, fmt.Sprintf("%d", triIndex), basicfont.Face7x13, dr)
+					camera.DebugDrawText(screen, fmt.Sprintf("%d", triIndex), screenPos[0], screenPos[1]+(textScale*16), textScale, color)
 
 				}
 
@@ -1368,12 +1360,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 			screenPos := camera.WorldToScreen(model.WorldPosition())
 
-			dr := &ebiten.DrawImageOptions{}
-			dr.ColorM.Scale(color.ToFloat64s())
-			dr.GeoM.Translate(screenPos[0], screenPos[1]+(textScale*16))
-			dr.GeoM.Scale(textScale, textScale)
-
-			text.DrawWithOptions(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), basicfont.Face7x13, dr)
+			camera.DebugDrawText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos[0], screenPos[1]+(textScale*16), textScale, color)
 
 		}
 
@@ -1437,6 +1424,35 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 		}
 
 	}
+
+}
+
+func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, posY, textScale float64, color *Color) {
+
+	dr := &ebiten.DrawImageOptions{}
+	dr.ColorM.Scale(0, 0, 0, 1)
+
+	for y := -1; y < 2; y++ {
+
+		for x := -1; x < 2; x++ {
+
+			dr.GeoM.Reset()
+			dr.GeoM.Translate(posX+4+float64(x), posY+(textScale*16)+4+float64(y))
+			dr.GeoM.Scale(textScale, textScale)
+
+			text.DrawWithOptions(screen, txtStr, basicfont.Face7x13, dr)
+		}
+
+	}
+
+	dr.ColorM.Reset()
+	dr.ColorM.Scale(color.ToFloat64s())
+
+	dr.GeoM.Reset()
+	dr.GeoM.Translate(posX+4, posY+(textScale*16)+4)
+	dr.GeoM.Scale(textScale, textScale)
+
+	text.DrawWithOptions(screen, txtStr, basicfont.Face7x13, dr)
 
 }
 

@@ -15,9 +15,10 @@ type BoundingTriangles struct {
 
 // NewBoundingTriangles returns a new BoundingTriangles object.
 func NewBoundingTriangles(name string, mesh *Mesh) *BoundingTriangles {
+	margin := 0.25 // An additional margin to help ensure the broadphase is crossed before checking for collisions
 	return &BoundingTriangles{
 		Node:         NewNode(name),
-		BoundingAABB: NewBoundingAABB("triangle broadphase aabb", mesh.Dimensions.Width(), mesh.Dimensions.Height(), mesh.Dimensions.Depth()),
+		BoundingAABB: NewBoundingAABB("triangle broadphase aabb", mesh.Dimensions.Width()+margin, mesh.Dimensions.Height()+margin, mesh.Dimensions.Depth()+margin),
 		Mesh:         mesh,
 	}
 }
@@ -52,14 +53,14 @@ func (bt *BoundingTriangles) AddChildren(children ...INode) {
 	bt.addChildren(bt, children...)
 }
 
-// Intersecting returns true if the BoundingTriangles object is intersecting the other specified BoundingObject.
-func (bt *BoundingTriangles) Intersecting(other BoundingObject) bool {
-	return bt.Intersection(other) != nil
+// Colliding returns true if the BoundingTriangles object is intersecting the other specified BoundingObject.
+func (bt *BoundingTriangles) Colliding(other BoundingObject) bool {
+	return bt.Collision(other) != nil
 }
 
-// Intersection returns an IntersectionResult if the BoundingTriangles object is intersecting another BoundingObject. If
-// no intersection is reported, Intersection returns nil. (Note that BoundingTriangles > AABB collision is buggy at the moment.)
-func (bt *BoundingTriangles) Intersection(other BoundingObject) *IntersectionResult {
+// Collision returns a Collision if the BoundingTriangles object is intersecting another BoundingObject. If
+// no intersection is reported, Collision returns nil. (Note that BoundingTriangles > AABB collision is buggy at the moment.)
+func (bt *BoundingTriangles) Collision(other BoundingObject) *Collision {
 
 	if other == bt {
 		return nil
@@ -68,20 +69,24 @@ func (bt *BoundingTriangles) Intersection(other BoundingObject) *IntersectionRes
 	switch otherBounds := other.(type) {
 
 	case *BoundingAABB:
-		intersection := otherBounds.Intersection(bt)
+		intersection := otherBounds.Collision(bt)
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
+				vector.In(inter.Normal).Invert()
 			}
+			intersection.CollidedObject = otherBounds
 		}
 		return intersection
 
 	case *BoundingSphere:
-		intersection := otherBounds.Intersection(bt)
+		intersection := otherBounds.Collision(bt)
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
+				vector.In(inter.Normal).Invert()
 			}
+			intersection.CollidedObject = otherBounds
 		}
 		return intersection
 
@@ -89,17 +94,34 @@ func (bt *BoundingTriangles) Intersection(other BoundingObject) *IntersectionRes
 		return btTrianglesTriangles(bt, otherBounds)
 
 	case *BoundingCapsule:
-		intersection := otherBounds.Intersection(bt)
+		intersection := otherBounds.Collision(bt)
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
+				vector.In(inter.Normal).Invert()
 			}
+			intersection.CollidedObject = otherBounds
 		}
 		return intersection
 
 	}
 
-	return nil
+	panic("Unimplemented bounds type")
+
+}
+
+// CollisionTest performs an collision test if the bounding object were to move in the given direction in world space.
+// It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+// distance. If no Collisions occurred, it will return an empty slice.
+func (bt *BoundingTriangles) CollisionTest(dx, dy, dz float64, others ...BoundingObject) []*Collision {
+	return commonCollisionTest(bt, dx, dy, dz, others...)
+}
+
+// CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space
+// using a vector. It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+// distance. If no Collisions occurred, it will return an empty slice.
+func (bt *BoundingTriangles) CollisionTestVec(moveVec vector.Vector, others ...BoundingObject) []*Collision {
+	return commonCollisionTest(bt, moveVec[0], moveVec[1], moveVec[2], others...)
 }
 
 // Type returns the NodeType for this object.

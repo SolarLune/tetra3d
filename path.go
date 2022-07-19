@@ -127,7 +127,7 @@ func (follower *PathFollower) Clone() *PathFollower {
 	return newFollower
 }
 
-// A Path represents a Node that contains Nodes that represent a sequential path. All children of the Path are considered its points.
+// A Path represents a Node that represents a sequential path. All children of the Path are considered its points, in order.
 type Path struct {
 	*Node
 	Closed bool // Closed indicates if a Path is closed (and so going to the end will return to the start) or not.
@@ -147,7 +147,7 @@ func NewPath(name string, points ...vector.Vector) *Path {
 	return path
 }
 
-// Clone creates a clone of the Path.
+// Clone creates a clone of the Path and its points.
 func (path *Path) Clone() INode {
 
 	clone := NewPath(path.name)

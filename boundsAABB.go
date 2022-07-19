@@ -144,15 +144,55 @@ func (box *BoundingAABB) ClosestPoint(point vector.Vector) vector.Vector {
 	return out
 }
 
-// Intersecting returns true if the BoundingAABB is intersecting with another BoundingObject.
-func (box *BoundingAABB) Intersecting(other BoundingObject) bool {
-	return box.Intersection(other) != nil
+// aabbNormalGuess guesses which normal to return for an AABB given an MTV vector. Basically, if you have an MTV vector indicating a sphere, for example,
+// moves up by 0.1 when colliding with an AABB, it must be colliding with the top, and so the returned normal would be [0, 1, 0].
+func aabbNormalGuess(dir vector.Vector) vector.Vector {
+
+	if dir[0] == 0 && dir[1] == 0 && dir[2] == 0 {
+		return vector.Vector{0, 0, 0}
+	}
+
+	ax := math.Abs(dir[0])
+	ay := math.Abs(dir[1])
+	az := math.Abs(dir[2])
+
+	if ax > az && ax > ay {
+		// X is greatest axis
+		if dir[0] > 0 {
+			return vector.Vector{1, 0, 0}
+		} else {
+			return vector.Vector{-1, 0, 0}
+		}
+	}
+
+	if ay > az {
+		// Y is greatest axis
+
+		if dir[1] > 0 {
+			return vector.Vector{0, 1, 0}
+		} else {
+			return vector.Vector{0, -1, 0}
+		}
+	}
+
+	// Z is greatest axis
+	if dir[2] > 0 {
+		return vector.Vector{0, 0, 1}
+	} else {
+		return vector.Vector{0, 0, -1}
+	}
+
 }
 
-// Intersection returns the intersection between the BoundingAABB and the other BoundingObject. If
+// Colliding returns true if the BoundingAABB is colliding with another BoundingObject.
+func (box *BoundingAABB) Colliding(other BoundingObject) bool {
+	return box.Collision(other) != nil
+}
+
+// Collision returns the Collision between the BoundingAABB and the other BoundingObject. If
 // there is no intersection, the function returns nil. (Note that BoundingAABB > BoundingTriangles collision
 // is buggy at the moment.)
-func (box *BoundingAABB) Intersection(other BoundingObject) *IntersectionResult {
+func (box *BoundingAABB) Collision(other BoundingObject) *Collision {
 
 	if other == box {
 		return nil
@@ -168,7 +208,9 @@ func (box *BoundingAABB) Intersection(other BoundingObject) *IntersectionResult 
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
+				vector.In(inter.Normal).Invert()
 			}
+			intersection.CollidedObject = otherBounds
 		}
 		return intersection
 
@@ -180,14 +222,30 @@ func (box *BoundingAABB) Intersection(other BoundingObject) *IntersectionResult 
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
+				vector.In(inter.Normal).Invert()
 			}
+			intersection.CollidedObject = otherBounds
 		}
 		return intersection
 
 	}
 
-	return nil
+	panic("Unimplemented bounds type")
 
+}
+
+// CollisionTest performs an collision test if the bounding object were to move in the given direction in world space.
+// It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+// distance. If no Collisions occurred, it will return an empty slice.
+func (box *BoundingAABB) CollisionTest(dx, dy, dz float64, others ...BoundingObject) []*Collision {
+	return commonCollisionTest(box, dx, dy, dz, others...)
+}
+
+// CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space
+// using a vector. It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+// distance. If no Collisions occurred, it will return an empty slice.
+func (box *BoundingAABB) CollisionTestVec(moveVec vector.Vector, others ...BoundingObject) []*Collision {
+	return commonCollisionTest(box, moveVec[0], moveVec[1], moveVec[2], others...)
 }
 
 // Type returns the NodeType for this object.

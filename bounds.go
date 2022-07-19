@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"math"
+	"sort"
 
 	"github.com/kvartborg/vector"
 )
@@ -9,39 +10,121 @@ import (
 type Intersection struct {
 	// The contact point between the two intersecting objects. Note that this may be the average
 	// between the two overlapping shapes, rather than the point of contact specifically.
-	ContactPoint vector.Vector
-	MTV          vector.Vector // MTV represents the minimum translation vector to remove the calling object from the intersecting object.
-	Triangle     *Triangle     // Triangle represents the triangle that was intersected in intersection tests that involve triangle meshes; if no triangle mesh was tested against, then this will be nil.
-	// Normal       vector.Vector
+	StartingPoint vector.Vector // The starting point for the intersection; either the center of the object for sphere / aabb, the center of the closest point for capsules, or the triangle position for triangless.
+	ContactPoint  vector.Vector // The contact point for the intersection.
+	MTV           vector.Vector // MTV represents the minimum translation vector to remove the calling object from the intersecting object.
+	Triangle      *Triangle     // Triangle represents the triangle that was intersected in intersection tests that involve triangle meshes; if no triangle mesh was tested against, then this will be nil.
+	Normal        vector.Vector
 }
 
-// IntersectionResult represents the result of an intersection test. An intersection test may result in
-// multiple intersections, and so IntersectionResult holds each of these individual intersections.
-type IntersectionResult struct {
-	Intersections []*Intersection
+// Slope returns the slope of the intersection's normal, in radians. This ranges from 0 (straight up) to pi (straight down).
+func (intersection *Intersection) Slope() float64 {
+	return vector.Y.Angle(intersection.Normal)
 }
 
-func NewIntersectionResult() *IntersectionResult {
-	return &IntersectionResult{
-		Intersections: []*Intersection{},
+// Collision represents the result of a collision test. A Collision test may result in multiple intersections, and
+// so an Collision holds each of these individual intersections in its Intersections slice.
+// The intersections are sorted in order of distance from the starting point of the intersection (the center of the
+// colliding sphere / aabb, the closest point in the capsule, the center of the closest triangle, etc) to the
+// contact point.
+type Collision struct {
+	CollidedObject BoundingObject  // The BoundingObject collided with
+	Intersections  []*Intersection // The slice of Intersections, one for each object or triangle intersected with, arranged in order of distance (far to close).
+}
+
+func newCollision(collidedObject BoundingObject) *Collision {
+	return &Collision{
+		CollidedObject: collidedObject,
+		Intersections:  []*Intersection{},
 	}
 }
 
-func (result *IntersectionResult) add(intersection *Intersection) *IntersectionResult {
-	result.Intersections = append(result.Intersections, intersection)
-	return result
+func (col *Collision) add(intersection *Intersection) *Collision {
+	col.Intersections = append(col.Intersections, intersection)
+	return col
 }
 
-// BoundingObject represents a Node type that can be tested for intersection.
+// sort the intersections by distance from starting point (which should be the same for all collisions except for triangle-triangle) to contact point.
+func (col *Collision) sortResults() {
+	sort.Slice(col.Intersections, func(i, j int) bool {
+		return fastVectorDistanceSquared(col.Intersections[i].StartingPoint, col.Intersections[i].ContactPoint) >
+			fastVectorDistanceSquared(col.Intersections[j].StartingPoint, col.Intersections[j].ContactPoint)
+	})
+}
+
+// AverageMTV returns the average MTV (minimum translation vector) from all Intersections contained within the Collision.
+// To be specific, this isn't actually the pure average, but rather is the result of adding together all MTVs from Intersections
+// in the Collision for the direction, and using the greatest MTV's magnitude for the distance of the returned vector. In other
+// words, AverageMTV returns the MTV to move in that should resolve all intersections from the Collision.
+func (col *Collision) AverageMTV() vector.Vector {
+	greatestDist := 0.0
+	mtv := vector.Vector{0, 0, 0}
+	for _, inter := range col.Intersections {
+		mag := inter.MTV.Magnitude()
+		if mag > greatestDist {
+			greatestDist = mag
+		}
+		vector.In(mtv).Add(inter.MTV)
+	}
+	vector.In(mtv).Unit().Scale(greatestDist)
+	return mtv
+}
+
+// AverageSlope returns the average slope of the Collision (ranging from 0, pointing straight up, to pi pointing straight down).
+// This average is spread across all intersections contained within the Collision.
+func (result *Collision) AverageSlope() float64 {
+	slope := result.Intersections[0].Slope()
+	slopeCount := 1.0
+	for i := 1; i < len(result.Intersections); i++ {
+		inter := result.Intersections[i]
+		if inter.MTV.Magnitude() > 0 {
+			slope += inter.Slope()
+			slopeCount++
+		}
+	}
+	return slope / slopeCount
+}
+
+// AverageContactPoint returns the average contact point out of the contact points of all Intersections
+// contained within the Collision.
+func (result *Collision) AverageContactPoint() vector.Vector {
+
+	contactPoint := vector.Vector{0, 0, 0}
+
+	for _, inter := range result.Intersections {
+		vector.In(contactPoint).Add(inter.ContactPoint)
+	}
+
+	contactPoint[0] /= float64(len(result.Intersections))
+	contactPoint[1] /= float64(len(result.Intersections))
+	contactPoint[2] /= float64(len(result.Intersections))
+
+	return contactPoint
+}
+
+// BoundingObject represents a Node type that can be tested for collision. The exposed functions are essentially just
+// concerning whether an object that implements BoundingObject is colliding with another BoundingObject, and
+// if so, by how much.
 type BoundingObject interface {
-	// Intersecting returns true if the BoundingSphere is intersecting the other BoundingObject.
-	Intersecting(other BoundingObject) bool
-	// Intersection returns an IntersectionResult if the BoundingSphere is intersecting another BoundingObject. If
-	// no intersection is reported, Intersection returns nil.
-	Intersection(other BoundingObject) *IntersectionResult
+	// Colliding returns true if the BoundingObject is intersecting the other BoundingObject.
+	Colliding(other BoundingObject) bool
+	// Collision returns a Collision if the BoundingObject is intersecting another BoundingObject. If
+	// no intersection is reported, Collision returns nil.
+	Collision(other BoundingObject) *Collision
+	// CollisionTest performs an collision test if the bounding object were to move in the given direction in world space.
+	// It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+	// distance. If no Collisions occurred, it will return an empty slice.
+	CollisionTest(dx, dy, dz float64, others ...BoundingObject) []*Collision
+	// CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space
+	// using a vector. It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
+	// distance. If no Collisions occurred, it will return an empty slice.
+	CollisionTestVec(moveVec vector.Vector, others ...BoundingObject) []*Collision
 }
 
-func btSphereSphere(sphereA, sphereB *BoundingSphere) *IntersectionResult {
+// The below set of bt functions are used to test for intersection between BoundingObject pairs.
+// I forget now, but I guess when I wrote this, bt* stood for Bounding Test, haha.
+
+func btSphereSphere(sphereA, sphereB *BoundingSphere) *Collision {
 
 	spherePos := sphereA.WorldPosition()
 	bPos := sphereB.WorldPosition()
@@ -58,12 +141,14 @@ func btSphereSphere(sphereA, sphereB *BoundingSphere) *IntersectionResult {
 		return nil
 	}
 
-	result := NewIntersectionResult()
+	result := newCollision(sphereB)
 
 	result.add(
 		&Intersection{
-			ContactPoint: bPos.Add(delta.Scale(bRadius)),
-			MTV:          delta.Scale(s2 - dist),
+			StartingPoint: spherePos,
+			ContactPoint:  bPos.Add(delta.Scale(bRadius)),
+			MTV:           delta.Scale(s2 - dist),
+			Normal:        delta,
 		},
 	)
 
@@ -71,7 +156,7 @@ func btSphereSphere(sphereA, sphereB *BoundingSphere) *IntersectionResult {
 
 }
 
-func btSphereAABB(sphere *BoundingSphere, aabb *BoundingAABB) *IntersectionResult {
+func btSphereAABB(sphere *BoundingSphere, aabb *BoundingAABB) *Collision {
 
 	spherePos := sphere.WorldPosition()
 	sphereRadius := sphere.WorldRadius()
@@ -86,28 +171,31 @@ func btSphereAABB(sphere *BoundingSphere, aabb *BoundingAABB) *IntersectionResul
 
 	delta := fastVectorSub(spherePos, intersection).Unit().Scale(sphereRadius - distance)
 
-	return NewIntersectionResult().add(
+	return newCollision(aabb).add(
 		&Intersection{
-			ContactPoint: intersection,
-			MTV:          delta,
+			StartingPoint: spherePos,
+			ContactPoint:  intersection,
+			MTV:           delta,
+			Normal:        aabbNormalGuess(delta),
 		},
 	)
 
 }
 
-func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *IntersectionResult {
+func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Collision {
 
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
-	if !sphere.Intersecting(triangles.BoundingAABB) {
+	if !sphere.Colliding(triangles.BoundingAABB) {
 		return nil
 	}
 
-	invertedTransform := triangles.Transform().Inverted()
-	transformNoLoc := triangles.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
+	triTrans := triangles.Transform()
+	invertedTransform := triTrans.Inverted()
+	transformNoLoc := triTrans.SetRow(3, vector.Vector{0, 0, 0, 1})
 	spherePos := invertedTransform.MultVec(sphere.WorldPosition())
 	sphereRadius := sphere.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
 
-	result := NewIntersectionResult()
+	result := newCollision(triangles)
 
 	for _, meshPart := range triangles.Mesh.MeshParts {
 
@@ -133,9 +221,11 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *In
 			if mag := delta.Magnitude(); mag <= sphereRadius {
 				result.add(
 					&Intersection{
-						ContactPoint: triangles.Transform().MultVec(closest),
-						MTV:          transformNoLoc.MultVec(delta.Unit().Scale(sphereRadius - mag)),
-						Triangle:     tri,
+						StartingPoint: spherePos,
+						ContactPoint:  triangles.Transform().MultVec(closest),
+						MTV:           transformNoLoc.MultVec(delta.Unit().Scale(sphereRadius - mag)),
+						Triangle:      tri,
+						Normal:        transformNoLoc.MultVec(tri.Normal).Unit(),
 					},
 				)
 			}
@@ -148,11 +238,13 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *In
 		return nil
 	}
 
+	result.sortResults()
+
 	return result
 
 }
 
-func btAABBAABB(aabbA, aabbB *BoundingAABB) *IntersectionResult {
+func btAABBAABB(aabbA, aabbB *BoundingAABB) *Collision {
 
 	aPos := aabbA.WorldPosition()
 	bPos := aabbB.WorldPosition()
@@ -180,7 +272,7 @@ func btAABBAABB(aabbA, aabbB *BoundingAABB) *IntersectionResult {
 		return nil
 	}
 
-	result := NewIntersectionResult()
+	result := newCollision(aabbB)
 
 	if px < py && px < pz {
 		sx := -1.0
@@ -189,11 +281,11 @@ func btAABBAABB(aabbA, aabbB *BoundingAABB) *IntersectionResult {
 		}
 
 		result.add(&Intersection{
-			ContactPoint: vector.Vector{aPos[0] + (aSize[0] * sx), bPos[1], bPos[2]},
-			MTV:          vector.Vector{px * sx, 0, 0},
+			StartingPoint: aPos,
+			ContactPoint:  vector.Vector{aPos[0] + (aSize[0] * sx), bPos[1], bPos[2]},
+			MTV:           vector.Vector{px * sx, 0, 0},
+			Normal:        vector.Vector{sx, 0, 0},
 		})
-
-		// result.Normal = vector.Vector{sx, 0, 0}
 
 	} else if py < pz && py < px {
 		sy := -1.0
@@ -202,10 +294,11 @@ func btAABBAABB(aabbA, aabbB *BoundingAABB) *IntersectionResult {
 		}
 
 		result.add(&Intersection{
-			ContactPoint: vector.Vector{bPos[0], aPos[1] + (aSize[1] * sy), bPos[2]},
-			MTV:          vector.Vector{0, py * sy, 0},
+			StartingPoint: aPos,
+			ContactPoint:  vector.Vector{bPos[0], aPos[1] + (aSize[1] * sy), bPos[2]},
+			MTV:           vector.Vector{0, py * sy, 0},
+			Normal:        vector.Vector{0, sy, 0},
 		})
-		// result.Normal = vector.Vector{0, sy, 0}
 
 	} else {
 
@@ -215,51 +308,23 @@ func btAABBAABB(aabbA, aabbB *BoundingAABB) *IntersectionResult {
 		}
 
 		result.add(&Intersection{
-			ContactPoint: vector.Vector{bPos[0], bPos[1], aPos[2] + (aSize[2] * sz)},
-			MTV:          vector.Vector{0, 0, pz * sz},
+			StartingPoint: aPos,
+			ContactPoint:  vector.Vector{bPos[0], bPos[1], aPos[2] + (aSize[2] * sz)},
+			MTV:           vector.Vector{0, 0, pz * sz},
+			Normal:        vector.Vector{0, 0, sz},
 		})
-		// result.Normal = vector.Vector{0, 0, sz}
 
 	}
-
-	// xMin := math.Max(aPos[0]-aSize[0], bPos[0]-bSize[0])
-	// xMax := math.Min(aPos[0]+aSize[0], bPos[0]+bSize[0])
-
-	// if xMin > xMax || xMax < xMin {
-	// 	return nil
-	// }
-
-	// yMin := math.Max(aPos[1]-aSize[1], bPos[1]-bSize[1])
-	// yMax := math.Min(aPos[1]+aSize[1], bPos[1]+bSize[1])
-
-	// if yMin > yMax || yMax < yMin {
-	// 	return nil
-	// }
-
-	// zMin := math.Max(aPos[2]-aSize[2], bPos[2]-bSize[2])
-	// zMax := math.Min(aPos[2]+aSize[2], bPos[2]+bSize[2])
-
-	// if zMin > zMax || zMax < zMin {
-	// 	return nil
-	// }
-
-	// delta := vector.Vector{0, 0, 0}
-
-	// rectOverlap := vector.Vector{
-	// 	xMax - xMin - 1,
-	// 	yMax - yMin - 1,
-	// 	zMax - zMin - 1,
-	// }
 
 	return result
 
 }
 
-func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *IntersectionResult {
+func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision {
 	// See https://gdbooks.gitbooks.io/3dcollisions/content/Chapter4/aabb-triangle.html
 
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
-	if !box.Intersecting(triangles.BoundingAABB) {
+	if !box.Colliding(triangles.BoundingAABB) {
 		return nil
 	}
 
@@ -267,11 +332,9 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Intersect
 	boxSize := box.Size.Scale(0.5)
 
 	transform := triangles.Transform()
+	transformNoLoc := transform.SetRow(3, vector.Vector{0, 0, 0, 1})
 
-	overallAxis := vector.Vector{0, 0, 0}
-	overlapDistance := 0.0
-
-	result := NewIntersectionResult()
+	result := newCollision(triangles)
 
 	for _, meshPart := range triangles.Mesh.MeshParts {
 
@@ -308,7 +371,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Intersect
 				vectorCross(vector.Z, bc, ca),
 				vectorCross(vector.Z, ca, ab),
 
-				transform.MultVec(tri.Normal),
+				transformNoLoc.MultVec(tri.Normal),
 			}
 
 			var overlapAxis vector.Vector
@@ -347,13 +410,15 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Intersect
 
 			}
 
-			if overlapAxis != nil && smallestOverlap > overlapDistance {
-				mtv := overallAxis.Scale(overlapDistance)
+			if overlapAxis != nil {
+				mtv := overlapAxis.Scale(smallestOverlap)
 
 				result.add(&Intersection{
-					ContactPoint: box.WorldPosition().Sub(mtv),
-					MTV:          mtv,
-					Triangle:     tri,
+					StartingPoint: boxPos,
+					ContactPoint:  closestPointOnTri(vector.Vector{0, 0, 0}, v0, v1, v2).Add(boxPos),
+					MTV:           mtv,
+					Triangle:      tri,
+					Normal:        axes[12],
 				})
 			}
 
@@ -365,15 +430,17 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Intersect
 		return nil
 	}
 
+	result.sortResults()
+
 	return result
 
 }
 
-func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *IntersectionResult {
+func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision {
 	// See https://gdbooks.gitbooks.io/3dcollisions/content/Chapter4/aabb-triangle.html
 
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
-	if !trianglesA.BoundingAABB.Intersecting(trianglesB.BoundingAABB) {
+	if !trianglesA.BoundingAABB.Colliding(trianglesB.BoundingAABB) {
 		return nil
 	}
 
@@ -383,7 +450,7 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Intersecti
 	transformedA := [][]vector.Vector{}
 	transformedB := [][]vector.Vector{}
 
-	result := NewIntersectionResult()
+	result := newCollision(trianglesB)
 
 	for _, meshPart := range trianglesA.Mesh.MeshParts {
 
@@ -495,10 +562,12 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Intersecti
 				mtv := overlapAxis.Scale(smallestOverlap)
 				result.add(
 					&Intersection{
+						StartingPoint: transformA.MultVec(bTris[bTriIndex].Center),
 						// ContactPoint: b[0].Add(b[1]).Add(b[2]).Scale(1.0 / 3.0),
-						ContactPoint: trianglesA.WorldPosition().Sub(mtv),
+						ContactPoint: trianglesB.WorldPosition().Add(mtv),
 						MTV:          mtv,
 						Triangle:     bTris[bTriIndex],
+						Normal:       b[6],
 					},
 				)
 			}
@@ -511,11 +580,13 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Intersecti
 		return nil
 	}
 
+	result.sortResults()
+
 	return result
 
 }
 
-func btCapsuleCapsule(capsuleA, capsuleB *BoundingCapsule) *IntersectionResult {
+func btCapsuleCapsule(capsuleA, capsuleB *BoundingCapsule) *Collision {
 	capsuleA.internalSphere.SetLocalScale(capsuleA.LocalScale())
 
 	// By getting the closest point to the world position (center), and then getting it again, we get closer to the
@@ -533,38 +604,39 @@ func btCapsuleCapsule(capsuleA, capsuleB *BoundingCapsule) *IntersectionResult {
 	return btSphereSphere(capsuleA.internalSphere, capsuleB.internalSphere)
 }
 
-func btSphereCapsule(sphere *BoundingSphere, capsule *BoundingCapsule) *IntersectionResult {
+func btSphereCapsule(sphere *BoundingSphere, capsule *BoundingCapsule) *Collision {
 	capsule.internalSphere.SetLocalScale(capsule.LocalScale())
 	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(sphere.WorldPosition()))
 	capsule.internalSphere.Radius = capsule.Radius
 	return btSphereSphere(sphere, capsule.internalSphere)
 }
 
-func btCapsuleAABB(capsule *BoundingCapsule, aabb *BoundingAABB) *IntersectionResult {
+func btCapsuleAABB(capsule *BoundingCapsule, aabb *BoundingAABB) *Collision {
 	capsule.internalSphere.SetLocalScale(capsule.LocalScale())
 	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(aabb.WorldPosition()))
 	capsule.internalSphere.Radius = capsule.Radius
 	return btSphereAABB(capsule.internalSphere, aabb)
 }
 
-func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) *IntersectionResult {
+func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) *Collision {
 
 	capsule.internalSphere.SetLocalScale(capsule.LocalScale())
-	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(triangles.WorldPosition()))
+	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(triangles.BoundingAABB.WorldPosition()))
 	capsule.internalSphere.Radius = capsule.Radius
 
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
-	if !capsule.internalSphere.Intersecting(triangles.BoundingAABB) {
+	if !capsule.internalSphere.Colliding(triangles.BoundingAABB) {
 		return nil
 	}
 
-	invertedTransform := triangles.Transform().Inverted()
-	transformNoLoc := triangles.Transform().SetRow(3, vector.Vector{0, 0, 0, 1})
+	triTrans := triangles.Transform()
+	invertedTransform := triTrans.Inverted()
+	transformNoLoc := triTrans.SetRow(3, vector.Vector{0, 0, 0, 1})
 
 	capsuleRadius := capsule.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
 
-	capsuleTop := invertedTransform.MultVec(capsule.Top())
-	capsuleBottom := invertedTransform.MultVec(capsule.Bottom())
+	capsuleTop := invertedTransform.MultVec(capsule.lineTop())
+	capsuleBottom := invertedTransform.MultVec(capsule.lineBottom())
 	capsulePosition := invertedTransform.MultVec(capsule.WorldPosition())
 	capsuleLine := capsuleTop.Sub(capsuleBottom)
 	capSpread := capsuleLine.Magnitude() + capsuleRadius
@@ -572,7 +644,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	var closestCapsulePoint vector.Vector
 
-	result := NewIntersectionResult()
+	result := newCollision(triangles)
 
 	for _, meshPart := range triangles.Mesh.MeshParts {
 
@@ -612,9 +684,11 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 				result.add(
 					&Intersection{
-						ContactPoint: triangles.Transform().MultVec(closest),
-						MTV:          transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - mag)),
-						Triangle:     tri,
+						StartingPoint: closest,
+						ContactPoint:  triangles.Transform().MultVec(closest),
+						MTV:           transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - mag)),
+						Triangle:      tri,
+						Normal:        transformNoLoc.MultVec(tri.Normal).Unit(),
 					},
 				)
 
@@ -628,7 +702,51 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 		return nil
 	}
 
+	result.sortResults()
+
 	return result
+
+}
+
+func commonCollisionTest(node INode, dx, dy, dz float64, others ...BoundingObject) []*Collision {
+
+	var ogPos vector.Vector
+
+	// If dx, dy, and dz are 0, we don't need to reposition the node for the collision test.
+	if dx != 0 && dy != 0 && dz != 0 {
+		ogPos = node.WorldPosition()
+		node.Move(dx, dy, dz)
+	}
+
+	intersections := []*Collision{}
+
+	for _, o := range others {
+		if result := node.(BoundingObject).Collision(o); result != nil {
+			intersections = append(intersections, result)
+		}
+	}
+
+	// Sort the IntersectionResults by distance (closer intersections come up "sooner").
+	sort.Slice(intersections, func(i, j int) bool {
+		return fastVectorDistanceSquared(intersections[i].AverageContactPoint(), intersections[i].Intersections[0].StartingPoint) >
+			fastVectorDistanceSquared(intersections[j].AverageContactPoint(), intersections[j].Intersections[0].StartingPoint)
+	})
+
+	if dx != 0 && dy != 0 && dz != 0 {
+
+		for _, result := range intersections {
+			for _, hit := range result.Intersections {
+				hit.MTV[0] -= dx
+				hit.MTV[1] -= dy
+				hit.MTV[2] -= dz
+			}
+		}
+
+		node.SetWorldPosition(ogPos)
+
+	}
+
+	return intersections
 
 }
 

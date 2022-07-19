@@ -143,6 +143,18 @@ func (g *Game) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
+	armature := g.Scene.Root.Get("Armature")
+
+	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+		armature.Move(-0.1, 0, 0)
+	} else if ebiten.IsKeyPressed(ebiten.KeyRight) {
+		armature.Move(0.1, 0, 0)
+	}
+
+	player := armature.AnimationPlayer()
+	player.Play(g.Library.Animations["ArmatureAction"])
+	player.Update(1.0 / 60.0)
+
 	// Rotating the camera with the mouse
 
 	// Rotate and tilt the camera according to mouse movements
@@ -229,6 +241,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
+		g.Camera.DrawDebugFrustums(screen, g.Scene.Root, colors.White())
 		g.Camera.DrawDebugText(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\nThere are six lights in this scene:\nan ambient light, three point lights, \na single directional (sun) light,\nand one more point light parented to the camera.\n1 Key: Toggle all lighting\n2 Key: Toggle camera light\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 150, color.RGBA{255, 0, 0, 255})

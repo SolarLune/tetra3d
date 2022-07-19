@@ -18,7 +18,10 @@ type Scene struct {
 	// scene graph by simply adding them into the tree via parenting anywhere under the Root. For them to be removed from rendering,
 	// they simply need to be removed from the tree.
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
-	Root     INode
+	Root       INode
+	ClearColor *Color // The clear color of the screen; note that this doesn't clear the color of the camera buffer or screen automatically;
+	// this is just what the color is if the scene was exported using the Tetra3D addon from Blender. It's up to you as to how you'd like to
+	// use it.
 	FogColor *Color  // The Color of any fog present in the Scene.
 	FogMode  FogMode // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
@@ -37,6 +40,7 @@ func NewScene(name string) *Scene {
 		FogColor:   NewColor(0, 0, 0, 0),
 		FogRange:   []float32{0, 1},
 		LightingOn: true,
+		ClearColor: NewColor(0.08, 0.09, 0.1, 1),
 	}
 
 	scene.Root.(*Node).scene = scene
@@ -59,6 +63,7 @@ func (scene *Scene) Clone() *Scene {
 	newScene.FogMode = scene.FogMode
 	newScene.FogRange[0] = scene.FogRange[0]
 	newScene.FogRange[1] = scene.FogRange[1]
+	newScene.ClearColor = scene.ClearColor.Clone()
 	return newScene
 
 }

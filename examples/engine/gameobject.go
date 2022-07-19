@@ -54,7 +54,7 @@ func (player *Player) Update() {
 	for _, b := range player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBounding) {
 		bounds := b.(tetra3d.BoundingObject)
 
-		if result := playerBounds.Intersection(bounds); result != nil {
+		if result := playerBounds.Collision(bounds); result != nil {
 
 			if b.Parent().Tags().Has("death") {
 				// Die

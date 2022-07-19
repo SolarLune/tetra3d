@@ -778,7 +778,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							dim[1][1] *= scale[1]
 							dim[1][2] *= scale[2]
 
-							sphere = NewBoundingSphere("_bounding sphere", dim.MaxSpan()/2)
+							sphere = NewBoundingSphere("_bounding sphere", dim.MaxDimension()/2)
 						}
 
 						if sphere != nil {
@@ -1104,6 +1104,45 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				ambientLight.Color = worldColor
 				scene.Root.AddChildren(ambientLight)
 			}
+
+			if cc, exists := dataMap["t3dClearColor__"]; exists {
+				wcc := cc.([]interface{})
+				clearColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64)))
+				clearColor.ConvertTosRGB()
+				scene.ClearColor = clearColor
+			}
+
+			if v, exists := dataMap["t3dFogMode__"]; exists {
+				fm := v.(string)
+				switch fm {
+				case "OFF":
+					scene.FogMode = FogOff
+				case "ADDITIVE":
+					scene.FogMode = FogAdd
+				case "MULTIPLY":
+					scene.FogMode = FogMultiply
+				case "OVERWRITE":
+					scene.FogMode = FogOverwrite
+				}
+			}
+
+			if v, exists := dataMap["t3dFogColor__"]; exists {
+				wcc := v.([]interface{})
+				fogColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64)))
+				fogColor.ConvertTosRGB()
+				scene.FogColor = fogColor
+			}
+
+			if v, exists := dataMap["t3dFogRangeStart__"]; exists {
+				fogStart := v.(float64)
+				scene.FogRange[0] = float32(fogStart)
+			}
+
+			if v, exists := dataMap["t3dFogRangeEnd__"]; exists {
+				fogEnd := v.(float64)
+				scene.FogRange[1] = float32(fogEnd)
+			}
+
 		}
 
 	}

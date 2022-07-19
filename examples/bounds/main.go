@@ -149,23 +149,9 @@ func (g *Game) Update() error {
 
 	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
 
-	for _, o := range g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBounding) {
-
-		other := o.(tetra3d.BoundingObject)
-
-		if inter := bounds.Intersection(other); inter != nil {
-
-			maxMTV := vector.Vector{0, 0, 0}
-			for _, i := range inter.Intersections {
-				if i.MTV.Magnitude() > maxMTV.Magnitude() {
-					maxMTV = i.MTV
-				}
-			}
-
-			g.Controlling.MoveVec(maxMTV)
-
-		}
-
+	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
+	for _, col := range bounds.CollisionTest(0, 0, 0, g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBounding).AsBoundingObjects()...) {
+		g.Controlling.MoveVec(col.AverageMTV())
 	}
 
 	// Rotate and tilt the camera according to mouse movements
@@ -249,8 +235,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugFrustums(screen, g.Scene.Root, colors.White())
-		// g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.White())
+		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.White())
 	}
 
 	if g.DrawDebugNormals {
@@ -265,7 +250,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.Camera.DrawDebugText(screen, 1, colors.White())
 		shapeName := g.Controlling.Name()
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nArrow keys: Move " + shapeName + "\nF: switch between capsule and sphere\nF1, F2, F3: Debug views\nF5: Display bounds shapes\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{192, 192, 192, 255})
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{192, 192, 192, 255})
 	}
 
 }
