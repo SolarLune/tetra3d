@@ -214,7 +214,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis demo shows how custom shaders work.\nThere are two kinds: fragment shaders and vertex programs.\nFragment shaders are written in Kage, while\nvertex programs are written in pure Go and are\ndone on the CPU.\nThe cube on the left is running a fragment shader,\nwhile the cube on the right runs a vertex program.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{255, 0, 0, 255})
 	}

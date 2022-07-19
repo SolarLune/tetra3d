@@ -4,11 +4,12 @@ import (
 	"strings"
 )
 
+// NodeFilter represents a filterable selection of INodes. For example, `
+// filter := scene.Root.ChildrenRecursive()` returns a NodeFilter composed of all nodes
+// underneath the root (excluding the root itself). From there, you can use additional
+// functions on the NodeFilter to filter it down further:
+// `filter = filter.ByName("player lamp", true).ByType(tetra3d.NodeTypeLight)`.
 type NodeFilter []INode
-
-func newNodeFilter(nodes ...INode) NodeFilter {
-	return NodeFilter(nodes)
-}
 
 // First returns the first Node in the NodeFilter; if the NodeFilter is empty, this function returns nil.
 func (nf NodeFilter) First() INode {
@@ -46,7 +47,7 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 			i++
 		}
 	}
-	return NodeFilter(out)
+	return out
 }
 
 // ByName allows you to filter a given selection of nodes by the given name. If wildcard is true,
@@ -68,7 +69,7 @@ func (nf NodeFilter) ByName(name string, exactMatch bool) NodeFilter {
 			out = append(out, node)
 		}
 	}
-	return NodeFilter(out)
+	return out
 }
 
 // ByType allows you to filter a given selection of nodes by the provided NodeType.
@@ -85,7 +86,7 @@ func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 
 	}
 
-	return NodeFilter(out)
+	return out
 
 }
 
@@ -98,7 +99,7 @@ func (nf NodeFilter) ByTags(tagNames ...string) NodeFilter {
 			out = append(out, node)
 		}
 	}
-	return NodeFilter(out)
+	return out
 }
 
 // Children filters out a selection of Nodes, returning a NodeFilter composed strictly of that selection's children.
@@ -107,7 +108,7 @@ func (nf NodeFilter) Children() NodeFilter {
 	for _, node := range nf {
 		out = append(out, node.Children()...)
 	}
-	return NodeFilter(out)
+	return out
 }
 
 // ChildrenRecursive filters out a selection of Nodes, returning a NodeFilter composed strictly of that selection's
@@ -117,7 +118,7 @@ func (nf NodeFilter) ChildrenRecursive() NodeFilter {
 	for _, node := range nf {
 		out = append(out, node.ChildrenRecursive()...)
 	}
-	return NodeFilter(out)
+	return out
 }
 
 // Empty returns true if the NodeFilter contains no Nodes.

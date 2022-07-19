@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v1.8.19",
+        "generator" : "Khronos glTF Blender I/O v3.2.43",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -59,12 +59,12 @@
             },
             "name" : "Scene",
             "nodes" : [
+                0,
                 1,
                 2,
                 3,
                 4,
-                5,
-                6
+                5
             ]
         }
     ],
@@ -75,18 +75,6 @@
                     "light" : 0
                 }
             },
-            "name" : "Light_Orientation",
-            "rotation" : [
-                -0.7071067690849304,
-                0,
-                0,
-                0.7071067690849304
-            ]
-        },
-        {
-            "children" : [
-                0
-            ],
             "extras" : {
                 "t3dOriginalLocalPosition__" : [
                     4.076245307922363,
@@ -96,10 +84,10 @@
             },
             "name" : "Light",
             "rotation" : [
-                0.16907575726509094,
-                0.7558803558349609,
-                -0.27217137813568115,
-                0.570947527885437
+                -0.2841663062572479,
+                0.7269423604011536,
+                0.34203392267227173,
+                0.5232754349708557
             ],
             "translation" : [
                 4.076245307922363,

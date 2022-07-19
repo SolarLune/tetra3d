@@ -253,7 +253,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how animated textures and billboarding work.\nThere are several lava planes, but they all share\nthe same mesh, which is animated by the\nTexturePlayer.\n\nThe character faces the camera because his\nmaterial has its BillboardMode set to X/Z (so\nit faces the camera, but doesn't tilt horizontally).\n1 key: Toggle playback\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{200, 200, 200, 255})
 	}

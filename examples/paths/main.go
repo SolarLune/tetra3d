@@ -218,7 +218,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how paths work.\nThe cube will follow the path (which is invisible,\nas it is made up of Nodes).\n1 key: Toggle running through path\nLeft, Right keys: Step 1 unit forward or\nback through the path\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 130, color.RGBA{255, 0, 0, 255})
 	}

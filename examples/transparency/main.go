@@ -235,7 +235,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 
-		g.Camera.DrawDebugText(screen, 1, colors.Black())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.Black())
 
 		transparencyOn := "On"
 		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {

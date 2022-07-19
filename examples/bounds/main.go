@@ -150,7 +150,7 @@ func (g *Game) Update() error {
 	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
 
 	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
-	for _, col := range bounds.CollisionTest(0, 0, 0, g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBounding).AsBoundingObjects()...) {
+	for _, col := range bounds.CollisionTest(0, 0, 0, g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).AsBoundingObjects()...) {
 		g.Controlling.MoveVec(col.AverageMTV())
 	}
 
@@ -247,7 +247,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		shapeName := g.Controlling.Name()
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nArrow keys: Move " + shapeName + "\nF: switch between capsule and sphere\nF1, F2, F3: Debug views\nF5: Display bounds shapes\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{192, 192, 192, 255})

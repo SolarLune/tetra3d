@@ -8,24 +8,26 @@ import (
 )
 
 // NodeType represents a Node's type. Node types are categorized, and can be said to extend or "be of" more general types.
-// For example, a BoundingSphere has a type of NodeTypeBoundingSphere. That type can also be said to be NodeTypeBounding
+// For example, a BoundingSphere has a type of NodeTypeBoundingSphere. That type can also be said to be NodeTypeBoundingObject
 // (because it is a bounding object). However, it is not of type NodeTypeBoundingTriangles, as that is a different category.
 type NodeType string
 
 const (
-	NodeTypeNode              NodeType = "Node"
-	NodeTypeModel             NodeType = "NodeModel"
-	NodeTypeCamera            NodeType = "NodeCamera"
-	NodeTypePath              NodeType = "NodePath"
-	NodeTypeBounding          NodeType = "NodeBounding"
-	NodeTypeBoundingAABB      NodeType = "NodeBoundingAABB"
-	NodeTypeBoundingCapsule   NodeType = "NodeBoundingCapsule"
-	NodeTypeBoundingTriangles NodeType = "NodeBoundingTriangles"
-	NodeTypeBoundingSphere    NodeType = "NodeBoundingSphere"
-	NodeTypeLight             NodeType = "NodeLight"
-	NodeTypeAmbientLight      NodeType = "NodeLightAmbient"
-	NodeTypePointLight        NodeType = "NodeLightPoint"
-	NodeTypeDirectionalLight  NodeType = "NodeLightDirectional"
+	NodeTypeNode   NodeType = "Node"       // NodeTypeNode represents any generic node
+	NodeTypeModel  NodeType = "NodeModel"  // NodeTypeModel represents specifically a Model
+	NodeTypeCamera NodeType = "NodeCamera" // NodeTypeCamera represents specifically a Camera
+	NodeTypePath   NodeType = "NodePath"   // NodeTypePath represents specifically a Path
+
+	NodeTypeBoundingObject    NodeType = "NodeBounding"          // NodeTypeBoundingObject represents any generic bounding object
+	NodeTypeBoundingAABB      NodeType = "NodeBoundingAABB"      // NodeTypeBoundingAABB represents specifically a BoundingAABB
+	NodeTypeBoundingCapsule   NodeType = "NodeBoundingCapsule"   // NodeTypeBoundingCapsule represents specifically a BoundingCapsule
+	NodeTypeBoundingTriangles NodeType = "NodeBoundingTriangles" // NodeTypeBoundingTriangles represents specifically a BoundingTriangles object
+	NodeTypeBoundingSphere    NodeType = "NodeBoundingSphere"    // NodeTypeBoundingSphere represents specifically a BoundingSphere BoundingObject
+
+	NodeTypeLight            NodeType = "NodeLight"            // NodeTypeLight represents any generic light
+	NodeTypeAmbientLight     NodeType = "NodeLightAmbient"     // NodeTypeAmbientLight represents specifically an ambient light
+	NodeTypePointLight       NodeType = "NodeLightPoint"       // NodeTypePointLight represents specifically a point light
+	NodeTypeDirectionalLight NodeType = "NodeLightDirectional" // NodeTypeDirectionalLight represents specifically a directional (sun) light
 )
 
 // Is returns true if a NodeType satisfies another NodeType category. A specific node type can be said to
@@ -44,65 +46,128 @@ func (nt NodeType) Is(other NodeType) bool {
 // successive). Models and Cameras are two examples of objects that fully implement the INode interface
 // by means of embedding Node.
 type INode interface {
+	// Name returns the object's name.
 	Name() string
+	// SetName sets the object's name.
 	SetName(name string)
+	// Clone returns a clone of the specified INode implementer.
 	Clone() INode
+	// SetData sets user-customizeable data that could be usefully stored on this node.
 	SetData(data interface{})
+	// Data returns a pointer to user-customizeable data that could be usefully stored on this node.
 	Data() interface{}
+	// Type returns the NodeType for this object.
 	Type() NodeType
 	setLibrary(lib *Library)
+	// Library returns the source Library from which this Node was instantiated. If it was created through code, this will be nil.
 	Library() *Library
 
 	setParent(INode)
+
+	// Parent returns the Node's parent. If the Node has no parent, this will return nil.
 	Parent() INode
+	// Unparent unparents the Node from its parent, removing it from the scenegraph.
 	Unparent()
 	// Scene looks for the Node's parents recursively to return what scene it exists in.
 	// If the node is not within a tree (i.e. unparented), this will return nil.
 	Scene() *Scene
+	// Root returns the root node in this tree by recursively traversing this node's hierarchy of
+	// parents upwards.
 	Root() INode
+
+	// Children() returns the Node's children as a NodeFilter.
 	Children() NodeFilter
+	// ChildrenRecursive() returns the Node's recursive children (i.e. children, grandchildren, etc)
+	// as a NodeFilter.
 	ChildrenRecursive() NodeFilter
+
+	// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+	// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
 	AddChildren(...INode)
+	// RemoveChildren removes the provided children from this object.
 	RemoveChildren(...INode)
+
 	// updateLocalTransform(newParent INode)
 	dirtyTransform()
 
+	// ResetLocalTransform resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
+	// by default, when you parent one Node to another, the local transform properties (position, scale, and rotation) are altered to keep the
+	// object in the same absolute location, even though the origin changes.
 	ResetLocalTransform()
+	// SetWorldTransform sets the Node's global (world) transform to the full 4x4 transformation matrix provided.
 	SetWorldTransform(transform Matrix4)
 
+	// LocalRotation returns the object's local rotation Matrix4.
 	LocalRotation() Matrix4
+	// SetLocalRotation sets the object's local rotation Matrix4 (relative to any parent).
 	SetLocalRotation(rotation Matrix4)
 	LocalPosition() vector.Vector
+	// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
+	// relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
 	SetLocalPosition(position vector.Vector)
+	// LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
 	LocalScale() vector.Vector
+	// SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
+	// scale should be a 3D vector (i.e. X, Y, and Z components).
 	SetLocalScale(scale vector.Vector)
 
+	// WorldRotation returns an absolute rotation Matrix4 representing the object's rotation.
 	WorldRotation() Matrix4
+	// SetWorldRotation sets an object's global, world rotation to the provided rotation Matrix4.
 	SetWorldRotation(rotation Matrix4)
 	WorldPosition() vector.Vector
 	SetWorldPosition(position vector.Vector)
+	// WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components).
 	WorldScale() vector.Vector
+	// SetWorldScale sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
 	SetWorldScale(scale vector.Vector)
 
+	// Move moves a Node in local space by the x, y, and z values provided.
 	Move(x, y, z float64)
+	// MoveVec moves a Node in local space using the vector provided.
 	MoveVec(moveVec vector.Vector)
+	// Rotate rotates a Node locally on the given vector, by the angle provided in radians.
 	Rotate(x, y, z, angle float64)
+	// Grow scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
 	Grow(x, y, z float64)
 
+	// Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
+	// If there's no change between the previous Transform() call and this one, Transform() will return a cached version of the
+	// transform for efficiency.
 	Transform() Matrix4
 
+	// Visible returns whether the Object is visible.
 	Visible() bool
+	// SetVisible sets the object's visibility. If recursive is true, all recursive children of this Node will have their visibility set the same way.
 	SetVisible(visible, recursive bool)
 
+	// Get searches a node's hierarchy using a string to find a specified node. The path is in the format of names of nodes, separated by forward
+	// slashes ('/'), and is relative to the node you use to call Get. As an example of Get, if you had a cup parented to a desk, which was
+	// parented to a room, that was finally parented to the root of the scene, it would be found at "Room/Desk/Cup". Note also that you can use "../" to
+	// "go up one" in the hierarchy (so cup.Get("../") would return the Desk node).
+	// Since Get uses forward slashes as path separation, it would be good to avoid using forward slashes in your Node names. Also note that Get()
+	// trims the extra spaces from the beginning and end of Node Names, so avoid using spaces at the beginning or end of your Nodes' names.
 	Get(path string) INode
+
+	// HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.
+	// Nodes will have a "+" next to their name, Models an "M", and Cameras a "C".
+	// BoundingSpheres will have BS, BoundingAABB AABB, BoundingCapsule CAP, and BoundingTriangles TRI.
+	// Lights will have an L next to their name.
+	// This is a useful function to debug the layout of a node tree, for example.
 	HierarchyAsString() string
+
+	// Path returns a string indicating the hierarchical path to get this Node from the root. The path returned will be absolute, such that
+	// passing it to Get() called on the scene root node will return this node. The path returned will not contain the root node's name ("Root").
 	Path() string
 
+	// Tags represents an unordered set of string tags that can be used to identify this object.
 	Tags() *Tags
 
+	// IsBone returns if the Node is a "bone" (a node that was a part of an armature and so can play animations back to influence a skinned mesh).
 	IsBone() bool
 	// IsRootBone() bool
 
+	// AnimationPlayer returns the object's animation player - every object has an AnimationPlayer by default.
 	AnimationPlayer() *AnimationPlayer
 
 	setOriginalLocalPosition(vector.Vector)
@@ -570,6 +635,7 @@ func (node *Node) SetWorldRotation(rotation Matrix4) {
 	node.dirtyTransform()
 }
 
+// Move moves a Node in local space by the x, y, and z values provided.
 func (node *Node) Move(x, y, z float64) {
 	node.position[0] += x
 	node.position[1] += y
@@ -577,10 +643,12 @@ func (node *Node) Move(x, y, z float64) {
 	node.dirtyTransform()
 }
 
+// MoveVec moves a Node in local space using the vector provided.
 func (node *Node) MoveVec(vec vector.Vector) {
 	node.Move(vec[0], vec[1], vec[2])
 }
 
+// Rotate rotates a Node locally on the given vector, by the angle provided in radians.
 func (node *Node) Rotate(x, y, z, angle float64) {
 	localRot := node.LocalRotation()
 	localRot = localRot.Rotated(x, y, z, angle)
@@ -665,6 +733,8 @@ func (node *Node) Children() NodeFilter {
 	return append(make(NodeFilter, 0, len(node.children)), node.children...)
 }
 
+// ChildrenRecursive() returns the Node's recursive children (i.e. children, grandchildren, etc)
+// as a NodeFilter.
 func (node *Node) ChildrenRecursive() NodeFilter {
 	out := node.Children()
 
@@ -862,6 +932,7 @@ func (node *Node) IsBone() bool {
 // 	return node.IsBone() && (node.parent == nil || !node.parent.IsBone())
 // }
 
+// AnimationPlayer returns the object's animation player - every object has an AnimationPlayer by default.
 func (node *Node) AnimationPlayer() *AnimationPlayer {
 	return node.animationPlayer
 }

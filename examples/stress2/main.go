@@ -337,7 +337,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nStress Test 2 - Here, cubes are moving. We can render them\nefficiently by dynamically batching them, though they\nwill mimic the batching object (the character plane) visually - \nthey no longer have their own object color,\ntexture, blend mode, or texture filtering\n(as they all take these properties from the red cube).\nThey also can no longer intersect; rather, they\nwill just draw in front of or behind each other.\n1 Key: Toggle batching cubes together\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{200, 200, 200, 255})
 	}

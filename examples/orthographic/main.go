@@ -200,7 +200,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		camera.DrawDebugText(screen, 1, colors.White())
+		camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nArrow Keys: Pan in cardinal directions\nW, S: Zoom in and Out\nQ, E: Rotate View\nR: Restart\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 128, color.RGBA{255, 0, 0, 255})
 	}

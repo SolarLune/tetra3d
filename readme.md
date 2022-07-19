@@ -335,7 +335,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 | Capsule        | ✅     | ✅           | ✅         | ✅       |   ❌  |
 | Ray            | ❌     | ❌           | ❌         | ❌       |   ❌  |
 
-- [ ] **3D Sound** (adjusting panning of sound sources based on 3D location) - NOTE: Unsure if I'll implement this; [beep](https://github.com/faiface/beep) allows you to affect sounds playing back, and it is relatively simple to make it pan as necessary.
+- [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
 - [ ] **Optimization**
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [x] -- Armature animation improvements? 

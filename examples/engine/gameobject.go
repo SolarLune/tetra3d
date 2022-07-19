@@ -51,7 +51,7 @@ func (player *Player) Update() {
 
 	movementResolution := vector.Vector{0, 0, 0}
 
-	for _, b := range player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBounding) {
+	for _, b := range player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject) {
 		bounds := b.(tetra3d.BoundingObject)
 
 		if result := playerBounds.Collision(bounds); result != nil {

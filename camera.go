@@ -1198,9 +1198,9 @@ func (camera *Camera) drawCircle(screen *ebiten.Image, position vector.Vector, r
 
 }
 
-// DrawDebugText draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
+// DrawDebugRenderInfo draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
 // at the top-left of the provided screen *ebiten.Image, using the textScale and color provided.
-func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64, color *Color) {
+func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float64, color *Color) {
 
 	m := camera.DebugInfo.AvgFrameTime.Round(time.Microsecond).Microseconds()
 	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
@@ -1225,7 +1225,7 @@ func (camera *Camera) DrawDebugText(screen *ebiten.Image, textScale float64, col
 		camera.DebugInfo.ActiveLightCount,
 		camera.DebugInfo.LightCount)
 
-	camera.DebugDrawText(screen, debugText, 0, textScale*16, textScale, color)
+	camera.DebugDrawText(screen, debugText, 0, 0, textScale, color)
 
 }
 
@@ -1432,12 +1432,14 @@ func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, p
 	dr := &ebiten.DrawImageOptions{}
 	dr.ColorM.Scale(0, 0, 0, 1)
 
+	periodOffset := 8.0
+
 	for y := -1; y < 2; y++ {
 
 		for x := -1; x < 2; x++ {
 
 			dr.GeoM.Reset()
-			dr.GeoM.Translate(posX+4+float64(x), posY+(textScale*16)+4+float64(y))
+			dr.GeoM.Translate(posX+4+float64(x), posY+4+float64(y)+periodOffset)
 			dr.GeoM.Scale(textScale, textScale)
 
 			text.DrawWithOptions(screen, txtStr, basicfont.Face7x13, dr)
@@ -1449,7 +1451,7 @@ func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, p
 	dr.ColorM.Scale(color.ToFloat64s())
 
 	dr.GeoM.Reset()
-	dr.GeoM.Translate(posX+4, posY+(textScale*16)+4)
+	dr.GeoM.Translate(posX+4, posY+4+periodOffset)
 	dr.GeoM.Scale(textScale, textScale)
 
 	text.DrawWithOptions(screen, txtStr, basicfont.Face7x13, dr)

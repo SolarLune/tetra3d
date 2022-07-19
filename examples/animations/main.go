@@ -245,7 +245,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n1 Key: Play [SmoothRoll] Animation On Table\n2 Key: Play [StepRoll] Animation on Table\nNote the animations can blend\nF Key: Play Animation on Skinned Mesh\nNote that the nodes move as well\nF4: Toggle fullscreen\nF6: Node Debug View\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{255, 0, 0, 255})
 	}

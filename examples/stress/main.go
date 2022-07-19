@@ -266,7 +266,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis is a simple stress test.\nAll of the cubes are statically merged\ntogether into as few render calls as possible.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{200, 200, 200, 255})
 	}

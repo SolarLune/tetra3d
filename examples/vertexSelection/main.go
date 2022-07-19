@@ -225,7 +225,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how to easily select specific\nvertices using vertex color in Tetra3D.\nIn this example, the glowing faces are colored in the 'Flash'\nvertex color channel in Blender (which\nbecomes channel 1 in Tetra3D as it's in the second slot).\nThe vertices that have a non-black color\nin the \"Flash\" channel are then assigned\na flashing color here in Tetra3D.\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{255, 0, 0, 255})
 	}

@@ -214,7 +214,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugText(screen, 1, colors.White())
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how game properties work with\nthe Tetra3D Blender add-on.\nGame properties are set in the blend file, and\nexported from there to a GLTF file.\nThey become tags here in Tetra3D,\ninfluencing whether the cubes rotate or float,\nand at what speed.\n\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{200, 200, 200, 255})
 	}
