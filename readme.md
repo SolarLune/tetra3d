@@ -10,22 +10,25 @@
 
 [Tetra3D Docs](https://pkg.go.dev/github.com/solarlune/tetra3d) / [Tetra3D Wiki](https://github.com/SolarLune/Tetra3d/wiki)
 
+[Quickstart Project Repo](https://github.com/SolarLune/tetra3d-quickstart)
+
 ## Support
 
 If you want to support development, feel free to check out my [itch.io](https://solarlune.itch.io/masterplan) / [Steam](https://store.steampowered.com/app/1269310/MasterPlan/) / [Patreon](https://www.patreon.com/SolarLune). I also have a [Discord server here](https://discord.gg/cepcpfV). Thanks~!
+
 ## What is Tetra3D?
 
 Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing (by use of shaders to compare and write depth and composite the result onto the finished texture). Depth testing can be turned off for a performance increase in exchange for no visual inter-object intersection.
 
 Tetra's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a largely-software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively simple fully 3D game (i.e. something on the level of a PS1 or N64 game). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
-In general, Tetra3D's just a renderer, so you can target higher resolutions (like 1080p or 4K) _or_ lower resolutions. Anything's fine as long as the target GPU can handle generating the color and depth textures at your desired resolution (assuming you have depth texture rendering on). 
+In general, Tetra3D's just a renderer, so you can target higher resolutions (like 1080p or 4K) _or_ lower resolutions. Anything's fine as long as the target GPU can handle generating the color and depth textures at your desired resolution (assuming you have depth texture rendering on).
 
 Tetra3D also gives you a Blender add-on to make the Blender > Tetra3D development process flow a bit smoother. See the Releases section for the add-on, and [this wiki page](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon) for more information.
 
 ## Why did I make it?
 
-Because there's not really too much of an ability to do 3D for gamedev in Go apart from [g3n](http://g3n.rocks), [go-gl](https://github.com/go-gl/gl) and [Raylib-go](https://github.com/gen2brain/raylib-go). I like Go, I like janky 3D, and so, here we are. 
+Because there's not really too much of an ability to do 3D for gamedev in Go apart from [g3n](http://g3n.rocks), [go-gl](https://github.com/go-gl/gl) and [Raylib-go](https://github.com/gen2brain/raylib-go). I like Go, I like janky 3D, and so, here we are.
 
 It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebiten but wanted to display just a few GUI elements or objects in 3D, Tetra3D should work well for you.
 
@@ -39,7 +42,7 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 `go get github.com/solarlune/tetra3d`
 
-Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed. 
+Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
 
 The Blender add-on is not required, but is provided as well, and can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). The add-on provides some useful helper functionality that makes using Tetra3D simpler - for more information, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
 
@@ -123,14 +126,14 @@ func NewGame() *Game {
 	// We can place Models, Cameras, and other Nodes with Node.SetWorldPosition() or 
 	// Node.SetLocalPosition(). Both functions take a 3D vector.Vector from kvartborg's 
 	// vector package.
-	
+
 	// The *World variants position Nodes in absolute space; the Local variants
 	// position Nodes relative to their parents' positioning and transforms.
 	// You can also move Nodes using Node.Move(x, y, z) / Node.MoveVec(vector).
 
 	// Each Scene has a tree that starts with the Root Node. To add Nodes to the Scene, 
 	// parent them to the Scene's base, like so:
-	
+
 	// g.GameScene.Root.AddChildren(object)
 
 	// For Cameras, we don't actually need to have them in the scene to view it, since
@@ -152,10 +155,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Now we'll render the Scene from the camera. The Camera's ColorTexture will then 
 	// hold the result. 
-	
+
 	// Below, we'll pass both the Scene and the scene root because 1) the Scene influences
 	// how Models draw (fog, for example), and 2) we may not want to render all Models. 
-	
+
 	// Camera.RenderNodes() renders all Nodes in a tree, starting with the 
 	// Node specified. You can also use Camera.Render() to simply render a selection of
 	// individual Models.
@@ -233,7 +236,9 @@ func (g *Game) Update() {
 
 That's basically it.
 
-Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine the examples folder for some examples showing how Tetra3D works. Calling `go run .` from within their directories should work. 
+Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine the examples folder for some examples showing how Tetra3D works. Calling `go run .` from within their directories should work.
+
+There's a quick start project repo available [here](https://github.com/SolarLune/tetra3d-quickstart), as well to help with getting started.
 
 For more information, check out the [Wiki](https://github.com/SolarLune/Tetra3d/wiki) for tips and tricks.
 
@@ -241,106 +246,106 @@ For more information, check out the [Wiki](https://github.com/SolarLune/Tetra3d/
 
 The following is a rough to-do list (tasks with checks have been implemented):
 
-- [x] **3D rendering**
-- [x] -- Perspective projection
-- [x] -- Orthographic projection (it's kinda jank, but it works)
+- [X] **3D rendering**
+- [X] -- Perspective projection
+- [X] -- Orthographic projection (it's kinda jank, but it works)
 - [ ] -- Automatic billboarding (not sure?)
 - [ ] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space) (not sure?)
-- [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
-- [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
-- [x] -- A more advanced / accurate depth buffer
+- [X] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
+- [X] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
+- [X] -- A more advanced / accurate depth buffer
 - [ ] -- Writing depth through some other means than vertex colors for precision
 - [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
-- [x] -- Offscreen Rendering
-- [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
+- [X] -- Offscreen Rendering
+- [X] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
 - [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
 - [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
 - [ ] -- Draw triangle in 3D space (could be useful for 3D lines, for example)
 - [ ] -- Easy dynamic 3D Text (the current idea is to render the text to texture from a font, and then map it to a plane)
 - [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
-- [x] **Culling**
-- [x] -- Backface culling
-- [x] -- Frustum culling
-- [x] -- Far triangle culling
+- [X] **Culling**
+- [X] -- Backface culling
+- [X] -- Frustum culling
+- [X] -- Far triangle culling
 - [ ] -- Triangle clipping to view (this isn't implemented, but not having it doesn't seem to be too much of a problem for now)
-- [x] **Debug**
-- [x] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
-- [x] -- Wireframe debug rendering
-- [x] -- Normal debug rendering
-- [x] **Materials**
-- [x] -- Basic Texturing
-- [x] -- Multitexturing / Per-triangle Materials
+- [X] **Debug**
+- [X] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
+- [X] -- Wireframe debug rendering
+- [X] -- Normal debug rendering
+- [X] **Materials**
+- [X] -- Basic Texturing
+- [X] -- Multitexturing / Per-triangle Materials
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
-- [x] **Animations**
-- [x] -- Armature-based animations
-- [x] -- Object transform-based animations
-- [x] -- Blending between animations
-- [x] -- Linear keyframe interpolation
-- [x] -- Constant keyframe interpolation
+- [X] **Animations**
+- [X] -- Armature-based animations
+- [X] -- Object transform-based animations
+- [X] -- Blending between animations
+- [X] -- Linear keyframe interpolation
+- [X] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
 - [ ] -- Morph (mesh-based) animations
-- [x] **Scenes**
-- [x] -- Fog
-- [x] -- A node or scenegraph for parenting and simple visibility culling
-- [x] - Vertex Coloring
+- [X] **Scenes**
+- [X] -- Fog
+- [X] -- A node or scenegraph for parenting and simple visibility culling
 - [ ] -- Ambient vertex coloring?
 - [ ] -- Multiple vertex color channels
-- [x] **GLTF / GLB model loading**
-- [x] -- Vertex colors loading
-- [x] -- UV map loading
-- [x] -- Normal loading
-- [x] -- Transform / full scene loading
-- [x] -- Animation loading
-- [x] -- Camera loading
-- [x] -- Loading world color in as ambient lighting
+- [X] **GLTF / GLB model loading**
+- [X] -- Vertex colors loading
+- [X] -- UV map loading
+- [X] -- Normal loading
+- [X] -- Transform / full scene loading
+- [X] -- Animation loading
+- [X] -- Camera loading
+- [X] -- Loading world color in as ambient lighting
 - [ ] -- Separate .bin loading
-- [x] **Blender Add-on**
-- [x] -- Export GLTF on save / on command via button
-- [x] -- Bounds node creation
-- [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
-- [x] -- Collection / group substitution
-- [ ] -- -- Overwriting properties through collection instance 
+- [X] **Blender Add-on**
+- [X] -- Export GLTF on save / on command via button
+- [X] -- Bounds node creation
+- [X] -- Game property export (less clunky version of Blender's vanilla custom properties)
+- [X] -- Collection / group substitution
+- [ ] -- -- Overwriting properties through collection instance
 - [ ] -- Optional camera size export
-- [x] -- Linking collections from external files
-- [x] -- Material data export
-- [x] -- Option to pack textures or leave them as a path
-- [x] -- Path / 3D Curve support
-- [x] **DAE model loading**
-- [x] -- Vertex colors loading
-- [x] -- UV map loading
-- [x] -- Normal loading
-- [x] -- Transform / full scene loading
-- [x] **Lighting**
-- [x] -- Ambient lights
-- [x] -- Point lights
-- [x] -- Directional lights
-- [x] -- Smooth shading
-- [x] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
+- [X] -- Linking collections from external files
+- [X] -- Material data export
+- [X] -- Option to pack textures or leave them as a path
+- [X] -- Path / 3D Curve support
+- [X] **DAE model loading**
+- [X] -- Vertex colors loading
+- [X] -- UV map loading
+- [X] -- Normal loading
+- [X] -- Transform / full scene loading
+- [X] **Lighting**
+- [X] -- Ambient lights
+- [X] -- Point lights
+- [X] -- Directional lights
+- [X] -- Smooth shading
+- [X] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
-- [x] **Shaders**
-- [x] -- Custom fragment shaders
+- [X] **Shaders**
+- [X] -- Custom fragment shaders
 - [ ] -- Normal rendering (useful for, say, screen-space shaders)
-- [x] **Collision Testing**
-- [x] -- Normal reporting
-- [x] -- Slope reporting
-- [x] -- Contact point reporting
-- [x] -- Varying collision shapes
-- [x] -- Checking multiple collisions at the same time
+- [X] **Collision Testing**
+- [X] -- Normal reporting
+- [X] -- Slope reporting
+- [X] -- Contact point reporting
+- [X] -- Varying collision shapes
+- [X] -- Checking multiple collisions at the same time
 
-| Collision Type | Sphere | AABB         | Triangle   | Capsule  | Ray (not implemented yet) |
-| ------         | ----   | ----         | --------   | -------- | ---- |
-| Sphere         |  ✅    | ✅           |    ✅      |  ✅      |   ❌  |
-| AABB           | ✅     |  ✅          | ⛔ (buggy) |  ✅      |   ❌  |
-| Triangle       | ✅     | ⛔ (buggy)   | ⛔ (buggy) | ✅       |   ❌  |
-| Capsule        | ✅     | ✅           | ✅         | ✅       |   ❌  |
-| Ray            | ❌     | ❌           | ❌         | ❌       |   ❌  |
+
+| Collision Type | Sphere | AABB       | Triangle   | Capsule | Ray (not implemented yet) |
+| ---------------- | -------- | ------------ | ------------ | --------- | --------------------------- |
+| Sphere         | ✅     | ✅         | ✅         | ✅      | ❌                        |
+| AABB           | ✅     | ✅         | ⛔ (buggy) | ✅      | ❌                        |
+| Triangle       | ✅     | ⛔ (buggy) | ⛔ (buggy) | ✅      | ❌                        |
+| Capsule        | ✅     | ✅         | ✅         | ✅      | ❌                        |
+| Ray            | ❌     | ❌         | ❌         | ❌      | ❌                        |
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
 - [ ] **Optimization**
 - [ ] -- Multithreading (particularly for vertex transformations)
-- [x] -- Armature animation improvements? 
+- [X] -- Armature animation improvements?
 - [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
-- [x] -- Vector pools
+- [X] -- Vector pools
 - [ ] -- Matrix pools?
 - [ ] -- Lighting speed improvements
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
@@ -349,7 +354,7 @@ Again, it's incomplete and jank. However, it's also pretty cool!
 
 ## Shout-out time~
 
-Huge shout-out to the open-source community: 
+Huge shout-out to the open-source community:
 
 - StackOverflow, in general
 - [fauxgl](https://github.com/fogleman/fauxgl)
@@ -357,5 +362,6 @@ Huge shout-out to the open-source community:
 - [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems)
 - [3DCollisions](https://gdbooks.gitbooks.io/3dcollisions/content/)
 - [Simon Rodriguez's "Writing a Small Software Renderer" article](http://blog.simonrodriguez.fr/articles/2017/02/writing_a_small_software_renderer.html)
-	
-... For sharing the information and code to make this possible; I would definitely have never made this happen otherwise.
+- And many other articles that I've forgotten to note down
+
+... For sharing the information and code to make this possible; I would definitely have never been able to create this otherwise.
