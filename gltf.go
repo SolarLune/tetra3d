@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"image"
 	"log"
 	"math"
@@ -1107,6 +1108,77 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		}
 	}
 
+	if len(doc.Scenes) > 0 && doc.Scenes[0].Extras != nil {
+
+		dataMap := doc.Scenes[0].Extras.(map[string]interface{})
+
+		if wd, exists := dataMap["t3dWorlds__"]; exists {
+
+			worldData := wd.(map[string]interface{})
+
+			for worldName, p := range worldData {
+
+				world := NewWorld(worldName)
+
+				props := p.(map[string]interface{})
+
+				if wc, exists := props["ambient color"]; exists {
+					wcc := wc.([]interface{})
+					worldColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1)
+					worldColor.ConvertTosRGB()
+					world.AmbientLight.Color.Set(worldColor.R, worldColor.G, worldColor.B, 1)
+				}
+
+				if wc, exists := props["ambient energy"]; exists {
+					world.AmbientLight.Energy = float32(wc.(float64))
+				}
+
+				if cc, exists := props["clear color"]; exists {
+					wcc := cc.([]interface{})
+					clearColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64)))
+					clearColor.ConvertTosRGB()
+					world.ClearColor = clearColor
+				}
+
+				if v, exists := props["fog mode"]; exists {
+					fm := v.(string)
+					switch fm {
+					case "OFF":
+						world.FogMode = FogOff
+					case "ADDITIVE":
+						world.FogMode = FogAdd
+					case "MULTIPLY":
+						world.FogMode = FogMultiply
+					case "OVERWRITE":
+						world.FogMode = FogOverwrite
+					}
+				}
+
+				if v, exists := props["fog color"]; exists {
+					wcc := v.([]interface{})
+					fogColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64)))
+					fogColor.ConvertTosRGB()
+					world.FogColor = fogColor
+				}
+
+				if v, exists := props["fog range start"]; exists {
+					fogStart := v.(float64)
+					world.FogRange[0] = float32(fogStart)
+				}
+
+				if v, exists := props["fog range end"]; exists {
+					fogEnd := v.(float64)
+					world.FogRange[1] = float32(fogEnd)
+				}
+
+				library.Worlds[world.Name] = world
+
+			}
+
+		}
+
+	}
+
 	for _, s := range doc.Scenes {
 
 		scene := library.AddScene(s.Name)
@@ -1118,54 +1190,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		}
 
 		if s.Extras != nil {
-			dataMap := s.Extras.(map[string]interface{})
-			if wc, exists := dataMap["t3dWorldColor__"]; exists {
-				wcc := wc.([]interface{})
-				worldColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1)
-				worldColor.ConvertTosRGB()
-				ambientLight := NewAmbientLight("World Ambient", 1, 1, 1, float32(dataMap["t3dWorldEnergy__"].(float64)))
-				ambientLight.Color = worldColor
-				scene.Root.AddChildren(ambientLight)
+			extras := s.Extras.(map[string]interface{})
+			if wn, exists := extras["t3dCurrentWorld__"]; exists {
+				scene.World = library.Worlds[wn.(string)]
+				fmt.Println("world set: ", scene.World.Name)
 			}
-
-			if cc, exists := dataMap["t3dClearColor__"]; exists {
-				wcc := cc.([]interface{})
-				clearColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64)))
-				clearColor.ConvertTosRGB()
-				scene.ClearColor = clearColor
-			}
-
-			if v, exists := dataMap["t3dFogMode__"]; exists {
-				fm := v.(string)
-				switch fm {
-				case "OFF":
-					scene.FogMode = FogOff
-				case "ADDITIVE":
-					scene.FogMode = FogAdd
-				case "MULTIPLY":
-					scene.FogMode = FogMultiply
-				case "OVERWRITE":
-					scene.FogMode = FogOverwrite
-				}
-			}
-
-			if v, exists := dataMap["t3dFogColor__"]; exists {
-				wcc := v.([]interface{})
-				fogColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64)))
-				fogColor.ConvertTosRGB()
-				scene.FogColor = fogColor
-			}
-
-			if v, exists := dataMap["t3dFogRangeStart__"]; exists {
-				fogStart := v.(float64)
-				scene.FogRange[0] = float32(fogStart)
-			}
-
-			if v, exists := dataMap["t3dFogRangeEnd__"]; exists {
-				fogEnd := v.(float64)
-				scene.FogRange[1] = float32(fogEnd)
-			}
-
 		}
 
 	}

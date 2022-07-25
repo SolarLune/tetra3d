@@ -602,7 +602,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	lights := []Light{}
 
-	if scene.LightingOn {
+	if scene.World != nil && scene.World.LightingOn {
 
 		for _, l := range scene.Root.ChildrenRecursive() {
 			if light, isLight := l.(Light); isLight {
@@ -615,6 +615,10 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 		}
 
+		if scene.World.AmbientLight != nil && scene.World.AmbientLight.isOn() {
+			lights = append(lights, scene.World.AmbientLight)
+		}
+
 	}
 
 	// By multiplying the camera's position against the view matrix (which contains the negated camera position), we're left with just the rotation
@@ -625,11 +629,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	rectShaderOptions.Images[0] = camera.colorIntermediate
 	rectShaderOptions.Images[1] = camera.depthIntermediate
 
-	if scene != nil {
+	if scene != nil && scene.World != nil {
 
 		rectShaderOptions.Uniforms = map[string]interface{}{
-			"Fog":      scene.fogAsFloatSlice(),
-			"FogRange": scene.FogRange,
+			"Fog":      scene.World.fogAsFloatSlice(),
+			"FogRange": scene.World.FogRange,
 		}
 
 	} else {
@@ -726,9 +730,13 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		meshPart := rp.MeshPart
 		mat := meshPart.Material
 
-		lighting := scene.LightingOn
-		if mat != nil {
-			lighting = scene.LightingOn && !mat.Shadeless
+		lighting := false
+		if scene.World != nil {
+			if mat != nil {
+				lighting = scene.World.LightingOn && !mat.Shadeless
+			} else {
+				lighting = scene.World.LightingOn
+			}
 		}
 
 		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
@@ -936,7 +944,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
 					depthVertexList[vertexListIndex+i].SrcY = v
 
-				} else if scene.FogMode != FogOff {
+				} else if scene.World != nil && scene.World.FogMode != FogOff {
 
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
@@ -949,16 +957,16 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 					// depth = 1 - depth
 
-					depth = scene.FogRange[0] + ((scene.FogRange[1]-scene.FogRange[0])*1 - depth)
+					depth = scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - depth)
 
-					if scene.FogMode == FogAdd {
-						colorVertexList[vertexListIndex+i].ColorR += scene.FogColor.R * depth
-						colorVertexList[vertexListIndex+i].ColorG += scene.FogColor.G * depth
-						colorVertexList[vertexListIndex+i].ColorB += scene.FogColor.B * depth
-					} else if scene.FogMode == FogMultiply {
-						colorVertexList[vertexListIndex+i].ColorR *= scene.FogColor.R * depth
-						colorVertexList[vertexListIndex+i].ColorG *= scene.FogColor.G * depth
-						colorVertexList[vertexListIndex+i].ColorB *= scene.FogColor.B * depth
+					if scene.World.FogMode == FogAdd {
+						colorVertexList[vertexListIndex+i].ColorR += scene.World.FogColor.R * depth
+						colorVertexList[vertexListIndex+i].ColorG += scene.World.FogColor.G * depth
+						colorVertexList[vertexListIndex+i].ColorB += scene.World.FogColor.B * depth
+					} else if scene.World.FogMode == FogMultiply {
+						colorVertexList[vertexListIndex+i].ColorR *= scene.World.FogColor.R * depth
+						colorVertexList[vertexListIndex+i].ColorG *= scene.World.FogColor.G * depth
+						colorVertexList[vertexListIndex+i].ColorB *= scene.World.FogColor.B * depth
 					}
 
 				}

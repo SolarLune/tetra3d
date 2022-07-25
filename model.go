@@ -404,7 +404,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		lightingOn := false
 		if scene != nil {
-			lightingOn = scene.LightingOn && (meshPart.Material == nil || !meshPart.Material.Shadeless)
+			if scene.World != nil {
+				lightingOn = scene.World.LightingOn && (meshPart.Material == nil || !meshPart.Material.Shadeless)
+			} else {
+				lightingOn = meshPart.Material == nil || !meshPart.Material.Shadeless
+			}
 		}
 
 		model.skinVectorPool.Reset()

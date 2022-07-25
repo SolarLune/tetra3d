@@ -82,7 +82,7 @@ func (amb *AmbientLight) Unparent() {
 }
 
 func (amb *AmbientLight) isOn() bool {
-	return amb.On
+	return amb.On && amb.Energy > 0
 }
 
 // Type returns the NodeType for this object.
@@ -246,7 +246,7 @@ func (point *PointLight) Unparent() {
 }
 
 func (point *PointLight) isOn() bool {
-	return point.On
+	return point.On && point.Energy > 0
 }
 
 // Type returns the NodeType for this object.
@@ -349,7 +349,7 @@ func (sun *DirectionalLight) Unparent() {
 }
 
 func (sun *DirectionalLight) isOn() bool {
-	return sun.On
+	return sun.On && sun.Energy > 0
 }
 
 // Type returns the NodeType for this object.

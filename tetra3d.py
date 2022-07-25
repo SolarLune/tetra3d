@@ -359,7 +359,6 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box.prop(context.scene, "t3dPackTextures__")
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
-        box.prop(context.scene, "t3dExportWorldAmbientColor__")
 
 
 def export():
@@ -403,36 +402,48 @@ def export():
     
     globalSet("t3dCollections__", collections)
 
+    worlds = {}
+
+    for world in bpy.data.worlds:
+
+        worldData = {}
+
+        worldNodes = world.node_tree.nodes
+        
+        # If you're using nodes, it'll try to use either a background or emission node; otherwise, it'll just use the background color
+        if ("Background" in worldNodes or "Emission" in worldNodes) and world.use_nodes:
+            if "Background"in worldNodes:
+                bgNode = worldNodes["Background"]
+            else:
+                bgNode = worldNodes["Emission"]
+            worldData["ambient color"] = list(bgNode.inputs[0].default_value)
+            worldData["ambient energy"] = bgNode.inputs[1].default_value
+        else:
+            worldData["ambient color"] = list(world.color)
+            worldData["ambient energy"] = 1
+
+        if "t3dClearColor__" in world:
+            worldData["clear color"] = world.t3dClearColor__
+        if "t3dFogMode__" in world:
+            worldData["fog mode"] = world.t3dFogMode__
+        if "t3dFogColor__" in world:
+            worldData["fog color"] = world.t3dFogColor__
+        if "t3dFogRangeStart__" in world:
+            worldData["fog range start"] = world.t3dFogRangeStart__
+        if "t3dFogRangeEnd__" in world:
+            worldData["fog range end"] = world.t3dFogRangeEnd__
+
+        worlds[world.name] = worldData
+
+    globalSet("t3dWorlds__", worlds)
+
     for scene in bpy.data.scenes:
+
         if scene.users > 0:
-            
-            if getExportWorldColor(None):
-                if scene.world:
-                    worldNodes = scene.world.node_tree.nodes
-                    if ("Background" in worldNodes or "Emission" in worldNodes) and scene.world.use_nodes:
-                        if "Background"in worldNodes:
-                            bgNode = worldNodes["Background"]
-                        else:
-                            bgNode = worldNodes["Emission"]
-                        scene["t3dWorldColor__"] = list(bgNode.inputs[0].default_value)
-                        scene["t3dWorldEnergy__"] = bgNode.inputs[1].default_value
-                    else:
-                        scene["t3dWorldColor__"] = list(scene.world.color)
-                        scene["t3dWorldEnergy__"] = 1
 
             if scene.world:
-                
-                if "t3dClearColor__" in scene.world:
-                    scene["t3dClearColor__"] = scene.world.t3dClearColor__
-                if "t3dFogMode__" in scene.world:
-                    scene["t3dFogMode__"] = scene.world.t3dFogMode__
-                if "t3dFogColor__" in scene.world:
-                    scene["t3dFogColor__"] = scene.world.t3dFogColor__
-                if "t3dFogRangeStart__" in scene.world:
-                    scene["t3dFogRangeStart__"] = scene.world.t3dFogRangeStart__
-                if "t3dFogRangeEnd__" in scene.world:
-                    scene["t3dFogRangeEnd__"] = scene.world.t3dFogRangeEnd__
-
+                scene["t3dCurrentWorld__"] = scene.world.name
+            
             for layer in scene.view_layers:
                 for obj in layer.objects:
 
@@ -493,24 +504,10 @@ def export():
 
     for scene in bpy.data.scenes:
 
-        if scene.world:
-            if "t3dClearColor__" in scene.world:
-                del(scene["t3dClearColor__"])
-            if "t3dFogMode__" in scene.world:
-                del(scene["t3dFogMode__"])
-            if "t3dFogColor__" in scene.world:
-                del(scene["t3dFogColor__"])
-            if "t3dFogRangeStart__" in scene.world:
-                del(scene["t3dFogRangeStart__"])
-            if "t3dFogRangeEnd" in scene.world:
-                del(scene["t3dFogRangeEnd__"])
+        if scene.world and "t3dCurrentWorld__" in scene:
+            del(scene["t3dCurrentWorld__"])
 
         if scene.users > 0:
-
-            if "t3dWorldColor__" in scene:
-                del(scene["t3dWorldColor__"])
-            if "t3dWorldEnergy__" in scene:
-                del(scene["t3dWorldEnergy__"])
 
             for layer in scene.view_layers:
 
@@ -535,6 +532,7 @@ def export():
             del(action["t3dMarkers__"])
 
     globalDel("t3dCollections__")
+    globalDel("t3dWorlds__")
 
     return True
 
@@ -636,16 +634,6 @@ def setPackTextures(self, value):
     globalSet("t3dPackTextures__", value)
 
 
-def getExportWorldColor(self):
-    l = globalGet("t3dExportWorldColor__")
-    if l is None:
-        l = True
-    return l
-
-def setExportWorldColor(self, value):
-    globalSet("t3dExportWorldColor__", value)
-
-
 def fogRangeStartSet(self, value):
     if value > bpy.context.world.t3dFogRangeEnd__:
         value = bpy.context.world.t3dFogRangeEnd__
@@ -703,9 +691,6 @@ def register():
     bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(name="Pack Textures", description="Whether Blender should pack textures into the GLTF file on export", default=False,
     get=getPackTextures, set=setPackTextures)    
 
-    bpy.types.Scene.t3dExportWorldAmbientColor__ = bpy.props.BoolProperty(name="Export World Color As Ambient Light", description="Whether Blender should export the world color (assuming it uses Background as the color) as an ambient light", default=False,
-    get=getExportWorldColor, set=setExportWorldColor)    
-
     bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
     bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
@@ -745,7 +730,6 @@ def unregister():
     del bpy.types.Scene.t3dExportCameras__
     del bpy.types.Scene.t3dExportLights__
     del bpy.types.Scene.t3dPackTextures__
-    del bpy.types.Scene.t3dExportWorldAmbientColor__
 
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__
