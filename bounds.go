@@ -793,3 +793,19 @@ func (projection projection) Overlap(other projection) float64 {
 func (projection projection) IsOverlapping(other projection) bool {
 	return !(projection.Min > other.Max || other.Min > projection.Max)
 }
+
+var sphereCheck = NewBoundingSphere("sphere check", 1)
+
+// SphereCheck performs a quick bounding sphere check at the specified X, Y, and Z position with the radius given,
+// against the bounding objects provided in "others".
+func SphereCheck(x, y, z, radius float64, others ...BoundingObject) []*Collision {
+	return SphereCheckVec(vector.Vector{x, y, z}, radius, others...)
+}
+
+// SphereCheck performs a quick bounding sphere check at the specified position with the radius given, against the
+// bounding objects provided in "others".
+func SphereCheckVec(position vector.Vector, radius float64, others ...BoundingObject) []*Collision {
+	sphereCheck.SetLocalPosition(position)
+	sphereCheck.Radius = radius
+	return commonCollisionTest(sphereCheck, 0, 0, 0, others...)
+}

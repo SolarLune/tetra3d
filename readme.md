@@ -298,6 +298,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Camera loading
 - [X] -- Loading world color in as ambient lighting
 - [ ] -- Separate .bin loading
+- [ ] -- Support for multiple scenes in a single Blend file (this used to work fine, but a regression with the GLTF exporter has broken this)
 - [X] **Blender Add-on**
 - [X] -- Export GLTF on save / on command via button
 - [X] -- Bounds node creation

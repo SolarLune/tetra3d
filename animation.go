@@ -229,16 +229,18 @@ type AnimationPlayer struct {
 	ChannelsToNodes        map[*AnimationChannel]INode
 	ChannelsUpdated        bool
 	Animation              *Animation
-	Playhead               float64                                   // Playhead of the animation. Setting this to 0 restarts the animation.
-	PlaySpeed              float64                                   // Playback speed in percentage - defaults to 1 (100%)
-	Playing                bool                                      // Whether the player is playing back or not.
-	FinishMode             int                                       // What to do when the player finishes playback. Defaults to looping.
-	OnFinish               func()                                    // Callback indicating the Animation has completed
+	Playhead               float64 // Playhead of the animation. Setting this to 0 restarts the animation.
+	PlaySpeed              float64 // Playback speed in percentage - defaults to 1 (100%)
+	Playing                bool    // Whether the player is playing back or not.
+	FinishMode             int     // What to do when the player finishes playback. Defaults to looping.
+	OnFinish               func()  // Callback indicating the Animation has completed
+	finished               bool
 	OnMarkerTouch          func(marker Marker, animation *Animation) // Callback indicating when the AnimationPlayer has entered a marker
-	AnimatedProperties     map[INode]*AnimationValues                // The properties that have been animated
-	prevAnimatedProperties map[INode]*AnimationValues                // The previous properties that have been animated from the previously Play()'d animation
-	BlendTime              float64                                   // How much time in seconds to blend between two animations
-	blendStart             time.Time                                 // The time that the blend started
+	touchedMarkers         []Marker
+	AnimatedProperties     map[INode]*AnimationValues // The properties that have been animated
+	prevAnimatedProperties map[INode]*AnimationValues // The previous properties that have been animated from the previously Play()'d animation
+	BlendTime              float64                    // How much time in seconds to blend between two animations
+	blendStart             time.Time                  // The time that the blend started
 	// If the AnimationPlayer should play the last frame or not. For example, if you have an animation that starts on frame 1 and goes to frame 10,
 	// then if PlayLastFrame is on, it will play all frames, INCLUDING frame 10, and only then repeat (if it's set to repeat).
 	// Otherwise, it will only play frames 1 - 9, which can be good if your last frame is a repeat of the first to make a cyclical animation.
@@ -398,8 +400,11 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 			ap.Playhead += dt * ap.PlaySpeed
 
 			for _, marker := range ap.Animation.Markers {
-				if ap.Playhead >= marker.Time && prevPlayhead <= marker.Time && ap.OnMarkerTouch != nil {
-					ap.OnMarkerTouch(marker, ap.Animation)
+				if ap.Playhead >= marker.Time && prevPlayhead <= marker.Time {
+					if ap.OnMarkerTouch != nil {
+						ap.OnMarkerTouch(marker, ap.Animation)
+					}
+					ap.touchedMarkers = append(ap.touchedMarkers, marker)
 				}
 			}
 
@@ -422,6 +427,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				if ap.OnFinish != nil {
 					ap.OnFinish()
 				}
+				ap.finished = true
 
 			} else if ap.FinishMode == FinishModePingPong && (ph > ap.Animation.Length || ph < 0) {
 
@@ -438,6 +444,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				if finishedLoop && ap.OnFinish != nil {
 					ap.OnFinish()
 				}
+				ap.finished = true
 
 				ap.PlaySpeed *= -1
 
@@ -452,6 +459,8 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				if ap.OnFinish != nil {
 					ap.OnFinish()
 				}
+				ap.finished = true
+
 				ap.Playing = false
 
 			}
@@ -464,6 +473,9 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 // Update updates the animation player by the delta specified in seconds (usually 1/FPS or 1/TARGET FPS), animating the transformation properties of the root node's tree.
 func (ap *AnimationPlayer) Update(dt float64) {
+
+	ap.finished = false
+	ap.touchedMarkers = []Marker{}
 
 	ap.updateValues(dt)
 
@@ -537,6 +549,55 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 	}
 
+}
+
+func (ap *AnimationPlayer) Finished() bool {
+	return ap.finished
+}
+
+//TouchedMarker returns if a marker with the specified name was touched this past frame - note that this relies on calling AnimationPlayer.Update().
+func (ap *AnimationPlayer) TouchedMarker(markerName string) bool {
+
+	if ap.Animation == nil || ap.finished {
+		return false
+	}
+
+	for _, marker := range ap.touchedMarkers {
+		if marker.Name == markerName {
+			return true
+		}
+	}
+	return false
+}
+
+//AfterMarker returns if the AnimationPlayer's playhead is after a marker with the specified name while the AnimationPlayer is not finished playing.
+func (ap *AnimationPlayer) AfterMarker(markerName string) bool {
+
+	if ap.Animation == nil || ap.finished {
+		return false
+	}
+
+	for _, marker := range ap.Animation.Markers {
+		if marker.Name == markerName && marker.Time < ap.Playhead {
+			return true
+		}
+	}
+	return false
+}
+
+//BeforeMarker returns if the AnimationPlayer's playhead is before a marker with the specified name while the AnimationPlayer is not finished playing.
+func (ap *AnimationPlayer) BeforeMarker(markerName string) bool {
+
+	if ap.Animation == nil || ap.finished {
+		return false
+	}
+
+	for _, marker := range ap.Animation.Markers {
+		if marker.Name == markerName && marker.Time > ap.Playhead {
+			return true
+		}
+	}
+	return false
 }
 
 // func (anim *Animation) TracksToString() string {

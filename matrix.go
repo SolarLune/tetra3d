@@ -163,6 +163,27 @@ func NewMatrix4RotateFromQuaternion(quat *Quaternion) Matrix4 {
 	return m1.Mult(m2)
 }
 
+// ToQuaternion returns a Quaternion representative of the Matrix4's rotation (assuming it is just a purely rotational Matrix4).
+func (matrix Matrix4) ToQuaternion() *Quaternion {
+
+	sqrt := math.Sqrt(1 + matrix[0][0] + matrix[1][1] + matrix[2][2])
+
+	if sqrt != 0 {
+		qw := sqrt / 2
+
+		return NewQuaternion(
+			(matrix[1][2]-matrix[2][1])/(4*qw),
+			(matrix[2][0]-matrix[0][2])/(4*qw),
+			(matrix[0][1]-matrix[1][0])/(4*qw),
+			qw,
+		)
+
+	}
+
+	return NewQuaternion(0, 1, 0, 0)
+
+}
+
 // Right returns the right-facing rotational component of the Matrix4. For an identity matrix, this would be [1, 0, 0], or +X.
 func (matrix Matrix4) Right() vector.Vector {
 	return vector.Vector{
@@ -567,6 +588,25 @@ func (matrix Matrix4) ScaleByScalar(scalar float64) Matrix4 {
 
 }
 
+func (matrix Matrix4) Sub(other Matrix4) Matrix4 {
+
+	newMat := matrix.Clone()
+
+	for i := 0; i < len(matrix); i++ {
+		for j := 0; j < len(matrix[i]); j++ {
+			newMat[i][j] -= other[i][j]
+		}
+	}
+
+	return newMat
+
+}
+
+// Lerping matrices is not very useful, so I'm hesitant to add it in
+// func (matrix Matrix4) Lerp(other Matrix4, perc float64) Matrix4 {
+// 	return matrix.Add(other.Sub(matrix).ScaleByScalar(perc))
+// }
+
 // Columns returns the Matrix4 as a slice of []float64, in column-major order (so it's transposed from the row-major default).
 func (matrix Matrix4) Columns() [][]float64 {
 
@@ -621,10 +661,10 @@ func (matrix Matrix4) String() string {
 	return s
 }
 
-// NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. target is the target's world position,
-// center is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
-func NewLookAtMatrix(target, center, up vector.Vector) Matrix4 {
-	z := target.Sub(center).Unit()
+// NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. to is the target's world position,
+// from is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
+func NewLookAtMatrix(from, to, up vector.Vector) Matrix4 {
+	z := to.Sub(from).Unit()
 	x, _ := up.Cross(z)
 	x = x.Unit()
 	y, _ := z.Cross(x)

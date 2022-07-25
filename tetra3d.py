@@ -49,17 +49,14 @@ worldFogCompositeModes = [
     ("OVERWRITE", "Overwrite", "Overwrite fog - this fog mode overwrites the object's color with the fog color, with maximum distance being the camera's far distance", 0, 3),
 ]
 
-GamePropTypeBool = 1
-GamePropTypeFloat = 2
-GamePropTypeString = 3
-GamePropTypeLink = 4
-
 gamePropTypes = [
     ("bool", "Bool", "Boolean data type", 0, 0),
     ("int", "Int", "Int data type", 0, 1),
     ("float", "Float", "Float data type", 0, 2),
     ("string", "String", "String data type", 0, 3),
     ("reference", "Object", "Object reference data type; converted to a string composed as follows on export - [SCENE NAME]:[OBJECT NAME]", 0, 4),
+    ("color", "Color", "Color data type", 0, 5),
+    ("vector3d", "3D Vector", "3D vector data type", 0, 6),
 ]
 
 class t3dGamePropertyItem__(bpy.types.PropertyGroup):
@@ -73,6 +70,9 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueString: bpy.props.StringProperty(name = "", description="The string value of the property")
     valueReference: bpy.props.PointerProperty(name = "", type=bpy.types.Object, description="The object to reference")
     valueReferenceScene: bpy.props.PointerProperty(name = "", type=bpy.types.Scene, description="The scene to search for an object to reference; if this is blank, all objects from all scenes will appear in the object search field")
+    valueColor: bpy.props.FloatVectorProperty(name = "", description="The color value of the property", subtype="COLOR", default=[1, 1, 1, 1], size=4, min=0, max=1)
+    valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="XYZ")
+    # valueVector4D: bpy.props.FloatVectorProperty(name = "", description="The 4D vector value of the property")
     
 
 class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
@@ -122,6 +122,8 @@ def copyProp(fromProp, toProp):
     toProp.valueString = fromProp.valueString
     toProp.valueReference = fromProp.valueReference
     toProp.valueReferenceScene = fromProp.valueReferenceScene
+    toProp.valueColor = fromProp.valueColor
+    toProp.valueVector3D = fromProp.valueVector3D
 
 
 class OBJECT_OT_tetra3dCopyProps(bpy.types.Operator):
@@ -262,6 +264,10 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                     row.prop_search(prop, "valueReference", prop.valueReferenceScene, "objects")
                 else:
                     row.prop(prop, "valueReference")
+            elif prop.valueType == "color":
+                row.prop(prop, "valueColor")
+            elif prop.valueType == "vector3d":
+                row.prop(prop, "valueVector3D")
         
         row = self.layout.row()
         row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
@@ -472,6 +478,7 @@ def export():
     # export_apply=True to ensure modifiers are applied.
     bpy.ops.export_scene.gltf(
         filepath=newPath, 
+        # use_active_scene=True, # Blender's GLTF exporter's kinda thrashed when it comes to multiple scenes, so it might be better to export each scene as its own GLTF file...?
         export_format=scene.t3dExportFormat__, 
         export_cameras=scene.t3dExportCameras__, 
         export_lights=scene.t3dExportLights__, 

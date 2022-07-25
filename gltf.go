@@ -968,6 +968,17 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		return nil
 	}
 
+	getOrDefaultFloatArray := func(propMap map[string]interface{}, key string, defaultValue []float64) []float64 {
+		if value, keyExists := propMap[key]; keyExists {
+			values := make([]float64, 0, len(value.([]interface{})))
+			for _, v := range value.([]interface{}) {
+				values = append(values, v.(float64))
+			}
+			return values
+		}
+		return defaultValue
+	}
+
 	// At this point, parenting should be set up.
 	for obj, node := range objToNode {
 
@@ -1005,6 +1016,18 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							if ref := getIfExistingMap(property, "valueReference"); ref != nil {
 								value = scene + ":" + getOrDefaultString(ref, "name", "")
 							}
+						} else if propType == 5 {
+							colorValues := getOrDefaultFloatArray(property, "valueColor", []float64{1, 1, 1, 1})
+							color := NewColor(float32(colorValues[0]), float32(colorValues[1]), float32(colorValues[2]), float32(colorValues[3]))
+							color.ConvertTosRGB()
+							value = color
+						} else if propType == 6 {
+							vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float64{0, 0, 0})
+							vec := vector.Vector{}
+							for _, v := range vecValues {
+								vec = append(vec, v)
+							}
+							value = vec
 						}
 
 						obj.Tags().Set(name, value)

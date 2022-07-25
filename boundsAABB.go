@@ -30,6 +30,7 @@ func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
 	bounds := &BoundingAABB{
 		Node:         NewNode(name),
 		internalSize: vector.Vector{width, height, depth},
+		Size:         vector.Vector{0, 0, 0},
 	}
 	bounds.updateSize()
 	return bounds
@@ -59,23 +60,48 @@ func (box *BoundingAABB) updateSize() {
 		{-1, -1, -1},
 	}
 
-	box.Size = vector.Vector{0, 0, 0}
-
-	for _, c := range corners {
-		cs := vector.Vector{
-			box.internalSize[0] * c[0],
-			box.internalSize[1] * c[1],
-			box.internalSize[2] * c[2],
-		}
-		cs = r.MultVec(cs)
-		box.Size[0] = math.Max(box.Size[0], math.Abs(cs[0]))
-		box.Size[1] = math.Max(box.Size[1], math.Abs(cs[1]))
-		box.Size[2] = math.Max(box.Size[2], math.Abs(cs[2]))
+	dimensions := Dimensions{
+		vector.Vector{math.MaxFloat64, math.MaxFloat64, math.MaxFloat64},
+		vector.Vector{-math.MaxFloat64, -math.MaxFloat64, -math.MaxFloat64},
 	}
 
-	box.Size[0] *= s[0]
-	box.Size[1] *= s[1]
-	box.Size[2] *= s[2]
+	for _, c := range corners {
+
+		position := r.MultVec(vector.Vector{
+			box.internalSize[0] * c[0] * s[0] / 2,
+			box.internalSize[1] * c[1] * s[1] / 2,
+			box.internalSize[2] * c[2] * s[2] / 2,
+		})
+
+		if dimensions[0][0] > position[0] {
+			dimensions[0][0] = position[0]
+		}
+
+		if dimensions[0][1] > position[1] {
+			dimensions[0][1] = position[1]
+		}
+
+		if dimensions[0][2] > position[2] {
+			dimensions[0][2] = position[2]
+		}
+
+		if dimensions[1][0] < position[0] {
+			dimensions[1][0] = position[0]
+		}
+
+		if dimensions[1][1] < position[1] {
+			dimensions[1][1] = position[1]
+		}
+
+		if dimensions[1][2] < position[2] {
+			dimensions[1][2] = position[2]
+		}
+
+	}
+
+	box.Size[0] = dimensions.Width()
+	box.Size[1] = dimensions.Height()
+	box.Size[2] = dimensions.Depth()
 
 }
 

@@ -216,14 +216,17 @@ func (tags *Tags) Has(nodeTags ...string) bool {
 	return true
 }
 
-// Get returns the value associated with the specified tag (key).
-// Note that this does not sanity check to ensure the tag exists first.
+// Get returns the value associated with the specified tag (key). If a tag with the
+// passed name (tagName) doesn't exist, Get will return nil.
 func (tags *Tags) Get(tagName string) interface{} {
-	return tags.tags[tagName]
+	if tag, ok := tags.tags[tagName]; ok {
+		return tag
+	}
+	return nil
 }
 
 // IsString returns true if the value associated with the specified tag is a string. If the
-// tag doesn't exist, this returns false.
+// tag doesn't exist or the tag's value isn't a string type, this returns false.
 func (tags *Tags) IsString(tagName string) bool {
 	if _, exists := tags.tags[tagName]; exists {
 		if _, ok := tags.tags[tagName].(string); ok {
@@ -240,7 +243,7 @@ func (tags *Tags) GetAsString(tagName string) string {
 }
 
 // IsFloat returns true if the value associated with the specified tag is a float64. If the
-// tag doesn't exist, this returns false.
+// tag doesn't exist or the tag's value isn't a float64 type, this returns false.
 func (tags *Tags) IsFloat(tagName string) bool {
 	if _, exists := tags.tags[tagName]; exists {
 		if _, ok := tags.tags[tagName].(float64); ok {
@@ -250,14 +253,14 @@ func (tags *Tags) IsFloat(tagName string) bool {
 	return false
 }
 
-// GetAsFloat returns the value associated with the specified tag (key) as a float.
+// GetAsFloat returns the value associated with the specified tag (key) as a float64.
 // Note that this does not sanity check to ensure the tag exists first.
 func (tags *Tags) GetAsFloat(tagName string) float64 {
 	return tags.tags[tagName].(float64)
 }
 
-// IsInt returns true if the value associated with the specified tag is a float64. If the
-// tag doesn't exist, this returns false.
+// IsInt returns true if the value associated with the specified tag is a int. If the
+// tag doesn't exist or the tag's value isn't an int type, this returns false.
 func (tags *Tags) IsInt(tagName string) bool {
 	if _, exists := tags.tags[tagName]; exists {
 		if _, ok := tags.tags[tagName].(int); ok {
@@ -271,6 +274,40 @@ func (tags *Tags) IsInt(tagName string) bool {
 // Note that this does not sanity check to ensure the tag exists first.
 func (tags *Tags) GetAsInt(tagName string) int {
 	return tags.tags[tagName].(int)
+}
+
+// IsColor returns true if the value associated with the specified tag is a color. If the
+// tag doesn't exist or the tag's value isn't a *Color type, this returns false.
+func (tags *Tags) IsColor(tagName string) bool {
+	if _, exists := tags.tags[tagName]; exists {
+		if _, ok := tags.tags[tagName].(*Color); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// GetAsColor returns the value associated with the specified tag (key) as a *Color.
+// Note that this does not sanity check to ensure the tag exists first.
+func (tags *Tags) GetAsColor(tagName string) *Color {
+	return tags.tags[tagName].(*Color)
+}
+
+// IsVector returns true if the value associated with the specified tag is a vector. If the
+// tag doesn't exist or the tag's value isn't a vector.Vector, this returns false.
+func (tags *Tags) IsVector(tagName string) bool {
+	if _, exists := tags.tags[tagName]; exists {
+		if _, ok := tags.tags[tagName].(vector.Vector); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// GetAsVector returns the value associated with the specified tag (key) as a *Color.
+// Note that this does not sanity check to ensure the tag exists first.
+func (tags *Tags) GetAsVector(tagName string) vector.Vector {
+	return tags.tags[tagName].(vector.Vector)
 }
 
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
