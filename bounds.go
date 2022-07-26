@@ -205,15 +205,18 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 
 			tri := mesh.Triangles[i]
 
+			// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
+			// only has to check triangles in the nearby cells.
+
+			// MaxSpan / 0.66 because if you have a triangle where the two vertices are very close to each other, they'll pull the triangle center
+			// towards them by twice as much as the third vertex (i.e. the center won't be in the center)
+			if fastVectorSub(spherePos, tri.Center).Magnitude() > (tri.MaxSpan*0.66)+sphereRadius {
+				continue
+			}
+
 			v0 := mesh.VertexPositions[tri.ID*3]
 			v1 := mesh.VertexPositions[tri.ID*3+1]
 			v2 := mesh.VertexPositions[tri.ID*3+2]
-
-			// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
-			// only has to check triangles in the nearby cells.
-			if fastVectorSub(spherePos, tri.Center).Magnitude() > tri.MaxSpan+sphereRadius {
-				continue
-			}
 
 			closest := closestPointOnTri(spherePos, v0, v1, v2)
 			delta := fastVectorSub(spherePos, closest)
@@ -656,7 +659,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 			// TODO: Replace this with an actual octree or something; the triangles should be spatially segmented into areas where a colliding object
 			// only has to check triangles in the nearby cells.
-			if fastVectorSub(capsulePosition, tri.Center).Magnitude() > tri.MaxSpan+capSpread {
+			if fastVectorSub(capsulePosition, tri.Center).Magnitude() > (tri.MaxSpan*0.66)+capSpread {
 				continue
 			}
 

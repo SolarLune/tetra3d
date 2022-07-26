@@ -173,6 +173,16 @@ class OBJECT_OT_tetra3dCopyOneProperty(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class OBJECT_OT_tetra3dCopyNodePathToClipboard(bpy.types.Operator):
+    bl_idname = "object.tetra3dcopynodepath"
+    bl_label = "Copy Node Path To Clipboard"
+    bl_description= "Copies an object's node path to clipboard"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        bpy.context.window_manager.clipboard = objectNodePath(context.object)
+        return {'FINISHED'}
+
 class OBJECT_OT_tetra3dClearProps(bpy.types.Operator):
    bl_idname = "object.tetra3dclearprops"
    bl_label = "Clear Game Properties"
@@ -189,6 +199,15 @@ class OBJECT_OT_tetra3dClearProps(bpy.types.Operator):
         return {'FINISHED'}
 
 
+def objectNodePath(object):
+
+    p = object.name
+
+    if object.parent:
+        p = objectNodePath(object.parent) + "/" + object.name
+
+    return p
+
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
     bl_label = "Tetra3d Object Properties"
@@ -201,6 +220,12 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         return context.object is not None
 
     def draw(self, context):
+
+        row = self.layout.row()
+        row.label(text="Node Path: " + objectNodePath(context.object))
+        row = self.layout.row()
+        row.operator("object.tetra3dcopynodepath", text="Copy Node Path to Clipboard", icon="COPYDOWN")
+        
         row = self.layout.row()
         row.prop(context.object, "t3dVisible__")
         row = self.layout.row()
@@ -228,7 +253,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
         row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
-        
+
         for index, prop in enumerate(context.object.t3dGameProperties__):
             box = self.layout.box()
             row = box.row()
@@ -666,6 +691,7 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyProps)
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyOneProperty)
     bpy.utils.register_class(OBJECT_OT_tetra3dClearProps)
+    bpy.utils.register_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
     bpy.utils.register_class(EXPORT_OT_tetra3d)
     
     bpy.utils.register_class(t3dGamePropertyItem__)
@@ -717,6 +743,7 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyProps)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyOneProperty)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dClearProps)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
     bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
     bpy.utils.unregister_class(t3dGamePropertyItem__)

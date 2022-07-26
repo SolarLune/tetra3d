@@ -249,7 +249,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] **3D rendering**
 - [X] -- Perspective projection
 - [X] -- Orthographic projection (it's kinda jank, but it works)
-- [ ] -- Automatic billboarding (not sure?)
+- [x] -- Automatic billboarding
 - [ ] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space) (not sure?)
 - [X] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [X] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
@@ -261,7 +261,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
 - [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
 - [ ] -- Draw triangle in 3D space (could be useful for 3D lines, for example)
-- [ ] -- Easy dynamic 3D Text (the current idea is to render the text to texture from a font, and then map it to a plane)
+- [ ] -- Easy dynamic 3D Text (to make this simple, it might be best to allow the user to render the text as he wishes, and then make a function to map it (or any other *Image) to a plane of variable size).
 - [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
 - [X] **Culling**
 - [X] -- Backface culling
