@@ -1491,11 +1491,9 @@ func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
 
 // DrawDebugBoundsColored will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
 // be drawn in the color provided for each kind of bounding object to the screen image provided.
-func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor *Color) {
+func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor, trianglesBroadphaseColor *Color) {
 
 	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
-
-	camWidth, camHeight := camera.resultColorTexture.Size()
 
 	for _, n := range allModels {
 
@@ -1579,7 +1577,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 			case *BoundingAABB:
 
 				pos := bounds.WorldPosition()
-				size := bounds.Size.Scale(1.0 / 2.0)
+				size := bounds.Dimensions.Size().Scale(0.5)
 
 				ufr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], size[2]}))
 				ufl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], size[2]}))
@@ -1610,6 +1608,12 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 				}
 
 			case *BoundingTriangles:
+
+				// for _, b := range bounds.Broadphase.allAABBs {
+				// 	camera.DrawDebugBoundsColored(screen, b, trianglesBroadphaseColor, trianglesBroadphaseColor, trianglesBroadphaseColor, trianglesBroadphaseColor, trianglesBroadphaseColor)
+				// }
+
+				camWidth, camHeight := camera.resultColorTexture.Size()
 
 				lines := []vector.Vector{}
 
@@ -1656,7 +1660,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 				}
 
-				camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, aabbColor, sphereColor, capsuleColor, trianglesColor)
+				camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, aabbColor, sphereColor, capsuleColor, trianglesColor, trianglesBroadphaseColor)
 
 			}
 
@@ -1666,10 +1670,16 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 }
 
+var defaultAabbColor = NewColor(0, 0.25, 1, 1)
+var defaultSphereColor = NewColor(0.5, 0.25, 1.0, 1)
+var defaultCapsuleColor = NewColor(0.25, 1, 0, 1)
+var defaultTrianglesColor = NewColor(1, 1, 1, 0.25)
+var defaultTrianglesBroadphaseColor = NewColor(1, 0, 0, 0.25)
+
 // DrawDebugBounds will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
-// be drawn in the color provided to the screen image provided.
-func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, color *Color) {
-	camera.DrawDebugBoundsColored(screen, rootNode, color, color, color, color)
+// be drawn using default colors to the screen image provided.
+func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode) {
+	camera.DrawDebugBoundsColored(screen, rootNode, defaultAabbColor, defaultSphereColor, defaultCapsuleColor, defaultTrianglesColor, defaultTrianglesBroadphaseColor)
 }
 
 // DrawDebugFrustums will draw shapes approximating the frustum spheres for objects underneath the rootNode.

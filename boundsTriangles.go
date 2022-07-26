@@ -10,17 +10,26 @@ import (
 type BoundingTriangles struct {
 	*Node
 	BoundingAABB *BoundingAABB
+	Broadphase   *Broadphase
 	Mesh         *Mesh
 }
 
 // NewBoundingTriangles returns a new BoundingTriangles object.
 func NewBoundingTriangles(name string, mesh *Mesh) *BoundingTriangles {
 	margin := 0.25 // An additional margin to help ensure the broadphase is crossed before checking for collisions
-	return &BoundingTriangles{
+	bt := &BoundingTriangles{
 		Node:         NewNode(name),
 		BoundingAABB: NewBoundingAABB("triangle broadphase aabb", mesh.Dimensions.Width()+margin, mesh.Dimensions.Height()+margin, mesh.Dimensions.Depth()+margin),
 		Mesh:         mesh,
 	}
+
+	gridSize := 4
+	// gridSize := 0
+	bt.Broadphase = NewBroadphase(gridSize, (bt.Mesh.Dimensions.MaxSpan()/float64(gridSize))+1, bt)
+
+	// bt.Broadphase = NewBroadphase(1, bt.Mesh.Dimensions.MaxSpan(), bt)
+
+	return bt
 }
 
 func (bt *BoundingTriangles) Transform() Matrix4 {
@@ -34,6 +43,8 @@ func (bt *BoundingTriangles) Transform() Matrix4 {
 		rot := bt.WorldRotation().MultVec(bt.Mesh.Dimensions.Center())
 		bt.BoundingAABB.MoveVec(rot)
 		bt.BoundingAABB.Transform()
+		bt.Broadphase.Center.SetWorldPosition(bt.WorldPosition())
+		bt.Broadphase.Center.Transform() // Update the transform
 	}
 
 	return transform

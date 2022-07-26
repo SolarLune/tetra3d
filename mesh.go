@@ -12,6 +12,13 @@ import (
 // Dimensions represents the minimum and maximum spatial dimensions of a Mesh arranged in a 2-space Vector slice.
 type Dimensions []vector.Vector
 
+func (dim Dimensions) Clone() Dimensions {
+	return Dimensions{
+		dim[0].Clone(),
+		dim[1].Clone(),
+	}
+}
+
 // MaxDimension returns the maximum value from all of the axes in the Dimensions. For example, if the Dimensions have a min of [-1, -2, -2],
 // and a max of [6, 1.5, 1], Max() will return 7 for the X axis, as it's the largest distance between all axes.
 func (dim Dimensions) MaxDimension() float64 {
@@ -47,11 +54,32 @@ func (dim Dimensions) Depth() float64 {
 	return dim[1][2] - dim[0][2]
 }
 
-func (dim Dimensions) Clone() Dimensions {
-	return Dimensions{
-		dim[0].Clone(),
-		dim[1].Clone(),
+// Limit limits the provided position vector to be within the dimensions set.
+func (dim Dimensions) Limit(position vector.Vector) vector.Vector {
+
+	if position[0] < dim[0][0] {
+		position[0] = dim[0][0]
+	} else if position[0] > dim[1][0] {
+		position[0] = dim[1][0]
 	}
+
+	if position[1] < dim[0][1] {
+		position[1] = dim[0][1]
+	} else if position[1] > dim[1][1] {
+		position[1] = dim[1][1]
+	}
+
+	if position[2] < dim[0][2] {
+		position[2] = dim[0][2]
+	} else if position[2] > dim[1][2] {
+		position[2] = dim[1][2]
+	}
+
+	return position
+}
+
+func (dim Dimensions) Size() vector.Vector {
+	return vector.Vector{dim.Width(), dim.Height(), dim.Depth()}
 }
 
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one

@@ -12,7 +12,7 @@ import (
 type BoundingAABB struct {
 	*Node
 	internalSize vector.Vector
-	Size         vector.Vector
+	Dimensions   Dimensions
 }
 
 // NewBoundingAABB returns a new BoundingAABB Node.
@@ -30,7 +30,6 @@ func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
 	bounds := &BoundingAABB{
 		Node:         NewNode(name),
 		internalSize: vector.Vector{width, height, depth},
-		Size:         vector.Vector{0, 0, 0},
 	}
 	bounds.updateSize()
 	return bounds
@@ -43,7 +42,7 @@ func (box *BoundingAABB) Transform() Matrix4 {
 	return box.Node.Transform()
 }
 
-// updateSize updates the BoundingAABB's external Size property to reflect its size after reposition, rotation, or resizing.
+// updateSize updates the BoundingAABB's external Dimensions property to reflect its size after reposition, rotation, or resizing.
 // This is be called automatically internally as necessary after the node's transform is updated.
 func (box *BoundingAABB) updateSize() {
 
@@ -99,9 +98,7 @@ func (box *BoundingAABB) updateSize() {
 
 	}
 
-	box.Size[0] = dimensions.Width()
-	box.Size[1] = dimensions.Height()
-	box.Size[2] = dimensions.Depth()
+	box.Dimensions = dimensions
 
 }
 
@@ -147,7 +144,7 @@ func (box *BoundingAABB) ClosestPoint(point vector.Vector) vector.Vector {
 	out := point.Clone()
 	pos := box.WorldPosition()
 
-	half := box.Size.Scale(0.5)
+	half := box.Dimensions.Size().Scale(0.5)
 
 	if out[0] > pos[0]+half[0] {
 		out[0] = pos[0] + half[0]
@@ -277,4 +274,20 @@ func (box *BoundingAABB) CollisionTestVec(moveVec vector.Vector, others ...Bound
 // Type returns the NodeType for this object.
 func (box *BoundingAABB) Type() NodeType {
 	return NodeTypeBoundingAABB
+}
+
+func (box *BoundingAABB) PointInside(point vector.Vector) bool {
+
+	position := box.WorldPosition()
+	min := box.Dimensions[0].Add(position)
+	max := box.Dimensions[1].Add(position)
+	margin := 0.1
+
+	if point[0] >= min[0]-margin && point[0] <= max[0]+margin &&
+		point[1] >= min[1]-margin && point[1] <= max[1]+margin &&
+		point[2] >= min[2]-margin && point[2] <= max[2]+margin {
+		return true
+	}
+
+	return false
 }
