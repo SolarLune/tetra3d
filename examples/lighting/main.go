@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"image/color"
 	"image/png"
 	"math"
 	"os"
@@ -15,11 +14,9 @@ import (
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
-	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 //go:embed lighting.gltf
@@ -46,7 +43,6 @@ func NewGame() *Game {
 		Width:             796,
 		Height:            448,
 		PrevMousePosition: vector.Vector{},
-		DrawDebugText:     true,
 	}
 
 	game.Init()
@@ -203,7 +199,7 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.Scene.LightingOn = !g.Scene.LightingOn
+		g.Scene.World.LightingOn = !g.Scene.World.LightingOn
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
@@ -217,11 +213,7 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Clear, but with a color - we can use the world lighting color for this.
-	light := g.Scene.Root.Get("World Ambient").(*tetra3d.AmbientLight)
-	energy := light.Energy
-	bgColor := light.Color.Clone()
-	bgColor.MultiplyRGBA(energy, energy, energy, 1)
-	screen.Fill(bgColor.ToRGBA64())
+	screen.Fill(g.Scene.World.ClearColor.ToRGBA64())
 
 	// Clear the Camera
 	g.Camera.Clear()
@@ -241,10 +233,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugText {
-		g.Camera.DrawDebugFrustums(screen, g.Scene.Root, colors.White())
 		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example simply shows dynamic vertex-based lighting.\nThere are six lights in this scene:\nan ambient light, three point lights, \na single directional (sun) light,\nand one more point light parented to the camera.\n1 Key: Toggle all lighting\n2 Key: Toggle camera light\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 150, color.RGBA{255, 0, 0, 255})
+		g.Camera.DebugDrawText(screen, txt, 0, 150, 1, colors.Red())
 	}
 }
 

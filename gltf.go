@@ -3,7 +3,6 @@ package tetra3d
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"image"
 	"log"
 	"math"
@@ -797,7 +796,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					case 4: // Triangles
 
 						if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-							triangles := NewBoundingTriangles("_bounding triangles", obj.(*Model).Mesh)
+
+							gridSize := 20.0
+
+							if getOrDefaultBool("t3dTrianglesCustomBroadphaseEnabled__", false) {
+								gridSize = getOrDefaultFloat("t3dTrianglesCustomBroadphaseGridSize__", 20)
+							}
+
+							triangles := NewBoundingTriangles("_bounding triangles", obj.(*Model).Mesh, gridSize)
+
 							obj.AddChildren(triangles)
 						}
 
@@ -1193,7 +1200,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			extras := s.Extras.(map[string]interface{})
 			if wn, exists := extras["t3dCurrentWorld__"]; exists {
 				scene.World = library.Worlds[wn.(string)]
-				fmt.Println("world set: ", scene.World.Name)
 			}
 		}
 

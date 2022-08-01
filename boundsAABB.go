@@ -281,7 +281,7 @@ func (box *BoundingAABB) PointInside(point vector.Vector) bool {
 	position := box.WorldPosition()
 	min := box.Dimensions[0].Add(position)
 	max := box.Dimensions[1].Add(position)
-	margin := 0.1
+	margin := 0.01
 
 	if point[0] >= min[0]-margin && point[0] <= max[0]+margin &&
 		point[1] >= min[1]-margin && point[1] <= max[1]+margin &&

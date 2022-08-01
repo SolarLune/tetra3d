@@ -248,6 +248,10 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             if context.object.t3dSphereCustomEnabled__:
                 row = self.layout.row()
                 row.prop(context.object, "t3dSphereCustomRadius__")
+        elif context.object.t3dBoundsType__ == 'TRIANGLES':
+            row.prop(context.object, "t3dTrianglesCustomBroadphaseEnabled__")
+            if context.object.t3dTrianglesCustomBroadphaseEnabled__:
+                row.prop(context.object, "t3dTrianglesCustomBroadphaseGridSize__")
         row = self.layout.row()
         row.separator()
         row = self.layout.row()
@@ -587,6 +591,8 @@ objectProps = {
     "t3dBoundsType__" : bpy.props.EnumProperty(items=boundsTypes, name="Bounds", description="What Bounding node type to create and parent to this object"),
     "t3dAABBCustomEnabled__" : bpy.props.BoolProperty(name="Custom AABB Size", description="If enabled, you can manually set the BoundingAABB node's size. If disabled, the AABB's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingAABB node will be generated)", default=False),
     "t3dAABBCustomSize__" : bpy.props.FloatVectorProperty(name="Size", description="Width (X), height (Y), and depth (Z) of the BoundingAABB node that will be created", min=0.0, default=[2,2,2]),
+    "t3dTrianglesCustomBroadphaseEnabled__" : bpy.props.BoolProperty(name="Custom Broadphase Size", description="If enabled, you can manually set the BoundingTriangle's broadphase settings. If disabled, the BoundingTriangle's broadphase settings will be automatically determined by this object's size", default=False),
+    "t3dTrianglesCustomBroadphaseGridSize__" : bpy.props.IntProperty(name="Broadphase Cell Size", description="How large the cells are in the broadphase collision grid", min=1, default=20),
     "t3dCapsuleCustomEnabled__" : bpy.props.BoolProperty(name="Custom Capsule Size", description="If enabled, you can manually set the BoundingCapsule node's size properties. If disabled, the Capsule's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingCapsule node will be generated)", default=False),
     "t3dCapsuleCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="The radius of the BoundingCapsule node.", min=0.0, default=0.5),
     "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Height", description="The height of the BoundingCapsule node.", min=0.0, default=2),

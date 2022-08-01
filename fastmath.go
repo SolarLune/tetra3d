@@ -23,8 +23,14 @@ func fastVectorSub(a, b vector.Vector) vector.Vector {
 }
 
 func fastVectorDistanceSquared(a, b vector.Vector) float64 {
-	sub := fastVectorSub(a, b)
-	return sub[0]*sub[0] + sub[1]*sub[1] + sub[2]*sub[2]
+	subX := a[0] - b[0]
+	subY := a[1] - b[1]
+	subZ := a[2] - b[2]
+	return subX*subX + subY*subY + subZ*subZ
+}
+
+func fastVectorMagnitudeSquared(vec vector.Vector) float64 {
+	return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
 }
 
 func fastMatrixMult(matrix, other Matrix4) Matrix4 {

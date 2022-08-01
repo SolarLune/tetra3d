@@ -4,41 +4,87 @@ import (
 	"github.com/kvartborg/vector"
 )
 
+// Broadphase is a utility object specifically created to assist with quickly ruling out
+// triangles when doing Triangle-Sphere/Capsule/AABB collision detection. This works
+// largely automatically; you should generally not have to tweak this too much. The general
+// idea is that the broadphase is composed of AABBs in a grid layout, completely covering
+// the owning BoundingTriangles instance. When you check for a collision against the
+// BoundingTriangles instance, it first checks to see if the colliding object is within the
+// BoundingTriangles' overall AABB bounding box. If so, it proceeds to the broadphase check,
+// where it sees which set(s) of triangles the colliding object could be colliding with, and
+// then returns that set for finer examination.
 type Broadphase struct {
 	GridSize          int
-	CellSize          float64
-	Limits            Dimensions
+	cellSize          float64
 	Center            *Node
 	aabb              *BoundingAABB
 	TriSets           [][][][]int
 	BoundingTriangles *BoundingTriangles
 }
 
-func NewBroadphase(gridSize int, cellSize float64, bt *BoundingTriangles) *Broadphase {
+// NewBroadphase returns a new Broadphase instance.
+func NewBroadphase(gridSize int, bt *BoundingTriangles) *Broadphase {
 	bp := &Broadphase{
 		BoundingTriangles: bt,
 		Center:            NewNode("broadphase center"),
-		aabb:              NewBoundingAABB("bounding aabb", cellSize, cellSize, cellSize),
+		aabb:              NewBoundingAABB("bounding aabb", 1, 1, 1),
 	}
+
 	bp.Center.AddChildren(bp.aabb)
-	bp.Resize(gridSize, cellSize)
+
+	bp.Center.SetWorldPosition(bt.WorldPosition().Add(bt.Mesh.Dimensions.Center()))
+	bp.Center.Transform() // Update the transform so that when resizing, the aabb can properly check all triangles
+
+	bp.Resize(gridSize)
 	return bp
 }
 
-func (bp *Broadphase) Resize(gridSize int, cellSize float64) {
-	bp.GridSize = gridSize
-	bp.CellSize = cellSize
+// Clone clones the Broadphase.
+func (bp *Broadphase) Clone() *Broadphase {
+	newBroadphase := NewBroadphase(0, bp.BoundingTriangles)
+	newBroadphase.Center = bp.Center.Clone().(*Node)
+	newBroadphase.aabb = newBroadphase.Center.children[0].(*BoundingAABB)
+	newBroadphase.GridSize = bp.GridSize
+	newBroadphase.cellSize = bp.cellSize
 
-	if gridSize <= 0 || cellSize <= 0 {
+	ts := make([][][][]int, len(bp.TriSets))
+
+	for i := range bp.TriSets {
+		ts[i] = make([][][]int, len(bp.TriSets[i]))
+		for j := range bp.TriSets[i] {
+			ts[i][j] = make([][]int, len(bp.TriSets[i][j]))
+			for k := range bp.TriSets[i][j] {
+				ts[i][j][k] = make([]int, len(bp.TriSets[i][j][k]))
+				copy(ts[i][j][k], bp.TriSets[i][j][k])
+			}
+		}
+	}
+
+	newBroadphase.TriSets = ts
+
+	return newBroadphase
+}
+
+// Resize resizes the Broadphase struct, using the new gridSize for how big in units each cell in the grid should be.
+func (bp *Broadphase) Resize(gridSize int) {
+	bp.GridSize = gridSize
+
+	if gridSize <= 0 {
 		return
 	}
 
+	maxDim := bp.BoundingTriangles.Mesh.Dimensions.MaxDimension()
+	cellSize := (maxDim / float64(gridSize)) + 1 // The +1 adds a little extra room
+	bp.cellSize = cellSize
+
+	bp.aabb.internalSize[0] = cellSize
+	bp.aabb.internalSize[1] = cellSize
+	bp.aabb.internalSize[2] = cellSize
+	bp.aabb.updateSize()
+
 	bp.TriSets = make([][][][]int, gridSize)
 
-	bp.Limits = Dimensions{
-		{-float64(gridSize) * cellSize, -float64(gridSize) * cellSize, -float64(gridSize) * cellSize},
-		{float64(gridSize) * cellSize, float64(gridSize) * cellSize, float64(gridSize) * cellSize},
-	}
+	hg := float64(bp.GridSize) / 2
 
 	for i := 0; i < gridSize; i++ {
 		bp.TriSets[i] = make([][][]int, gridSize)
@@ -49,67 +95,119 @@ func (bp *Broadphase) Resize(gridSize int, cellSize float64) {
 				bp.TriSets[i][j][k] = []int{}
 
 				bp.aabb.SetLocalPosition(vector.Vector{
-					(-float64(gridSize)/2+float64(i))*cellSize + (cellSize / 2),
-					(-float64(gridSize)/2+float64(j))*cellSize + (cellSize / 2),
-					(-float64(gridSize)/2+float64(k))*cellSize + (cellSize / 2),
+					(float64(i) - hg + 0.5) * bp.cellSize,
+					(float64(j) - hg + 0.5) * bp.cellSize,
+					(float64(k) - hg + 0.5) * bp.cellSize,
 				})
 
+				center := bp.aabb.WorldPosition()
+
 				for _, tri := range bp.BoundingTriangles.Mesh.Triangles {
+
 					v0 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3]
 					v1 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3+1]
 					v2 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3+2]
-					closestOnAABB := bp.aabb.ClosestPoint(tri.Center)
-					closestOnTri := closestPointOnTri(closestOnAABB, v0, v1, v2)
-					// if bp.AABBs[i][j][k].PointInside(v0) || bp.AABBs[i][j][k].PointInside(v1) || bp.AABBs[i][j][k].PointInside(v2) {
+					closestOnTri := closestPointOnTri(center, v0, v1, v2)
 					if bp.aabb.PointInside(closestOnTri) {
 						bp.TriSets[i][j][k] = append(bp.TriSets[i][j][k], tri.ID)
 					}
+
 				}
+
 			}
+
 		}
+
 	}
 
 }
 
-func (bp *Broadphase) GetTrianglesFromBounding(boundingObject BoundingObject) []*Triangle {
+// GetTrianglesFromBounding retursn a set (map[int]bool) of triangle IDs, based on where the BoundingObject is
+// in relation to the Broadphase owning BoundingTriangles instance. The returned set contains each triangle only
+// once, of course.
+func (bp *Broadphase) GetTrianglesFromBounding(boundingObject BoundingObject) map[int]bool {
 
-	if bp.CellSize <= 0 || bp.GridSize <= 0 {
-		return bp.BoundingTriangles.Mesh.Triangles
+	if bp.GridSize <= 0 {
+		trianglesSet := make(map[int]bool, len(bp.BoundingTriangles.Mesh.Triangles))
+		for _, tri := range bp.BoundingTriangles.Mesh.Triangles {
+			trianglesSet[tri.ID] = true
+		}
+		return trianglesSet
 	}
 
-	trianglesSet := make(map[*Triangle]bool, len(bp.TriSets))
+	trianglesSet := make(map[int]bool, len(bp.TriSets))
+
+	hg := float64(bp.GridSize) / 2
 
 	// We're brute forcing it here; this isn't ideal, but it works alright for now
 	for i := 0; i < bp.GridSize; i++ {
 		for j := 0; j < bp.GridSize; j++ {
 			for k := 0; k < bp.GridSize; k++ {
 
+				// We can skip empty sets
+				if len(bp.TriSets[i][j][k]) == 0 {
+					continue
+				}
+
 				bp.aabb.SetLocalPosition(vector.Vector{
-					(-float64(bp.GridSize)/2+float64(i))*bp.CellSize + (bp.CellSize / 2),
-					(-float64(bp.GridSize)/2+float64(j))*bp.CellSize + (bp.CellSize / 2),
-					(-float64(bp.GridSize)/2+float64(k))*bp.CellSize + (bp.CellSize / 2),
+					(float64(i) - hg + 0.5) * bp.cellSize,
+					(float64(j) - hg + 0.5) * bp.cellSize,
+					(float64(k) - hg + 0.5) * bp.cellSize,
 				})
 
 				if bp.aabb.Colliding(boundingObject) {
 					// triangles = append(triangles, bp.TriSets[i][j][k]...)
 					for _, triID := range bp.TriSets[i][j][k] {
-						trianglesSet[bp.BoundingTriangles.Mesh.Triangles[triID]] = true
+						trianglesSet[triID] = true
 					}
 				}
 			}
 		}
 	}
 
-	tris := make([]*Triangle, len(trianglesSet))
+	return trianglesSet
 
-	i := 0
-	for t := range trianglesSet {
-		tris[i] = t
-		i++
+}
+
+func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
+
+	aabbs := []*BoundingAABB{}
+
+	if bp.GridSize <= 0 || bp.cellSize <= 0 {
+		return aabbs
 	}
 
-	return tris
+	hg := float64(bp.GridSize) / 2
 
+	bp.aabb.SetLocalPosition(vector.Vector{0, 0, 0})
+
+	for i := 0; i < bp.GridSize; i++ {
+		for j := 0; j < bp.GridSize; j++ {
+			for k := 0; k < bp.GridSize; k++ {
+
+				clone := bp.aabb.Clone().(*BoundingAABB)
+
+				clone.SetLocalPosition(vector.Vector{
+					// (-float64(bp.GridSize)/2+float64(i))*bp.CellSize + (bp.CellSize / 2),
+					// (-float64(bp.GridSize)/2+float64(j))*bp.CellSize + (bp.CellSize / 2),
+					// (-float64(bp.GridSize)/2+float64(k))*bp.CellSize + (bp.CellSize / 2),
+					(float64(i) - hg + 0.5) * bp.cellSize,
+					(float64(j) - hg + 0.5) * bp.cellSize,
+					(float64(k) - hg + 0.5) * bp.cellSize,
+					// 0, 0, 0,
+				})
+
+				clone.SetWorldTransform(bp.aabb.Transform().Mult(clone.Transform()))
+
+				clone.Transform()
+
+				aabbs = append(aabbs, clone)
+
+			}
+		}
+	}
+
+	return aabbs
 }
 
 // package tetra3d

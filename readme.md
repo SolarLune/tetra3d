@@ -260,7 +260,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
 - [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
 - [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
-- [ ] -- Draw triangle in 3D space (could be useful for 3D lines, for example)
+- [ ] -- Draw triangle in 3D space through a function (could be useful for 3D lines, for example)
 - [ ] -- Easy dynamic 3D Text (to make this simple, it might be best to allow the user to render the text as he wishes, and then make a function to map it (or any other *Image) to a plane of variable size).
 - [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
 - [X] **Culling**
@@ -320,7 +320,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Point lights
 - [X] -- Directional lights
 - [X] -- Smooth shading
-- [X] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
+- [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
 - [X] **Shaders**
 - [X] -- Custom fragment shaders
@@ -331,6 +331,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Contact point reporting
 - [X] -- Varying collision shapes
 - [X] -- Checking multiple collisions at the same time
+- [X] -- Bounding / Broadphase collision checking
 
 
 | Collision Type | Sphere | AABB       | Triangle   | Capsule | Ray (not implemented yet) |
@@ -345,9 +346,10 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] **Optimization**
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?
-- [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)
+- [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)?
 - [X] -- Vector pools
 - [ ] -- Matrix pools?
+- [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
 - [ ] -- Lighting speed improvements
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 

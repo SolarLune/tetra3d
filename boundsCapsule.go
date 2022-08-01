@@ -114,14 +114,33 @@ func (capsule *BoundingCapsule) PointInside(point vector.Vector) bool {
 func (capsule *BoundingCapsule) ClosestPoint(point vector.Vector) vector.Vector {
 
 	up := capsule.Node.WorldRotation().Up()
-	start := capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 + capsule.Radius))
-	end := capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 - capsule.Radius))
+	pos := capsule.Node.WorldPosition()
+
+	start := pos.Clone()
+	start[0] += up[0] * (-capsule.Height/2 + capsule.Radius)
+	start[1] += up[1] * (-capsule.Height/2 + capsule.Radius)
+	start[2] += up[2] * (-capsule.Height/2 + capsule.Radius)
+
+	end := pos.Clone()
+	end[0] += up[0] * (capsule.Height/2 - capsule.Radius)
+	end[2] += up[1] * (capsule.Height/2 - capsule.Radius)
+	end[1] += up[2] * (capsule.Height/2 - capsule.Radius)
+
 	segment := end.Sub(start)
 
-	t := dot(point.Sub(start), segment) / dot(segment, segment)
-	t = math.Max(math.Min(t, 1), 0)
+	vector.In(point).Sub(start)
+	t := dot(point, segment) / dot(segment, segment)
+	if t > 1 {
+		t = 1
+	} else if t < 0 {
+		t = 0
+	}
 
-	return start.Add(segment.Scale(t))
+	start[0] += segment[0] * t
+	start[1] += segment[1] * t
+	start[2] += segment[2] * t
+
+	return start
 
 }
 

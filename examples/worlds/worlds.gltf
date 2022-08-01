@@ -122,7 +122,7 @@
                             0.0,
                             1.0
                         ],
-                        "fog mode" : "ADDITIVE",
+                        "fog mode" : "OFF",
                         "fog color" : [
                             1.0,
                             0.0010483220685273409,

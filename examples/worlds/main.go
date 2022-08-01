@@ -178,7 +178,6 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	fmt.Println(g.Scene.World)
 	screen.Fill(g.Scene.World.ClearColor.ToRGBA64())
 
 	// Clear the Camera

@@ -1,7 +1,5 @@
 package tetra3d
 
-import "fmt"
-
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
 // graph of parents and children. Models (visual instances of Meshes), Cameras, and "empty" NodeBases all are kinds of Nodes.
 type Scene struct {
@@ -40,8 +38,6 @@ func (scene *Scene) Clone() *Scene {
 	newScene.Root.(*Node).scene = newScene
 
 	newScene.World = scene.World // Here, we simply reference the same world; we don't clone it, since a single world can be shared across multiple Scenes
-
-	fmt.Println("clone: ", scene.World.Name, newScene.World.Name)
 
 	return newScene
 

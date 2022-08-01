@@ -14,8 +14,13 @@ type BoundingTriangles struct {
 	Mesh         *Mesh
 }
 
-// NewBoundingTriangles returns a new BoundingTriangles object.
-func NewBoundingTriangles(name string, mesh *Mesh) *BoundingTriangles {
+// NewBoundingTriangles returns a new BoundingTriangles object. name is the name of the BoundingTriangles node, while mesh is a reference
+// to the Mesh that the BoundingTriangles object should use for collision. broadphaseCellSize is how large the BoundingTriangle's broadphase
+// collision cells should be - larger cells means more triangles are checked at a time when doing collision checks, while larger cells also means
+// fewer broadphase cells need to be checked. Striking a balance is a good idea if you're setting this value by hand (by default, the grid size is
+// the maximum dimension size / 20, rounded up (a grid of at least one cell every 20 Blender Units). A size of 0 disables the usage of the broadphase
+// for collision checks.
+func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float64) *BoundingTriangles {
 	margin := 0.25 // An additional margin to help ensure the broadphase is crossed before checking for collisions
 	bt := &BoundingTriangles{
 		Node:         NewNode(name),
@@ -23,15 +28,31 @@ func NewBoundingTriangles(name string, mesh *Mesh) *BoundingTriangles {
 		Mesh:         mesh,
 	}
 
-	gridSize := 4
-	// gridSize := 0
-	bt.Broadphase = NewBroadphase(gridSize, (bt.Mesh.Dimensions.MaxSpan()/float64(gridSize))+1, bt)
+	// This initializes the broadphase using a default grid size.
 
-	// bt.Broadphase = NewBroadphase(1, bt.Mesh.Dimensions.MaxSpan(), bt)
+	// If the object is too small (less than 5 units large), it may not be worth doing
+	maxDim := bt.Mesh.Dimensions.MaxDimension()
+
+	gridSize := 0
+
+	if broadphaseGridSize > 0 {
+		gridSize = int(math.Ceil(maxDim / broadphaseGridSize))
+	}
+
+	bt.Broadphase = NewBroadphase(gridSize, bt)
 
 	return bt
 }
 
+// DisableBroadphase turns off the broadphase system for collision detection by settings its grid and cell size to 0.
+// To turn broadphase collision back on, simply call Broadphase.Resize(gridSize) with a gridSize value above 0.
+func (bt *BoundingTriangles) DisableBroadphase() {
+	bt.Broadphase.Resize(0)
+}
+
+// Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
+// If there's no change between the previous Transform() call and this one, Transform() will return a cached version of the
+// transform for efficiency.
 func (bt *BoundingTriangles) Transform() Matrix4 {
 
 	transformDirty := bt.Node.isTransformDirty
@@ -43,7 +64,9 @@ func (bt *BoundingTriangles) Transform() Matrix4 {
 		rot := bt.WorldRotation().MultVec(bt.Mesh.Dimensions.Center())
 		bt.BoundingAABB.MoveVec(rot)
 		bt.BoundingAABB.Transform()
-		bt.Broadphase.Center.SetWorldPosition(bt.WorldPosition())
+
+		bt.Broadphase.Center.SetWorldTransform(transform)
+		bt.Broadphase.Center.MoveVec(rot)
 		bt.Broadphase.Center.Transform() // Update the transform
 	}
 
@@ -51,8 +74,10 @@ func (bt *BoundingTriangles) Transform() Matrix4 {
 
 }
 
+// Clone returns a new Broadphase Node with the same values set as the original.
 func (bt *BoundingTriangles) Clone() INode {
-	clone := NewBoundingTriangles(bt.name, bt.Mesh)
+	clone := NewBoundingTriangles(bt.name, bt.Mesh, 0) // Broadphase size is set to 0 so cloning doesn't create the broadphase triangle sets
+	clone.Broadphase = bt.Broadphase.Clone()
 	clone.Node = bt.Node.Clone().(*Node)
 	return clone
 }
@@ -231,7 +256,16 @@ func (plane *collisionPlane) closestPointOnLine(point, start, end vector.Vector)
 	diff := plane.VectorPool.Sub(end, start)
 	dotA := dot(plane.VectorPool.Sub(point, start), diff)
 	dotB := dot(diff, diff)
-	d := math.Min(math.Max(dotA/dotB, 0), 1)
-	return plane.VectorPool.Add(start, diff.Scale(d))
+	d := dotA / dotB
+	if d > 1 {
+		d = 1
+	} else if d < 0 {
+		d = 0
+	}
+	diff[0] *= d
+	diff[1] *= d
+	diff[2] *= d
+
+	return plane.VectorPool.Add(start, diff)
 
 }
