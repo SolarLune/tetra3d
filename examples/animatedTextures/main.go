@@ -71,7 +71,7 @@ func (g *Game) Init() {
 	g.Scene = library.ExportedScene.Clone()
 
 	// Turn off lighting
-	g.Scene.LightingOn = false
+	g.Scene.World.LightingOn = false
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})

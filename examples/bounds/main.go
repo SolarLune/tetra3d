@@ -120,19 +120,30 @@ func (g *Game) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
+	move := vector.Vector{0, 0, 0}
+	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
+	solids := g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).AsBoundingObjects()
+
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		g.Controlling.Move(moveSpd, 0, 0)
+		move[0] = moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		g.Controlling.Move(-moveSpd, 0, 0)
+		move[0] = -moveSpd
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		g.Controlling.Move(0, 0, -moveSpd)
+		move[2] = -moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		g.Controlling.Move(0, 0, moveSpd)
+		move[2] = moveSpd
 	}
+
+	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
+	for _, col := range bounds.CollisionTestVec(move, solids...) {
+		vector.In(move).Add(col.AverageMTV())
+	}
+
+	g.Controlling.MoveVec(move)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)
@@ -145,14 +156,17 @@ func (g *Game) Update() error {
 	}
 
 	// Gravity
-	g.Controlling.Move(0, -0.1, 0)
 
-	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
+	move[0] = 0
+	move[1] = -0.1
+	move[2] = 0
 
 	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
-	for _, col := range bounds.CollisionTest(0, 0, 0, g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).AsBoundingObjects()...) {
-		g.Controlling.MoveVec(col.AverageMTV())
+	for _, col := range bounds.CollisionTestVec(move, solids...) {
+		vector.In(move).Add(col.AverageMTV())
 	}
+
+	g.Controlling.MoveVec(move)
 
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
@@ -243,7 +257,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugBounds {
-		g.Camera.DrawDebugBoundsColored(screen, g.Scene.Root, colors.White(), colors.White(), colors.White(), colors.Gray())
+		g.Camera.DrawDebugBounds(screen, g.Scene.Root)
 	}
 
 	if g.DrawDebugText {

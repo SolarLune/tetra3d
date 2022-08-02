@@ -17,12 +17,14 @@ type GameObject interface {
 }
 
 type Player struct {
-	node tetra3d.INode
+	node   tetra3d.INode
+	Bounds *tetra3d.BoundingAABB
 }
 
 func NewPlayer(node tetra3d.INode) *Player {
 	return &Player{
-		node: node,
+		node:   node,
+		Bounds: node.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingAABB).First().(*tetra3d.BoundingAABB),
 	}
 }
 
@@ -45,32 +47,22 @@ func (player *Player) Update() {
 		move[2] += moveSpd
 	}
 
+	collisions := player.Bounds.CollisionTestVec(
+		move,
+		player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).AsBoundingObjects()...,
+	)
+
 	player.node.MoveVec(move)
 
-	playerBounds := player.node.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingAABB)[0].(*tetra3d.BoundingAABB)
+	for _, col := range collisions {
 
-	movementResolution := vector.Vector{0, 0, 0}
-
-	for _, b := range player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject) {
-		bounds := b.(tetra3d.BoundingObject)
-
-		if result := playerBounds.Collision(bounds); result != nil {
-
-			if b.Parent().Tags().Has("death") {
-				// Die
-				player.node.Unparent() // Unparenting is the equivalent of destroying the node
-			}
-
-			// An object can intersect with multiple other BoundingObjects at the same time, so we
-			// combine them all together here. This isn't necessarily the only way to resolve collisions,
-			// but it is one way.
-			for _, intersection := range result.Intersections {
-				movementResolution = movementResolution.Add(intersection.MTV)
-			}
-
+		if col.CollidedObject.(tetra3d.INode).Parent().Tags().Has("death") {
+			player.node.Unparent() // Unparenting is the equivalent of destroying the node
 		}
+
+		player.node.MoveVec(col.AverageMTV())
+
 	}
-	player.node.MoveVec(movementResolution)
 
 }
 

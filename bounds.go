@@ -22,6 +22,21 @@ func (intersection *Intersection) Slope() float64 {
 	return vector.Y.Angle(intersection.Normal)
 }
 
+// SlideAgainstNormal takes an input vector and alters it to slide against the intersection's returned normal.
+func (intersection *Intersection) SlideAgainstNormal(movementVec vector.Vector) vector.Vector {
+
+	temp, _ := intersection.Normal.Cross(movementVec)
+
+	if temp.Magnitude() == 0 {
+		return movementVec.Invert()
+	}
+
+	out, _ := temp.Cross(intersection.Normal)
+
+	return out
+
+}
+
 // Collision represents the result of a collision test. A Collision test may result in multiple intersections, and
 // so an Collision holds each of these individual intersections in its Intersections slice.
 // The intersections are sorted in order of distance from the starting point of the intersection (the center of the
@@ -68,6 +83,32 @@ func (col *Collision) AverageMTV() vector.Vector {
 	}
 	vector.In(mtv).Unit().Scale(greatestDist)
 	return mtv
+}
+
+// AverageNormal returns the average normal vector from all Intersections contained within the Collision.
+func (col *Collision) AverageNormal() vector.Vector {
+	normal := col.Intersections[0].Normal.Clone()
+	for i := 1; i < len(col.Intersections); i++ {
+		vector.In(normal).Add(col.Intersections[i].Normal)
+	}
+	vector.In(normal).Scale(1.0 / float64(len(col.Intersections)))
+	return normal
+}
+
+// SlideAgainstAverageNormal takes an input movement vector and alters it to slide against the Collision's average normal.
+func (col *Collision) SlideAgainstAverageNormal(movementVec vector.Vector) vector.Vector {
+
+	averageNormal := col.AverageNormal()
+
+	temp, _ := averageNormal.Cross(movementVec)
+
+	if temp.Magnitude() == 0 {
+		return movementVec.Invert()
+	}
+
+	out, _ := temp.Cross(averageNormal)
+
+	return out
 }
 
 // AverageSlope returns the average slope of the Collision (ranging from 0, pointing straight up, to pi pointing straight down).
@@ -754,29 +795,29 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...BoundingObjec
 	var ogPos vector.Vector
 
 	// If dx, dy, and dz are 0, we don't need to reposition the node for the collision test.
-	if dx != 0 && dy != 0 && dz != 0 {
+	if dx != 0 || dy != 0 || dz != 0 {
 		ogPos = node.WorldPosition()
 		node.Move(dx, dy, dz)
 	}
 
-	intersections := []*Collision{}
+	collisions := []*Collision{}
 
 	for _, o := range others {
-		if result := node.(BoundingObject).Collision(o); result != nil {
-			intersections = append(intersections, result)
+		if collision := node.(BoundingObject).Collision(o); collision != nil {
+			collisions = append(collisions, collision)
 		}
 	}
 
 	// Sort the IntersectionResults by distance (closer intersections come up "sooner").
-	sort.Slice(intersections, func(i, j int) bool {
-		return fastVectorDistanceSquared(intersections[i].AverageContactPoint(), intersections[i].Intersections[0].StartingPoint) >
-			fastVectorDistanceSquared(intersections[j].AverageContactPoint(), intersections[j].Intersections[0].StartingPoint)
+	sort.Slice(collisions, func(i, j int) bool {
+		return fastVectorDistanceSquared(collisions[i].AverageContactPoint(), collisions[i].Intersections[0].StartingPoint) >
+			fastVectorDistanceSquared(collisions[j].AverageContactPoint(), collisions[j].Intersections[0].StartingPoint)
 	})
 
-	if dx != 0 && dy != 0 && dz != 0 {
+	if dx != 0 || dy != 0 || dz != 0 {
 
-		for _, result := range intersections {
-			for _, hit := range result.Intersections {
+		for _, collision := range collisions {
+			for _, hit := range collision.Intersections {
 				hit.MTV[0] -= dx
 				hit.MTV[1] -= dy
 				hit.MTV[2] -= dz
@@ -787,7 +828,7 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...BoundingObjec
 
 	}
 
-	return intersections
+	return collisions
 
 }
 

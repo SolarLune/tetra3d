@@ -79,8 +79,8 @@ func (g *Game) Init() {
 
 	g.Scene.Root.Get("Water").(*tetra3d.Model).Color.A = 0.6
 
-	g.Scene.FogMode = tetra3d.FogOverwrite
-	g.Scene.FogColor = tetra3d.NewColor(0.8, 0.9, 1, 1)
+	g.Scene.World.FogMode = tetra3d.FogOverwrite
+	g.Scene.World.FogColor = tetra3d.NewColor(0.8, 0.9, 1, 1)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -210,7 +210,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	screen.Fill(g.Scene.FogColor.ToRGBA64())
+	screen.Fill(g.Scene.World.FogColor.ToRGBA64())
 
 	// Clear the Camera
 	g.Camera.Clear()

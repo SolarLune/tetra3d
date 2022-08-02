@@ -43,7 +43,7 @@ func (g *Game) Init() {
 	g.Scene = tetra3d.NewScene("cube example")
 
 	// Turn off lighting.
-	g.Scene.LightingOn = false
+	g.Scene.World.LightingOn = false
 
 	// Create a cube, set the color, add it to the scene.
 	cube := tetra3d.NewModel(tetra3d.NewCube(), "Cube")

@@ -64,7 +64,7 @@ func (g *Game) Init() {
 	// And set its image to the offscreen buffer
 	data.Materials["ScreenTexture"].Texture = g.Offscreen
 
-	g.Scene.LightingOn = false
+	g.Scene.World.LightingOn = false
 
 	// This is another way to do it
 	// screen := g.Scene.Root.Get("Screen").(*tetra3d.Model)

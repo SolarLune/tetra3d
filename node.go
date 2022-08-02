@@ -478,12 +478,8 @@ func (node *Node) SetWorldTransform(transform Matrix4) {
 // rebuilt. This should be called when modifying the transformation properties (position, scale, rotation) of the Node.
 func (node *Node) dirtyTransform() {
 
-	if !node.isTransformDirty {
-
-		for _, child := range node.ChildrenRecursive() {
-			child.dirtyTransform()
-		}
-
+	for _, child := range node.ChildrenRecursive() {
+		child.dirtyTransform()
 	}
 
 	node.isTransformDirty = true
@@ -937,25 +933,20 @@ func (node *Node) Path() string {
 
 }
 
-// Root returns the root node in this tree by recursively traversing this node's hierarchy of
-// parents upwards.
+// Root returns the root node in the scene by recursively traversing this node's hierarchy of
+// parents upwards. If, instead, the node this is called on is the root (and so has no parents), this function
+// returns the node itself. If the node is not the root and it has no path to the scene root, this
+// function returns nil.
 func (node *Node) Root() INode {
 
 	if node.parent == nil {
-		return node
-	}
-
-	parent := node.Parent()
-
-	for parent != nil {
-		next := parent.Parent()
-		if next == nil {
-			break
+		if node.scene != nil {
+			return node
 		}
-		parent = next
+		return nil
 	}
 
-	return parent
+	return node.parent.Root()
 
 }
 

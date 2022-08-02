@@ -38,13 +38,18 @@
                         ]
                     }
                 },
-                "t3dWorldColor__" : [
-                    0.05087608844041824,
-                    0.05087608844041824,
-                    0.05087608844041824,
-                    1.0
-                ],
-                "t3dWorldEnergy__" : 1.0
+                "t3dWorlds__" : {
+                    "World" : {
+                        "ambient color" : [
+                            0.05087608844041824,
+                            0.05087608844041824,
+                            0.05087608844041824,
+                            1.0
+                        ],
+                        "ambient energy" : 1.0
+                    }
+                },
+                "t3dCurrentWorld__" : "World"
             },
             "name" : "Scene",
             "nodes" : [
@@ -187,6 +192,8 @@
         {
             "extras" : {
                 "t3dBoundsType__" : 4,
+                "t3dTrianglesCustomBroadphaseEnabled__" : 0,
+                "t3dTrianglesCustomBroadphaseGridSize__" : 0,
                 "t3dOriginalLocalPosition__" : [
                     12.5,
                     -3.5999999046325684,
@@ -204,6 +211,8 @@
         {
             "extras" : {
                 "t3dBoundsType__" : 4,
+                "t3dTrianglesCustomBroadphaseEnabled__" : 0,
+                "t3dTrianglesCustomBroadphaseGridSize__" : 0,
                 "t3dOriginalLocalPosition__" : [
                     0.0,
                     0.0,

@@ -69,7 +69,7 @@ func (g *Game) Init() {
 	g.Camera.Move(0, 0, 10)
 	scene := g.Library.Scenes[0]
 	// Turn off lighting
-	scene.LightingOn = false
+	scene.World.LightingOn = false
 	scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)

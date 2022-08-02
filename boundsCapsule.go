@@ -123,8 +123,8 @@ func (capsule *BoundingCapsule) ClosestPoint(point vector.Vector) vector.Vector 
 
 	end := pos.Clone()
 	end[0] += up[0] * (capsule.Height/2 - capsule.Radius)
-	end[2] += up[1] * (capsule.Height/2 - capsule.Radius)
-	end[1] += up[2] * (capsule.Height/2 - capsule.Radius)
+	end[1] += up[1] * (capsule.Height/2 - capsule.Radius)
+	end[2] += up[2] * (capsule.Height/2 - capsule.Radius)
 
 	segment := end.Sub(start)
 

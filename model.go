@@ -458,11 +458,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		if mat == nil || mat.BillboardMode == BillboardModeNone {
 			base = model.Transform()
 		} else if mat.BillboardMode == BillboardModeXZ {
-			base = NewLookAtMatrix(camera.WorldPosition(), model.WorldPosition(), vector.Y)
+			base = NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y)
 			base = base.SetRow(1, vector.Vector{0, 1, 0, 0})
 			base = base.Mult(model.Transform())
 		} else if mat.BillboardMode == BillboardModeAll {
-			base = NewLookAtMatrix(camera.WorldPosition(), model.WorldPosition(), vector.Y).Mult(model.Transform())
+			base = NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y).Mult(model.Transform())
 		}
 
 		mvp := fastMatrixMult(base, vpMatrix)

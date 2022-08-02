@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.2.40",
+        "generator" : "Khronos glTF Blender I/O v3.2.43",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -13,7 +13,6 @@
                 "t3dPackTextures__" : 1,
                 "t3dExportFormat__" : 2,
                 "t3dExportOnSave__" : 1,
-                "t3dExport__" : 1,
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
@@ -76,13 +75,18 @@
                         ]
                     }
                 },
-                "t3dWorldColor__" : [
-                    0.05087608844041824,
-                    0.05087608844041824,
-                    0.05087608844041824,
-                    1.0
-                ],
-                "t3dWorldEnergy__" : 1.0
+                "t3dWorlds__" : {
+                    "World" : {
+                        "ambient color" : [
+                            0.05087608844041824,
+                            0.05087608844041824,
+                            0.05087608844041824,
+                            1.0
+                        ],
+                        "ambient energy" : 1.0
+                    }
+                },
+                "t3dCurrentWorld__" : "World"
             },
             "name" : "Scene",
             "nodes" : [

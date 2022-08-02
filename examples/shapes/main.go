@@ -142,20 +142,20 @@ func (g *Game) Update() error {
 
 	// Fog controls
 	if ebiten.IsKeyPressed(ebiten.Key1) {
-		g.Scene.FogColor.Set(1, 0, 0, 1)
-		g.Scene.FogMode = tetra3d.FogAdd
+		g.Scene.World.FogColor.Set(1, 0, 0, 1)
+		g.Scene.World.FogMode = tetra3d.FogAdd
 	} else if ebiten.IsKeyPressed(ebiten.Key2) {
-		g.Scene.FogColor.Set(0, 0, 0, 1)
-		g.Scene.FogMode = tetra3d.FogMultiply
+		g.Scene.World.FogColor.Set(0, 0, 0, 1)
+		g.Scene.World.FogMode = tetra3d.FogMultiply
 	} else if ebiten.IsKeyPressed(ebiten.Key3) {
-		g.Scene.FogColor.Set(0, 0, 0, 1)
-		g.Scene.FogMode = tetra3d.FogOverwrite
+		g.Scene.World.FogColor.Set(0, 0, 0, 1)
+		g.Scene.World.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key4) {
-		g.Scene.FogColor = colors.White()
-		g.Scene.FogMode = tetra3d.FogOverwrite
+		g.Scene.World.FogColor = colors.White()
+		g.Scene.World.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key5) {
-		g.Scene.FogMode = tetra3d.FogOff
-		g.Scene.FogColor = colors.Black() // With the fog being off, setting the color doesn't do anything directly, but the clear color is set below to the fog color
+		g.Scene.World.FogMode = tetra3d.FogOff
+		g.Scene.World.FogColor = colors.Black() // With the fog being off, setting the color doesn't do anything directly, but the clear color is set below to the fog color
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
@@ -196,7 +196,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	screen.Fill(g.Scene.FogColor.ToRGBA64())
+	screen.Fill(g.Scene.World.FogColor.ToRGBA64())
 
 	g.Camera.Clear()
 

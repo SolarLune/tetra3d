@@ -74,7 +74,7 @@ func (bt *BoundingTriangles) Transform() Matrix4 {
 
 }
 
-// Clone returns a new Broadphase Node with the same values set as the original.
+// Clone returns a new BoundingTriangles Node with the same values set as the original.
 func (bt *BoundingTriangles) Clone() INode {
 	clone := NewBoundingTriangles(bt.name, bt.Mesh, 0) // Broadphase size is set to 0 so cloning doesn't create the broadphase triangle sets
 	clone.Broadphase = bt.Broadphase.Clone()
