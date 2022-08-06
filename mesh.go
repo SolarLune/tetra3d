@@ -232,7 +232,7 @@ func (mesh *Mesh) AddMeshPart(material *Material) *MeshPart {
 // FindMeshPart allows you to retrieve a MeshPart by its material's name. If no material with the provided name is given, the function returns nil.
 func (mesh *Mesh) FindMeshPart(materialName string) *MeshPart {
 	for _, mp := range mesh.MeshParts {
-		if mp.Material.Name == materialName {
+		if mp.Material != nil && mp.Material.Name == materialName {
 			return mp
 		}
 	}
@@ -766,18 +766,19 @@ func (part *MeshPart) TriangleCount() int {
 	return part.TriangleEnd - part.TriangleStart + 1
 }
 
-// func (part *MeshPart) ApplyMatrix(matrix Matrix4) {
-// 	mesh := part.Mesh
-// 	for triIndex := part.TriangleStart; triIndex < part.TriangleEnd; triIndex++ {
-// 		for i := 0; i < 3; i++ {
-// 			x, y, z := fastMatrixMultVec(matrix, mesh.VertexPositions[triIndex*3+i])
-// 			vert := mesh.VertexPositions[triIndex*3+i]
-// 			vert[0] = x
-// 			vert[1] = y
-// 			vert[2] = z
-// 		}
-// 	}
-// }
+// ApplyMatrix applies a transformation matrix to the vertices referenced by the MeshPart.
+func (part *MeshPart) ApplyMatrix(matrix Matrix4) {
+	mesh := part.Mesh
+	for triIndex := part.TriangleStart; triIndex < part.TriangleEnd; triIndex++ {
+		for i := 0; i < 3; i++ {
+			x, y, z := fastMatrixMultVec(matrix, mesh.VertexPositions[triIndex*3+i])
+			vert := mesh.VertexPositions[triIndex*3+i]
+			vert[0] = x
+			vert[1] = y
+			vert[2] = z
+		}
+	}
+}
 
 type VertexInfo struct {
 	ID                        int

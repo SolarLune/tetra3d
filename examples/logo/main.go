@@ -36,7 +36,7 @@ type Game struct {
 	PrevMousePosition vector.Vector
 }
 
-//go:embed tetra3d.glb
+//go:embed tetra3d.gltf
 var logoModel []byte
 
 func NewGame() *Game {

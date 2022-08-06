@@ -27,6 +27,7 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float64) *
 		BoundingAABB: NewBoundingAABB("triangle broadphase aabb", mesh.Dimensions.Width()+margin, mesh.Dimensions.Height()+margin, mesh.Dimensions.Depth()+margin),
 		Mesh:         mesh,
 	}
+	bt.Node.onTransformUpdate = bt.UpdateTransform
 
 	// This initializes the broadphase using a default grid size.
 
@@ -53,24 +54,20 @@ func (bt *BoundingTriangles) DisableBroadphase() {
 // Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
 // If there's no change between the previous Transform() call and this one, Transform() will return a cached version of the
 // transform for efficiency.
-func (bt *BoundingTriangles) Transform() Matrix4 {
-
-	transformDirty := bt.Node.isTransformDirty
+func (bt *BoundingTriangles) UpdateTransform() {
 
 	transform := bt.Node.Transform()
 
-	if transformDirty {
-		bt.BoundingAABB.SetWorldTransform(transform)
-		rot := bt.WorldRotation().MultVec(bt.Mesh.Dimensions.Center())
-		bt.BoundingAABB.MoveVec(rot)
-		bt.BoundingAABB.Transform()
+	bt.BoundingAABB.SetWorldTransform(transform)
+	rot := bt.WorldRotation().MultVec(bt.Mesh.Dimensions.Center())
+	bt.BoundingAABB.MoveVec(rot)
+	bt.BoundingAABB.Transform()
 
+	if bt.Broadphase != nil {
 		bt.Broadphase.Center.SetWorldTransform(transform)
 		bt.Broadphase.Center.MoveVec(rot)
 		bt.Broadphase.Center.Transform() // Update the transform
 	}
-
-	return transform
 
 }
 
@@ -79,6 +76,7 @@ func (bt *BoundingTriangles) Clone() INode {
 	clone := NewBoundingTriangles(bt.name, bt.Mesh, 0) // Broadphase size is set to 0 so cloning doesn't create the broadphase triangle sets
 	clone.Broadphase = bt.Broadphase.Clone()
 	clone.Node = bt.Node.Clone().(*Node)
+	clone.Node.onTransformUpdate = clone.UpdateTransform
 	return clone
 }
 

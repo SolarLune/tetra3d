@@ -126,10 +126,14 @@ type INode interface {
 	Move(x, y, z float64)
 	// MoveVec moves a Node in local space using the vector provided.
 	MoveVec(moveVec vector.Vector)
-	// Rotate rotates a Node locally on the given vector, by the angle provided in radians.
+	// Rotate rotates a Node locally on the given vector with the given axis, by the angle provided in radians.
 	Rotate(x, y, z, angle float64)
+	// RotateVec rotates a Node locally on the given vector, by the angle provided in radians.
+	RotateVec(vec vector.Vector, angle float64)
 	// Grow scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
 	Grow(x, y, z float64)
+	// GrowVec scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
+	GrowVec(vec vector.Vector)
 
 	// Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
 	// If there's no change between the previous Transform() call and this one, Transform() will return a cached version of the
@@ -331,6 +335,7 @@ type Node struct {
 	boneInfluence         Matrix4
 	library               *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 	scene                 *Scene
+	onTransformUpdate     func()
 }
 
 // NewNode returns a new Node.
@@ -454,6 +459,10 @@ func (node *Node) Transform() Matrix4 {
 
 	if node.isBone {
 		node.boneInfluence = node.inverseBindMatrix.Mult(transform)
+	}
+
+	if node.onTransformUpdate != nil {
+		node.onTransformUpdate()
 	}
 
 	// We want to call child.Transform() here to ensure the children also rebuild their transforms as necessary; otherwise,
@@ -606,7 +615,8 @@ func (node *Node) SetLocalScale(scale vector.Vector) {
 	node.dirtyTransform()
 }
 
-// WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components).
+// WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components). Note that this is a bit slow as it
+// requires decomposing the node's world transform, so you want to use node.LocalScale() if you can and performacne is a concern.
 func (node *Node) WorldScale() vector.Vector {
 	_, scale, _ := node.Transform().Decompose()
 	return scale
@@ -646,7 +656,8 @@ func (node *Node) SetLocalRotation(rotation Matrix4) {
 	node.dirtyTransform()
 }
 
-// WorldRotation returns an absolute rotation Matrix4 representing the object's rotation.
+// WorldRotation returns an absolute rotation Matrix4 representing the object's rotation. Note that this is a bit slow as it
+// requires decomposing the node's world transform, so you want to use node.LocalRotation() if you can and performacne is a concern.
 func (node *Node) WorldRotation() Matrix4 {
 	_, _, rotation := node.Transform().Decompose()
 	return rotation
@@ -670,6 +681,9 @@ func (node *Node) SetWorldRotation(rotation Matrix4) {
 
 // Move moves a Node in local space by the x, y, and z values provided.
 func (node *Node) Move(x, y, z float64) {
+	if x == 0 && y == 0 && z == 0 {
+		return
+	}
 	node.position[0] += x
 	node.position[1] += y
 	node.position[2] += z
@@ -681,20 +695,38 @@ func (node *Node) MoveVec(vec vector.Vector) {
 	node.Move(vec[0], vec[1], vec[2])
 }
 
-// Rotate rotates a Node locally on the given vector, by the angle provided in radians.
+// Rotate rotates a Node locally on a vector with the given axis, by the angle provided in radians.
 func (node *Node) Rotate(x, y, z, angle float64) {
+	if x == 0 && y == 0 && z == 0 {
+		return
+	}
 	localRot := node.LocalRotation()
 	localRot = localRot.Rotated(x, y, z, angle)
 	node.SetLocalRotation(localRot)
 }
 
-// Grow scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
+// RotateVec rotates a Node locally on the given vector, by the angle provided in radians.
+func (node *Node) RotateVec(vec vector.Vector, angle float64) {
+	node.Rotate(vec[0], vec[1], vec[2], angle)
+}
+
+// Grow scales the object additively using the x, y, and z arguments provided (i.e. calling
+// Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
 func (node *Node) Grow(x, y, z float64) {
+	if x == 0 && y == 0 && z == 0 {
+		return
+	}
 	scale := node.LocalScale()
 	scale[0] += x
 	scale[1] += y
 	scale[2] += z
 	node.SetLocalScale(scale)
+}
+
+// GrowVec scales the object additively using the scaling vector provided (i.e. calling
+// Node.GrowVec(vector.Vector{1, 0, 0}) will scale it +1 on the X-axis).
+func (node *Node) GrowVec(vec vector.Vector) {
+	node.Grow(vec[0], vec[1], vec[2])
 }
 
 // Parent returns the Node's parent. If the Node has no parent, this will return nil.
@@ -784,12 +816,12 @@ func (node *Node) Visible() bool {
 
 // SetVisible sets the object's visibility. If recursive is true, all recursive children of this Node will have their visibility set the same way.
 func (node *Node) SetVisible(visible bool, recursive bool) {
-	node.visible = visible
-	if recursive {
+	if recursive && node.visible != visible {
 		for _, child := range node.ChildrenRecursive() {
 			child.SetVisible(visible, true)
 		}
 	}
+	node.visible = visible
 }
 
 // Tags represents an unordered set of string tags that can be used to identify this object.

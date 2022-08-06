@@ -21,37 +21,66 @@ func (color *Color) Clone() *Color {
 }
 
 // Set sets the RGBA components of the Color to the r, g, b, and a arguments provided. The components are expected to range from 0 to 1.
-func (color *Color) Set(r, g, b, a float32) {
+func (color *Color) Set(r, g, b, a float32) *Color {
 	color.R = r
 	color.G = g
 	color.B = b
 	color.A = a
+	return color
 }
 
 // AddRGBA adds the provided R, G, B, and A values to the color as provided. The components are expected to range from 0 to 1.
-func (color *Color) AddRGBA(r, g, b, a float32) {
+func (color *Color) AddRGBA(r, g, b, a float32) *Color {
 	color.R += r
 	color.G += g
 	color.B += b
 	color.A += a
+	return color
 }
 
 // Add adds the provided Color to the existing Color.
-func (color *Color) Add(other *Color) {
-	color.AddRGBA(other.ToFloat32s())
+func (color *Color) Add(other *Color) *Color {
+	return color.AddRGBA(other.ToFloat32s())
 }
 
 // MultiplyRGBA multiplies the color's RGBA channels by the provided R, G, B, and A scalar values.
-func (color *Color) MultiplyRGBA(scalarR, scalarG, scalarB, scalarA float32) {
+func (color *Color) MultiplyRGBA(scalarR, scalarG, scalarB, scalarA float32) *Color {
 	color.R *= scalarR
 	color.G *= scalarG
 	color.B *= scalarB
 	color.A *= scalarA
+	return color
 }
 
 // Multiply multiplies the existing Color by the provided Color.
-func (color *Color) Multiply(other *Color) {
-	color.MultiplyRGBA(other.ToFloat32s())
+func (color *Color) Multiply(other *Color) *Color {
+	return color.MultiplyRGBA(other.ToFloat32s())
+}
+
+// Sub subtracts the other Color from the calling Color instance.
+func (color *Color) Sub(other *Color) *Color {
+	color.R -= other.R
+	color.G -= other.G
+	color.B -= other.B
+	color.A -= other.A
+	return color
+}
+
+// Mix mixes the calling Color with the other Color, mixed to the percentage given (ranging from 0 - 1).
+func (color *Color) Mix(other *Color, percentage float32) *Color {
+
+	color.R += (other.R - color.R) * percentage
+	color.G += (other.G - color.G) * percentage
+	color.B += (other.B - color.B) * percentage
+	color.A += (other.A - color.A) * percentage
+	return color
+
+}
+
+// SetAlpha sets the Color's alpha to the provided alpha value.
+func (color *Color) SetAlpha(alpha float32) *Color {
+	color.A = alpha
+	return color
 }
 
 // ToFloat32s returns the Color as four float32 in the order R, G, B, and A.

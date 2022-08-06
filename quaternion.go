@@ -119,6 +119,57 @@ func (q1 *Quaternion) Mult(q2 *Quaternion) *Quaternion {
 	)
 }
 
+// ToMatrix4 generates a rotation Matrx4 from the given Quaternion.
+func (quat *Quaternion) ToMatrix4() Matrix4 {
+
+	// See this page for where this formula comes from: https://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToMatrix/jay.htm
+
+	m1 := NewMatrix4()
+	m1[0][0] = quat.W
+	m1[0][1] = quat.Z
+	m1[0][2] = -quat.Y
+	m1[0][3] = quat.X
+
+	m1[1][0] = -quat.Z
+	m1[1][1] = quat.W
+	m1[1][2] = quat.X
+	m1[1][3] = quat.Y
+
+	m1[2][0] = quat.Y
+	m1[2][1] = -quat.X
+	m1[2][2] = quat.W
+	m1[2][3] = quat.Z
+
+	m1[3][0] = -quat.X
+	m1[3][1] = -quat.Y
+	m1[3][2] = -quat.Z
+	m1[3][3] = quat.W
+
+	m2 := NewMatrix4()
+
+	m2[0][0] = quat.W
+	m2[0][1] = quat.Z
+	m2[0][2] = -quat.Y
+	m2[0][3] = -quat.X
+
+	m2[1][0] = -quat.Z
+	m2[1][1] = quat.W
+	m2[1][2] = quat.X
+	m2[1][3] = -quat.Y
+
+	m2[2][0] = quat.Y
+	m2[2][1] = -quat.X
+	m2[2][2] = quat.W
+	m2[2][3] = -quat.Z
+
+	m2[3][0] = quat.X
+	m2[3][1] = quat.Y
+	m2[3][2] = quat.Z
+	m2[3][3] = quat.W
+
+	return m1.Mult(m2)
+}
+
 // func NewLookAtQuaternion(from, to, up vector.Vector) *Quaternion {
 // 	// Cribbed from StackOverflow: https://stackoverflow.com/questions/12435671/quaternion-lookat-function
 

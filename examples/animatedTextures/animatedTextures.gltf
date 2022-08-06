@@ -16,7 +16,6 @@
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
-                            "Camera",
                             "Plane",
                             "Plane.002",
                             "Plane.003",
@@ -139,34 +138,11 @@
                 46,
                 47,
                 48,
-                49,
-                50
+                49
             ]
         }
     ],
     "nodes" : [
-        {
-            "camera" : 0,
-            "extras" : {
-                "t3dOriginalLocalPosition__" : [
-                    7.358891487121582,
-                    -6.925790786743164,
-                    4.958309173583984
-                ]
-            },
-            "name" : "Camera",
-            "rotation" : [
-                -0.20997299253940582,
-                0.3857799470424652,
-                0.09062844514846802,
-                0.8937962055206299
-            ],
-            "translation" : [
-                7.358891487121582,
-                4.958309173583984,
-                6.925790786743164
-            ]
-        },
         {
             "extras" : {
                 "t3dOriginalLocalPosition__" : [
@@ -961,18 +937,6 @@
                 0,
                 6
             ]
-        }
-    ],
-    "cameras" : [
-        {
-            "name" : "Camera",
-            "perspective" : {
-                "aspectRatio" : 1.7777777777777777,
-                "yfov" : 0.39959652046304894,
-                "zfar" : 100,
-                "znear" : 0.10000000149011612
-            },
-            "type" : "perspective"
         }
     ],
     "materials" : [

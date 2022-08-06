@@ -521,11 +521,11 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 			if start.Rotation != nil && props.Rotation != nil {
 				rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
-				node.SetLocalRotation(NewMatrix4RotateFromQuaternion(rot))
+				node.SetLocalRotation(rot.ToMatrix4())
 			} else if props.Rotation != nil {
-				node.SetLocalRotation(NewMatrix4RotateFromQuaternion(props.Rotation))
+				node.SetLocalRotation(props.Rotation.ToMatrix4())
 			} else if start.Rotation != nil {
-				node.SetLocalRotation(NewMatrix4RotateFromQuaternion(start.Rotation))
+				node.SetLocalRotation(start.Rotation.ToMatrix4())
 			}
 
 			if bp == 1 {
@@ -542,7 +542,7 @@ func (ap *AnimationPlayer) Update(dt float64) {
 				node.SetLocalScale(props.Scale)
 			}
 			if props.Rotation != nil {
-				node.SetLocalRotation(NewMatrix4RotateFromQuaternion(props.Rotation))
+				node.SetLocalRotation(props.Rotation.ToMatrix4())
 			}
 
 		}
@@ -555,7 +555,7 @@ func (ap *AnimationPlayer) Finished() bool {
 	return ap.finished
 }
 
-//TouchedMarker returns if a marker with the specified name was touched this past frame - note that this relies on calling AnimationPlayer.Update().
+// TouchedMarker returns if a marker with the specified name was touched this past frame - note that this relies on calling AnimationPlayer.Update().
 func (ap *AnimationPlayer) TouchedMarker(markerName string) bool {
 
 	if ap.Animation == nil || ap.finished {
@@ -570,7 +570,7 @@ func (ap *AnimationPlayer) TouchedMarker(markerName string) bool {
 	return false
 }
 
-//AfterMarker returns if the AnimationPlayer's playhead is after a marker with the specified name while the AnimationPlayer is not finished playing.
+// AfterMarker returns if the AnimationPlayer's playhead is after a marker with the specified name while the AnimationPlayer is not finished playing.
 func (ap *AnimationPlayer) AfterMarker(markerName string) bool {
 
 	if ap.Animation == nil || ap.finished {
@@ -585,7 +585,7 @@ func (ap *AnimationPlayer) AfterMarker(markerName string) bool {
 	return false
 }
 
-//BeforeMarker returns if the AnimationPlayer's playhead is before a marker with the specified name while the AnimationPlayer is not finished playing.
+// BeforeMarker returns if the AnimationPlayer's playhead is before a marker with the specified name while the AnimationPlayer is not finished playing.
 func (ap *AnimationPlayer) BeforeMarker(markerName string) bool {
 
 	if ap.Animation == nil || ap.finished {

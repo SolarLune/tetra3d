@@ -17,10 +17,10 @@ type Model struct {
 	Mesh              *Mesh
 	FrustumCulling    bool                                                 // Whether the Model is culled when it leaves the frustum.
 	Color             *Color                                               // The overall multiplicative color of the Model.
-	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM // The blending function used to color the Model; by default, it basically modulates the model by the color.
+	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM // A user-customizeable blending function used to color the Model.
 	BoundingSphere    *BoundingSphere
 
-	DynamicBatchModels []*Model // Models that are dynamically merged into this one.
+	DynamicBatchModels map[*MeshPart][]*Model // Models that are dynamically merged into this one.
 	DynamicBatchOwner  *Model
 
 	Skinned        bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
@@ -28,17 +28,6 @@ type Model struct {
 	skinMatrix     Matrix4
 	bones          [][]*Node // The bones (nodes) of the Model, assuming it has been skinned. A Mesh's bones slice will point to indices indicating bones in the Model.
 	skinVectorPool *VectorPool
-}
-
-var defaultColorBlendingFunc = func(model *Model, meshPart *MeshPart) ebiten.ColorM {
-	colorM := ebiten.ColorM{}
-	colorM.Scale(model.Color.ToFloat64s())
-
-	if meshPart.Material != nil {
-		colorM.Scale(meshPart.Material.Color.ToFloat64s())
-	}
-
-	return colorM
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -49,10 +38,11 @@ func NewModel(mesh *Mesh, name string) *Model {
 		Mesh:               mesh,
 		FrustumCulling:     true,
 		Color:              NewColor(1, 1, 1, 1),
-		ColorBlendingFunc:  defaultColorBlendingFunc,
 		skinMatrix:         NewMatrix4(),
-		DynamicBatchModels: []*Model{},
+		DynamicBatchModels: map[*MeshPart][]*Model{},
 	}
+
+	model.Node.onTransformUpdate = model.TransformUpdate
 
 	if mesh != nil {
 		model.skinVectorPool = NewVectorPool(mesh.VertexCount * 2) // Both position and normal
@@ -75,7 +65,11 @@ func (model *Model) Clone() INode {
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.visible = model.visible
 	newModel.Color = model.Color.Clone()
-	newModel.DynamicBatchModels = append(newModel.DynamicBatchModels, model.DynamicBatchModels...)
+
+	for k := range model.DynamicBatchModels {
+		newModel.DynamicBatchModels[k] = append([]*Model{}, model.DynamicBatchModels[k]...)
+	}
+
 	newModel.DynamicBatchOwner = model.DynamicBatchOwner
 
 	newModel.Skinned = model.Skinned
@@ -85,6 +79,7 @@ func (model *Model) Clone() INode {
 	}
 
 	newModel.Node = model.Node.Clone().(*Node)
+	newModel.Node.onTransformUpdate = newModel.TransformUpdate
 	for _, child := range newModel.children {
 		child.setParent(newModel)
 	}
@@ -97,70 +92,70 @@ func (model *Model) Clone() INode {
 
 // Transform returns the global transform of the Model, taking into account any transforms its parents or grandparents have that
 // would impact the Model.
-func (model *Model) Transform() Matrix4 {
+func (model *Model) TransformUpdate() {
 
-	if model.Mesh == nil {
-		return NewEmptyMatrix4()
+	wp := model.WorldPosition()
+
+	// Skinned models have their positions at 0, 0, 0, and vertices offset according to wherever they were when exported.
+	// To combat this, we save the original local positions of the mesh on export to position the bounding sphere in the
+	// correct location.
+
+	var center vector.Vector
+
+	// We do this because if a model is skinned and we've parented the model to the armature, then the center is
+	// now from origin relative to the base of the armature on scene export.
+	if model.SkinRoot != nil && model.Skinned && model.parent == model.SkinRoot {
+		parent := model.parent.(*Node)
+		center = model.Mesh.Dimensions.Center().Sub(parent.originalLocalPosition)
+	} else {
+		center = model.Mesh.Dimensions.Center()
 	}
 
-	if model.isTransformDirty {
+	center = model.WorldRotation().MultVec(center)
 
-		wp := model.WorldPosition()
+	wp[0] += center[0]
+	wp[1] += center[1]
+	wp[2] += center[2]
 
-		// Skinned models have their positions at 0, 0, 0, and vertices offset according to wherever they were when exported.
-		// To combat this, we save the original local positions of the mesh on export to position the bounding sphere in the
-		// correct location.
+	model.BoundingSphere.SetLocalPosition(wp)
 
-		var center vector.Vector
+	dim := model.Mesh.Dimensions.Clone()
+	scale := model.WorldScale()
+	dim[0][0] *= scale[0]
+	dim[0][1] *= scale[1]
+	dim[0][2] *= scale[2]
 
-		// We do this because if a model is skinned and we've parented the model to the armature, then the center is
-		// now from origin relative to the base of the armature on scene export.
-		if model.SkinRoot != nil && model.Skinned && model.parent == model.SkinRoot {
-			parent := model.parent.(*Node)
-			center = model.Mesh.Dimensions.Center().Sub(parent.originalLocalPosition)
-		} else {
-			center = model.Mesh.Dimensions.Center()
-		}
+	dim[1][0] *= scale[0]
+	dim[1][1] *= scale[1]
+	dim[1][2] *= scale[2]
 
-		wp[0] += center[0]
-		wp[1] += center[1]
-		wp[2] += center[2]
-
-		model.BoundingSphere.SetLocalPosition(wp)
-
-		dim := model.Mesh.Dimensions.Clone()
-		scale := model.WorldScale()
-		dim[0][0] *= scale[0]
-		dim[0][1] *= scale[1]
-		dim[0][2] *= scale[2]
-
-		dim[1][0] *= scale[0]
-		dim[1][1] *= scale[1]
-		dim[1][2] *= scale[2]
-
-		model.BoundingSphere.Radius = dim.MaxSpan() / 2
-
-	}
-
-	return model.Node.Transform()
+	model.BoundingSphere.Radius = dim.MaxSpan() / 2
 
 }
 
 func (model *Model) modelAlreadyDynamicallyBatched(batchedModel *Model) bool {
-	for _, m := range model.DynamicBatchModels {
-		if m == batchedModel {
-			return true
+
+	for _, modelSlice := range model.DynamicBatchModels {
+
+		for _, model := range modelSlice {
+
+			if model == batchedModel {
+				return true
+			}
+
 		}
+
 	}
+
 	return false
 }
 
-// DynamicBatchAdd adds the provided models to the calling Model's dynamic batch. Note that unlike StaticMerge(), DynamicBatchAdd works by simply
-// rendering the batched models using the calling Model's first MeshPart's material. By dynamically batching models together, this allows us to
-// not flush between rendering multiple Models, saving a lot of render time, particularly if rendering many low-poly, individual models that have
-// very little variance (i.e. if they all share a single texture).
+// DynamicBatchAdd adds the provided models to the calling Model's dynamic batch, rendering with the specified meshpart (which should be part of the calling Model,
+// of course). Note that unlike StaticMerge(), DynamicBatchAdd works by simply rendering the batched models using the calling Model's first MeshPart's material. By
+// dynamically batching models together, this allows us to not flush between rendering multiple Models, saving a lot of render time, particularly if rendering many
+// low-poly, individual models that have very little variance (i.e. if they all share a single texture).
 // For more information, see this Wiki page on batching / merging: https://github.com/SolarLune/Tetra3d/wiki/Merging-and-Batching-Draw-Calls
-func (model *Model) DynamicBatchAdd(batchedModels ...*Model) error {
+func (model *Model) DynamicBatchAdd(meshPart *MeshPart, batchedModels ...*Model) error {
 
 	for _, other := range batchedModels {
 
@@ -174,27 +169,11 @@ func (model *Model) DynamicBatchAdd(batchedModels ...*Model) error {
 			return errors.New("too many triangles in dynamic merge")
 		}
 
-		// for _, otherPart := range other.Mesh.MeshParts {
+		if _, exists := model.DynamicBatchModels[meshPart]; !exists {
+			model.DynamicBatchModels[meshPart] = []*Model{}
+		}
 
-		// 	var targetPart *MeshPart
-
-		// 	for _, mp := range model.Mesh.MeshParts {
-		// 		if mp.Material == otherPart.Material && mp.TriangleCount()+otherPart.TriangleCount() < maxTriangleCount {
-		// 			targetPart = mp
-		// 			break
-		// 		}
-		// 	}
-
-		// 	if targetPart == nil {
-		// 		targetPart = model.Mesh.AddMeshPart(otherPart.Material)
-		// 	}
-
-		// 	// Here, we'll batch meshparts together, using its existing mesh parts if the materials match
-		// 	// and if adding in the triangles wouldn't exceed the maximum triangle count (21845 in a single draw call).
-
-		// }
-
-		model.DynamicBatchModels = append(model.DynamicBatchModels, other)
+		model.DynamicBatchModels[meshPart] = append(model.DynamicBatchModels[meshPart], other)
 		other.DynamicBatchOwner = model
 
 	}
@@ -206,13 +185,21 @@ func (model *Model) DynamicBatchAdd(batchedModels ...*Model) error {
 // DynamicBatchRemove removes the specified batched Models from the calling Model's dynamic batch slice.
 func (model *Model) DynamicBatchRemove(batched ...*Model) {
 	for _, m := range batched {
-		for i, existing := range model.DynamicBatchModels {
-			if existing == m {
-				model.DynamicBatchModels[i] = nil
-				model.DynamicBatchModels = append(model.DynamicBatchModels[:i], model.DynamicBatchModels[i+1:]...)
-				m.DynamicBatchOwner = nil
-				break
+		for meshPartName, modelSlice := range model.DynamicBatchModels {
+			for i, existing := range modelSlice {
+				if existing == m {
+					model.DynamicBatchModels[meshPartName][i] = nil
+					model.DynamicBatchModels[meshPartName] = append(model.DynamicBatchModels[meshPartName][:i], model.DynamicBatchModels[meshPartName][i+1:]...)
+					m.DynamicBatchOwner = nil
+					break
+				}
 			}
+		}
+	}
+
+	for mp := range model.DynamicBatchModels {
+		if len(model.DynamicBatchModels[mp]) == 0 {
+			delete(model.DynamicBatchModels, mp)
 		}
 	}
 }
@@ -220,8 +207,10 @@ func (model *Model) DynamicBatchRemove(batched ...*Model) {
 // DynamicBatchTriangleCount returns the total number of triangles of Models in the calling Model's dynamic batch.
 func (model *Model) DynamicBatchTriangleCount() int {
 	count := 0
-	for _, child := range model.DynamicBatchModels {
-		count += len(child.Mesh.Triangles)
+	for _, models := range model.DynamicBatchModels {
+		for _, child := range models {
+			count += len(child.Mesh.Triangles)
+		}
 	}
 	return count
 }
@@ -454,15 +443,21 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		mat := meshPart.Material
 
-		var base Matrix4
-		if mat == nil || mat.BillboardMode == BillboardModeNone {
-			base = model.Transform()
-		} else if mat.BillboardMode == BillboardModeXZ {
-			base = NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y)
-			base = base.SetRow(1, vector.Vector{0, 1, 0, 0})
-			base = base.Mult(model.Transform())
-		} else if mat.BillboardMode == BillboardModeAll {
-			base = NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y).Mult(model.Transform())
+		base := model.Transform()
+
+		if mat != nil && mat.BillboardMode != BillboardModeNone {
+
+			lookat := NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y)
+
+			if mat.BillboardMode == BillboardModeXZ {
+				lookat = lookat.SetRow(1, vector.Vector{0, 1, 0, 0})
+			}
+
+			// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
+			p, s, r := base.Decompose()
+
+			base = r.Mult(lookat).Mult(NewMatrix4Scale(s[0], s[1], s[2])).SetRow(3, vector.Vector{p[0], p[1], p[2], 1})
+
 		}
 
 		mvp := fastMatrixMult(base, vpMatrix)

@@ -25,7 +25,8 @@ type DebugInfo struct {
 	frameCount       int
 	tickTime         time.Time
 	DrawnParts       int // Number of draw calls, excluding those invisible or culled based on distance
-	TotalParts       int // Total number of objects
+	TotalParts       int // Total number of draw calls
+	BatchedParts     int // Total batched number of draw calls
 	DrawnTris        int // Number of drawn triangles, excluding those hidden from backface culling
 	TotalTris        int // Total number of triangles
 	LightCount       int // Total number of lights
@@ -552,6 +553,7 @@ func (camera *Camera) Clear() {
 
 	}
 	camera.DebugInfo.DrawnParts = 0
+	camera.DebugInfo.BatchedParts = 0
 	camera.DebugInfo.TotalParts = 0
 	camera.DebugInfo.TotalTris = 0
 	camera.DebugInfo.DrawnTris = 0
@@ -579,7 +581,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 	nodes := rootNode.ChildrenRecursive()
 
 	for _, node := range nodes {
-		if model, ok := node.(*Model); ok {
+		if model, ok := node.(*Model); ok && model.DynamicBatchOwner == nil {
 			meshes = append(meshes, model)
 		}
 	}
@@ -659,34 +661,54 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	for _, model := range models {
 
+		if !model.visible {
+			continue
+		}
+
 		if len(model.DynamicBatchModels) > 0 {
 
 			dynamicDepths := map[*Model]float64{}
 
 			transparent := false
 
-			for _, child := range model.DynamicBatchModels {
+			for meshPart, modelSlice := range model.DynamicBatchModels {
 
-				dynamicDepths[child] = camera.WorldToScreen(child.WorldPosition())[2]
+				for _, child := range modelSlice {
 
-				for _, mp := range child.Mesh.MeshParts {
-					if child.isTransparent(mp) {
-						transparent = true
+					if !child.visible {
+						continue
 					}
+
+					dynamicDepths[child] = camera.WorldToScreen(child.WorldPosition())[2]
+
+					if !transparent {
+
+						for _, mp := range child.Mesh.MeshParts {
+
+							if child.isTransparent(mp) {
+								transparent = true
+								break
+							}
+
+						}
+
+					}
+
 				}
+
+				sort.Slice(modelSlice, func(i, j int) bool {
+					return dynamicDepths[modelSlice[i]] > dynamicDepths[modelSlice[j]]
+				})
+
+				if transparent {
+					transparents = append(transparents, renderPair{model, meshPart})
+				} else {
+					solids = append(solids, renderPair{model, meshPart})
+				}
+
 			}
 
-			sort.SliceStable(model.DynamicBatchModels, func(i, j int) bool {
-				return dynamicDepths[model.DynamicBatchModels[i]] > dynamicDepths[model.DynamicBatchModels[j]]
-			})
-
-			if transparent {
-				transparents = append(transparents, renderPair{model, model.Mesh.MeshParts[0]})
-			} else {
-				solids = append(solids, renderPair{model, model.Mesh.MeshParts[0]})
-			}
-
-		} else if model.DynamicBatchOwner == nil && model.Mesh != nil {
+		} else if model.Mesh != nil {
 
 			for _, mp := range model.Mesh.MeshParts {
 				if model.isTransparent(mp) {
@@ -727,6 +749,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		startingVertexListIndex := vertexListIndex
 
 		model := rp.Model
+
+		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
+		if model.Mesh == nil {
+			return
+		}
+
 		meshPart := rp.MeshPart
 		mat := meshPart.Material
 
@@ -737,15 +765,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			} else {
 				lighting = scene.World.LightingOn
 			}
-		}
-
-		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
-		if model.Mesh == nil {
-			return
-		}
-
-		if !model.visible {
-			return
 		}
 
 		camera.DebugInfo.TotalParts++
@@ -761,7 +780,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		}
 
-		camera.DebugInfo.DrawnParts++
+		if model.DynamicBatchOwner != nil {
+			camera.DebugInfo.BatchedParts++
+		}
 
 		model.ProcessVertices(vpMatrix, camera, meshPart, scene)
 
@@ -776,16 +797,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		if mat != nil && mat.Texture != nil {
 			srcW = float64(mat.Texture.Bounds().Dx())
 			srcH = float64(mat.Texture.Bounds().Dy())
-		}
-
-		var img *ebiten.Image
-
-		if mat != nil {
-			img = mat.Texture
-		}
-
-		if img == nil {
-			img = defaultImg
 		}
 
 		if lighting {
@@ -888,6 +899,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		vertexListIndex = startingVertexListIndex
 
+		mpColor := model.Color.Clone()
+
+		if meshPart.Material != nil {
+			mpColor.MultiplyRGBA(meshPart.Material.Color.ToFloat32s())
+		}
+
 		for _, tri := range meshPart.sortingTriangles {
 
 			if !tri.rendered {
@@ -910,15 +927,15 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				// Vertex colors
 
 				if activeChannel := mesh.VertexActiveColorChannel[vertIndex]; activeChannel >= 0 {
-					colorVertexList[vertexListIndex+i].ColorR = mesh.VertexColors[vertIndex][activeChannel].R
-					colorVertexList[vertexListIndex+i].ColorG = mesh.VertexColors[vertIndex][activeChannel].G
-					colorVertexList[vertexListIndex+i].ColorB = mesh.VertexColors[vertIndex][activeChannel].B
-					colorVertexList[vertexListIndex+i].ColorA = mesh.VertexColors[vertIndex][activeChannel].A
+					colorVertexList[vertexListIndex+i].ColorR = mesh.VertexColors[vertIndex][activeChannel].R * mpColor.R
+					colorVertexList[vertexListIndex+i].ColorG = mesh.VertexColors[vertIndex][activeChannel].G * mpColor.G
+					colorVertexList[vertexListIndex+i].ColorB = mesh.VertexColors[vertIndex][activeChannel].B * mpColor.B
+					colorVertexList[vertexListIndex+i].ColorA = mesh.VertexColors[vertIndex][activeChannel].A * mpColor.A
 				} else {
-					colorVertexList[vertexListIndex+i].ColorR = 1
-					colorVertexList[vertexListIndex+i].ColorG = 1
-					colorVertexList[vertexListIndex+i].ColorB = 1
-					colorVertexList[vertexListIndex+i].ColorA = 1
+					colorVertexList[vertexListIndex+i].ColorR = mpColor.R
+					colorVertexList[vertexListIndex+i].ColorG = mpColor.G
+					colorVertexList[vertexListIndex+i].ColorB = mpColor.B
+					colorVertexList[vertexListIndex+i].ColorA = mpColor.A
 				}
 
 				if camera.RenderDepth {
@@ -1080,7 +1097,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		t := &ebiten.DrawTrianglesOptions{}
-		t.ColorM = model.ColorBlendingFunc(model, meshPart) // Modify the model's appearance using its color blending function
+		if model.ColorBlendingFunc != nil {
+			t.ColorM = model.ColorBlendingFunc(model, meshPart) // Modify the model's appearance using its color blending function
+		}
 		if mat != nil {
 			t.Filter = mat.TextureFilterMode
 			t.Address = mat.TextureWrapMode
@@ -1128,6 +1147,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		camera.DebugInfo.DrawnTris += vertexListIndex / 3
+		camera.DebugInfo.DrawnParts++
 
 		vertexListIndex = 0
 
@@ -1135,13 +1155,24 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	for _, pair := range solids {
 
+		if !pair.Model.visible {
+			continue
+		}
+
 		// Internally, the idea behind dynamic batching is that we simply hold off on flushing until the
 		// end - this saves a lot of time if we're rendering singular low-poly objects, at the cost of each
 		// object sharing the same material / object-level properties (color / material blending mode, for
 		// example).
 		if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
 
-			for _, merged := range dyn {
+			modelSlice := dyn[pair.MeshPart]
+
+			for _, merged := range modelSlice {
+
+				if !merged.visible {
+					continue
+				}
+
 				for _, part := range merged.Mesh.MeshParts {
 					render(renderPair{Model: merged, MeshPart: part})
 				}
@@ -1163,9 +1194,20 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		for _, pair := range transparents {
 
+			if !pair.Model.visible {
+				continue
+			}
+
 			if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
 
-				for _, merged := range dyn {
+				modelSlice := dyn[pair.MeshPart]
+
+				for _, merged := range modelSlice {
+
+					if !merged.visible {
+						continue
+					}
+
 					for _, part := range merged.Mesh.MeshParts {
 						render(renderPair{Model: merged, MeshPart: part})
 					}
@@ -1220,7 +1262,7 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
 
 	debugText := fmt.Sprintf(
-		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d\nRendered triangles: %d/%d\nActive Lights: %d/%d",
+		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d",
 		ebiten.CurrentTPS(),
 		ebiten.CurrentFPS(),
 		ft,
@@ -1228,6 +1270,7 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 		lt,
 		camera.DebugInfo.DrawnParts,
 		camera.DebugInfo.TotalParts,
+		camera.DebugInfo.BatchedParts,
 		camera.DebugInfo.DrawnTris,
 		camera.DebugInfo.TotalTris,
 		camera.DebugInfo.ActiveLightCount,
