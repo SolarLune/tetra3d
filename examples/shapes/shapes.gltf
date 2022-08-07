@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.2.40",
+        "generator" : "Khronos glTF Blender I/O v3.2.43",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -14,7 +14,6 @@
                 "t3dExportFormat__" : 2,
                 "t3dPackTextures__" : 1,
                 "t3dExportLights__" : 1,
-                "t3dExport__" : 1,
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
@@ -49,13 +48,18 @@
                         ]
                     }
                 },
-                "t3dWorldColor__" : [
-                    0.05087608844041824,
-                    0.05087608844041824,
-                    0.05087608844041824,
-                    1.0
-                ],
-                "t3dWorldEnergy__" : 1.0
+                "t3dWorlds__" : {
+                    "World" : {
+                        "ambient color" : [
+                            0.05087608844041824,
+                            0.05087608844041824,
+                            0.05087608844041824,
+                            1.0
+                        ],
+                        "ambient energy" : 1.0
+                    }
+                },
+                "t3dCurrentWorld__" : "World"
             },
             "name" : "Another",
             "nodes" : [
@@ -68,13 +72,7 @@
         },
         {
             "extras" : {
-                "t3dWorldColor__" : [
-                    0.05087608844041824,
-                    0.05087608844041824,
-                    0.05087608844041824,
-                    1.0
-                ],
-                "t3dWorldEnergy__" : 1.0
+                "t3dCurrentWorld__" : "World"
             },
             "name" : "Scene",
             "nodes" : [
@@ -406,7 +404,13 @@
                 "KHR_materials_unlit" : {}
             },
             "extras" : {
-                "t3dMaterialShadeless__" : 1
+                "t3dMaterialShadeless__" : 1,
+                "t3dMaterialColor__" : [
+                    0.2422812283039093,
+                    0.799102783203125,
+                    0.0,
+                    1.0
+                ]
             },
             "name" : "Green",
             "pbrMetallicRoughness" : {
@@ -425,7 +429,13 @@
                 "KHR_materials_unlit" : {}
             },
             "extras" : {
-                "t3dMaterialShadeless__" : 1
+                "t3dMaterialShadeless__" : 1,
+                "t3dMaterialColor__" : [
+                    0.022173894569277763,
+                    0.022173894569277763,
+                    0.022173894569277763,
+                    1.0
+                ]
             },
             "name" : "Dark Gray",
             "pbrMetallicRoughness" : {

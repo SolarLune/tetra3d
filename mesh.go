@@ -303,6 +303,19 @@ func (mesh *Mesh) GetVertexInfo(vertexIndex int) VertexInfo {
 
 }
 
+// AutoNormal automatically recalculates the normals for the triangles contained within the Mesh and sets the vertex normals for
+// all triangles to the triangles' surface normal.
+func (mesh *Mesh) AutoNormal() {
+
+	for _, tri := range mesh.Triangles {
+		tri.RecalculateNormal()
+		mesh.VertexNormals[tri.ID*3] = tri.Normal
+		mesh.VertexNormals[tri.ID*3+1] = tri.Normal
+		mesh.VertexNormals[tri.ID*3+2] = tri.Normal
+	}
+
+}
+
 // SelectVertices generates a new vertex selection for the current Mesh.
 func (mesh *Mesh) SelectVertices() *VertexSelection {
 	return NewVertexSelection(mesh)
@@ -503,9 +516,124 @@ func NewCube() *Mesh {
 	)
 
 	mesh.UpdateBounds()
+	mesh.AutoNormal()
 
 	return mesh
 
+}
+
+// NewIcosphere creates a new icosphere Mesh of the specified detail level. Note that the UVs are left at {0,0} because I'm lazy.
+func NewIcosphere(detailLevel int) *Mesh {
+
+	// Code cribbed from http://blog.andreaskahler.com/2009/06/creating-icosphere-mesh-in-code.html, thank you very much Andreas!
+
+	mesh := NewMesh("Icosphere")
+	part := mesh.AddMeshPart(NewMaterial("Icosphere"))
+
+	t := (1.0 + math.Sqrt(5)) / 2
+
+	v0 := NewVertex(-1, t, 0, 0, 0)
+	v1 := NewVertex(1, t, 0, 0, 0)
+	v2 := NewVertex(-1, -t, 0, 0, 0)
+	v3 := NewVertex(1, -t, 0, 0, 0)
+
+	v4 := NewVertex(0, -1, t, 0, 0)
+	v5 := NewVertex(0, 1, t, 0, 0)
+	v6 := NewVertex(0, -1, -t, 0, 0)
+	v7 := NewVertex(0, 1, -t, 0, 0)
+
+	v8 := NewVertex(t, 0, -1, 0, 0)
+	v9 := NewVertex(t, 0, 1, 0, 0)
+	v10 := NewVertex(-t, 0, -1, 0, 0)
+	v11 := NewVertex(-t, 0, 1, 0, 0)
+
+	triangles := []VertexInfo{
+
+		v0, v11, v5,
+		v0, v5, v1,
+		v0, v1, v7,
+		v0, v7, v10,
+		v0, v10, v11,
+
+		v1, v5, v9,
+		v5, v11, v4,
+		v11, v10, v2,
+		v10, v7, v6,
+		v7, v1, v8,
+
+		v3, v9, v4,
+		v3, v4, v2,
+		v3, v2, v6,
+		v3, v6, v8,
+		v3, v8, v9,
+
+		v4, v9, v5,
+		v2, v4, v11,
+		v6, v2, v10,
+		v8, v6, v7,
+		v9, v8, v1,
+	}
+
+	if detailLevel > 0 {
+
+		for i := 0; i < detailLevel+1; i++ {
+
+			newFaces := make([]VertexInfo, 0, len(triangles)*4)
+
+			for triIndex := 0; triIndex < len(triangles); triIndex += 3 {
+
+				a := vector.Vector{triangles[triIndex].X, triangles[triIndex].Y, triangles[triIndex].Z}
+				b := vector.Vector{triangles[triIndex+1].X, triangles[triIndex+1].Y, triangles[triIndex+1].Z}
+				c := vector.Vector{triangles[triIndex+2].X, triangles[triIndex+2].Y, triangles[triIndex+2].Z}
+
+				midA := a.Add(b.Sub(a).Scale(0.5))
+				midB := b.Add(c.Sub(b).Scale(0.5))
+				midC := c.Add(a.Sub(c).Scale(0.5))
+
+				midAVert := NewVertex(midA[0], midA[1], midA[2], 0, 0)
+				midBVert := NewVertex(midB[0], midB[1], midB[2], 0, 0)
+				midCVert := NewVertex(midC[0], midC[1], midC[2], 0, 0)
+
+				newFaces = append(newFaces,
+					triangles[triIndex], midAVert, midCVert,
+					triangles[triIndex+1], midBVert, midAVert,
+					triangles[triIndex+2], midCVert, midBVert,
+					midAVert, midBVert, midCVert,
+					// triangles[triIndex], triangles[triIndex+1], triangles[triIndex+2],
+				)
+
+			}
+
+			triangles = newFaces
+
+		}
+
+	}
+
+	for i := range triangles {
+
+		v := vector.Vector{triangles[i].X, triangles[i].Y, triangles[i].Z}.Unit() // Make it spherical
+		triangles[i].X = v[0]
+		triangles[i].Y = v[1]
+		triangles[i].Z = v[2]
+
+		triangles[i].U = 0
+		triangles[i].V = 0
+		if i%3 == 1 {
+			triangles[i].U = 1
+		} else if i%3 == 2 {
+			triangles[i].V = 1
+		}
+
+	}
+
+	part.AddTriangles(triangles...)
+
+	mesh.AutoNormal()
+
+	mesh.UpdateBounds()
+
+	return mesh
 }
 
 // NewPlane creates a new plane Mesh and gives it a new material (suitably named "Plane").
@@ -524,6 +652,7 @@ func NewPlane() *Mesh {
 	)
 
 	mesh.UpdateBounds()
+	mesh.AutoNormal()
 
 	return mesh
 

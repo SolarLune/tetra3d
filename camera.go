@@ -1533,8 +1533,9 @@ func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
 }
 
 // DrawDebugBoundsColored will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
-// be drawn in the color provided for each kind of bounding object to the screen image provided.
-func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor, trianglesBroadphaseColor *Color) {
+// be drawn in the color provided for each kind of bounding object to the screen image provided. If the passed color is nil, that kind of shape
+// won't be debug-rendered.
+func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor, trianglesAABBColor, trianglesBroadphaseColor *Color) {
 
 	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
 
@@ -1546,164 +1547,158 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 			case *BoundingSphere:
 
-				pos := bounds.WorldPosition()
-				radius := bounds.WorldRadius()
-
-				u := camera.WorldToScreen(pos.Add(vector.Y.Scale(radius)))
-				d := camera.WorldToScreen(pos.Add(vector.Y.Scale(-radius)))
-				r := camera.WorldToScreen(pos.Add(vector.X.Scale(radius)))
-				l := camera.WorldToScreen(pos.Add(vector.X.Scale(-radius)))
-				f := camera.WorldToScreen(pos.Add(vector.Z.Scale(radius)))
-				b := camera.WorldToScreen(pos.Add(vector.Z.Scale(-radius)))
-
-				lines := []vector.Vector{
-					u, r, d, l,
-					u, f, d, b, u,
-					b, r, f, l, b,
-				}
-
-				for i := range lines {
-
-					if i >= len(lines)-1 {
-						break
-					}
-
-					start := lines[i]
-					end := lines[i+1]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], sphereColor.ToRGBA64())
-
+				if sphereColor != nil {
+					camera.drawSphere(screen, bounds, sphereColor)
 				}
 
 			case *BoundingCapsule:
 
-				pos := bounds.WorldPosition()
-				radius := bounds.WorldRadius()
-				height := bounds.Height / 2
+				if capsuleColor != nil {
 
-				uv := bounds.WorldRotation().Up()
-				rv := bounds.WorldRotation().Right()
-				fv := bounds.WorldRotation().Forward()
+					pos := bounds.WorldPosition()
+					radius := bounds.WorldRadius()
+					height := bounds.Height / 2
 
-				u := camera.WorldToScreen(pos.Add(uv.Scale(height)))
+					uv := bounds.WorldRotation().Up()
+					rv := bounds.WorldRotation().Right()
+					fv := bounds.WorldRotation().Forward()
 
-				ur := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(radius)))
-				ul := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(-radius)))
-				uf := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(radius)))
-				ub := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(-radius)))
+					u := camera.WorldToScreen(pos.Add(uv.Scale(height)))
 
-				d := camera.WorldToScreen(pos.Add(uv.Scale(-height)))
+					ur := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(radius)))
+					ul := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(-radius)))
+					uf := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(radius)))
+					ub := camera.WorldToScreen(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(-radius)))
 
-				dr := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(radius)))
-				dl := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(-radius)))
-				df := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(radius)))
-				db := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(-radius)))
+					d := camera.WorldToScreen(pos.Add(uv.Scale(-height)))
 
-				lines := []vector.Vector{
-					u, ur, dr, d, dl, ul,
-					u, uf, df, d, db, ub, u,
-					ul, uf, ur, ub, ul,
-					dl, db, dr, df, dl,
-				}
+					dr := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(radius)))
+					dl := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(-radius)))
+					df := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(radius)))
+					db := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(-radius)))
 
-				for i := range lines {
-
-					if i >= len(lines)-1 {
-						break
+					lines := []vector.Vector{
+						u, ur, dr, d, dl, ul,
+						u, uf, df, d, db, ub, u,
+						ul, uf, ur, ub, ul,
+						dl, db, dr, df, dl,
 					}
 
-					start := lines[i]
-					end := lines[i+1]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], capsuleColor.ToRGBA64())
+					for i := range lines {
+
+						if i >= len(lines)-1 {
+							break
+						}
+
+						start := lines[i]
+						end := lines[i+1]
+						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], capsuleColor.ToRGBA64())
+
+					}
 
 				}
 
 			case *BoundingAABB:
 
-				pos := bounds.WorldPosition()
-				size := bounds.Dimensions.Size().Scale(0.5)
+				if aabbColor != nil {
 
-				ufr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], size[2]}))
-				ufl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], size[2]}))
-				ubr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], -size[2]}))
-				ubl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], -size[2]}))
+					pos := bounds.WorldPosition()
+					size := bounds.Dimensions.Size().Scale(0.5)
 
-				dfr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], -size[1], size[2]}))
-				dfl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], -size[1], size[2]}))
-				dbr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], -size[1], -size[2]}))
-				dbl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], -size[1], -size[2]}))
+					ufr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], size[2]}))
+					ufl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], size[2]}))
+					ubr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], -size[2]}))
+					ubl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], -size[2]}))
 
-				lines := []vector.Vector{
-					ufr, ufl, ubl, ubr, ufr,
-					dfr, dfl, dbl, dbr, dfr,
-					ufr, ufl, dfl, dbl, ubl, ubr, dbr,
-				}
+					dfr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], -size[1], size[2]}))
+					dfl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], -size[1], size[2]}))
+					dbr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], -size[1], -size[2]}))
+					dbl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], -size[1], -size[2]}))
 
-				for i := range lines {
-
-					if i >= len(lines)-1 {
-						break
+					lines := []vector.Vector{
+						ufr, ufl, ubl, ubr, ufr,
+						dfr, dfl, dbl, dbr, dfr,
+						ufr, ufl, dfl, dbl, ubl, ubr, dbr,
 					}
 
-					start := lines[i]
-					end := lines[i+1]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], aabbColor.ToRGBA64())
+					for i := range lines {
+
+						if i >= len(lines)-1 {
+							break
+						}
+
+						start := lines[i]
+						end := lines[i+1]
+						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], aabbColor.ToRGBA64())
+
+					}
 
 				}
 
 			case *BoundingTriangles:
 
-				for _, b := range bounds.Broadphase.allAABBPositions() {
-					camera.DrawDebugBoundsColored(screen, b, defaultTrianglesBroadphaseColor, nil, nil, nil, nil)
-				}
+				if trianglesBroadphaseColor != nil {
 
-				camWidth, camHeight := camera.resultColorTexture.Size()
-
-				lines := []vector.Vector{}
-
-				mesh := bounds.Mesh
-
-				for _, tri := range mesh.Triangles {
-
-					mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
-
-					v0 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3]))
-					v1 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3+1]))
-					v2 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3+2]))
-
-					if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
-						(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
-						(v0[0] > float64(camWidth) && v1[0] > float64(camWidth) && v2[0] > float64(camWidth)) ||
-						(v0[1] > float64(camHeight) && v1[1] > float64(camHeight) && v2[1] > float64(camHeight)) {
-						continue
+					for _, b := range bounds.Broadphase.allAABBPositions() {
+						camera.DrawDebugBoundsColored(screen, b, trianglesBroadphaseColor, nil, nil, nil, nil, nil)
 					}
 
-					lines = append(lines, v0, v1, v2)
-
 				}
 
-				triColor := trianglesColor.ToRGBA64()
+				if trianglesColor != nil {
 
-				for i := 0; i < len(lines); i += 3 {
+					camWidth, camHeight := camera.resultColorTexture.Size()
 
-					if i >= len(lines)-1 {
-						break
+					lines := []vector.Vector{}
+
+					mesh := bounds.Mesh
+
+					for _, tri := range mesh.Triangles {
+
+						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
+
+						v0 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3]))
+						v1 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3+1]))
+						v2 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3+2]))
+
+						if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
+							(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
+							(v0[0] > float64(camWidth) && v1[0] > float64(camWidth) && v2[0] > float64(camWidth)) ||
+							(v0[1] > float64(camHeight) && v1[1] > float64(camHeight) && v2[1] > float64(camHeight)) {
+							continue
+						}
+
+						lines = append(lines, v0, v1, v2)
+
 					}
 
-					start := lines[i]
-					end := lines[i+1]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+					triColor := trianglesColor.ToRGBA64()
 
-					start = lines[i+1]
-					end = lines[i+2]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+					for i := 0; i < len(lines); i += 3 {
 
-					start = lines[i+2]
-					end = lines[i]
-					ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+						if i >= len(lines)-1 {
+							break
+						}
+
+						start := lines[i]
+						end := lines[i+1]
+						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+
+						start = lines[i+1]
+						end = lines[i+2]
+						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+
+						start = lines[i+2]
+						end = lines[i]
+						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+
+					}
 
 				}
 
-				camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, aabbColor, sphereColor, capsuleColor, trianglesColor, trianglesBroadphaseColor)
+				if trianglesAABBColor != nil {
+					camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, trianglesAABBColor, nil, nil, nil, nil, nil)
+				}
 
 			}
 
@@ -1713,16 +1708,27 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 }
 
-var defaultAabbColor = NewColor(0, 0.25, 1, 1)
+var defaultAABBColor = NewColor(0, 0.25, 1, 1)
 var defaultSphereColor = NewColor(0.5, 0.25, 1.0, 1)
 var defaultCapsuleColor = NewColor(0.25, 1, 0, 1)
 var defaultTrianglesColor = NewColor(0, 0, 0, 0.5)
 var defaultTrianglesBroadphaseColor = NewColor(1, 0, 0, 0.25)
 
 // DrawDebugBounds will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
-// be drawn using default colors to the screen image provided.
-func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode) {
-	camera.DrawDebugBoundsColored(screen, rootNode, defaultAabbColor, defaultSphereColor, defaultCapsuleColor, defaultTrianglesColor, defaultTrianglesBroadphaseColor)
+// be drawn using default colors to the screen image provided. renderBroadphaseCells indicates whether the broadphase cells for triangle
+// objects should be rendered; similarly, renderTriangleAABB handles whether AABB bounding shapes for triangles should be rendered.
+func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, renderBroadphaseCells, renderTriangleAABB bool) {
+	var broadphaseColor *Color
+	var trianglesAABBColor *Color
+
+	if renderBroadphaseCells {
+		broadphaseColor = defaultTrianglesBroadphaseColor
+	}
+	if renderTriangleAABB {
+		trianglesAABBColor = defaultAABBColor
+	}
+
+	camera.DrawDebugBoundsColored(screen, rootNode, defaultAABBColor, defaultSphereColor, defaultCapsuleColor, defaultTrianglesColor, trianglesAABBColor, broadphaseColor)
 }
 
 // DrawDebugFrustums will draw shapes approximating the frustum spheres for objects underneath the rootNode.
@@ -1736,38 +1742,24 @@ func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, co
 		if model, ok := n.(*Model); ok {
 
 			bounds := model.BoundingSphere
-
-			pos := bounds.WorldPosition()
-			radius := bounds.WorldRadius()
-
-			u := camera.WorldToScreen(pos.Add(vector.Y.Scale(radius)))
-			d := camera.WorldToScreen(pos.Add(vector.Y.Scale(-radius)))
-			r := camera.WorldToScreen(pos.Add(vector.X.Scale(radius)))
-			l := camera.WorldToScreen(pos.Add(vector.X.Scale(-radius)))
-			f := camera.WorldToScreen(pos.Add(vector.Z.Scale(radius)))
-			b := camera.WorldToScreen(pos.Add(vector.Z.Scale(-radius)))
-
-			lines := []vector.Vector{
-				u, r, d, l,
-				u, f, d, b, u,
-				b, r, f, l, b,
-			}
-
-			for i := range lines {
-
-				if i >= len(lines)-1 {
-					break
-				}
-
-				start := lines[i]
-				end := lines[i+1]
-				ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], color.ToRGBA64())
-
-			}
+			camera.drawSphere(screen, bounds, color)
 
 		}
 
 	}
+
+}
+
+var debugIcosphereMesh = NewIcosphere(1)
+var debugIcosphere = NewModel(debugIcosphereMesh, "debug icosphere")
+
+func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color *Color) {
+
+	debugIcosphere.SetLocalPosition(sphere.WorldPosition())
+	s := sphere.WorldRadius()
+	debugIcosphere.SetLocalScale(vector.Vector{s, s, s})
+	debugIcosphere.Transform()
+	camera.DrawDebugWireframe(screen, debugIcosphere, color)
 
 }
 

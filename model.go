@@ -94,7 +94,9 @@ func (model *Model) Clone() INode {
 // would impact the Model.
 func (model *Model) TransformUpdate() {
 
-	wp := model.WorldPosition()
+	transform := model.cachedTransform
+
+	position, scale, rotation := transform.Decompose()
 
 	// Skinned models have their positions at 0, 0, 0, and vertices offset according to wherever they were when exported.
 	// To combat this, we save the original local positions of the mesh on export to position the bounding sphere in the
@@ -111,16 +113,14 @@ func (model *Model) TransformUpdate() {
 		center = model.Mesh.Dimensions.Center()
 	}
 
-	center = model.WorldRotation().MultVec(center)
+	center = rotation.MultVec(center)
 
-	wp[0] += center[0]
-	wp[1] += center[1]
-	wp[2] += center[2]
-
-	model.BoundingSphere.SetLocalPosition(wp)
+	position[0] += center[0] * scale[0]
+	position[1] += center[1] * scale[1]
+	position[2] += center[2] * scale[2]
+	model.BoundingSphere.SetLocalPosition(position)
 
 	dim := model.Mesh.Dimensions.Clone()
-	scale := model.WorldScale()
 	dim[0][0] *= scale[0]
 	dim[0][1] *= scale[1]
 	dim[0][2] *= scale[2]
