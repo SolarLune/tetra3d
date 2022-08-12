@@ -702,8 +702,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				if transparent {
 					transparents = append(transparents, renderPair{model, meshPart})
+					depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
 				} else {
 					solids = append(solids, renderPair{model, meshPart})
+					if sorting {
+						depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
+					}
 				}
 
 			}
