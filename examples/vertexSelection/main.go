@@ -87,7 +87,7 @@ func (g *Game) Init() {
 
 	// Select our vertices.
 	mesh := g.Cube.Mesh
-	g.FlashingVertices = mesh.SelectVertices().SelectColorInChannel("Flash")
+	g.FlashingVertices = mesh.SelectVertices().SelectInChannel(mesh.VertexColorChannelNames["Flash"])
 
 	// Once we know which vertices are not black in the "Flash" channel in Blender, we're good to go.
 
@@ -112,7 +112,7 @@ func (g *Game) Update() error {
 	// Once we've gotten our indices, we can use the helper SetColor() function to set the color of all vertices at the same time.
 	// If we wanted to do something else a bit more special, we could do so manually by looping through the indices in the *VertexSelection
 	// instance and modifying the mesh's vertex properties.
-	g.FlashingVertices.SetColor("Color", glow)
+	g.FlashingVertices.SetColor(0, glow)
 
 	// Moving the Camera
 

@@ -239,7 +239,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugBounds {
-		g.Camera.DrawDebugBounds(screen, g.Scene.Root)
+		g.Camera.DrawDebugBounds(screen, g.Scene.Root, false, false)
 	}
 
 }

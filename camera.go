@@ -602,14 +602,14 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	frametimeStart := time.Now()
 
-	lights := []Light{}
+	lights := []ILight{}
 
 	if scene.World != nil && scene.World.LightingOn {
 
 		for _, l := range scene.Root.ChildrenRecursive() {
-			if light, isLight := l.(Light); isLight {
+			if light, isLight := l.(ILight); isLight {
 				camera.DebugInfo.LightCount++
-				if light.isOn() {
+				if light.IsOn() {
 					lights = append(lights, light)
 					light.beginRender()
 					camera.DebugInfo.ActiveLightCount++
@@ -617,7 +617,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 		}
 
-		if scene.World.AmbientLight != nil && scene.World.AmbientLight.isOn() {
+		if scene.World.AmbientLight != nil && scene.World.AmbientLight.IsOn() {
 			lights = append(lights, scene.World.AmbientLight)
 		}
 
@@ -808,7 +808,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			t := time.Now()
 
 			for _, light := range lights {
-				light.beginModel(model, camera)
+				light.beginModel(model)
 			}
 
 			camera.DebugInfo.lightTime += time.Since(t)

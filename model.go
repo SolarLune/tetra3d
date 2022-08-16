@@ -475,14 +475,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				}
 
 				t0 := model.Mesh.vertexTransforms[tri.ID*3+i]
-				x, y, z, w := fastMatrixMultVecW(mvp, v0)
-				t0[0] = x
-				t0[1] = y
-				t0[2] = z
-				t0[3] = w
+				t0[0], t0[1], t0[2], t0[3] = fastMatrixMultVecW(mvp, v0)
 
-				if w < depth {
-					depth = w
+				if t0[3] < depth {
+					depth = t0[3]
 				}
 			}
 
@@ -508,6 +504,224 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		sort.SliceStable(meshPart.sortingTriangles, func(i, j int) bool {
 			return meshPart.sortingTriangles[i].depth < meshPart.sortingTriangles[j].depth
 		})
+	}
+
+}
+
+type AOBakeOptions struct {
+	TargetChannel  int     // The target vertex color channel to bake the ambient occlusion to.
+	OcclusionAngle float64 // How severe the angle must be (in radians) for the occlusion effect to show up.
+	Color          *Color  // The color for the ambient occlusion.
+
+	// A slice indicating other models that influence AO when baking. If this is empty, the AO will
+	// just take effect for triangles within the Model, rather than also taking effect for objects that
+	// are too close to the baking Model.
+	OtherModels        []*Model
+	InterModelDistance float64 // How far the other models in OtherModels must be to influence the baking AO.
+}
+
+// NewDefaultAOBakeOptions creates a new AOBakeOptions struct with default settings.
+func NewDefaultAOBakeOptions() *AOBakeOptions {
+
+	return &AOBakeOptions{
+		TargetChannel:      0,
+		OcclusionAngle:     ToRadians(90),
+		Color:              NewColor(0.4, 0.4, 0.4, 1),
+		InterModelDistance: 1,
+		OtherModels:        []*Model{},
+	}
+
+}
+
+// BakeAO bakes the ambient occlusion for a model to its vertex colors, using the baking options set in the provided AOBakeOptions
+// struct. If a slice of models is passed in the OtherModels slice, then inter-object AO will also be baked.
+// If nil is passed instead of bake options, a default AOBakeOptions struct will be created and used.
+// The resulting vertex color will be mixed between whatever was originally there in that channel and the AO color where the color
+// takes effect.
+func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
+
+	if bakeOptions == nil {
+		bakeOptions = NewDefaultAOBakeOptions()
+	}
+
+	if model.Mesh == nil || bakeOptions.TargetChannel < 0 {
+		return
+	}
+
+	model.Mesh.ensureEnoughVertexColorChannels(bakeOptions.TargetChannel)
+
+	// Same model AO first
+
+	for _, tri := range model.Mesh.Triangles {
+
+		ao := [3]float32{0, 0, 0}
+
+		verts := tri.VertexIndices()
+
+		for _, other := range model.Mesh.Triangles {
+
+			if tri == other {
+				continue
+			}
+
+			span := tri.MaxSpan
+			if other.MaxSpan > span {
+				span = other.MaxSpan
+			}
+
+			span = span * 0.66
+
+			if tri == other || fastVectorDistanceSquared(tri.Center, other.Center) > span*span {
+				continue
+			}
+
+			// If the two normals are equal, we can skip them
+			if tri.Normal.Equal(other.Normal) {
+				continue
+			}
+
+			angle := tri.Normal.Angle(other.Normal)
+			if angle < bakeOptions.OcclusionAngle {
+				continue
+			}
+
+			if shared := tri.SharesVertexPositions(other); shared != nil {
+
+				if shared[0] >= 0 {
+					ao[0] = 1
+				}
+				if shared[1] >= 0 {
+					ao[1] = 1
+				}
+				if shared[2] >= 0 {
+					ao[2] = 1
+				}
+
+			}
+
+		}
+
+		for i := 0; i < 3; i++ {
+			model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel].Mix(bakeOptions.Color, ao[i])
+		}
+
+	}
+
+	// Inter-object AO next; this is kinda slow and janky, but it does work OK, I think
+
+	transform := model.Transform()
+
+	for _, other := range bakeOptions.OtherModels {
+
+		rad := model.BoundingSphere.WorldRadius()
+		if or := other.BoundingSphere.WorldRadius(); or > rad {
+			rad = or
+		}
+		if model == other || fastVectorDistanceSquared(model.WorldPosition(), other.WorldPosition()) > rad*rad {
+			continue
+		}
+
+		otherTransform := other.Transform()
+
+		for _, tri := range model.Mesh.Triangles {
+
+			ao := [3]float32{0, 0, 0}
+
+			verts := tri.VertexIndices()
+
+			for _, otherTri := range other.Mesh.Triangles {
+
+				otherVerts := otherTri.VertexIndices()
+
+				span := tri.MaxSpan
+				if otherTri.MaxSpan > span {
+					span = otherTri.MaxSpan
+				}
+
+				span = span * 0.66
+
+				if fastVectorDistanceSquared(transform.MultVec(tri.Center), otherTransform.MultVec(otherTri.Center)) > span {
+					continue
+				}
+
+				angle := transform.MultVec(tri.Normal).Angle(otherTransform.MultVec(otherTri.Normal))
+				if angle < bakeOptions.OcclusionAngle {
+					continue
+				}
+
+				for i := 0; i < 3; i++ {
+					for j := 0; j < 3; j++ {
+						if fastVectorDistanceSquared(transform.MultVec(model.Mesh.VertexPositions[verts[i]]), otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[j]])) < bakeOptions.InterModelDistance*bakeOptions.InterModelDistance {
+							ao[i] = 1
+							break
+						}
+					}
+				}
+
+			}
+
+			for i := 0; i < 3; i++ {
+				model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel].Mix(bakeOptions.Color, ao[i])
+			}
+
+		}
+
+	}
+
+}
+
+// BakeLighting bakes the colors for the provided lights into a Model's Mesh's vertex colors. Note that the baked lighting overwrites whatever vertex colors
+// previously existed in the target channel (as otherwise, the colors could only get brighter with additive mixing, or only get darker with multiplicative mixing).
+func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
+
+	if model.Mesh == nil || targetChannel < 0 {
+		return
+	}
+
+	model.Mesh.ensureEnoughVertexColorChannels(targetChannel)
+
+	allLights := append([]ILight{}, lights...)
+
+	if model.Scene() != nil {
+		allLights = append(allLights, model.Scene().World.AmbientLight)
+	}
+
+	for _, light := range allLights {
+
+		if light.IsOn() {
+
+			light.beginRender()
+			light.beginModel(model)
+
+		}
+
+	}
+
+	for _, tri := range model.Mesh.Triangles {
+
+		lightResults := [9]float32{}
+
+		for _, light := range allLights {
+
+			if light.IsOn() {
+				lightColors := light.Light(tri.ID, model)
+
+				for i := range lightColors {
+					lightResults[i] += lightColors[i]
+				}
+			}
+
+		}
+
+		for i := 0; i < 3; i++ {
+
+			channel := model.Mesh.VertexColors[(tri.ID*3)+i][targetChannel]
+			channel.R = lightResults[i*3]
+			channel.G = lightResults[i*3+1]
+			channel.B = lightResults[i*3+2]
+
+		}
+
 	}
 
 }

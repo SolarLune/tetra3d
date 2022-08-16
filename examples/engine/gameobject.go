@@ -49,7 +49,7 @@ func (player *Player) Update() {
 
 	collisions := player.Bounds.CollisionTestVec(
 		move,
-		player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).AsBoundingObjects()...,
+		player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).BoundingObjects()...,
 	)
 
 	player.node.MoveVec(move)

@@ -815,17 +815,7 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...BoundingObjec
 	})
 
 	if dx != 0 || dy != 0 || dz != 0 {
-
-		for _, collision := range collisions {
-			for _, hit := range collision.Intersections {
-				hit.MTV[0] -= dx
-				hit.MTV[1] -= dy
-				hit.MTV[2] -= dz
-			}
-		}
-
 		node.SetWorldPosition(ogPos)
-
 	}
 
 	return collisions

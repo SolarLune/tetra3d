@@ -152,9 +152,12 @@ func (bt *BoundingTriangles) CollisionTest(dx, dy, dz float64, others ...Boundin
 }
 
 // CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space
-// using a vector. It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
-// distance. If no Collisions occurred, it will return an empty slice.
+// using a vector. If no vector is supplied, it's equivalent to {0, 0, 0}. It returns all valid Collisions across all
+// BoundingObjects passed in as others. Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
 func (bt *BoundingTriangles) CollisionTestVec(moveVec vector.Vector, others ...BoundingObject) []*Collision {
+	if moveVec == nil {
+		return commonCollisionTest(bt, 0, 0, 0, others...)
+	}
 	return commonCollisionTest(bt, moveVec[0], moveVec[1], moveVec[2], others...)
 }
 

@@ -150,26 +150,77 @@ func (mesh *Mesh) Clone() *Mesh {
 	newMesh.triIndex = mesh.triIndex
 
 	newMesh.allocateVertexBuffers(mesh.VertexMax)
-	copy(newMesh.VertexPositions, mesh.VertexPositions)
-	copy(newMesh.VertexNormals, mesh.VertexNormals)
-	copy(newMesh.VertexUVs, mesh.VertexUVs)
-	copy(newMesh.VertexColors, mesh.VertexColors)
-	copy(newMesh.VertexActiveColorChannel, mesh.VertexActiveColorChannel)
-	copy(newMesh.VertexBones, mesh.VertexBones)
-	copy(newMesh.VertexWeights, mesh.VertexWeights)
+
+	for i := range mesh.VertexPositions {
+		newMesh.VertexPositions[i] = mesh.VertexPositions[i].Clone()
+	}
+
+	for i := range mesh.VertexPositions {
+		newMesh.VertexNormals[i] = mesh.VertexNormals[i].Clone()
+	}
+
+	for i := range mesh.VertexPositions {
+		newMesh.VertexUVs[i] = mesh.VertexUVs[i].Clone()
+	}
+
+	for i := range mesh.VertexColors {
+		newMesh.VertexColors[i] = make([]*Color, len(mesh.VertexColors[i]))
+		for channelIndex := range mesh.VertexColors[i] {
+			newMesh.VertexColors[i][channelIndex] = mesh.VertexColors[i][channelIndex].Clone()
+		}
+	}
+
+	for c := range mesh.VertexActiveColorChannel {
+		newMesh.VertexActiveColorChannel[c] = mesh.VertexActiveColorChannel[c]
+	}
+
+	for c := range mesh.VertexBones {
+		for v := range mesh.VertexBones[c] {
+			newMesh.VertexBones[c][v] = mesh.VertexBones[c][v]
+		}
+	}
+
+	for c := range mesh.VertexWeights {
+		for v := range mesh.VertexWeights[c] {
+			newMesh.VertexWeights[c][v] = mesh.VertexWeights[c][v]
+		}
+	}
+
+	for v := range mesh.vertexTransforms {
+		newMesh.vertexTransforms[v] = mesh.vertexTransforms[v].Clone()
+	}
+
+	for v := range mesh.vertexSkinnedNormals {
+		newMesh.vertexSkinnedNormals[v] = mesh.vertexSkinnedNormals[v].Clone()
+	}
+
+	for v := range mesh.vertexSkinnedPositions {
+		newMesh.vertexSkinnedPositions[v] = mesh.vertexSkinnedPositions[v].Clone()
+	}
 
 	newMesh.VertexCount = mesh.VertexCount
 	newMesh.VertexMax = mesh.VertexMax
 
+	newMesh.Triangles = make([]*Triangle, 0, len(mesh.Triangles))
+
 	for _, part := range mesh.MeshParts {
 		newPart := part.Clone()
+
+		for i := newPart.TriangleStart; i < newPart.TriangleEnd; i++ {
+			newTri := mesh.Triangles[i].Clone()
+			newTri.MeshPart = newPart
+			newMesh.Triangles = append(newMesh.Triangles, newTri)
+		}
+
 		newMesh.MeshParts = append(newMesh.MeshParts, newPart)
-		newPart.Mesh = mesh
+		newPart.Mesh = newMesh
 	}
 
 	for channelName, index := range mesh.VertexColorChannelNames {
 		newMesh.VertexColorChannelNames[channelName] = index
 	}
+
+	newMesh.Dimensions = mesh.Dimensions.Clone()
 
 	return newMesh
 }
@@ -220,6 +271,78 @@ func (mesh *Mesh) allocateVertexBuffers(size int) {
 
 	mesh.VertexMax = size
 
+}
+
+func (mesh *Mesh) ensureEnoughVertexColorChannels(channelIndex int) {
+
+	for i := range mesh.VertexColors {
+		for len(mesh.VertexColors[i]) <= channelIndex {
+			mesh.VertexColors[i] = append(mesh.VertexColors[i], NewColor(1, 1, 1, 1))
+		}
+	}
+
+}
+
+// CombineVertexColors allows you to combine vertex color channels together. The targetChannel is the channel that will hold
+// the result, and multiplicative controls whether the combination is multiplicative (true) or additive (false). The sourceChannels
+// ...int is the vertex color channel indices to combine together.
+func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, sourceChannels ...int) {
+
+	if len(sourceChannels) == 0 {
+		return
+	}
+
+	for i := range mesh.VertexColors {
+
+		var base *Color
+
+		if multiplicative {
+			base = NewColor(1, 1, 1, 1)
+		} else {
+			base = NewColor(0, 0, 0, 1)
+		}
+
+		for _, c := range sourceChannels {
+
+			if len(mesh.VertexColors[i]) <= c {
+				continue
+			}
+
+			if multiplicative {
+				base.Multiply(mesh.VertexColors[i][c])
+			} else {
+				base.Add(mesh.VertexColors[i][c])
+			}
+
+		}
+
+		mesh.ensureEnoughVertexColorChannels(targetChannel)
+
+		mesh.VertexColors[i][targetChannel] = base
+
+	}
+
+}
+
+// SetVertexColor sets the specified vertex color for all vertices in the mesh for the target color channel.
+func (mesh *Mesh) SetVertexColor(targetChannel int, color *Color) {
+	mesh.SelectVertices().SelectAll().SetColor(targetChannel, color)
+}
+
+// SetActiveColorChannel sets the active color channel for all vertices in the mesh to the specified channel index.
+func (mesh *Mesh) SetActiveColorChannel(targetChannel int) {
+	mesh.SelectVertices().SelectAll().SetActiveColorChannel(targetChannel)
+}
+
+// Materials returns a slice of the materials present in the Mesh's MeshParts.
+func (mesh *Mesh) Materials() []*Material {
+	mats := []*Material{}
+	for _, mp := range mesh.MeshParts {
+		if mp.Material != nil {
+			mats = append(mats, mp.Material)
+		}
+	}
+	return mats
 }
 
 // AddMeshPart allows you to add a new MeshPart to the Mesh with the given Material (with a nil Material reference also being valid).
@@ -332,22 +455,16 @@ func NewVertexSelection(mesh *Mesh) *VertexSelection {
 	return &VertexSelection{Indices: map[int]bool{}, Mesh: mesh}
 }
 
-// SelectColorInChannel selects all vertices in the Mesh that have a non-pure black color in a color channel
-// with the specified name.
-func (vs *VertexSelection) SelectColorInChannel(channelName string) *VertexSelection {
+// SelectInChannel selects all vertices in the Mesh that have a non-pure black color in the color channel
+// with the specified index. If the index lies outside of the bounds of currently existent color channels,
+// the color channel will be created.
+func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
 
-	colorChannel, exists := vs.Mesh.VertexColorChannelNames[channelName]
-	if !exists {
-		return vs
-	}
+	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
 	for vertexIndex := range vs.Mesh.VertexColors {
 
-		// if colorChannel < len(vs.Mesh.VertexColors[vertexIndex])-1 {
-		// 	return false
-		// }
-
-		color := vs.Mesh.VertexColors[vertexIndex][colorChannel]
+		color := vs.Mesh.VertexColors[vertexIndex][channelIndex]
 
 		if color.R > 0.01 || color.G > 0.01 || color.B > 0.01 {
 			vs.Indices[vertexIndex] = true
@@ -381,29 +498,24 @@ func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
 }
 
 // SetColor sets the color of the specified channel in all vertices contained within the VertexSelection to the provided Color.
-func (vs *VertexSelection) SetColor(channelName string, color *Color) {
+func (vs *VertexSelection) SetColor(channelIndex int, color *Color) {
 
-	colorChannel, exists := vs.Mesh.VertexColorChannelNames[channelName]
-	if !exists {
-		return
-	}
+	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
 	for i := range vs.Indices {
-		vs.Mesh.VertexColors[i][colorChannel].Set(color.ToFloat32s())
+		vs.Mesh.VertexColors[i][channelIndex].Set(color.ToFloat32s())
 	}
 
 }
 
-// SetActiveColorChannel sets the active color channel in all vertices contained within the VertexSelection to the named channel.
-func (vs *VertexSelection) SetActiveColorChannel(channelName string) {
+// SetActiveColorChannel sets the active color channel in all vertices contained within the VertexSelection to the channel with the
+// specified index.
+func (vs *VertexSelection) SetActiveColorChannel(channelIndex int) {
 
-	colorChannel, exists := vs.Mesh.VertexColorChannelNames[channelName]
-	if !exists {
-		return
-	}
+	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
 	for i := range vs.Indices {
-		vs.Mesh.VertexActiveColorChannel[i] = colorChannel
+		vs.Mesh.VertexActiveColorChannel[i] = channelIndex
 	}
 
 }
@@ -780,6 +892,37 @@ func (tri *Triangle) RecalculateNormal() {
 	tri.Normal = calculateNormal(verts[tri.ID*3], verts[tri.ID*3+1], verts[tri.ID*3+2])
 }
 
+func (tri *Triangle) VertexIndices() [3]int {
+	return [3]int{tri.ID * 3, tri.ID*3 + 1, tri.ID*3 + 2}
+}
+
+func (tri *Triangle) SharesVertexPositions(other *Triangle) []int {
+
+	triIndices := tri.VertexIndices()
+	otherIndices := other.VertexIndices()
+
+	mesh := tri.MeshPart.Mesh
+	otherMesh := other.MeshPart.Mesh
+
+	shareCount := []int{-1, -1, -1}
+
+	for i, index := range triIndices {
+		for j, otherIndex := range otherIndices {
+			if mesh.VertexPositions[index].Equal(otherMesh.VertexPositions[otherIndex]) {
+				shareCount[i] = j
+				break
+			}
+		}
+	}
+
+	if shareCount[0] == -1 && shareCount[1] == -1 && shareCount[2] == -1 {
+		return nil
+	}
+
+	return shareCount
+
+}
+
 func calculateNormal(p1, p2, p3 vector.Vector) vector.Vector {
 
 	v0 := p2.Sub(p1)
@@ -819,6 +962,13 @@ func (part *MeshPart) Clone() *MeshPart {
 		TriangleStart: part.TriangleStart,
 		TriangleEnd:   part.TriangleEnd,
 	}
+
+	for i := 0; i < len(part.sortingTriangles); i++ {
+		newMP.sortingTriangles = append(newMP.sortingTriangles, sortingTriangle{
+			ID: part.sortingTriangles[i].ID,
+		})
+	}
+
 	newMP.Material = part.Material
 	return newMP
 }

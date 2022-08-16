@@ -126,9 +126,9 @@ func (nf NodeFilter) Empty() bool {
 	return len(nf) == 0
 }
 
-// AsBoundingObjects returns the NodeFilter as a slice of BoundingObjects. This is particularly useful when you're using
+// BoundingObjects returns a slice of the BoundingObjects contained within the NodeFilter. This is particularly useful when you're using
 // NodeFilters to filter down a selection of Nodes that you then need to pass into BoundingObject.CollisionTest().
-func (nc NodeFilter) AsBoundingObjects() []BoundingObject {
+func (nc NodeFilter) BoundingObjects() []BoundingObject {
 	boundings := make([]BoundingObject, 0, len(nc))
 	for _, n := range nc {
 		if b, ok := n.(BoundingObject); ok {
@@ -136,4 +136,26 @@ func (nc NodeFilter) AsBoundingObjects() []BoundingObject {
 		}
 	}
 	return boundings
+}
+
+// Models returns a slice of the *Models contained within the NodeFilter.
+func (nc NodeFilter) Models() []*Model {
+	models := make([]*Model, 0, len(nc))
+	for _, n := range nc {
+		if m, ok := n.(*Model); ok {
+			models = append(models, m)
+		}
+	}
+	return models
+}
+
+// Lights returns a slice of the ILights contained within the NodeFilter.
+func (nc NodeFilter) Lights() []ILight {
+	lights := make([]ILight, 0, len(nc))
+	for _, n := range nc {
+		if m, ok := n.(ILight); ok {
+			lights = append(lights, m)
+		}
+	}
+	return lights
 }

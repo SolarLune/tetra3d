@@ -122,7 +122,7 @@ func (g *Game) Update() error {
 
 	move := vector.Vector{0, 0, 0}
 	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
-	solids := g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).AsBoundingObjects()
+	solids := g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).BoundingObjects()
 
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
 		move[0] = moveSpd
@@ -138,12 +138,30 @@ func (g *Game) Update() error {
 		move[2] = moveSpd
 	}
 
-	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
-	for _, col := range bounds.CollisionTestVec(move, solids...) {
-		vector.In(move).Add(col.AverageMTV())
+	// Let's do gravity first
+
+	down := vector.Vector{0, -0.3, 0}
+	g.Controlling.MoveVec(down)
+
+	// OK, so the general idea here is we're doing collision testing by moving the object into the position we want
+	for _, col := range bounds.CollisionTest(0, 0, 0, solids...) {
+		mtv := col.AverageMTV()
+		mtv[0] = 0
+		mtv[2] = 0
+		mtv[1] += 0.1
+		g.Controlling.MoveVec(mtv)
+		break
 	}
 
 	g.Controlling.MoveVec(move)
+
+	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
+	for _, col := range bounds.CollisionTest(0, 0, 0, solids...) {
+		g.Controlling.MoveVec(col.AverageMTV())
+		move = col.SlideAgainstAverageNormal(move)
+		move[1] = 0 // We don't want to move up
+		// break
+	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)
@@ -154,19 +172,6 @@ func (g *Game) Update() error {
 			g.Controlling = sphere
 		}
 	}
-
-	// Gravity
-
-	move[0] = 0
-	move[1] = -0.1
-	move[2] = 0
-
-	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
-	for _, col := range bounds.CollisionTestVec(move, solids...) {
-		vector.In(move).Add(col.AverageMTV())
-	}
-
-	g.Controlling.MoveVec(move)
 
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
@@ -257,7 +262,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 
 	if g.DrawDebugBounds {
-		g.Camera.DrawDebugBounds(screen, g.Scene.Root)
+		g.Camera.DrawDebugBounds(screen, g.Scene.Root, false, false)
 	}
 
 	if g.DrawDebugText {

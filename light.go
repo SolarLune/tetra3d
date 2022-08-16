@@ -6,18 +6,19 @@ import (
 	"github.com/kvartborg/vector"
 )
 
-// Light represents an interface that is fulfilled by an object that emits light, returning the color a vertex should be given that Vertex and its model matrix.
-type Light interface {
-	// beginRender() is used to call any set-up code or to prepare math structures that are used when lighting the scene.
+// ILight represents an interface that is fulfilled by an object that emits light, returning the color a vertex should be given that Vertex and its model matrix.
+type ILight interface {
+	// beginRender is used to call any set-up code or to prepare math structures that are used when lighting the scene.
 	// It gets called once when first rendering a set of Nodes.
 	beginRender()
 
-	// beginModel() is, similarly to beginRender(), used to prepare or precompute any math necessary when lighting the scene.
+	// beginModel is, similarly to beginRender(), used to prepare or precompute any math necessary when lighting the scene.
 	// It gets called once before lighting all visible triangles of a given Model.
-	beginModel(model *Model, camera *Camera)
+	beginModel(model *Model)
 
-	Light(triIndex int, model *Model) [9]float32 // Light() returns the R, G, and B colors used to light the vertices of the given triangle.
-	isOn() bool                                  // isOn() is simply used to tell if a "generic" Light is on or not.
+	Light(triIndex int, model *Model) [9]float32 // Light returns the R, G, and B colors used to light the vertices of the given triangle.
+	IsOn() bool                                  // isOn is simply used to tell if a "generic" Light is on or not.
+	SetOn(on bool)                               // SetOn sets whether the light is on or not
 }
 
 //---------------//
@@ -58,7 +59,7 @@ func (amb *AmbientLight) Clone() INode {
 
 func (amb *AmbientLight) beginRender() {}
 
-func (amb *AmbientLight) beginModel(model *Model, camera *Camera) {}
+func (amb *AmbientLight) beginModel(model *Model) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
 func (amb *AmbientLight) Light(triIndex int, model *Model) [9]float32 {
@@ -81,8 +82,12 @@ func (amb *AmbientLight) Unparent() {
 	}
 }
 
-func (amb *AmbientLight) isOn() bool {
+func (amb *AmbientLight) IsOn() bool {
 	return amb.On && amb.Energy > 0
+}
+
+func (amb *AmbientLight) SetOn(on bool) {
+	amb.On = on
 }
 
 // Type returns the NodeType for this object.
@@ -108,7 +113,6 @@ type PointLight struct {
 	On bool
 
 	workingPosition vector.Vector
-	cameraPosition  vector.Vector
 }
 
 // NewPointLight creates a new Point light.
@@ -141,7 +145,7 @@ func (point *PointLight) Clone() INode {
 func (point *PointLight) beginRender() {
 }
 
-func (point *PointLight) beginModel(model *Model, camera *Camera) {
+func (point *PointLight) beginModel(model *Model) {
 
 	p, _, r := model.Transform().Inverted().Decompose()
 
@@ -150,10 +154,10 @@ func (point *PointLight) beginModel(model *Model, camera *Camera) {
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
 
 	if model.Skinned {
-		point.cameraPosition = camera.WorldPosition()
+		// point.cameraPosition = camera.WorldPosition()
 		point.workingPosition = point.WorldPosition()
 	} else {
-		point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
+		// point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
 		point.workingPosition = r.MultVec(point.WorldPosition()).Add(p)
 	}
 
@@ -181,11 +185,11 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 		triCenter = model.Mesh.Triangles[triIndex].Center
 	}
 
-	dist := fastVectorSub(point.workingPosition, triCenter)
+	dist := point.workingPosition.Sub(triCenter).Magnitude()
 
-	distanceSquared := math.Pow(point.Distance, 2)
+	distanceSquared := point.Distance * point.Distance
 
-	if point.Distance > 0 && dist.Magnitude() > distanceSquared {
+	if point.Distance > 0 && dist > distanceSquared {
 		return light
 	}
 
@@ -245,8 +249,12 @@ func (point *PointLight) Unparent() {
 	}
 }
 
-func (point *PointLight) isOn() bool {
+func (point *PointLight) IsOn() bool {
 	return point.On && point.Energy > 0
+}
+
+func (point *PointLight) SetOn(on bool) {
+	point.On = on
 }
 
 // Type returns the NodeType for this object.
@@ -299,7 +307,7 @@ func (sun *DirectionalLight) beginRender() {
 	sun.workingForward = sun.WorldRotation().Forward() // Already reversed
 }
 
-func (sun *DirectionalLight) beginModel(model *Model, camera *Camera) {
+func (sun *DirectionalLight) beginModel(model *Model) {
 	if !model.Skinned {
 		sun.workingModelRotation = model.WorldRotation().Inverted().Transposed()
 	}
@@ -348,8 +356,12 @@ func (sun *DirectionalLight) Unparent() {
 	}
 }
 
-func (sun *DirectionalLight) isOn() bool {
+func (sun *DirectionalLight) IsOn() bool {
 	return sun.On && sun.Energy > 0
+}
+
+func (sun *DirectionalLight) SetOn(on bool) {
+	sun.On = on
 }
 
 // Type returns the NodeType for this object.

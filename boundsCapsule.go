@@ -98,9 +98,12 @@ func (capsule *BoundingCapsule) CollisionTest(dx, dy, dz float64, others ...Boun
 }
 
 // CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space
-// using a vector. It returns all valid Collisions across all BoundingObjects passed in as others. Collisions will be sorted in order of
-// distance. If no Collisions occurred, it will return an empty slice.
+// using a vector. If no vector is supplied, it's equivalent to {0, 0, 0}. It returns all valid Collisions across all
+// BoundingObjects passed in as others. Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
 func (capsule *BoundingCapsule) CollisionTestVec(moveVec vector.Vector, others ...BoundingObject) []*Collision {
+	if moveVec == nil {
+		return commonCollisionTest(capsule, 0, 0, 0, others...)
+	}
 	return commonCollisionTest(capsule, moveVec[0], moveVec[1], moveVec[2], others...)
 }
 
@@ -128,7 +131,7 @@ func (capsule *BoundingCapsule) ClosestPoint(point vector.Vector) vector.Vector 
 
 	segment := end.Sub(start)
 
-	vector.In(point).Sub(start)
+	point = point.Sub(start)
 	t := dot(point, segment) / dot(segment, segment)
 	if t > 1 {
 		t = 1
