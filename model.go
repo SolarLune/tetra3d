@@ -28,6 +28,10 @@ type Model struct {
 	skinMatrix     Matrix4
 	bones          [][]*Node // The bones (nodes) of the Model, assuming it has been skinned. A Mesh's bones slice will point to indices indicating bones in the Model.
 	skinVectorPool *VectorPool
+
+	// A LightGroup indicates if a Model should be lit by a specific group of Lights. This allows you to control the overall lighting of scenes more accurately.
+	// If a Model has no LightGroup, the Model is lit by the lights present in the Scene.
+	LightGroup *LightGroup
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -85,6 +89,10 @@ func (model *Model) Clone() INode {
 	}
 
 	newModel.originalLocalPosition = model.originalLocalPosition.Clone()
+
+	if model.LightGroup != nil {
+		newModel.LightGroup = model.LightGroup.Clone()
+	}
 
 	return newModel
 

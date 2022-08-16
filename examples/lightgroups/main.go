@@ -19,7 +19,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-//go:embed baking.gltf
+//go:embed lighting.gltf
 var gltfData []byte
 
 type Game struct {
@@ -42,7 +42,6 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             796,
 		Height:            448,
-		DrawDebugText:     true,
 		PrevMousePosition: vector.Vector{},
 	}
 
@@ -50,13 +49,6 @@ func NewGame() *Game {
 
 	return game
 }
-
-const (
-	ChannelLight    = iota // The light color channel
-	ChannelAO              // The AO color channel
-	ChannelCombined        // The combined color channel
-	ChannelNone     = -1   // No color channel
-)
 
 func (g *Game) Init() {
 
@@ -75,91 +67,17 @@ func (g *Game) Init() {
 	g.Camera.SetLocalPosition(vector.Vector{0, 2, 15})
 	g.Scene.Root.AddChildren(g.Camera)
 
+	gt := g.Scene.Root.Get("OnlyGreen").(*tetra3d.Model)
+	gt.LightGroup = tetra3d.NewLightGroup(g.Scene.Root.Get("GreenLight").(*tetra3d.PointLight))
+
+	rt := g.Scene.Root.Get("OnlyRed").(*tetra3d.Model)
+	rt.LightGroup = tetra3d.NewLightGroup(g.Scene.Root.Get("RedLight").(*tetra3d.PointLight))
+
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	// OK, so in this example we're going to bake lighting and AO.
-	// We will combine them into different vertex color channels to
-	// easily preview the differences, as well.
-
-	// We start by collecting all the lights we'll be baking. NodeFilter.Lights() will automatically give us just the lights out of our selection and discard any other INodes.
-	lights := g.Scene.Root.ChildrenRecursive().Lights()
-
-	// // Don't forget the world's ambient light!
-	lights = append(lights, g.Scene.World.AmbientLight)
-
-	// Let's get all the solid, occluding models here.
-	models := g.Scene.Root.ChildrenRecursive().ByTags("ao").Models()
-
-	// The idea is that we'll bake the lighting and AO of each ao-applicable Model.
-
-	// We'll bake the lighting to vertex channel #0, AO to channel #1, and combine both
-	// in vertex channel #2. We will use named consts to make referencing these channels simple.
-
-	for _, model := range models {
-
-		// First, we'll bake the lighting into the lighting vertex color channel.
-		model.BakeLighting(ChannelLight, lights...)
-
-		// Next, we'll bake the AO into the AO vertex color channel.
-
-		// The AOBakeOptions struct controls how our AO should be baked. For readability, we create it
-		// here, though we should, of course, create it outside our model loop if the options don't differ
-		// for each Model.
-		bakeOptions := tetra3d.NewDefaultAOBakeOptions()
-		bakeOptions.OcclusionAngle = tetra3d.ToRadians(60)
-		bakeOptions.TargetChannel = ChannelAO // Set the target baking channel (as it's not 0)
-		bakeOptions.OtherModels = models      // Specify what other objects should influence the AO (note that this is optional)
-		model.Mesh.SetVertexColor(ChannelAO, colors.White())
-		model.BakeAO(bakeOptions) // And bake the AO.
-
-		// We'll combine the channels together multiplicatively here.
-		model.Mesh.CombineVertexColors(ChannelCombined, true, ChannelLight, ChannelAO)
-
-		for _, mat := range model.Mesh.Materials() {
-			mat.Shadeless = true // We don't need lighting anymore.
-		}
-
-		// Finally, we'll set the models' active color channel here. By default, it's -1, indicating no vertex colors are active (unless
-		// the mesh was exported from Blender with an active vertex color channel).
-		model.Mesh.SetActiveColorChannel(ChannelCombined)
-
-	}
-
-	// We can turn off the lights now, as we won't need them anymore.
-	for _, light := range lights {
-		light.SetOn(false)
-	}
 
 }
 
 func (g *Game) Update() error {
-
-	// lights := g.Scene.Root.ChildrenRecursive().AsLights()
-
-	// Bake the lighting real quick
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
-			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelNone) // Switch to unlit
-		}
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
-			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelAO) // Switch to AO only
-		}
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.Key3) {
-		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
-			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelLight) // Switch to Lighting
-		}
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.Key4) {
-		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
-			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelCombined) // Switch to lighting+AO
-		}
-	}
 
 	g.Time += 1.0 / 60.0
 
@@ -178,8 +96,6 @@ func (g *Game) Update() error {
 	right := g.Camera.LocalRotation().Right()
 
 	pos := g.Camera.LocalPosition()
-
-	// g.Scene.Root.Get("point light").(*tetra3d.PointLight).Distance = 10 + (math.Sin(g.Time*math.Pi) * 5)
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		pos = pos.Add(forward.Scale(moveSpd))
@@ -206,6 +122,14 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+	}
+
+	armature := g.Scene.Root.Get("Armature")
+
+	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+		armature.Move(-0.1, 0, 0)
+	} else if ebiten.IsKeyPressed(ebiten.KeyRight) {
+		armature.Move(0.1, 0, 0)
 	}
 
 	// Rotating the camera with the mouse
@@ -255,6 +179,18 @@ func (g *Game) Update() error {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+		green := g.Scene.Root.Get("OnlyGreen").(*tetra3d.Model)
+		green.LightGroup.Active = !green.LightGroup.Active
+
+		red := g.Scene.Root.Get("OnlyRed").(*tetra3d.Model)
+		red.LightGroup.Active = !red.LightGroup.Active
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+		g.Scene.World.LightingOn = !g.Scene.World.LightingOn
+	}
+
 	return err
 }
 
@@ -271,18 +207,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
-	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture().Size()
-	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
 	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), opt)
+		screen.DrawImage(g.Camera.DepthTexture(), nil)
 	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), opt)
+		screen.DrawImage(g.Camera.ColorTexture(), nil)
 	}
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example shows how lighting and primitive\nambient occlusion can be baked into vertex colors.\n1 Key: Switch to unlit channel\n2 Key: Switch to only AO\n3 key: Switch to only lighting\n4 Key: Switch to lighting+AO\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis example shows light groups.\nLight groups allow you to control\nwhich lights influence Models\nwhile having them remain available for others.\n\nThere's two point lights in this scene - a red one\nand a green one. The left cube is only\nlit by the green light, while the right\nis only lit by the red one.\n\n1 Key: Toggle light groups being active\n2 Key: Toggle all lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		g.Camera.DebugDrawText(screen, txt, 0, 150, 1, colors.LightGray())
 	}
 }
@@ -308,7 +241,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Baked Lighting Test")
+	ebiten.SetWindowTitle("Tetra3d - LightGroup Test")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()

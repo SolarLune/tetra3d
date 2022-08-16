@@ -602,23 +602,24 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	frametimeStart := time.Now()
 
-	lights := []ILight{}
+	sceneLights := []ILight{}
+	lights := sceneLights
 
-	if scene.World != nil && scene.World.LightingOn {
+	if scene.World == nil || scene.World.LightingOn {
 
 		for _, l := range scene.Root.ChildrenRecursive() {
 			if light, isLight := l.(ILight); isLight {
 				camera.DebugInfo.LightCount++
 				if light.IsOn() {
-					lights = append(lights, light)
+					sceneLights = append(sceneLights, light)
 					light.beginRender()
 					camera.DebugInfo.ActiveLightCount++
 				}
 			}
 		}
 
-		if scene.World.AmbientLight != nil && scene.World.AmbientLight.IsOn() {
-			lights = append(lights, scene.World.AmbientLight)
+		if scene.World != nil && scene.World.AmbientLight != nil && scene.World.AmbientLight.IsOn() {
+			sceneLights = append(sceneLights, scene.World.AmbientLight)
 		}
 
 	}
@@ -806,6 +807,15 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		if lighting {
 
 			t := time.Now()
+
+			lights = sceneLights
+
+			if model.LightGroup != nil && model.LightGroup.Active {
+				lights = model.LightGroup.Lights
+				for _, l := range model.LightGroup.Lights {
+					l.beginRender() // Call this because it's relatively cheap and necessary if a light doesn't exist in the Scene
+				}
+			}
 
 			for _, light := range lights {
 				light.beginModel(model)
