@@ -78,8 +78,37 @@ func (dim Dimensions) Limit(position vector.Vector) vector.Vector {
 	return position
 }
 
+// Inside returns if a position is inside a set of dimensions.
+func (dim Dimensions) Inside(position vector.Vector) bool {
+
+	if position[0] < dim[0][0] ||
+		position[0] > dim[1][0] ||
+		position[1] < dim[0][1] ||
+		position[1] > dim[1][1] ||
+		position[2] < dim[0][2] ||
+		position[2] > dim[1][2] {
+		return false
+	}
+
+	return true
+}
+
 func (dim Dimensions) Size() vector.Vector {
 	return vector.Vector{dim.Width(), dim.Height(), dim.Depth()}
+}
+
+func (dim Dimensions) reform() {
+
+	for i := 0; i < 3; i++ {
+
+		if dim[0][i] > dim[1][i] {
+			swap := dim[1][i]
+			dim[1][i] = dim[0][i]
+			dim[0][i] = swap
+		}
+
+	}
+
 }
 
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one
@@ -908,7 +937,7 @@ func (tri *Triangle) SharesVertexPositions(other *Triangle) []int {
 
 	for i, index := range triIndices {
 		for j, otherIndex := range otherIndices {
-			if mesh.VertexPositions[index].Equal(otherMesh.VertexPositions[otherIndex]) {
+			if vectorsEqual(mesh.VertexPositions[index], otherMesh.VertexPositions[otherIndex]) {
 				shareCount[i] = j
 				break
 			}

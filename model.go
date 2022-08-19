@@ -533,7 +533,7 @@ func NewDefaultAOBakeOptions() *AOBakeOptions {
 
 	return &AOBakeOptions{
 		TargetChannel:      0,
-		OcclusionAngle:     ToRadians(90),
+		OcclusionAngle:     ToRadians(60),
 		Color:              NewColor(0.4, 0.4, 0.4, 1),
 		InterModelDistance: 1,
 		OtherModels:        []*Model{},
@@ -568,7 +568,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 		for _, other := range model.Mesh.Triangles {
 
-			if tri == other {
+			if tri == other || vectorsEqual(tri.Normal, other.Normal) {
 				continue
 			}
 
@@ -577,14 +577,9 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 				span = other.MaxSpan
 			}
 
-			span = span * 0.66
+			span *= 0.66
 
-			if tri == other || fastVectorDistanceSquared(tri.Center, other.Center) > span*span {
-				continue
-			}
-
-			// If the two normals are equal, we can skip them
-			if tri.Normal.Equal(other.Normal) {
+			if fastVectorDistanceSquared(tri.Center, other.Center) > span*span {
 				continue
 			}
 
@@ -619,6 +614,8 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 	transform := model.Transform()
 
+	distanceSquared := bakeOptions.InterModelDistance * bakeOptions.InterModelDistance
+
 	for _, other := range bakeOptions.OtherModels {
 
 		rad := model.BoundingSphere.WorldRadius()
@@ -637,6 +634,12 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 			verts := tri.VertexIndices()
 
+			transformedTriVerts := [3]vector.Vector{
+				transform.MultVec(model.Mesh.VertexPositions[verts[0]]),
+				transform.MultVec(model.Mesh.VertexPositions[verts[1]]),
+				transform.MultVec(model.Mesh.VertexPositions[verts[2]]),
+			}
+
 			for _, otherTri := range other.Mesh.Triangles {
 
 				otherVerts := otherTri.VertexIndices()
@@ -646,20 +649,21 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 					span = otherTri.MaxSpan
 				}
 
-				span = span * 0.66
+				span *= 0.66
 
 				if fastVectorDistanceSquared(transform.MultVec(tri.Center), otherTransform.MultVec(otherTri.Center)) > span {
 					continue
 				}
 
-				angle := transform.MultVec(tri.Normal).Angle(otherTransform.MultVec(otherTri.Normal))
-				if angle < bakeOptions.OcclusionAngle {
-					continue
+				transformedOtherVerts := [3]vector.Vector{
+					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[0]]),
+					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[1]]),
+					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[2]]),
 				}
 
 				for i := 0; i < 3; i++ {
 					for j := 0; j < 3; j++ {
-						if fastVectorDistanceSquared(transform.MultVec(model.Mesh.VertexPositions[verts[i]]), otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[j]])) < bakeOptions.InterModelDistance*bakeOptions.InterModelDistance {
+						if fastVectorDistanceSquared(transformedTriVerts[i], transformedOtherVerts[j]) <= distanceSquared {
 							ao[i] = 1
 							break
 						}

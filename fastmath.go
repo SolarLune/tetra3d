@@ -95,6 +95,12 @@ func vectorCross(vecA, vecB, failsafeVec vector.Vector) vector.Vector {
 	return cross
 }
 
+// vectorsEqual returns if two >=3D vectors are basically equal in position.
+func vectorsEqual(a, b vector.Vector) bool {
+	m := 0.0001
+	return math.Abs(a[0]-b[0]) < m && math.Abs(a[1]-b[1]) < m && math.Abs(a[2]-b[2]) < m
+}
+
 type VectorPool struct {
 	Vectors        []vector.Vector
 	RetrievalIndex int

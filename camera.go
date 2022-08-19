@@ -620,6 +620,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		if scene.World != nil && scene.World.AmbientLight != nil && scene.World.AmbientLight.IsOn() {
 			sceneLights = append(sceneLights, scene.World.AmbientLight)
+			scene.World.AmbientLight.beginRender()
 		}
 
 	}
@@ -826,6 +827,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		mesh := model.Mesh
+		maxSpan := model.Mesh.Dimensions.MaxSpan()
+		modelPos := model.WorldPosition()
 
 		// Here we do all vertex transforms first because of data locality (it's faster to access all vertex transformations, then go back and do all UV values, etc)
 
@@ -1011,6 +1014,19 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				addLightResults := [9]float32{}
 
 				for _, light := range lights {
+
+					if point, ok := light.(*PointLight); ok && point.Distance > 0 {
+						dist := maxSpan + point.Distance
+						if fastVectorDistanceSquared(modelPos, point.WorldPosition()) > dist*dist {
+							continue
+						}
+					} else if cube, ok := light.(*CubeLight); ok && cube.Distance > 0 {
+						dist := maxSpan + cube.Distance
+						if fastVectorDistanceSquared(modelPos, cube.WorldPosition()) > dist*dist {
+							continue
+						}
+					}
+
 					lightResults := light.Light(tri.ID, model)
 					for i := 0; i < 9; i++ {
 						addLightResults[i] += lightResults[i]

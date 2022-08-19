@@ -319,10 +319,10 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Ambient lights
 - [X] -- Point lights
 - [X] -- Directional lights
+- [X] -- Cube (AABB volume) lights
 - [X] -- Smooth shading
 - [X] -- Ability to bake lighting to vertex colors
 - [X] -- Ability to bake ambient occlusion to vertex colors
-- [ ] -- Polygonal lights
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
 - [X] **Shaders**
