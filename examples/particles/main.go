@@ -170,7 +170,7 @@ func (g *Game) Init() {
 	// And that's about it!
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
+	g.Camera.SetLocalPositionVec(vector.Vector{0, 2, 5})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -224,7 +224,7 @@ func (g *Game) Update() error {
 		pos[1] -= moveSpd
 	}
 
-	g.Camera.SetLocalPosition(pos)
+	g.Camera.SetLocalPositionVec(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())

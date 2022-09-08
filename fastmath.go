@@ -104,14 +104,22 @@ func vectorsEqual(a, b vector.Vector) bool {
 type VectorPool struct {
 	Vectors        []vector.Vector
 	RetrievalIndex int
+	Vectors4D      bool
 }
 
-func NewVectorPool(vectorCount int) *VectorPool {
+func NewVectorPool(vectorCount int, vectors4D bool) *VectorPool {
 	pool := &VectorPool{
-		Vectors: make([]vector.Vector, vectorCount),
+		Vectors:   make([]vector.Vector, vectorCount),
+		Vectors4D: vectors4D,
 	}
-	for i := 0; i < vectorCount; i++ {
-		pool.Vectors[i] = vector.Vector{0, 0, 0, 0}
+	if vectors4D {
+		for i := 0; i < vectorCount; i++ {
+			pool.Vectors[i] = vector.Vector{0, 0, 0, 0}
+		}
+	} else {
+		for i := 0; i < vectorCount; i++ {
+			pool.Vectors[i] = vector.Vector{0, 0, 0}
+		}
 	}
 	return pool
 }
@@ -152,29 +160,44 @@ func (pool *VectorPool) MultVecW(matrix Matrix4, vect vector.Vector) vector.Vect
 }
 
 func (pool *VectorPool) Sub(v0, v1 vector.Vector) vector.Vector {
-	v := pool.Get()
-	for i := range v0 {
-		v[i] = v0[i] - v1[i]
+	out := pool.Get()
+
+	if pool.Vectors4D {
+		out[0] = v0[0] - v1[0]
+		out[1] = v0[1] - v1[1]
+		out[2] = v0[2] - v1[2]
+		out[3] = v0[3] - v1[3]
+	} else {
+		out[0] = v0[0] - v1[0]
+		out[1] = v0[1] - v1[1]
+		out[2] = v0[2] - v1[2]
 	}
-	return v
+	return out
 }
 
 func (pool *VectorPool) Add(v0, v1 vector.Vector) vector.Vector {
-	v := pool.Get()
-	for i := range v0 {
-		v[i] = v0[i] + v1[i]
+	out := pool.Get()
+	if pool.Vectors4D {
+		out[0] = v0[0] + v1[0]
+		out[1] = v0[1] + v1[1]
+		out[2] = v0[2] + v1[2]
+		out[3] = v0[3] + v1[3]
+	} else {
+		out[0] = v0[0] + v1[0]
+		out[1] = v0[1] + v1[1]
+		out[2] = v0[2] + v1[2]
 	}
-	return v
+	return out
 }
 
 func (pool *VectorPool) Cross(v0, v1 vector.Vector) vector.Vector {
-	v := pool.Get()
+	out := pool.Get()
 
-	v[0] = v0[1]*v1[2] - v1[1]*v0[2]
-	v[1] = v0[2]*v1[0] - v1[2]*v0[0]
-	v[2] = v0[0]*v1[1] - v1[0]*v0[1]
+	out[0] = v0[1]*v1[2] - v1[1]*v0[2]
+	out[1] = v0[2]*v1[0] - v1[2]*v0[0]
+	out[2] = v0[0]*v1[1] - v1[0]*v0[1]
 
-	return v[:3]
+	return out[:3]
 }
 
 // Fast dot that should never call append() on the input Vectors, regardless of dimensions

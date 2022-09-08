@@ -620,41 +620,41 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 }
 
 func btCapsuleCapsule(capsuleA, capsuleB *BoundingCapsule) *Collision {
-	capsuleA.internalSphere.SetLocalScale(capsuleA.LocalScale())
+	capsuleA.internalSphere.SetLocalScaleVec(capsuleA.LocalScale())
 
 	// By getting the closest point to the world position (center), and then getting it again, we get closer to the
 	// true closest point for both capsules, which is good enough for now lol
 	caClosest := capsuleA.ClosestPoint(capsuleB.WorldPosition())
 	cbClosest := capsuleB.ClosestPoint(capsuleA.WorldPosition())
 
-	capsuleA.internalSphere.SetLocalPosition(capsuleA.ClosestPoint(cbClosest))
+	capsuleA.internalSphere.SetLocalPositionVec(capsuleA.ClosestPoint(cbClosest))
 	capsuleA.internalSphere.Radius = capsuleA.Radius
 
-	capsuleB.internalSphere.SetLocalScale(capsuleB.LocalScale())
-	capsuleB.internalSphere.SetLocalPosition(capsuleB.ClosestPoint(caClosest))
+	capsuleB.internalSphere.SetLocalScaleVec(capsuleB.LocalScale())
+	capsuleB.internalSphere.SetLocalPositionVec(capsuleB.ClosestPoint(caClosest))
 	capsuleB.internalSphere.Radius = capsuleB.Radius
 
 	return btSphereSphere(capsuleA.internalSphere, capsuleB.internalSphere)
 }
 
 func btSphereCapsule(sphere *BoundingSphere, capsule *BoundingCapsule) *Collision {
-	capsule.internalSphere.SetLocalScale(capsule.LocalScale())
-	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(sphere.WorldPosition()))
+	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
+	capsule.internalSphere.SetLocalPositionVec(capsule.ClosestPoint(sphere.WorldPosition()))
 	capsule.internalSphere.Radius = capsule.Radius
 	return btSphereSphere(sphere, capsule.internalSphere)
 }
 
 func btCapsuleAABB(capsule *BoundingCapsule, aabb *BoundingAABB) *Collision {
-	capsule.internalSphere.SetLocalScale(capsule.LocalScale())
-	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(aabb.WorldPosition()))
+	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
+	capsule.internalSphere.SetLocalPositionVec(capsule.ClosestPoint(aabb.WorldPosition()))
 	capsule.internalSphere.Radius = capsule.Radius
 	return btSphereAABB(capsule.internalSphere, aabb)
 }
 
 func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) *Collision {
 
-	capsule.internalSphere.SetLocalScale(capsule.LocalScale())
-	capsule.internalSphere.SetLocalPosition(capsule.ClosestPoint(triangles.BoundingAABB.WorldPosition()))
+	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
+	capsule.internalSphere.SetLocalPositionVec(capsule.ClosestPoint(triangles.BoundingAABB.WorldPosition()))
 	capsule.internalSphere.Radius = capsule.Radius
 
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
@@ -796,7 +796,7 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...BoundingObjec
 
 	// If dx, dy, and dz are 0, we don't need to reposition the node for the collision test.
 	if dx != 0 || dy != 0 || dz != 0 {
-		ogPos = node.WorldPosition()
+		ogPos = node.LocalPosition()
 		node.Move(dx, dy, dz)
 	}
 
@@ -815,7 +815,7 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...BoundingObjec
 	})
 
 	if dx != 0 || dy != 0 || dz != 0 {
-		node.SetWorldPosition(ogPos)
+		node.SetLocalPositionVec(ogPos)
 	}
 
 	return collisions
@@ -871,13 +871,15 @@ var sphereCheck = NewBoundingSphere("sphere check", 1)
 // SphereCheck performs a quick bounding sphere check at the specified X, Y, and Z position with the radius given,
 // against the bounding objects provided in "others".
 func SphereCheck(x, y, z, radius float64, others ...BoundingObject) []*Collision {
-	return SphereCheckVec(vector.Vector{x, y, z}, radius, others...)
+	sphereCheck.SetLocalPosition(x, y, z)
+	sphereCheck.Radius = radius
+	return commonCollisionTest(sphereCheck, 0, 0, 0, others...)
 }
 
 // SphereCheck performs a quick bounding sphere check at the specified position with the radius given, against the
 // bounding objects provided in "others".
 func SphereCheckVec(position vector.Vector, radius float64, others ...BoundingObject) []*Collision {
-	sphereCheck.SetLocalPosition(position)
+	sphereCheck.SetLocalPositionVec(position)
 	sphereCheck.Radius = radius
 	return commonCollisionTest(sphereCheck, 0, 0, 0, others...)
 }

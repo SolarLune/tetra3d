@@ -32,6 +32,20 @@ type Model struct {
 	// A LightGroup indicates if a Model should be lit by a specific group of Lights. This allows you to control the overall lighting of scenes more accurately.
 	// If a Model has no LightGroup, the Model is lit by the lights present in the Scene.
 	LightGroup *LightGroup
+
+	// VertexTransformFunction is a function that runs on the world position of each vertex position rendered with the material.
+	// It accepts the vertex position as an argument, along with the index of the vertex in the mesh.
+	// One can use this to simply transform vertices of the mesh on CPU (note that this is, of course, not as performant as
+	// a traditional GPU vertex shader, but is fine for simple / low-poly mesh transformations).
+	// This function is run after skinning the vertex if the material belongs to a mesh that is skinned by an armature.
+	// Note that the VertexTransformFunction must return the vector passed.
+	VertexTransformFunction func(vertexPosition vector.Vector, vertexIndex int) vector.Vector
+
+	// VertexClipFunction is a function that runs on the clipped result of each vertex position rendered with the material.
+	// The function takes the vertex position along with the vertex index in the mesh.
+	// This program runs after the vertex position is clipped to screen coordinates.
+	// Note that the VertexClipFunction must return the vector passed.
+	VertexClipFunction func(vertexPosition vector.Vector, vertexIndex int) vector.Vector
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -49,7 +63,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 	model.Node.onTransformUpdate = model.TransformUpdate
 
 	if mesh != nil {
-		model.skinVectorPool = NewVectorPool(mesh.VertexCount * 2) // Both position and normal
+		model.skinVectorPool = NewVectorPool(mesh.VertexCount*2, true) // Both position and normal
 	}
 
 	radius := 0.0
@@ -94,6 +108,9 @@ func (model *Model) Clone() INode {
 		newModel.LightGroup = model.LightGroup.Clone()
 	}
 
+	newModel.VertexClipFunction = model.VertexClipFunction
+	newModel.VertexTransformFunction = model.VertexTransformFunction
+
 	return newModel
 
 }
@@ -126,7 +143,7 @@ func (model *Model) TransformUpdate() {
 	position[0] += center[0] * scale[0]
 	position[1] += center[1] * scale[1]
 	position[2] += center[2] * scale[2]
-	model.BoundingSphere.SetLocalPosition(position)
+	model.BoundingSphere.SetLocalPositionVec(position)
 
 	dim := model.Mesh.Dimensions.Clone()
 	dim[0][0] *= scale[0]
@@ -303,10 +320,10 @@ func (model *Model) Merge(models ...*Model) {
 
 	model.Mesh.UpdateBounds()
 
-	model.BoundingSphere.SetLocalPosition(model.Mesh.Dimensions.Center())
+	model.BoundingSphere.SetLocalPositionVec(model.Mesh.Dimensions.Center())
 	model.BoundingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
 
-	model.skinVectorPool = NewVectorPool(len(model.Mesh.VertexPositions))
+	model.skinVectorPool = NewVectorPool(len(model.Mesh.VertexPositions)*2, true)
 
 }
 
@@ -393,9 +410,22 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	var transformFunc func(vertPos vector.Vector, index int) vector.Vector
 
-	if meshPart.Material != nil && meshPart.Material.VertexTransformFunction != nil {
-		transformFunc = meshPart.Material.VertexTransformFunction
+	if model.VertexTransformFunction != nil {
+		transformFunc = model.VertexTransformFunction
 	}
+
+	modelTransform := model.Transform()
+	p, _, r := modelTransform.Inverted().Decompose()
+
+	s := model.WorldScale()
+
+	p[0] *= s[0]
+	p[1] *= s[1]
+	p[2] *= s[2]
+
+	camPos := r.MultVec(camera.WorldPosition()).Add(p)
+
+	camFarSquared := camera.Far * camera.Far
 
 	if model.Skinned {
 
@@ -451,7 +481,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		mat := meshPart.Material
 
-		base := model.Transform()
+		base := modelTransform
 
 		if mat != nil && mat.BillboardMode != BillboardModeNone {
 
@@ -472,17 +502,25 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		for i := 0; i < len(meshPart.sortingTriangles); i++ {
 
-			tri := meshPart.sortingTriangles[i]
+			triID := meshPart.sortingTriangles[i].ID
 			depth := math.MaxFloat64
 
+			triRef := model.Mesh.Triangles[triID]
+			if fastVectorDistanceSquared(camPos, triRef.Center) > (camFarSquared)+triRef.MaxSpan {
+				meshPart.sortingTriangles[i].rendered = false
+				continue
+			}
+
+			meshPart.sortingTriangles[i].rendered = true
+
 			for i := 0; i < 3; i++ {
-				v0 := model.Mesh.VertexPositions[tri.ID*3+i]
+				v0 := model.Mesh.VertexPositions[triID*3+i]
 
 				if transformFunc != nil {
-					v0 = transformFunc(v0.Clone(), tri.ID*3+i)
+					v0 = transformFunc(v0.Clone(), triID*3+i)
 				}
 
-				t0 := model.Mesh.vertexTransforms[tri.ID*3+i]
+				t0 := model.Mesh.vertexTransforms[triID*3+i]
 				t0[0], t0[1], t0[2], t0[3] = fastMatrixMultVecW(mvp, v0)
 
 				if t0[3] < depth {

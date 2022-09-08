@@ -74,7 +74,7 @@ func (g *Game) Init() {
 	g.Scene.World.LightingOn = false
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
+	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	// Firstly, we create a TexturePlayer, which animates a collection of vertices' UV values to
@@ -167,7 +167,7 @@ func (g *Game) Update() error {
 		pos[1] -= moveSpd
 	}
 
-	g.Camera.SetLocalPosition(pos)
+	g.Camera.SetLocalPositionVec(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())

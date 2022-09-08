@@ -75,15 +75,15 @@ func (g *Game) Init() {
 	mat.Texture = loadImage(testImageData)
 
 	parent := tetra3d.NewModel(cubeMesh, "parent")
-	parent.SetLocalPosition(vector.Vector{0, -3, 0})
+	parent.SetLocalPositionVec(vector.Vector{0, -3, 0})
 
 	child := tetra3d.NewModel(cubeMesh, "child")
-	child.SetLocalPosition(vector.Vector{10, 2, 0})
+	child.SetLocalPositionVec(vector.Vector{10, 2, 0})
 
 	g.Scene.Root.AddChildren(parent, child)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
+	g.Camera.SetLocalPositionVec(vector.Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -128,10 +128,10 @@ func (g *Game) Update() error {
 		position[2] += 0.1
 	}
 
-	parent.SetLocalPosition(position)
+	parent.SetLocalPositionVec(position)
 
 	if ebiten.IsKeyPressed(ebiten.KeyG) {
-		child.SetWorldPosition(vector.Vector{10, 2, 0})
+		child.SetWorldPositionVec(vector.Vector{10, 2, 0})
 		child.SetWorldRotation(tetra3d.NewMatrix4Rotate(0, 1, 0, 0))
 	}
 
@@ -178,7 +178,7 @@ func (g *Game) Update() error {
 		pos[1] -= moveSpd
 	}
 
-	g.Camera.SetLocalPosition(pos)
+	g.Camera.SetLocalPositionVec(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())

@@ -337,7 +337,7 @@ func (ps *ParticleSystem) Spawn() {
 		ps.Root.AddChildren(part.Model)
 	}
 
-	part.Model.SetWorldScale(ps.Settings.Scale.Value())
+	part.Model.SetWorldScaleVec(ps.Settings.Scale.Value())
 
 	part.Velocity = ps.Settings.Velocity.Value()
 	part.Acceleration = ps.Settings.Acceleration.Value()
@@ -376,7 +376,7 @@ func (ps *ParticleSystem) Spawn() {
 		pos = ps.Root.WorldPosition()
 	}
 
-	part.Model.SetWorldPosition(pos.Add(ps.Settings.SpawnOffset.Value()))
+	part.Model.SetWorldPositionVec(pos.Add(ps.Settings.SpawnOffset.Value()))
 
 	if ps.Settings.SpawnOffsetFunction != nil {
 		ps.Settings.SpawnOffsetFunction(part)

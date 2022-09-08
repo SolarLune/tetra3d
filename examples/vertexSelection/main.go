@@ -74,7 +74,7 @@ func (g *Game) Init() {
 	g.Cube = g.Scene.Root.Get("Cube").(*tetra3d.Model)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
+	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	// So, the easiest way to select vertices is to just use Mesh.SelectVertices() - it allows us to select vertices that fulfill a set of
@@ -143,7 +143,7 @@ func (g *Game) Update() error {
 		pos[1] -= moveSpd
 	}
 
-	g.Camera.SetLocalPosition(pos)
+	g.Camera.SetLocalPositionVec(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())

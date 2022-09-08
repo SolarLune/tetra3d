@@ -405,8 +405,8 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 		p, s, r := mat.Decompose()
 
-		model.SetLocalPosition(p)
-		model.SetLocalScale(s)
+		model.SetLocalPositionVec(p)
+		model.SetLocalScaleVec(s)
 		model.SetLocalRotation(r)
 
 		return model

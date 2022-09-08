@@ -359,13 +359,13 @@
     "cameras" : [
         {
             "name" : "Camera",
-            "perspective" : {
-                "aspectRatio" : 1.7777777777777777,
-                "yfov" : 0.7853981852531433,
+            "orthographic" : {
+                "xmag" : 60,
+                "ymag" : 60,
                 "zfar" : 30,
                 "znear" : 0.10000000149011612
             },
-            "type" : "perspective"
+            "type" : "orthographic"
         }
     ],
     "materials" : [

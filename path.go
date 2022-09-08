@@ -141,7 +141,7 @@ func NewPath(name string, points ...vector.Vector) *Path {
 	}
 	for i, point := range points {
 		pointNode := NewNode("_point." + strconv.Itoa(i))
-		pointNode.SetLocalPosition(point)
+		pointNode.SetLocalPositionVec(point)
 		path.AddChildren(pointNode)
 	}
 	return path

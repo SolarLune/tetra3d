@@ -646,6 +646,53 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		} else {
 			obj = NewNode(node.Name)
+
+			if node.Extras != nil && nodeHasProp(node, "t3dGridConnections__") {
+
+				extraMap := node.Extras.(map[string]interface{})
+
+				type gridPointPosition struct {
+					X, Y, Z float64
+				}
+
+				creationOrder := []*GridPoint{}
+
+				parsePosition := func(gpString string) gridPointPosition {
+					trimmed := strings.Trim(gpString, "()")
+					components := strings.Split(trimmed, ", ")
+					x, _ := strconv.ParseFloat(components[0], 64)
+					y, _ := strconv.ParseFloat(components[1], 64)
+					z, _ := strconv.ParseFloat(components[2], 64)
+
+					return gridPointPosition{
+						X: x,
+						Y: y,
+						Z: z,
+					}
+				}
+
+				for _, k := range extraMap["t3dGridEntries__"].([]interface{}) {
+
+					key := parsePosition(k.(string))
+					gp := NewGridPoint("Grid Point")
+					obj.AddChildren(gp)
+					gp.SetWorldPosition(key.X, key.Z, -key.Y)
+					creationOrder = append(creationOrder, gp)
+
+				}
+
+				for k, array := range extraMap["t3dGridConnections__"].(map[string]interface{}) {
+
+					key, _ := strconv.Atoi(k)
+					for _, v := range array.([]interface{}) {
+						connectedID, _ := strconv.Atoi(v.(string))
+						creationOrder[key].Connect(creationOrder[connectedID])
+					}
+
+				}
+
+			}
+
 		}
 
 		objToNode[obj] = node
@@ -712,18 +759,18 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						if aabbCustomEnabled := getOrDefaultBool("t3dAABBCustomEnabled__", false); aabbCustomEnabled {
 
 							boundsSize := getOrDefaultFloatSlice("t3dAABBCustomSize__", []float64{2, 2, 2})
-							aabb = NewBoundingAABB("_bounding aabb", boundsSize[0], boundsSize[1], boundsSize[2])
+							aabb = NewBoundingAABB("BoundingAABB", boundsSize[0], boundsSize[1], boundsSize[2])
 
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
 							mesh := obj.(*Model).Mesh
 							dim := mesh.Dimensions
-							aabb = NewBoundingAABB("_bounding aabb", dim.Width(), dim.Height(), dim.Depth())
+							aabb = NewBoundingAABB("BoundingAABB", dim.Width(), dim.Height(), dim.Depth())
 						}
 
 						if aabb != nil {
 
 							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								aabb.SetLocalPosition(obj.(*Model).Mesh.Dimensions.Center())
+								aabb.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(aabb)
@@ -739,17 +786,17 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						if capsuleCustomEnabled := getOrDefaultBool("t3dCapsuleCustomEnabled__", false); capsuleCustomEnabled {
 							height := getOrDefaultFloat("t3dCapsuleCustomHeight__", 2)
 							radius := getOrDefaultFloat("t3dCapsuleCustomRadius__", 0.5)
-							capsule = NewBoundingCapsule("_bounding capsule", height, radius)
+							capsule = NewBoundingCapsule("BoundingCapsule", height, radius)
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
 							mesh := obj.(*Model).Mesh
 							dim := mesh.Dimensions
-							capsule = NewBoundingCapsule("_bounding capsule", dim.Height(), math.Max(dim.Width(), dim.Depth())/2)
+							capsule = NewBoundingCapsule("BoundingCapsule", dim.Height(), math.Max(dim.Width(), dim.Depth())/2)
 						}
 
 						if capsule != nil {
 
 							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								capsule.SetLocalPosition(obj.(*Model).Mesh.Dimensions.Center())
+								capsule.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(capsule)
@@ -764,7 +811,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 						if sphereCustomEnabled := getOrDefaultBool("t3dSphereCustomEnabled__", false); sphereCustomEnabled {
 							radius := getOrDefaultFloat("t3dSphereCustomRadius__", 1)
-							sphere = NewBoundingSphere("_bounding sphere", radius)
+							sphere = NewBoundingSphere("BoundingSphere", radius)
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
 
 							model := obj.(*Model)
@@ -778,13 +825,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							dim[1][1] *= scale[1]
 							dim[1][2] *= scale[2]
 
-							sphere = NewBoundingSphere("_bounding sphere", dim.MaxDimension()/2)
+							sphere = NewBoundingSphere("BoundingSphere", dim.MaxDimension()/2)
 						}
 
 						if sphere != nil {
 
 							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								sphere.SetLocalPosition(obj.(*Model).Mesh.Dimensions.Center())
+								sphere.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(sphere)
@@ -803,7 +850,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 								gridSize = getOrDefaultFloat("t3dTrianglesCustomBroadphaseGridSize__", 20)
 							}
 
-							triangles := NewBoundingTriangles("_bounding triangles", obj.(*Model).Mesh, gridSize)
+							triangles := NewBoundingTriangles("BoundingTriangles", obj.(*Model).Mesh, gridSize)
 
 							obj.AddChildren(triangles)
 						}
@@ -831,14 +878,14 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			p, s, r := matrix.Decompose()
 
-			obj.SetLocalPosition(p)
-			obj.SetLocalScale(s)
+			obj.SetLocalPositionVec(p)
+			obj.SetLocalScaleVec(s)
 			obj.SetLocalRotation(r)
 
 		} else {
 
-			obj.SetLocalPosition(vector.Vector{float64(node.Translation[0]), float64(node.Translation[1]), float64(node.Translation[2])})
-			obj.SetLocalScale(vector.Vector{float64(node.Scale[0]), float64(node.Scale[1]), float64(node.Scale[2])})
+			obj.SetLocalPositionVec(vector.Vector{float64(node.Translation[0]), float64(node.Translation[1]), float64(node.Translation[2])})
+			obj.SetLocalScaleVec(vector.Vector{float64(node.Scale[0]), float64(node.Scale[1]), float64(node.Scale[2])})
 			obj.SetLocalRotation(NewQuaternion(float64(node.Rotation[0]), float64(node.Rotation[1]), float64(node.Rotation[2]), float64(node.Rotation[3])).ToMatrix4())
 
 		}
@@ -862,7 +909,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			// Unsure of if this is necessary.
 			// if skin.Skeleton != nil {
 			// 	skeletonRoot := objects[*skin.Skeleton]
-			// 	model.SetWorldPosition(skeletonRoot.WorldPosition())
+			// 	model.SetWorldPositionVec(skeletonRoot.WorldPosition())
 			// 	model.SetWorldScale(skeletonRoot.WorldScale())
 			// 	model.SetWorldRotation(skeletonRoot.WorldRotation())
 			// }

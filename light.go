@@ -116,6 +116,7 @@ type PointLight struct {
 	// If the light is on and contributing to the scene.
 	On bool
 
+	distanceSquared float64
 	workingPosition vector.Vector
 }
 
@@ -146,6 +147,7 @@ func (point *PointLight) Clone() INode {
 }
 
 func (point *PointLight) beginRender() {
+	point.distanceSquared = point.Distance * point.Distance
 }
 
 func (point *PointLight) beginModel(model *Model) {
@@ -188,11 +190,9 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 		triCenter = model.Mesh.Triangles[triIndex].Center
 	}
 
-	dist := point.workingPosition.Sub(triCenter).Magnitude()
+	dist := fastVectorDistanceSquared(point.workingPosition, triCenter)
 
-	distanceSquared := point.Distance * point.Distance
-
-	if point.Distance > 0 && dist > distanceSquared {
+	if point.Distance > 0 && dist > point.distanceSquared+model.Mesh.Triangles[triIndex].MaxSpan {
 		return light
 	}
 
@@ -226,7 +226,7 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 		if point.Distance == 0 {
 			diffuseFactor = diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
 		} else {
-			diffuseFactor = diffuse * math.Max(math.Min(1.0-(math.Pow((distance/distanceSquared), 4)), 1), 0)
+			diffuseFactor = diffuse * math.Max(math.Min(1.0-(math.Pow((distance/point.distanceSquared), 4)), 1), 0)
 		}
 
 		light[(i * 3)] = point.Color.R * float32(diffuseFactor) * point.Energy

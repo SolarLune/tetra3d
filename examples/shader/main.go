@@ -77,19 +77,20 @@ func (g *Game) Init() {
 	mat := vertCube.MeshParts[0].Material
 	mat.Shadeless = true
 
-	// ... And here we specify a "vertex program" - in truth, this operates on CPU, rather than the GPU, but it still is useful.
-	// Much like a Fragment shader, it operates on all vertices that render with the material.
-	mat.VertexTransformFunction = func(v vector.Vector, id int) vector.Vector {
-		waveHeight := 0.1
-		v[1] += math.Sin(g.Time*math.Pi+v[0])*waveHeight + (waveHeight / 2)
-		return v
-	}
 	model = tetra3d.NewModel(vertCube, "vertexcube")
 	model.Move(2, 0, 0)
 	g.Scene.Root.AddChildren(model)
 
+	// ... And here we specify a "vertex program" - in truth, this operates on CPU, rather than the GPU, but it still is useful.
+	// Much like a Fragment shader, it operates on all vertices that render with the material.
+	model.VertexTransformFunction = func(v vector.Vector, id int) vector.Vector {
+		waveHeight := 0.1
+		v[1] += math.Sin(g.Time*math.Pi+v[0])*waveHeight + (waveHeight / 2)
+		return v
+	}
+
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 2, 5})
+	g.Camera.SetLocalPositionVec(vector.Vector{0, 2, 5})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -136,7 +137,7 @@ func (g *Game) Update() error {
 		pos[1] -= moveSpd
 	}
 
-	g.Camera.SetLocalPosition(pos)
+	g.Camera.SetLocalPositionVec(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())

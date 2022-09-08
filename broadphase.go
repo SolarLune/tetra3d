@@ -32,7 +32,7 @@ func NewBroadphase(gridSize int, bt *BoundingTriangles) *Broadphase {
 
 	bp.Center.AddChildren(bp.aabb)
 
-	bp.Center.SetWorldPosition(bt.WorldPosition().Add(bt.Mesh.Dimensions.Center()))
+	bp.Center.SetWorldPositionVec(bt.WorldPosition().Add(bt.Mesh.Dimensions.Center()))
 	bp.Center.Transform() // Update the transform so that when resizing, the aabb can properly check all triangles
 
 	bp.Resize(gridSize)
@@ -94,7 +94,7 @@ func (bp *Broadphase) Resize(gridSize int) {
 
 				bp.TriSets[i][j][k] = []int{}
 
-				bp.aabb.SetLocalPosition(vector.Vector{
+				bp.aabb.SetLocalPositionVec(vector.Vector{
 					(float64(i) - hg + 0.5) * bp.cellSize,
 					(float64(j) - hg + 0.5) * bp.cellSize,
 					(float64(k) - hg + 0.5) * bp.cellSize,
@@ -149,7 +149,7 @@ func (bp *Broadphase) GetTrianglesFromBounding(boundingObject BoundingObject) ma
 					continue
 				}
 
-				bp.aabb.SetLocalPosition(vector.Vector{
+				bp.aabb.SetLocalPositionVec(vector.Vector{
 					(float64(i) - hg + 0.5) * bp.cellSize,
 					(float64(j) - hg + 0.5) * bp.cellSize,
 					(float64(k) - hg + 0.5) * bp.cellSize,
@@ -179,7 +179,7 @@ func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
 
 	hg := float64(bp.GridSize) / 2
 
-	bp.aabb.SetLocalPosition(vector.Vector{0, 0, 0})
+	bp.aabb.SetLocalPositionVec(vector.Vector{0, 0, 0})
 
 	for i := 0; i < bp.GridSize; i++ {
 		for j := 0; j < bp.GridSize; j++ {
@@ -187,7 +187,7 @@ func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
 
 				clone := bp.aabb.Clone().(*BoundingAABB)
 
-				clone.SetLocalPosition(vector.Vector{
+				clone.SetLocalPositionVec(vector.Vector{
 					// (-float64(bp.GridSize)/2+float64(i))*bp.CellSize + (bp.CellSize / 2),
 					// (-float64(bp.GridSize)/2+float64(j))*bp.CellSize + (bp.CellSize / 2),
 					// (-float64(bp.GridSize)/2+float64(k))*bp.CellSize + (bp.CellSize / 2),
@@ -253,7 +253,7 @@ func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
 // 			for k := 0; k < gridSize; k++ {
 // 				b := NewBoundingAABB("", cellSize, cellSize, cellSize)
 // 				bp.Center.AddChildren(b)
-// 				b.SetLocalPosition(vector.Vector{
+// 				b.SetLocalPositionVec(vector.Vector{
 // 					(-float64(gridSize)/2+float64(i))*cellSize + (cellSize / 2),
 // 					(-float64(gridSize)/2+float64(j))*cellSize + (cellSize / 2),
 // 					(-float64(gridSize)/2+float64(k))*cellSize + (cellSize / 2),

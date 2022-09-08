@@ -70,7 +70,7 @@ func (g *Game) Init() {
 	g.Scene = library.ExportedScene.Clone()
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPosition(vector.Vector{0, 5, 10})
+	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	g.PathFollower = tetra3d.NewPathFollower(g.Scene.Root.Get("Path").(*tetra3d.Path))
@@ -119,7 +119,7 @@ func (g *Game) Update() error {
 		pos[1] -= moveSpd
 	}
 
-	g.Camera.SetLocalPosition(pos)
+	g.Camera.SetLocalPositionVec(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
@@ -136,7 +136,7 @@ func (g *Game) Update() error {
 	}
 
 	cube := g.Scene.Root.Get("Cube")
-	cube.SetWorldPosition(g.PathFollower.WorldPosition())
+	cube.SetWorldPositionVec(g.PathFollower.WorldPosition())
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		g.AutoAdvance = !g.AutoAdvance

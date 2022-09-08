@@ -174,7 +174,7 @@ type collisionPlane struct {
 
 func newCollisionPlane() *collisionPlane {
 	return &collisionPlane{
-		VectorPool: NewVectorPool(16),
+		VectorPool: NewVectorPool(16, false),
 	}
 }
 
@@ -182,7 +182,8 @@ func (plane *collisionPlane) Set(v0, v1, v2 vector.Vector) {
 
 	first := plane.VectorPool.Sub(v1, v0)
 	second := plane.VectorPool.Sub(v2, v0)
-	normal := plane.VectorPool.Cross(first, second).Unit()
+	normal := plane.VectorPool.Cross(first, second)
+	vector.In(normal).Unit()
 	distance := dot(normal, v0)
 
 	plane.Normal = normal
@@ -193,7 +194,7 @@ func (plane *collisionPlane) Set(v0, v1, v2 vector.Vector) {
 func (plane *collisionPlane) ClosestPoint(point vector.Vector) vector.Vector {
 
 	dist := dot(plane.Normal, point) - plane.Distance
-	return plane.VectorPool.Sub(point, plane.Normal.Scale(dist))[:3]
+	return plane.VectorPool.Sub(point, plane.Normal.Scale(dist))
 
 }
 
@@ -233,9 +234,9 @@ func closestPointOnTri(point, v0, v1, v2 vector.Vector) vector.Vector {
 
 func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 vector.Vector) bool {
 
-	ca := plane.VectorPool.Sub(v2, v0)[:3]
-	ba := plane.VectorPool.Sub(v1, v0)[:3]
-	pa := plane.VectorPool.Sub(point, v0)[:3]
+	ca := plane.VectorPool.Sub(v2, v0)
+	ba := plane.VectorPool.Sub(v1, v0)
+	pa := plane.VectorPool.Sub(point, v0)
 
 	dot00 := dot(ca, ca)
 	dot01 := dot(ca, ba)

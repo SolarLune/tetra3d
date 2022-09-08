@@ -3,6 +3,8 @@ package tetra3d
 import (
 	"image/color"
 	"math"
+	"strconv"
+	"strings"
 )
 
 // Color represents a color, containing R, G, B, and A components, each expected to range from 0 to 1.
@@ -191,6 +193,43 @@ func NewColorFromHSV(h, s, v float64) *Color {
 	}
 
 	return &Color{float32(m + r), float32(m + g), float32(m + b), 1}
+}
+
+func NewColorFromHexString(hex string) *Color {
+
+	c := NewColor(0, 0, 0, 1)
+
+	hex = strings.TrimPrefix(hex, "#")
+
+	if len(hex) >= 2 {
+		v, _ := strconv.ParseInt(hex[:2], 16, 32)
+		c.R = float32(v) / 256.0
+
+		if len(hex) >= 4 {
+			v, _ := strconv.ParseInt(hex[2:4], 16, 32)
+			c.G = float32(v) / 256.0
+		} else {
+			c.G = 1
+		}
+
+		if len(hex) >= 6 {
+			v, _ := strconv.ParseInt(hex[4:6], 16, 32)
+			c.B = float32(v) / 256.0
+		} else {
+			c.B = 1
+		}
+
+		if len(hex) >= 8 {
+			v, _ := strconv.ParseInt(hex[6:8], 16, 32)
+			c.A = float32(v) / 256.0
+		} else {
+			c.A = 1
+		}
+
+	}
+
+	return c
+
 }
 
 // HSV returns a color as a hue, saturation, and value (each ranging from 0 to 1).

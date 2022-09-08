@@ -43,7 +43,7 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 	i := 0
 	for _, node := range nf {
 		if filterFunc(node) {
-			out[i] = node
+			out = append(out, node)
 			i++
 		}
 	}
@@ -158,4 +158,15 @@ func (nc NodeFilter) Lights() []ILight {
 		}
 	}
 	return lights
+}
+
+// GridPoints returns a slice of the GridPoints contained within the NodeFilter.
+func (nc NodeFilter) GridPoints() []*GridPoint {
+	points := make([]*GridPoint, 0, len(nc))
+	for _, n := range nc {
+		if g, ok := n.(*GridPoint); ok {
+			points = append(points, g)
+		}
+	}
+	return points
 }

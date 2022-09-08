@@ -76,7 +76,7 @@ func (g *Game) Init() {
 
 	// newCube := scenes.Scenes[0].Root.Get("Cube.001").Clone()
 	// scenes.Scenes[0].Root.Get("Armature/Root/1/2/3/4/5").AddChildren(newCube)
-	// newCube.SetLocalPosition(vector.Vector{0, 2, 0})
+	// newCube.SetLocalPositionVec(vector.Vector{0, 2, 0})
 
 }
 
@@ -118,7 +118,7 @@ func (g *Game) Update() error {
 		pos[1] -= moveSpd
 	}
 
-	g.Camera.SetLocalPosition(pos)
+	g.Camera.SetLocalPositionVec(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())

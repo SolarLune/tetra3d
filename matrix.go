@@ -54,6 +54,15 @@ func (matrix Matrix4) Clone() Matrix4 {
 	return newMat
 }
 
+// Set allows you to set the Matrix4 to the same values as another Matrix4.
+func (matrix *Matrix4) Set(other Matrix4) {
+	for y := 0; y < len(matrix); y++ {
+		for x := 0; x < len(matrix[y]); x++ {
+			matrix[y][x] = other[y][x]
+		}
+	}
+}
+
 // BlenderToTetra returns a Matrix with the rows altered such that Blender's +Z is now Tetra's +Y and Blender's +Y is now Tetra's -Z.
 func (matrix Matrix4) BlenderToTetra() Matrix4 {
 	newMat := matrix.Clone()

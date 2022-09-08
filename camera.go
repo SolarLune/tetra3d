@@ -51,7 +51,6 @@ type Camera struct {
 	colorIntermediate     *ebiten.Image
 	depthIntermediate     *ebiten.Image
 	clipAlphaIntermediate *ebiten.Image
-	clipBehind            *ebiten.Image
 
 	resultAccumulatedColorTexture *ebiten.Image // ResultAccumulatedColorTexture holds the previous frame's render result of rendering any models.
 	accumulatedBackBuffer         *ebiten.Image
@@ -90,7 +89,7 @@ func NewCamera(w, h int) *Camera {
 		Near:        0.1,
 		Far:         100,
 
-		backfacePool:          NewVectorPool(3),
+		backfacePool:          NewVectorPool(3, true),
 		AccumulateDrawOptions: &ebiten.DrawImageOptions{},
 	}
 
@@ -254,6 +253,7 @@ func (camera *Camera) Clone() INode {
 	clone.Far = camera.Far
 	clone.Perspective = camera.Perspective
 	clone.FieldOfView = camera.FieldOfView
+	clone.OrthoScale = camera.OrthoScale
 
 	clone.AccumulateColorMode = camera.AccumulateColorMode
 	clone.AccumulateDrawOptions = camera.AccumulateDrawOptions
@@ -283,7 +283,6 @@ func (camera *Camera) Resize(w, h int) {
 		camera.colorIntermediate.Dispose()
 		camera.depthIntermediate.Dispose()
 		camera.clipAlphaIntermediate.Dispose()
-		camera.clipBehind.Dispose()
 	}
 
 	camera.resultAccumulatedColorTexture = ebiten.NewImage(w, h)
@@ -293,7 +292,6 @@ func (camera *Camera) Resize(w, h int) {
 	camera.colorIntermediate = ebiten.NewImage(w, h)
 	camera.depthIntermediate = ebiten.NewImage(w, h)
 	camera.clipAlphaIntermediate = ebiten.NewImage(w, h)
-	camera.clipBehind = ebiten.NewImage(w, h)
 	camera.sphereFactorCalculated = false
 
 }
@@ -347,7 +345,7 @@ func (camera *Camera) SetOrthographic(orthoScale float64) {
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
 // does this by taking outVec, a vertex (vector.Vector) that it stores the values in and returns, which avoids reallocation.
-func (camera *Camera) clipToScreen(vert, outVec vector.Vector, vertID int, mat *Material, width, height float64) vector.Vector {
+func (camera *Camera) clipToScreen(vert, outVec vector.Vector, vertID int, model *Model, width, height float64) vector.Vector {
 
 	v3 := vert[3]
 
@@ -368,8 +366,8 @@ func (camera *Camera) clipToScreen(vert, outVec vector.Vector, vertID int, mat *
 	outVec[2] = vert[2] / v3
 	outVec[3] = 1
 
-	if mat != nil && mat.VertexClipFunction != nil {
-		outVec = mat.VertexClipFunction(outVec, vertID)
+	if model != nil && model.VertexClipFunction != nil {
+		outVec = model.VertexClipFunction(outVec, vertID)
 	}
 
 	return outVec
@@ -716,15 +714,18 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		} else if model.Mesh != nil {
 
+			modelIsTransparent := false
+
 			for _, mp := range model.Mesh.MeshParts {
 				if model.isTransparent(mp) {
 					transparents = append(transparents, renderPair{model, mp})
+					modelIsTransparent = true
 				} else {
 					solids = append(solids, renderPair{model, mp})
 				}
 			}
 
-			if sorting {
+			if sorting || modelIsTransparent {
 				depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
 			}
 
@@ -834,6 +835,10 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		for t := range meshPart.sortingTriangles {
 
+			if !meshPart.sortingTriangles[t].rendered {
+				continue
+			}
+
 			meshPart.sortingTriangles[t].rendered = false
 
 			vertIndex := meshPart.sortingTriangles[t].ID * 3
@@ -850,9 +855,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				continue
 			}
 
-			p0 = camera.clipToScreen(v0, p0, vertIndex, mat, float64(camWidth), float64(camHeight))
-			p1 = camera.clipToScreen(v1, p1, vertIndex+1, mat, float64(camWidth), float64(camHeight))
-			p2 = camera.clipToScreen(v2, p2, vertIndex+2, mat, float64(camWidth), float64(camHeight))
+			p0 = camera.clipToScreen(v0, p0, vertIndex, model, float64(camWidth), float64(camHeight))
+			p1 = camera.clipToScreen(v1, p1, vertIndex+1, model, float64(camWidth), float64(camHeight))
+			p2 = camera.clipToScreen(v2, p2, vertIndex+2, model, float64(camWidth), float64(camHeight))
 
 			// We can skip triangles that lie entirely outside of the view horizontally and vertically.
 			if (p0[0] < 0 && p1[0] < 0 && p2[0] < 0) ||
@@ -1785,9 +1790,9 @@ var debugIcosphere = NewModel(debugIcosphereMesh, "debug icosphere")
 
 func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color *Color) {
 
-	debugIcosphere.SetLocalPosition(sphere.WorldPosition())
+	debugIcosphere.SetLocalPositionVec(sphere.WorldPosition())
 	s := sphere.WorldRadius()
-	debugIcosphere.SetLocalScale(vector.Vector{s, s, s})
+	debugIcosphere.SetLocalScaleVec(vector.Vector{s, s, s})
 	debugIcosphere.Transform()
 	camera.DrawDebugWireframe(screen, debugIcosphere, color)
 

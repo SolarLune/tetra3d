@@ -123,8 +123,8 @@ func NewGame() *Game {
 	// Models, Lights, and Nodes (which are essentially "empties" one can
 	// use for positioning and parenting) can, as well.
 
-	// We can place Models, Cameras, and other Nodes with Node.SetWorldPosition() or 
-	// Node.SetLocalPosition(). Both functions take a 3D vector.Vector from kvartborg's 
+	// We can place Models, Cameras, and other Nodes with node.SetWorldPositionVecVec() or 
+	// node.SetLocalPositionVecVec(). Both functions take a 3D vector.Vector from kvartborg's 
 	// vector package.
 
 	// The *World variants position Nodes in absolute space; the Local variants

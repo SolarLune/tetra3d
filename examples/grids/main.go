@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"math/rand"
 	"os"
 	"runtime/pprof"
 	"time"
@@ -22,30 +23,81 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-//go:embed transparency.gltf
-var gltfData []byte
+// Shared cube mesh
+var cubeMesh = tetra3d.NewCube()
+
+type CubeElement struct {
+	Model           *tetra3d.Model
+	Root            *tetra3d.Node
+	Current, Target *tetra3d.GridPoint
+	Path            []*tetra3d.GridPoint
+}
+
+func newCubeElement(root tetra3d.INode) *CubeElement {
+	element := &CubeElement{
+		Model:   tetra3d.NewModel(cubeMesh, "Cube Element"),
+		Root:    root.(*tetra3d.Node),
+		Current: root.Get("Network").Children()[0].(*tetra3d.GridPoint),
+	}
+	element.Model.Color.Set(1, rand.Float32()*0.1, rand.Float32()*0.1, 1)
+	element.Model.SetWorldScale(0.1, 0.1, 0.1)
+	element.ChooseNewTarget()
+	root.AddChildren(element.Model)
+	return element
+}
+
+func (cube *CubeElement) Update() {
+	pos := cube.Model.WorldPosition()
+
+	if len(cube.Path) > 0 {
+
+		target := cube.Path[0]
+
+		if pos.Sub(target.WorldPosition()).Magnitude() < 0.1 {
+			cube.Path = cube.Path[1:]
+			if len(cube.Path) == 0 {
+				cube.Current = cube.Target
+				cube.ChooseNewTarget()
+			}
+		} else {
+			diff := target.WorldPosition().Sub(cube.Model.WorldPosition()).Unit()
+			cube.Model.MoveVec(diff.Scale(0.025))
+		}
+
+	} else {
+		cube.ChooseNewTarget()
+	}
+
+}
+
+func (cube *CubeElement) ChooseNewTarget() {
+	gridPoints := cube.Root.Get("Network").Children().GridPoints()
+	cube.Target = cube.Root.Get("Network").Children().GridPoints()[rand.Intn(len(gridPoints))]
+	cube.Path = cube.Target.PathTo(cube.Current)
+}
 
 type Game struct {
 	Width, Height int
-	Library       *tetra3d.Library
 	Scene         *tetra3d.Scene
 
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
 	CameraRotate float64
 
-	DrawDebugText      bool
-	DrawDebugWireframe bool
-	DrawDebugDepth     bool
-	PrevMousePosition  vector.Vector
+	Cubes []*CubeElement
 
-	Time float64
+	DrawDebugText     bool
+	DrawDebugDepth    bool
+	PrevMousePosition vector.Vector
 }
+
+//go:embed grids.gltf
+var grids []byte
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             1920,
-		Height:            1080,
+		Width:             398,
+		Height:            224,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -56,47 +108,29 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
-
-	opt := tetra3d.DefaultGLTFLoadOptions()
-	opt.CameraWidth = g.Width
-	opt.CameraHeight = g.Height
-	library, err := tetra3d.LoadGLTFData(gltfData, opt)
+	data, err := tetra3d.LoadGLTFData(grids, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	g.Library = library
-	library.Materials["Gate"].BackfaceCulling = false
-	g.Scene = library.Scenes[0]
+	g.Scene = data.Scenes[0]
 
-	g.Camera = tetra3d.NewCamera(1920, 1080)
-	g.Camera.Far = 30
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 15})
+	g.Scene.World.LightingOn = false
+
+	for i := 0; i < 40; i++ {
+		newCube := newCubeElement(g.Scene.Root)
+		g.Cubes = append(g.Cubes, newCube)
+	}
+
+	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
+	g.Camera.SetLocalPositionVec(vector.Vector{0, 0, 5})
 	g.Scene.Root.AddChildren(g.Camera)
 
-	ambientLight := tetra3d.NewAmbientLight("ambient", 0.8, 0.9, 1, 0.5)
-	g.Scene.Root.AddChildren(ambientLight)
-
-	g.Scene.Root.Get("Water").(*tetra3d.Model).Color.A = 0.6
-
-	g.Scene.World.FogMode = tetra3d.FogOverwrite
-	g.Scene.World.FogColor = tetra3d.NewColor(0.8, 0.9, 1, 1)
-
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
-
-	water.VertexTransformFunction = func(v vector.Vector, vertID int) vector.Vector {
-		v[1] += math.Sin((g.Time*math.Pi)+(v[0]*1.2)+(v[2]*0.739)) * 0.1
-		return v
-	}
 
 }
 
 func (g *Game) Update() error {
-
-	g.Time += 1.0 / 60.0
-
 	var err error
 
 	moveSpd := 0.05
@@ -105,16 +139,8 @@ func (g *Game) Update() error {
 		err = errors.New("quit")
 	}
 
-	// We toggle transparency here; note that we can also just leave the mode set to TransparencyModeAuto for the water, instead; then, we would just need to make the material or object color transparent.
-	// Tetra3D would then treat the material as though it had TransparencyModeTransparent set.
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {
-			g.Library.Materials["TransparentSquare"].TransparencyMode = tetra3d.TransparencyModeAlphaClip
-			g.Library.Materials["Water"].TransparencyMode = tetra3d.TransparencyModeTransparent
-		} else {
-			g.Library.Materials["TransparentSquare"].TransparencyMode = tetra3d.TransparencyModeOpaque
-			g.Library.Materials["Water"].TransparencyMode = tetra3d.TransparencyModeOpaque
-		}
+	for _, cube := range g.Cubes {
+		cube.Update()
 	}
 
 	// Moving the Camera
@@ -124,8 +150,6 @@ func (g *Game) Update() error {
 	right := g.Camera.LocalRotation().Right()
 
 	pos := g.Camera.LocalPosition()
-
-	// g.Scene.Root.Get("point light").(*tetra3d.PointLight).Distance = 10 + (math.Sin(g.Time*math.Pi) * 5)
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
 		pos = pos.Add(forward.Scale(moveSpd))
@@ -197,11 +221,7 @@ func (g *Game) Update() error {
 		g.DrawDebugText = !g.DrawDebugText
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.DrawDebugWireframe = !g.DrawDebugWireframe
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
 		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
@@ -210,12 +230,12 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	screen.Fill(g.Scene.World.FogColor.ToRGBA64())
+	screen.Fill(color.RGBA{60, 70, 80, 255})
 
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the scene
+	// Render the logo first
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
@@ -229,29 +249,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		screen.DrawImage(g.Camera.ColorTexture(), opt)
 	}
 
-	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Blue())
-	}
-
 	if g.DrawDebugText {
-
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.Black())
-
-		transparencyOn := "On"
-		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {
-			transparencyOn = "Off"
-		}
-
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n" +
-			"Transparent materials draw in a second pass;\n" +
-			"they don't appear in the depth texture.\n" +
-			"They can overlap (bad), but also show things\n" +
-			"underneath (good).\n" +
-			"1 Key: Toggle transparency, currently: " + transparencyOn +
-			"\nF2: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{0, 0, 40, 255})
-
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe screen object shows what the\ncamera is looking at.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{200, 200, 200, 255})
 	}
 }
 
@@ -276,7 +277,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Transparency Test")
+	ebiten.SetWindowTitle("Tetra3d - Webs Test")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()

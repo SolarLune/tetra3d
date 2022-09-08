@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"log"
+	"math"
 	"time"
 
 	"github.com/kvartborg/vector"
@@ -297,7 +298,11 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 		return
 	}
 
-	ap.Playhead = 0.0
+	if ap.PlaySpeed > 0 {
+		ap.Playhead = 0.0
+	} else {
+		ap.Playhead = animation.Length
+	}
 	ap.ChannelsUpdated = false
 
 	if ap.BlendTime > 0 {
@@ -377,12 +382,12 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				} else {
 
 					if track, exists := channel.Tracks[TrackTypePosition]; exists {
-						// node.SetLocalPosition(track.ValueAsVector(ap.Playhead))
+						// node.SetLocalPositionVecVec(track.ValueAsVector(ap.Playhead))
 						ap.AnimatedProperties[node].Position = track.ValueAsVector(ap.Playhead)
 					}
 
 					if track, exists := channel.Tracks[TrackTypeScale]; exists {
-						// node.SetLocalScale(track.ValueAsVector(ap.Playhead))
+						// node.SetLocalScaleVec(track.ValueAsVector(ap.Playhead))
 						ap.AnimatedProperties[node].Scale = track.ValueAsVector(ap.Playhead)
 					}
 
@@ -400,7 +405,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 			ap.Playhead += dt * ap.PlaySpeed
 
 			for _, marker := range ap.Animation.Markers {
-				if ap.Playhead >= marker.Time && prevPlayhead <= marker.Time {
+				if math.Abs(ap.Playhead-marker.Time) < 0.001 && prevPlayhead <= marker.Time {
 					if ap.OnMarkerTouch != nil {
 						ap.OnMarkerTouch(marker, ap.Animation)
 					}
@@ -503,20 +508,20 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 			if start.Position != nil && props.Position != nil {
 				diff := props.Position.Sub(start.Position)
-				node.SetLocalPosition(start.Position.Add(diff.Scale(bp)))
+				node.SetLocalPositionVec(start.Position.Add(diff.Scale(bp)))
 			} else if props.Position != nil {
-				node.SetLocalPosition(props.Position)
+				node.SetLocalPositionVec(props.Position)
 			} else if start.Position != nil {
-				node.SetLocalPosition(start.Position)
+				node.SetLocalPositionVec(start.Position)
 			}
 
 			if start.Scale != nil && props.Scale != nil {
 				diff := props.Scale.Sub(start.Scale)
-				node.SetLocalScale(start.Scale.Add(diff.Scale(bp)))
+				node.SetLocalScaleVec(start.Scale.Add(diff.Scale(bp)))
 			} else if props.Scale != nil {
-				node.SetLocalScale(props.Scale)
+				node.SetLocalScaleVec(props.Scale)
 			} else if start.Scale != nil {
-				node.SetLocalScale(start.Scale)
+				node.SetLocalScaleVec(start.Scale)
 			}
 
 			if start.Rotation != nil && props.Rotation != nil {
@@ -536,10 +541,10 @@ func (ap *AnimationPlayer) Update(dt float64) {
 		} else {
 
 			if props.Position != nil {
-				node.SetLocalPosition(props.Position)
+				node.SetLocalPositionVec(props.Position)
 			}
 			if props.Scale != nil {
-				node.SetLocalScale(props.Scale)
+				node.SetLocalScaleVec(props.Scale)
 			}
 			if props.Rotation != nil {
 				node.SetLocalRotation(props.Rotation.ToMatrix4())
@@ -558,7 +563,7 @@ func (ap *AnimationPlayer) Finished() bool {
 // TouchedMarker returns if a marker with the specified name was touched this past frame - note that this relies on calling AnimationPlayer.Update().
 func (ap *AnimationPlayer) TouchedMarker(markerName string) bool {
 
-	if ap.Animation == nil || ap.finished {
+	if ap.Animation == nil {
 		return false
 	}
 
@@ -573,7 +578,7 @@ func (ap *AnimationPlayer) TouchedMarker(markerName string) bool {
 // AfterMarker returns if the AnimationPlayer's playhead is after a marker with the specified name while the AnimationPlayer is not finished playing.
 func (ap *AnimationPlayer) AfterMarker(markerName string) bool {
 
-	if ap.Animation == nil || ap.finished {
+	if ap.Animation == nil {
 		return false
 	}
 
@@ -588,7 +593,7 @@ func (ap *AnimationPlayer) AfterMarker(markerName string) bool {
 // BeforeMarker returns if the AnimationPlayer's playhead is before a marker with the specified name while the AnimationPlayer is not finished playing.
 func (ap *AnimationPlayer) BeforeMarker(markerName string) bool {
 
-	if ap.Animation == nil || ap.finished {
+	if ap.Animation == nil {
 		return false
 	}
 

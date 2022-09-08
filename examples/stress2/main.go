@@ -139,7 +139,7 @@ func (g *Game) Init() {
 		for j := 0; j < 21; j++ {
 			// Create a new Cube, position it, add it to the scene, and add it to the cubes slice.
 			cube := tetra3d.NewModel(cubeMesh, "Cube")
-			cube.SetLocalPosition(vector.Vector{float64(i) * 1.5, 0, float64(-j * 3)})
+			cube.SetLocalPositionVec(vector.Vector{float64(i) * 1.5, 0, float64(-j * 3)})
 			g.Scene.Root.AddChildren(cube)
 			g.Cubes = append(g.Cubes, cube)
 		}
@@ -149,7 +149,7 @@ func (g *Game) Init() {
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Far = 120
-	g.Camera.SetLocalPosition(vector.Vector{0, 0, 15})
+	g.Camera.SetLocalPositionVec(vector.Vector{0, 0, 15})
 
 	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMaximum)
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -171,7 +171,7 @@ func (g *Game) Update() error {
 
 		wp[1] = math.Sin(g.Time*math.Pi + float64(cubeIndex))
 
-		cube.SetWorldPosition(wp)
+		cube.SetWorldPositionVec(wp)
 		cube.Color.R = float32(cubeIndex) / 100
 		cube.Color.G = float32(cubeIndex) / 10
 	}
@@ -220,7 +220,7 @@ func (g *Game) Update() error {
 		pos[1] -= moveSpd
 	}
 
-	g.Camera.SetLocalPosition(pos)
+	g.Camera.SetLocalPositionVec(pos)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())

@@ -13,10 +13,11 @@ import (
 type NodeType string
 
 const (
-	NodeTypeNode   NodeType = "Node"       // NodeTypeNode represents any generic node
-	NodeTypeModel  NodeType = "NodeModel"  // NodeTypeModel represents specifically a Model
-	NodeTypeCamera NodeType = "NodeCamera" // NodeTypeCamera represents specifically a Camera
-	NodeTypePath   NodeType = "NodePath"   // NodeTypePath represents specifically a Path
+	NodeTypeNode      NodeType = "Node"          // NodeTypeNode represents any generic node
+	NodeTypeModel     NodeType = "NodeModel"     // NodeTypeModel represents specifically a Model
+	NodeTypeCamera    NodeType = "NodeCamera"    // NodeTypeCamera represents specifically a Camera
+	NodeTypePath      NodeType = "NodePath"      // NodeTypePath represents specifically a Path
+	NodeTypeGridPoint NodeType = "NodeGridPoint" // NodeTypeGrid represents specifically a Grid
 
 	NodeTypeBoundingObject    NodeType = "NodeBounding"          // NodeTypeBoundingObject represents any generic bounding object
 	NodeTypeBoundingAABB      NodeType = "NodeBoundingAABB"      // NodeTypeBoundingAABB represents specifically a BoundingAABB
@@ -105,23 +106,26 @@ type INode interface {
 	LocalPosition() vector.Vector
 	// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 	// relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
-	SetLocalPosition(position vector.Vector)
+	SetLocalPositionVec(position vector.Vector)
+	SetLocalPosition(x, y, z float64)
 	// LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
 	LocalScale() vector.Vector
 	// SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
 	// scale should be a 3D vector (i.e. X, Y, and Z components).
-	SetLocalScale(scale vector.Vector)
+	SetLocalScaleVec(scale vector.Vector)
+	SetLocalScale(w, h, d float64)
 
 	// WorldRotation returns an absolute rotation Matrix4 representing the object's rotation.
 	WorldRotation() Matrix4
 	// SetWorldRotation sets an object's global, world rotation to the provided rotation Matrix4.
 	SetWorldRotation(rotation Matrix4)
 	WorldPosition() vector.Vector
-	SetWorldPosition(position vector.Vector)
+	SetWorldPositionVec(position vector.Vector)
+	SetWorldPosition(x, y, z float64)
 	// WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components).
 	WorldScale() vector.Vector
-	// SetWorldScale sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
-	SetWorldScale(scale vector.Vector)
+	// SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
+	SetWorldScaleVec(scale vector.Vector)
 
 	// Move moves a Node in local space by the x, y, and z values provided.
 	Move(x, y, z float64)
@@ -242,8 +246,14 @@ func (tags *Tags) IsString(tagName string) bool {
 }
 
 // GetAsString returns the value associated with the specified tag (key) as a string.
-// Note that this does not sanity check to ensure the tag exists first.
+// If the tag doesn't exist, it will return an empty string.
+// Note that this does not sanity check to ensure the tag is a string first.
 func (tags *Tags) GetAsString(tagName string) string {
+
+	if !tags.Has(tagName) {
+		return ""
+	}
+
 	return tags.tags[tagName].(string)
 }
 
@@ -260,7 +270,12 @@ func (tags *Tags) IsFloat(tagName string) bool {
 
 // GetAsFloat returns the value associated with the specified tag (key) as a float64.
 // Note that this does not sanity check to ensure the tag exists first.
+// If the tag doesn't exist, it will return 0.
+// Note that this does not sanity check to ensure the tag is a float64 first.
 func (tags *Tags) GetAsFloat(tagName string) float64 {
+	if !tags.Has(tagName) {
+		return 0
+	}
 	return tags.tags[tagName].(float64)
 }
 
@@ -276,8 +291,12 @@ func (tags *Tags) IsInt(tagName string) bool {
 }
 
 // GetAsInt returns the value associated with the specified tag (key) as a float.
-// Note that this does not sanity check to ensure the tag exists first.
+// If the tag doesn't exist, it will return 0.
+// Note that this does not sanity check to ensure the tag is an int first.
 func (tags *Tags) GetAsInt(tagName string) int {
+	if !tags.Has(tagName) {
+		return 0
+	}
 	return tags.tags[tagName].(int)
 }
 
@@ -293,8 +312,12 @@ func (tags *Tags) IsColor(tagName string) bool {
 }
 
 // GetAsColor returns the value associated with the specified tag (key) as a *Color.
-// Note that this does not sanity check to ensure the tag exists first.
+// If the tag doesn't exist, it will return a new color set to opaque white.
+// Note that this does not sanity check to ensure the tag is a Color first.
 func (tags *Tags) GetAsColor(tagName string) *Color {
+	if !tags.Has(tagName) {
+		return NewColor(1, 1, 1, 1)
+	}
 	return tags.tags[tagName].(*Color)
 }
 
@@ -311,7 +334,12 @@ func (tags *Tags) IsVector(tagName string) bool {
 
 // GetAsVector returns the value associated with the specified tag (key) as a *Color.
 // Note that this does not sanity check to ensure the tag exists first.
+// If the tag doesn't exist, it will return {0, 0, 0}.
+// Note that this does not sanity check to ensure the tag is a vector first.
 func (tags *Tags) GetAsVector(tagName string) vector.Vector {
+	if !tags.Has(tagName) {
+		return vector.Vector{0, 0, 0}
+	}
 	return tags.tags[tagName].(vector.Vector)
 }
 
@@ -479,8 +507,8 @@ func (node *Node) Transform() Matrix4 {
 // SetWorldTransform sets the Node's global (world) transform to the full 4x4 transformation matrix provided.
 func (node *Node) SetWorldTransform(transform Matrix4) {
 	position, scale, rotationMatrix := transform.Decompose()
-	node.SetWorldPosition(position)
-	node.SetWorldScale(scale)
+	node.SetWorldPositionVec(position)
+	node.SetWorldScaleVec(scale)
 	node.SetWorldRotation(rotationMatrix)
 }
 
@@ -544,7 +572,7 @@ func (node *Node) dirtyTransform() {
 // LocalPosition returns a 3D Vector consisting of the object's local position (position relative to its parent). If this object has no parent, the position will be
 // relative to world origin (0, 0, 0).
 func (node *Node) LocalPosition() vector.Vector {
-	return node.position
+	return node.position.Clone()
 }
 
 // ResetLocalTransform resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
@@ -569,16 +597,22 @@ func (node *Node) WorldPosition() vector.Vector {
 
 // SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 // relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetLocalPosition(position vector.Vector) {
-	node.position[0] = position[0]
-	node.position[1] = position[1]
-	node.position[2] = position[2]
+func (node *Node) SetLocalPosition(x, y, z float64) {
+	node.position[0] = x
+	node.position[1] = y
+	node.position[2] = z
 	node.dirtyTransform()
 }
 
-// SetWorldPosition sets the object's world position (position relative to the world origin point of {0, 0, 0}).
+// SetLocalPositionVec sets the object's local position (position relative to its parent). If this object has no parent, the position should be
+// relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
+func (node *Node) SetLocalPositionVec(position vector.Vector) {
+	node.SetLocalPosition(position[0], position[1], position[2])
+}
+
+// SetWorldPositionVec sets the object's world position (position relative to the world origin point of {0, 0, 0}).
 // position needs to be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetWorldPosition(position vector.Vector) {
+func (node *Node) SetWorldPositionVec(position vector.Vector) {
 
 	if node.parent != nil {
 
@@ -602,17 +636,27 @@ func (node *Node) SetWorldPosition(position vector.Vector) {
 
 }
 
+// SetWorldPosition sets the object's world position (position relative to the world origin point of {0, 0, 0}).
+func (node *Node) SetWorldPosition(x, y, z float64) {
+	node.SetWorldPositionVec(vector.Vector{x, y, z})
+}
+
 // LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
 func (node *Node) LocalScale() vector.Vector {
-	return node.scale
+	return node.scale.Clone()
+}
+
+// SetLocalScaleVec sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
+// scale should be a 3D vector (i.e. X, Y, and Z components).
+func (node *Node) SetLocalScaleVec(scale vector.Vector) {
+	node.SetLocalScale(scale[0], scale[1], scale[2])
 }
 
 // SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
-// scale should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetLocalScale(scale vector.Vector) {
-	node.scale[0] = scale[0]
-	node.scale[1] = scale[1]
-	node.scale[2] = scale[2]
+func (node *Node) SetLocalScale(w, h, d float64) {
+	node.scale[0] = w
+	node.scale[1] = h
+	node.scale[2] = d
 	node.dirtyTransform()
 }
 
@@ -623,8 +667,13 @@ func (node *Node) WorldScale() vector.Vector {
 	return scale
 }
 
-// SetWorldScale sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetWorldScale(scale vector.Vector) {
+// SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
+func (node *Node) SetWorldScaleVec(scale vector.Vector) {
+	node.SetWorldScale(scale[0], scale[1], scale[2])
+}
+
+// SetWorldScale sets the object's absolute world scale.
+func (node *Node) SetWorldScale(w, h, d float64) {
 
 	if node.parent != nil {
 
@@ -632,28 +681,29 @@ func (node *Node) SetWorldScale(scale vector.Vector) {
 		_, parentScale, _ := parentTransform.Decompose()
 
 		node.scale = vector.Vector{
-			scale[0] / parentScale[0],
-			scale[1] / parentScale[1],
-			scale[2] / parentScale[2],
+			w / parentScale[0],
+			h / parentScale[1],
+			d / parentScale[2],
 		}
 
 	} else {
-		node.scale[0] = scale[0]
-		node.scale[1] = scale[1]
-		node.scale[2] = scale[2]
+		node.scale[0] = w
+		node.scale[1] = h
+		node.scale[2] = d
 	}
 
 	node.dirtyTransform()
+
 }
 
 // LocalRotation returns the object's local rotation Matrix4.
 func (node *Node) LocalRotation() Matrix4 {
-	return node.rotation
+	return node.rotation.Clone()
 }
 
 // SetLocalRotation sets the object's local rotation Matrix4 (relative to any parent).
 func (node *Node) SetLocalRotation(rotation Matrix4) {
-	node.rotation = rotation.Clone()
+	node.rotation.Set(rotation)
 	node.dirtyTransform()
 }
 
@@ -671,10 +721,10 @@ func (node *Node) SetWorldRotation(rotation Matrix4) {
 
 		parentTransform := node.parent.Transform()
 		_, _, parentRot := parentTransform.Decompose()
-		node.rotation = parentRot.Transposed().Mult(rotation)
+		node.rotation.Set(parentRot.Transposed().Mult(rotation))
 
 	} else {
-		node.rotation = rotation.Clone()
+		node.rotation.Set(rotation)
 	}
 
 	node.dirtyTransform()
@@ -721,7 +771,7 @@ func (node *Node) Grow(x, y, z float64) {
 	scale[0] += x
 	scale[1] += y
 	scale[2] += z
-	node.SetLocalScale(scale)
+	node.SetLocalScale(scale[0], scale[1], scale[2])
 }
 
 // GrowVec scales the object additively using the scaling vector provided (i.e. calling

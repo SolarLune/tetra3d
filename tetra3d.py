@@ -15,6 +15,11 @@ bl_info = {
     "doc_url" : "https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon",
 }
 
+objectTypes = [
+    ("MESH", "Mesh", "A standard, visible mesh object", 0, 0),
+    ("GRID", "Grid", "A grid object; not visualized or 'physically present'. The vertices in Blender become grid points in Tetra3D; the edges become their connections", 0, 1),
+]
+
 boundsTypes = [
     ("NONE", "No Bounds", "No collision will be created for this object.", 0, 0),
     ("AABB", "AABB", "An AABB (axis-aligned bounding box). If the size isn't customized, it will be big enough to fully contain the mesh of the current object. Currently buggy when resolving intersections between AABB or other Triangle Nodes", 0, 1),
@@ -230,7 +235,15 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         row.prop(context.object, "t3dVisible__")
         row = self.layout.row()
         row.prop(context.object, "t3dBoundsType__")
+        
+        if context.object.type == "MESH":
+            box = self.layout.box()
+            row = box.row()
+            row.label(text="Object Type: ")
+            row.prop(context.object, "t3dObjectType__", expand=True)
+
         row = self.layout.row()
+
         
         if context.object.t3dBoundsType__ == 'AABB':
             row.prop(context.object, "t3dAABBCustomEnabled__")
@@ -410,6 +423,7 @@ def export():
     # Gather collection information
     ogCollections = {} # What collection an object was originally pointing to
     collections = {} # What collections exist in the Blend file
+    ogGrids = {}
 
     for collection in bpy.data.collections:
         if len(collection.objects) == 0:
@@ -481,6 +495,28 @@ def export():
                     if obj.type == "MESH":
                         vertexColors = [layer.name for layer in obj.data.vertex_colors]
                         obj.data["t3dVertexColorNames__"] = vertexColors
+                        if obj.t3dObjectType__ == 'GRID':
+                            gridConnections = {}
+                            gridEntries = []
+                            ogGrids[obj] = obj.data
+                            obj.data = None # Hide the data just in case - that way Grid objects don't get mesh data exported
+
+                            for edge in obj.data.edges:
+                                v0 = str(obj.data.vertices[edge.vertices[0]].co.to_tuple(4))
+                                v1 = str(obj.data.vertices[edge.vertices[1]].co.to_tuple(4))
+
+                                if v0 not in gridEntries:
+                                    gridEntries.append(v0)
+                                    gridConnections[str(gridEntries.index(v0))] = []
+                                if v1 not in gridEntries:
+                                    gridEntries.append(v1)
+                                    gridConnections[str(gridEntries.index(v1))] = []
+
+                                gridConnections[str(gridEntries.index(v0))].append(str(gridEntries.index(v1)))
+                                gridConnections[str(gridEntries.index(v1))].append(str(gridEntries.index(v0)))
+                                
+                            obj["t3dGridConnections__"] = gridConnections
+                            obj["t3dGridEntries__"] = gridEntries
 
                     # Record relevant information for curves
                     if obj.type == "CURVE":
@@ -555,6 +591,10 @@ def export():
                         del(obj["t3dPathCyclic__"])
                     if obj.type == "MESH" and "t3dVertexColorNames__" in obj.data:
                         del(obj.data["t3dVertexColorNames__"])
+                    if obj.t3dObjectType__ == 'GRID':
+                        del(obj["t3dGridConnections__"])
+                        del(obj["t3dGridEntries__"])
+                        obj.data = ogGrids[obj] # Restore the mesh reference afterward
 
     for action in bpy.data.actions:
         if "t3dMarkers__" in action:
@@ -598,7 +638,8 @@ objectProps = {
     "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Height", description="The height of the BoundingCapsule node.", min=0.0, default=2),
     "t3dSphereCustomEnabled__" : bpy.props.BoolProperty(name="Custom Sphere Size", description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)", default=False),
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
-    "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__)
+    "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
+    "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is")
 }
 
 def getExportOnSave(self):

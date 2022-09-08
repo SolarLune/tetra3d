@@ -2,7 +2,6 @@ package tetra3d
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
 )
 
 const (
@@ -45,20 +44,6 @@ type Material struct {
 	Shadeless         bool                 // If the material should be shadeless (unlit) or not
 	CompositeMode     ebiten.CompositeMode // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
 	BillboardMode     int                  // Billboard mode
-
-	// VertexTransformFunction is a function that runs on the world position of each vertex position rendered with the material.
-	// It accepts the vertex position as an argument, along with the index of the vertex in the mesh.
-	// One can use this to simply transform vertices of the mesh on CPU (note that this is, of course, not as performant as
-	// a traditional GPU vertex shader, but is fine for simple / low-poly mesh transformations).
-	// This function is run after skinning the vertex if the material belongs to a mesh that is skinned by an armature.
-	// Note that the VertexTransformFunction must return the vector passed.
-	VertexTransformFunction func(vertexPosition vector.Vector, vertexIndex int) vector.Vector
-
-	// VertexClipFunction is a function that runs on the clipped result of each vertex position rendered with the material.
-	// The function takes the vertex position along with the vertex index in the mesh.
-	// This program runs after the vertex position is clipped to screen coordinates.
-	// Note that the VertexClipFunction must return the vector passed.
-	VertexClipFunction func(vertexPosition vector.Vector, vertexIndex int) vector.Vector
 
 	// fragmentShader represents a shader used to render the material with. This shader is activated after rendering
 	// to the depth texture, but before compositing the finished render to the screen after fog.
@@ -109,8 +94,6 @@ func (material *Material) Clone() *Material {
 	newMat.CompositeMode = material.CompositeMode
 
 	newMat.BillboardMode = material.BillboardMode
-	newMat.VertexTransformFunction = material.VertexTransformFunction
-	newMat.VertexClipFunction = material.VertexClipFunction
 	newMat.SetShader(material.fragmentSrc)
 	newMat.FragmentShaderOn = material.FragmentShaderOn
 
