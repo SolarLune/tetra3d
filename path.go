@@ -6,72 +6,89 @@ import (
 	"github.com/kvartborg/vector"
 )
 
-// PathFollower follows a Path, stepping through the Path spatially to completion. You can use this to make objects that follow a path's positions in
+type IPath interface {
+	Distance() float64
+	Points() []vector.Vector
+	isClosed() bool
+}
+
+// Navigator follows a Path or GridPath, stepping through it spatially to completion. You can use this to make objects that follow a path's positions in
 // space.
-type PathFollower struct {
-	Percentage float64 // Percentage is how far along the Path the PathFollower is, ranging from 0 to 1.
-	FinishMode int     // FinishMode indicates what should happen when the PathFollower finishes running across the given Path.
-	Direction  int     // Direction indicates the playback direction.
-	Path       *Path   // A Reference to the Path
+type Navigator struct {
+	Percentage float64    // Percentage is how far along the Path the PathFollower is, ranging from 0 to 1.
+	FinishMode FinishMode // FinishMode indicates what should happen when the PathFollower finishes running across the given Path.
+	Direction  int        // Direction indicates the playback direction.
+	Path       IPath      // A Reference to the Path
 	OnFinish   func()
 	// OnFinish is a function that gets called when the PathFollower completes moving across the provided Path.
 	// If the FinishMode is set to FinishModePingPong, then this triggers when the animation plays once both forwards and backwards.
-	onIndex int
+	onIndex  int
+	finished bool
 }
 
-// NewPathFollower returns a new PathFollower object.
-func NewPathFollower(path *Path) *PathFollower {
-	follower := &PathFollower{
+// NewNavigator returns a new PathFollower object.
+func NewNavigator(path IPath) *Navigator {
+	navigator := &Navigator{
 		FinishMode: FinishModeLoop,
 		Path:       path,
 		Direction:  1,
 	}
-	return follower
+	return navigator
 }
 
 // AdvancePercentage advances the PathFollower by a certain percentage of the path. This being a percentage, the larger the path, the further
 // in space a percentage advances the PathFollower.
-func (follower *PathFollower) AdvancePercentage(percentage float64) {
-	follower.Percentage += percentage * float64(follower.Direction)
+func (navigator *Navigator) AdvancePercentage(percentage float64) {
 
-	if follower.FinishMode == FinishModeLoop {
+	navigator.finished = false
+
+	if len(navigator.Path.Points()) <= 1 {
+		navigator.finished = true
+		return
+	}
+
+	navigator.Percentage += percentage * float64(navigator.Direction)
+
+	if navigator.FinishMode == FinishModeLoop {
 
 		looped := false
 
-		for follower.Percentage > 1 {
-			follower.Percentage--
+		for navigator.Percentage > 1 {
+			navigator.Percentage--
 			looped = true
 		}
-		for follower.Percentage < 0 {
-			follower.Percentage++
+		for navigator.Percentage < 0 {
+			navigator.Percentage++
 			looped = true
 		}
 
-		if looped && follower.OnFinish != nil {
-			follower.OnFinish()
+		if looped && navigator.OnFinish != nil {
+			navigator.OnFinish()
 		}
 
 	} else {
 
 		finish := false
 
-		if follower.Percentage > 1 {
-			follower.Percentage = 1
+		if navigator.Percentage > 1 {
+			navigator.Percentage = 1
 			finish = true
-		} else if follower.Percentage < 0 {
-			follower.Percentage = 0
+		} else if navigator.Percentage < 0 {
+			navigator.Percentage = 0
 			finish = true
 		}
 
 		if finish {
 
-			if follower.FinishMode == FinishModePingPong {
-				if follower.Direction < 0 && follower.OnFinish != nil {
-					follower.OnFinish()
+			navigator.finished = true
+
+			if navigator.FinishMode == FinishModePingPong {
+				if navigator.Direction < 0 && navigator.OnFinish != nil {
+					navigator.OnFinish()
 				}
-				follower.Direction *= -1
-			} else if follower.OnFinish != nil {
-				follower.OnFinish()
+				navigator.Direction *= -1
+			} else if navigator.OnFinish != nil {
+				navigator.OnFinish()
 			}
 
 		}
@@ -81,50 +98,74 @@ func (follower *PathFollower) AdvancePercentage(percentage float64) {
 }
 
 // AdvanceDistance advances the PathFollower by a certain distance in absolute movement units on the path.
-func (follower *PathFollower) AdvanceDistance(distance float64) {
-	follower.AdvancePercentage(distance / follower.Path.Distance())
+func (navigator *Navigator) AdvanceDistance(distance float64) {
+	navigator.AdvancePercentage(distance / navigator.Path.Distance())
 }
 
 // WorldPosition returns the position of the PathFollower in world space.
-func (follower *PathFollower) WorldPosition() vector.Vector {
+func (navigator *Navigator) WorldPosition() vector.Vector {
 
-	totalDistance := follower.Path.Distance()
-	d := follower.Percentage
+	totalDistance := navigator.Path.Distance()
+	d := navigator.Percentage
 
-	points := follower.Path.Children()
+	points := navigator.Path.Points()
 
-	if follower.Path.Closed {
+	if len(points) == 0 {
+		return nil
+	}
+
+	if len(points) == 1 {
+		return points[0]
+	}
+
+	if navigator.Path.isClosed() {
 		points = append(points, points[0])
 	}
 
 	for i := 0; i < len(points)-1; i++ {
-		segment := points[i+1].WorldPosition().Sub(points[i].WorldPosition())
+		segment := points[i+1].Sub(points[i])
 		segmentDistance := segment.Magnitude() / totalDistance
 		if d > segmentDistance {
 			d -= segmentDistance
 		} else {
-			follower.onIndex = i
-			return points[i].WorldPosition().Add(segment.Scale(d / segmentDistance))
+			navigator.onIndex = i
+			return points[i].Add(segment.Scale(d / segmentDistance))
 		}
 	}
 
-	return points[len(points)-1].WorldPosition()
+	return points[len(points)-1]
 }
 
 // Index returns the index of the point / child that the PathFollower is on.
-func (follower *PathFollower) Index() int {
-	return follower.onIndex
+func (navigator *Navigator) Index() int {
+	return navigator.onIndex
 }
 
 // Clone returns a clone of this PathFollower.
-func (follower *PathFollower) Clone() *PathFollower {
-	newFollower := NewPathFollower(follower.Path)
-	newFollower.FinishMode = follower.FinishMode
-	newFollower.Percentage = follower.Percentage
-	newFollower.Direction = follower.Direction
-	newFollower.onIndex = follower.onIndex
-	newFollower.OnFinish = follower.OnFinish
-	return newFollower
+func (navigator *Navigator) Clone() *Navigator {
+	newNavigator := NewNavigator(navigator.Path)
+	newNavigator.FinishMode = navigator.FinishMode
+	newNavigator.Percentage = navigator.Percentage
+	newNavigator.Direction = navigator.Direction
+	newNavigator.onIndex = navigator.onIndex
+	newNavigator.OnFinish = navigator.OnFinish
+	return newNavigator
+}
+
+func (navigator *Navigator) HasPath() bool {
+	return navigator.Path != nil && len(navigator.Path.Points()) > 0
+}
+
+func (navigator *Navigator) SetPath(path IPath) {
+	if path != navigator.Path {
+		navigator.Path = path
+		navigator.Percentage = 0
+		navigator.finished = false
+	}
+}
+
+func (navigator *Navigator) Finished() bool {
+	return navigator.finished
 }
 
 // A Path represents a Node that represents a sequential path. All children of the Path are considered its points, in order.
@@ -183,6 +224,18 @@ func (path *Path) Distance() float64 {
 	}
 
 	return dist
+}
+
+func (path *Path) Points() []vector.Vector {
+	points := make([]vector.Vector, 0, len(path.Children()))
+	for _, c := range path.children {
+		points = append(points, c.WorldPosition())
+	}
+	return points
+}
+
+func (path *Path) isClosed() bool {
+	return path.Closed
 }
 
 /////

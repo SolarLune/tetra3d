@@ -16,54 +16,49 @@ import (
 	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
-	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 // Shared cube mesh
 var cubeMesh = tetra3d.NewCube()
 
 type CubeElement struct {
-	Model           *tetra3d.Model
-	Root            *tetra3d.Node
-	Current, Target *tetra3d.GridPoint
-	Path            []*tetra3d.GridPoint
+	Model     *tetra3d.Model
+	Root      *tetra3d.Node
+	Target    *tetra3d.GridPoint
+	Navigator *tetra3d.Navigator
 }
 
 func newCubeElement(root tetra3d.INode) *CubeElement {
+
+	grid := root.Get("Network").(*tetra3d.Grid)
+
 	element := &CubeElement{
-		Model:   tetra3d.NewModel(cubeMesh, "Cube Element"),
-		Root:    root.(*tetra3d.Node),
-		Current: root.Get("Network").Children()[0].(*tetra3d.GridPoint),
+		Model:     tetra3d.NewModel(cubeMesh, "Cube Element"),
+		Root:      root.(*tetra3d.Node),
+		Navigator: tetra3d.NewNavigator(nil),
 	}
-	element.Model.Color.Set(1, rand.Float32()*0.1, rand.Float32()*0.1, 1)
+
+	element.Navigator.FinishMode = tetra3d.FinishModeStop
+	element.Model.Color.Set(0.8+rand.Float32()*0.2, rand.Float32()*0.5, rand.Float32()*0.5, 1)
 	element.Model.SetWorldScale(0.1, 0.1, 0.1)
+	element.Model.SetWorldPositionVec(grid.RandomPoint().WorldPosition())
+
 	element.ChooseNewTarget()
 	root.AddChildren(element.Model)
 	return element
 }
 
 func (cube *CubeElement) Update() {
-	pos := cube.Model.WorldPosition()
 
-	if len(cube.Path) > 0 {
-
-		target := cube.Path[0]
-
-		if pos.Sub(target.WorldPosition()).Magnitude() < 0.1 {
-			cube.Path = cube.Path[1:]
-			if len(cube.Path) == 0 {
-				cube.Current = cube.Target
-				cube.ChooseNewTarget()
-			}
-		} else {
-			diff := target.WorldPosition().Sub(cube.Model.WorldPosition()).Unit()
-			cube.Model.MoveVec(diff.Scale(0.025))
+	if cube.Navigator.HasPath() {
+		cube.Navigator.AdvanceDistance(0.05)
+		cube.Model.SetWorldPositionVec(cube.Navigator.WorldPosition())
+		if cube.Navigator.Finished() {
+			cube.Navigator.SetPath(nil)
 		}
-
 	} else {
 		cube.ChooseNewTarget()
 	}
@@ -71,9 +66,9 @@ func (cube *CubeElement) Update() {
 }
 
 func (cube *CubeElement) ChooseNewTarget() {
-	gridPoints := cube.Root.Get("Network").Children().GridPoints()
-	cube.Target = cube.Root.Get("Network").Children().GridPoints()[rand.Intn(len(gridPoints))]
-	cube.Path = cube.Target.PathTo(cube.Current)
+	grid := cube.Root.Get("Network").(*tetra3d.Grid)
+	closest := grid.NearestPoint(cube.Model.WorldPosition())
+	cube.Navigator.SetPath(closest.PathTo(grid.RandomPoint()))
 }
 
 type Game struct {
@@ -96,8 +91,8 @@ var grids []byte
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             398,
-		Height:            224,
+		Width:             796,
+		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -251,8 +246,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe screen object shows what the\ncamera is looking at.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{200, 200, 200, 255})
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example shows how Grids work.\nGrids are networks of vertices,\nconnected by their edges. Navigators can\nnavigate from point to point on Grids.\n\nCurrently, navigation is calculated using\nnumber of hops, rather than overall\ndistance to navigate.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		g.Camera.DebugDrawText(screen, txt, 0, 120, 1, colors.White())
 	}
 }
 

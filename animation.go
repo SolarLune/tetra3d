@@ -211,12 +211,6 @@ func (animation *Animation) Library() *Library {
 	return animation.library
 }
 
-const (
-	FinishModeLoop     = iota // Loop on animation completion
-	FinishModePingPong        // Reverse on animation completion; if this is the case, the OnFinish() callback is called after two loops (one reversal)
-	FinishModeStop            // Stop on animation completion
-)
-
 // AnimationValues indicate the current position, scale, and rotation for a Node.
 type AnimationValues struct {
 	Position vector.Vector
@@ -230,11 +224,11 @@ type AnimationPlayer struct {
 	ChannelsToNodes        map[*AnimationChannel]INode
 	ChannelsUpdated        bool
 	Animation              *Animation
-	Playhead               float64 // Playhead of the animation. Setting this to 0 restarts the animation.
-	PlaySpeed              float64 // Playback speed in percentage - defaults to 1 (100%)
-	Playing                bool    // Whether the player is playing back or not.
-	FinishMode             int     // What to do when the player finishes playback. Defaults to looping.
-	OnFinish               func()  // Callback indicating the Animation has completed
+	Playhead               float64    // Playhead of the animation. Setting this to 0 restarts the animation.
+	PlaySpeed              float64    // Playback speed in percentage - defaults to 1 (100%)
+	Playing                bool       // Whether the player is playing back or not.
+	FinishMode             FinishMode // What to do when the player finishes playback. Defaults to looping.
+	OnFinish               func()     // Callback indicating the Animation has completed
 	finished               bool
 	OnMarkerTouch          func(marker Marker, animation *Animation) // Callback indicating when the AnimationPlayer has entered a marker
 	touchedMarkers         []Marker

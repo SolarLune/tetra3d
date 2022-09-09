@@ -31,7 +31,7 @@ type Game struct {
 	CameraTilt   float64
 	CameraRotate float64
 
-	PathFollower *tetra3d.PathFollower
+	PathFollower *tetra3d.Navigator
 	AutoAdvance  bool
 
 	DrawDebugText      bool
@@ -73,7 +73,7 @@ func (g *Game) Init() {
 	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
-	g.PathFollower = tetra3d.NewPathFollower(g.Scene.Root.Get("Path").(*tetra3d.Path))
+	g.PathFollower = tetra3d.NewNavigator(g.Scene.Root.Get("Path").(*tetra3d.Path))
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 

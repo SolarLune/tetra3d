@@ -644,55 +644,54 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			obj = path
 
-		} else {
-			obj = NewNode(node.Name)
+		} else if node.Extras != nil && nodeHasProp(node, "t3dGridConnections__") {
 
-			if node.Extras != nil && nodeHasProp(node, "t3dGridConnections__") {
+			obj = NewGrid(node.Name)
 
-				extraMap := node.Extras.(map[string]interface{})
+			extraMap := node.Extras.(map[string]interface{})
 
-				type gridPointPosition struct {
-					X, Y, Z float64
+			type gridPointPosition struct {
+				X, Y, Z float64
+			}
+
+			creationOrder := []*GridPoint{}
+
+			parsePosition := func(gpString string) gridPointPosition {
+				trimmed := strings.Trim(gpString, "()")
+				components := strings.Split(trimmed, ", ")
+				x, _ := strconv.ParseFloat(components[0], 64)
+				y, _ := strconv.ParseFloat(components[1], 64)
+				z, _ := strconv.ParseFloat(components[2], 64)
+
+				return gridPointPosition{
+					X: x,
+					Y: y,
+					Z: z,
 				}
+			}
 
-				creationOrder := []*GridPoint{}
+			for _, k := range extraMap["t3dGridEntries__"].([]interface{}) {
 
-				parsePosition := func(gpString string) gridPointPosition {
-					trimmed := strings.Trim(gpString, "()")
-					components := strings.Split(trimmed, ", ")
-					x, _ := strconv.ParseFloat(components[0], 64)
-					y, _ := strconv.ParseFloat(components[1], 64)
-					z, _ := strconv.ParseFloat(components[2], 64)
+				key := parsePosition(k.(string))
+				gp := NewGridPoint("Grid Point")
+				obj.AddChildren(gp)
+				gp.SetWorldPosition(key.X, key.Z, -key.Y)
+				creationOrder = append(creationOrder, gp)
 
-					return gridPointPosition{
-						X: x,
-						Y: y,
-						Z: z,
-					}
-				}
+			}
 
-				for _, k := range extraMap["t3dGridEntries__"].([]interface{}) {
+			for k, array := range extraMap["t3dGridConnections__"].(map[string]interface{}) {
 
-					key := parsePosition(k.(string))
-					gp := NewGridPoint("Grid Point")
-					obj.AddChildren(gp)
-					gp.SetWorldPosition(key.X, key.Z, -key.Y)
-					creationOrder = append(creationOrder, gp)
-
-				}
-
-				for k, array := range extraMap["t3dGridConnections__"].(map[string]interface{}) {
-
-					key, _ := strconv.Atoi(k)
-					for _, v := range array.([]interface{}) {
-						connectedID, _ := strconv.Atoi(v.(string))
-						creationOrder[key].Connect(creationOrder[connectedID])
-					}
-
+				key, _ := strconv.Atoi(k)
+				for _, v := range array.([]interface{}) {
+					connectedID, _ := strconv.Atoi(v.(string))
+					creationOrder[key].Connect(creationOrder[connectedID])
 				}
 
 			}
 
+		} else {
+			obj = NewNode(node.Name)
 		}
 
 		objToNode[obj] = node

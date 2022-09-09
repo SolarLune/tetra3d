@@ -13,11 +13,13 @@ import (
 type NodeType string
 
 const (
-	NodeTypeNode      NodeType = "Node"          // NodeTypeNode represents any generic node
-	NodeTypeModel     NodeType = "NodeModel"     // NodeTypeModel represents specifically a Model
-	NodeTypeCamera    NodeType = "NodeCamera"    // NodeTypeCamera represents specifically a Camera
-	NodeTypePath      NodeType = "NodePath"      // NodeTypePath represents specifically a Path
-	NodeTypeGridPoint NodeType = "NodeGridPoint" // NodeTypeGrid represents specifically a Grid
+	NodeTypeNode   NodeType = "Node"       // NodeTypeNode represents any generic node
+	NodeTypeModel  NodeType = "NodeModel"  // NodeTypeModel represents specifically a Model
+	NodeTypeCamera NodeType = "NodeCamera" // NodeTypeCamera represents specifically a Camera
+	NodeTypePath   NodeType = "NodePath"   // NodeTypePath represents specifically a Path
+	NodeTypeGrid   NodeType = "NodeGrid"   // NodeTypeGrid represents specifically a Grid
+
+	NodeTypeGridPoint NodeType = "Node_GridPoint" // NodeTypeGrid represents specifically a GridPoint (note the extra underscore to ensure !NodeTypeGridPoint.Is(NodeTypeGrid))
 
 	NodeTypeBoundingObject    NodeType = "NodeBounding"          // NodeTypeBoundingObject represents any generic bounding object
 	NodeTypeBoundingAABB      NodeType = "NodeBoundingAABB"      // NodeTypeBoundingAABB represents specifically a BoundingAABB
@@ -897,14 +899,22 @@ func (node *Node) HierarchyAsString() string {
 
 		if nodeType.Is(NodeTypeModel) {
 			prefix = "MODEL"
+		} else if nodeType.Is(NodeTypeCamera) {
+			prefix = "CAM"
+		} else if nodeType.Is(NodeTypePath) {
+			prefix = "PATH"
+		} else if nodeType.Is(NodeTypeGrid) {
+			prefix = "GRID"
+		} else if nodeType.Is(NodeTypeGridPoint) {
+			prefix = "GPOINT"
 		} else if nodeType.Is(NodeTypeAmbientLight) {
 			prefix = "AMB"
 		} else if nodeType.Is(NodeTypeDirectionalLight) {
 			prefix = "DIR"
 		} else if nodeType.Is(NodeTypePointLight) {
 			prefix = "POINT"
-		} else if nodeType.Is(NodeTypeCamera) {
-			prefix = "CAM"
+		} else if nodeType.Is(NodeTypeCubeLight) {
+			prefix = "CUBE"
 		} else if nodeType.Is(NodeTypeBoundingSphere) {
 			prefix = "BS"
 		} else if nodeType.Is(NodeTypeBoundingAABB) {
@@ -913,8 +923,6 @@ func (node *Node) HierarchyAsString() string {
 			prefix = "CAP"
 		} else if nodeType.Is(NodeTypeBoundingTriangles) {
 			prefix = "TRI"
-		} else if nodeType.Is(NodeTypePath) {
-			prefix = "CURVE"
 		} else {
 			prefix = "NODE"
 		}
