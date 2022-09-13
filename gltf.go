@@ -244,6 +244,19 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	for _, mesh := range doc.Meshes {
 
+		// If t3dGrid__ is set on a mesh, then it can be skipped for loading
+		if mesh.Extras != nil {
+
+			if dataMap, isMap := mesh.Extras.(map[string]interface{}); isMap {
+
+				if _, exists := dataMap["t3dGrid__"]; exists {
+					continue
+				}
+
+			}
+
+		}
+
 		newMesh := NewMesh(mesh.Name)
 		library.Meshes[mesh.Name] = newMesh
 		newMesh.library = library
@@ -582,8 +595,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		var obj INode
 
+		var mesh *Mesh
+
 		if node.Mesh != nil {
-			mesh := library.Meshes[doc.Meshes[*node.Mesh].Name]
+			mesh = library.Meshes[doc.Meshes[*node.Mesh].Name]
+		}
+
+		if mesh != nil {
 			obj = NewModel(mesh, node.Name)
 		} else if node.Camera != nil {
 

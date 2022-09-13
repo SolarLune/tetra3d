@@ -22,9 +22,10 @@ func NewGridPoint(name string) *GridPoint {
 }
 
 func (point *GridPoint) Clone() INode {
-	newPoint := NewGridPoint(point.name)
-	newPoint.Connections = append(newPoint.Connections, point.Connections...)
-	return newPoint
+	return &GridPoint{
+		Node:        point.Node.Clone().(*Node),
+		Connections: []*GridPoint{},
+	}
 }
 
 func (point *GridPoint) IsConnected(other *GridPoint) bool {
@@ -142,8 +143,23 @@ func NewGrid(name string) *Grid {
 
 // Clone creates a clone of this GridPoint.
 func (grid *Grid) Clone() INode {
+
 	newGrid := &Grid{}
 	newGrid.Node = grid.Node.Clone().(*Node)
+
+	for _, c := range grid.Node.children {
+		if childPoint, ok := c.(*GridPoint); ok {
+
+			start := newGrid.NearestPoint(childPoint.WorldPosition())
+			for _, connect := range childPoint.Connections {
+				end := newGrid.NearestPoint(connect.WorldPosition())
+				start.Connect(end)
+			}
+
+		}
+
+	}
+
 	return newGrid
 }
 

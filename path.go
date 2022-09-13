@@ -26,7 +26,7 @@ type Navigator struct {
 	finished bool
 }
 
-// NewNavigator returns a new PathFollower object.
+// NewNavigator returns a new PathFollower object. path is an object that fulfills the IPath interface (so a Path or a GridPath).
 func NewNavigator(path IPath) *Navigator {
 	navigator := &Navigator{
 		FinishMode: FinishModeLoop,
@@ -42,7 +42,7 @@ func (navigator *Navigator) AdvancePercentage(percentage float64) {
 
 	navigator.finished = false
 
-	if len(navigator.Path.Points()) <= 1 {
+	if !navigator.HasPath() || len(navigator.Path.Points()) <= 1 {
 		navigator.finished = true
 		return
 	}
@@ -62,8 +62,11 @@ func (navigator *Navigator) AdvancePercentage(percentage float64) {
 			looped = true
 		}
 
-		if looped && navigator.OnFinish != nil {
-			navigator.OnFinish()
+		if looped {
+			navigator.finished = true
+			if navigator.OnFinish != nil {
+				navigator.OnFinish()
+			}
 		}
 
 	} else {
@@ -134,6 +137,20 @@ func (navigator *Navigator) WorldPosition() vector.Vector {
 	}
 
 	return points[len(points)-1]
+}
+
+// TouchingNode returns if a Navigator is within a distance of margin units to a point in a Grid or Path. If it is not within that distance, TouchingNode returns nil.
+func (navigator *Navigator) TouchingNode(margin float64) vector.Vector {
+
+	wp := navigator.WorldPosition()
+	for _, p := range navigator.Path.Points() {
+		if p.Sub(wp).Magnitude() <= margin {
+			return p
+		}
+	}
+
+	return nil
+
 }
 
 // Index returns the index of the point / child that the PathFollower is on.

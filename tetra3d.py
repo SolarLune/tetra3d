@@ -227,7 +227,9 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
     def draw(self, context):
 
         row = self.layout.row()
-        row.label(text="Node Path: " + objectNodePath(context.object))
+        np = objectNodePath(context.object)
+        np = " / ".join(np.split("/"))
+        row.label(text="Node Path : " + np)
         row = self.layout.row()
         row.operator("object.tetra3dcopynodepath", text="Copy Node Path to Clipboard", icon="COPYDOWN")
         
@@ -499,7 +501,8 @@ def export():
                             gridConnections = {}
                             gridEntries = []
                             ogGrids[obj] = obj.data
-                            obj.data = None # Hide the data just in case - that way Grid objects don't get mesh data exported
+                            # obj.data = None # Hide the data just in case - that way Grid objects don't get mesh data exported
+                            obj.data["t3dGrid__"] = True
 
                             for edge in obj.data.edges:
                                 v0 = str(obj.data.vertices[edge.vertices[0]].co.to_tuple(4))
@@ -589,12 +592,14 @@ def export():
                         del(obj["t3dPathPoints__"])
                     if "t3dPathCyclic__" in obj:
                         del(obj["t3dPathCyclic__"])
-                    if obj.type == "MESH" and "t3dVertexColorNames__" in obj.data:
-                        del(obj.data["t3dVertexColorNames__"])
-                    if obj.t3dObjectType__ == 'GRID':
-                        del(obj["t3dGridConnections__"])
-                        del(obj["t3dGridEntries__"])
-                        obj.data = ogGrids[obj] # Restore the mesh reference afterward
+                    if obj.type == "MESH":
+                        if "t3dVertexColorNames__" in obj.data:
+                            del(obj.data["t3dVertexColorNames__"])
+                        if obj.t3dObjectType__ == 'GRID':
+                            del(obj.data["t3dGrid__"])
+                            del(obj["t3dGridConnections__"])
+                            del(obj["t3dGridEntries__"])
+                            obj.data = ogGrids[obj] # Restore the mesh reference afterward
 
     for action in bpy.data.actions:
         if "t3dMarkers__" in action:

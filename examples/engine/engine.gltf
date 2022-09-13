@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.2.40",
+        "generator" : "Khronos glTF Blender I/O v3.2.43",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -14,7 +14,6 @@
                 "t3dExportFormat__" : 2,
                 "t3dExportLights__" : 0,
                 "t3dExportCameras__" : 0,
-                "t3dExport__" : 1,
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
@@ -30,13 +29,18 @@
                         ]
                     }
                 },
-                "t3dWorldColor__" : [
-                    0.04445478320121765,
-                    0.04445478320121765,
-                    0.04445478320121765,
-                    1.0
-                ],
-                "t3dWorldEnergy__" : 1.0
+                "t3dWorlds__" : {
+                    "World" : {
+                        "ambient color" : [
+                            0.04445478320121765,
+                            0.04445478320121765,
+                            0.04445478320121765,
+                            1.0
+                        ],
+                        "ambient energy" : 1.0
+                    }
+                },
+                "t3dCurrentWorld__" : "World"
             },
             "name" : "Scene",
             "nodes" : [
@@ -55,6 +59,10 @@
                         "name" : "gameobject",
                         "valueType" : 3,
                         "valueString" : "player"
+                    },
+                    {
+                        "name" : "solid",
+                        "valueBool" : 1
                     }
                 ],
                 "t3dBoundsType__" : 1,
@@ -97,6 +105,27 @@
                         "valueBool" : 1,
                         "valueReference" : {},
                         "valueReferenceScene" : {}
+                    },
+                    {
+                        "name" : "solid",
+                        "valueType" : 0,
+                        "valueBool" : 1,
+                        "valueInt" : 0,
+                        "valueFloat" : 0.0,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null,
+                        "valueColor" : [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "valueVector3D" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
                     }
                 ],
                 "t3dOriginalLocalPosition__" : [
@@ -114,7 +143,29 @@
             ],
             "extras" : {
                 "t3dBoundsType__" : 1,
-                "t3dGameProperties__" : [],
+                "t3dGameProperties__" : [
+                    {
+                        "name" : "solid",
+                        "valueType" : 0,
+                        "valueBool" : 1,
+                        "valueInt" : 0,
+                        "valueFloat" : 0.0,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null,
+                        "valueColor" : [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "valueVector3D" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                ],
                 "t3dOriginalLocalPosition__" : [
                     5.0,
                     11.0,
@@ -138,6 +189,12 @@
                         "valueBool" : 1,
                         "valueReference" : {},
                         "valueReferenceScene" : {}
+                    },
+                    {
+                        "name" : "solid",
+                        "valueBool" : 1,
+                        "valueReference" : {},
+                        "valueReferenceScene" : {}
                     }
                 ],
                 "t3dOriginalLocalPosition__" : [
@@ -155,7 +212,29 @@
             ],
             "extras" : {
                 "t3dBoundsType__" : 1,
-                "t3dGameProperties__" : [],
+                "t3dGameProperties__" : [
+                    {
+                        "name" : "solid",
+                        "valueType" : 0,
+                        "valueBool" : 1,
+                        "valueInt" : 0,
+                        "valueFloat" : 0.0,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null,
+                        "valueColor" : [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "valueVector3D" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                ],
                 "t3dOriginalLocalPosition__" : [
                     9.399999618530273,
                     7.0,

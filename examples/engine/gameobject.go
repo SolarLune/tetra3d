@@ -49,14 +49,14 @@ func (player *Player) Update() {
 
 	collisions := player.Bounds.CollisionTestVec(
 		move,
-		player.node.Root().ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject).BoundingObjects()...,
+		player.node.Root().ChildrenRecursive().ByTags("solid")...,
 	)
 
 	player.node.MoveVec(move)
 
 	for _, col := range collisions {
 
-		if col.CollidedObject.(tetra3d.INode).Parent().Tags().Has("death") {
+		if col.CollidedBoundingObject.Tags().Has("death") {
 			player.node.Unparent() // Unparenting is the equivalent of destroying the node
 		}
 
