@@ -846,15 +846,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			v1 := mesh.vertexTransforms[vertIndex+1]
 			v2 := mesh.vertexTransforms[vertIndex+2]
 
-			// Near-ish clipping (basically clip triangles that are wholly behind the camera)
-			if v0[3] < 0 && v1[3] < 0 && v2[3] < 0 {
-				continue
-			}
-
-			if v0[2] > far && v1[2] > far && v2[2] > far {
-				continue
-			}
-
 			p0 = camera.clipToScreen(v0, p0, vertIndex, model, float64(camWidth), float64(camHeight))
 			p1 = camera.clipToScreen(v1, p1, vertIndex+1, model, float64(camWidth), float64(camHeight))
 			p2 = camera.clipToScreen(v2, p2, vertIndex+2, model, float64(camWidth), float64(camHeight))
@@ -895,19 +886,19 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				}
 			}
 
-			colorVertexList[vertexListIndex].DstX = float32(p0[0])
-			colorVertexList[vertexListIndex].DstY = float32(p0[1])
-			colorVertexList[vertexListIndex+1].DstX = float32(p1[0])
-			colorVertexList[vertexListIndex+1].DstY = float32(p1[1])
-			colorVertexList[vertexListIndex+2].DstX = float32(p2[0])
-			colorVertexList[vertexListIndex+2].DstY = float32(p2[1])
+			colorVertexList[vertexListIndex].DstX = float32(int(p0[0]))
+			colorVertexList[vertexListIndex].DstY = float32(int(p0[1]))
+			colorVertexList[vertexListIndex+1].DstX = float32(int(p1[0]))
+			colorVertexList[vertexListIndex+1].DstY = float32(int(p1[1]))
+			colorVertexList[vertexListIndex+2].DstX = float32(int(p2[0]))
+			colorVertexList[vertexListIndex+2].DstY = float32(int(p2[1]))
 
-			depthVertexList[vertexListIndex].DstX = float32(p0[0])
-			depthVertexList[vertexListIndex].DstY = float32(p0[1])
-			depthVertexList[vertexListIndex+1].DstX = float32(p1[0])
-			depthVertexList[vertexListIndex+1].DstY = float32(p1[1])
-			depthVertexList[vertexListIndex+2].DstX = float32(p2[0])
-			depthVertexList[vertexListIndex+2].DstY = float32(p2[1])
+			depthVertexList[vertexListIndex].DstX = float32(int(p0[0]))
+			depthVertexList[vertexListIndex].DstY = float32(int(p0[1]))
+			depthVertexList[vertexListIndex+1].DstX = float32(int(p1[0]))
+			depthVertexList[vertexListIndex+1].DstY = float32(int(p1[1]))
+			depthVertexList[vertexListIndex+2].DstX = float32(int(p2[0]))
+			depthVertexList[vertexListIndex+2].DstY = float32(int(p2[1]))
 
 			meshPart.sortingTriangles[t].rendered = true
 

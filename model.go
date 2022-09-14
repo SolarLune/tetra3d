@@ -427,6 +427,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	camFarSquared := camera.Far * camera.Far
 
+	far := camera.Far
+
 	if model.Skinned {
 
 		lightingOn := false
@@ -449,6 +451,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			depth := math.MaxFloat32
 
+			outOfBounds := true
+
 			for v := 0; v < 3; v++ {
 
 				vertPos, vertNormal := model.skinVertex(tri.ID*3+v, lightingOn)
@@ -466,9 +470,19 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				transformed[2] = z
 				transformed[3] = w
 
+				if w > 0 && w < far {
+					outOfBounds = false
+				}
+
 				if w < depth {
 					depth = w
 				}
+
+			}
+
+			if outOfBounds {
+				meshPart.sortingTriangles[i].rendered = false
+				continue
 			}
 
 			meshPart.sortingTriangles[i].depth = float32(depth)
@@ -506,12 +520,16 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			depth := math.MaxFloat64
 
 			triRef := model.Mesh.Triangles[triID]
+			// TODO: Replace this distance check with a broadphase check; we could also use it to easily reject
+			// triangles that lie outside of the camera frustum.
 			if fastVectorDistanceSquared(camPos, triRef.Center) > (camFarSquared)+triRef.MaxSpan {
 				meshPart.sortingTriangles[i].rendered = false
 				continue
 			}
 
 			meshPart.sortingTriangles[i].rendered = true
+
+			outOfBounds := true
 
 			for i := 0; i < 3; i++ {
 				v0 := model.Mesh.VertexPositions[triID*3+i]
@@ -526,6 +544,16 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				if t0[3] < depth {
 					depth = t0[3]
 				}
+
+				if t0[3] > 0 && t0[3] < far {
+					outOfBounds = false
+				}
+
+			}
+
+			if outOfBounds {
+				meshPart.sortingTriangles[i].rendered = false
+				continue
 			}
 
 			meshPart.sortingTriangles[i].depth = float32(depth)
