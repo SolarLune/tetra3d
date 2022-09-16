@@ -69,12 +69,12 @@ func fastMatrixMultVec(matrix Matrix4, vect vector.Vector) (x, y, z float64) {
 
 }
 
-func fastMatrixMultVecW(matrix Matrix4, vect vector.Vector) (x, y, z, w float64) {
+func fastMatrixMultVecW(matrix Matrix4, vect vector.Vector) (x, y, z, w float32) {
 
-	x = matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0]
-	y = matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1]
-	z = matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2]
-	w = matrix[0][3]*vect[0] + matrix[1][3]*vect[1] + matrix[2][3]*vect[2] + matrix[3][3]
+	x = float32(matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0])
+	y = float32(matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1])
+	z = float32(matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2])
+	w = float32(matrix[0][3]*vect[0] + matrix[1][3]*vect[1] + matrix[2][3]*vect[2] + matrix[3][3])
 
 	return
 
@@ -96,9 +96,9 @@ func vectorCross(vecA, vecB, failsafeVec vector.Vector) vector.Vector {
 }
 
 // vectorsEqual returns if two >=3D vectors are basically equal in position.
-func vectorsEqual(a, b vector.Vector) bool {
+func vectorsEqual(x1, y1, z1, x2, y2, z2 float32) bool {
 	m := 0.0001
-	return math.Abs(a[0]-b[0]) < m && math.Abs(a[1]-b[1]) < m && math.Abs(a[2]-b[2]) < m
+	return math.Abs(float64(x1-x2)) < m && math.Abs(float64(y1-y2)) < m && math.Abs(float64(z1-z2)) < m
 }
 
 type VectorPool struct {
@@ -213,4 +213,10 @@ func ToRadians(degrees float64) float64 {
 // ToDegrees is a helper function to easily convert radians to degrees for human readability.
 func ToDegrees(radians float64) float64 {
 	return radians / math.Pi * 180
+}
+
+func setVector(vec vector.Vector, xyz ...float32) {
+	for i := 0; i < len(xyz); i++ {
+		vec[i] = float64(xyz[i])
+	}
 }

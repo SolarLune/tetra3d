@@ -253,7 +253,7 @@ func (model *Model) Merge(models ...*Model) {
 		if model == other {
 			continue
 		}
-		totalSize += len(other.Mesh.VertexPositions)
+		totalSize += other.Mesh.VertexCount
 	}
 
 	if totalSize == 0 {
@@ -261,7 +261,7 @@ func (model *Model) Merge(models ...*Model) {
 	}
 
 	if model.Mesh.triIndex*3+totalSize > model.Mesh.VertexMax {
-		model.Mesh.allocateVertexBuffers(model.Mesh.VertexMax + totalSize)
+		model.Mesh.MeshBuffer.Allocate(model.Mesh.VertexMax + totalSize)
 	}
 
 	for _, other := range models {
@@ -415,19 +415,19 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	modelTransform := model.Transform()
-	p, _, r := modelTransform.Inverted().Decompose()
+	// p, _, r := modelTransform.Inverted().Decompose()
 
-	s := model.WorldScale()
+	// s := model.WorldScale()
 
-	p[0] *= s[0]
-	p[1] *= s[1]
-	p[2] *= s[2]
+	// p[0] *= s[0]
+	// p[1] *= s[1]
+	// p[2] *= s[2]
 
-	camPos := r.MultVec(camera.WorldPosition()).Add(p)
+	// camPos := r.MultVec(camera.WorldPosition()).Add(p)
 
-	camFarSquared := camera.Far * camera.Far
+	// camFarSquared := camera.Far * camera.Far
 
-	far := camera.Far
+	far := float32(camera.Far)
 
 	if model.Skinned {
 
@@ -449,33 +449,33 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			tri := meshPart.sortingTriangles[i]
 
-			depth := math.MaxFloat32
+			depth := float32(math.MaxFloat32)
 
 			outOfBounds := true
 
-			for v := 0; v < 3; v++ {
+			meshPart.sortingTriangles[i].rendered = true
 
-				vertPos, vertNormal := model.skinVertex(tri.ID*3+v, lightingOn)
+			for i := 0; i < 3; i++ {
+
+				vertPos, vertNormal := model.skinVertex(tri.ID*3+i, lightingOn)
 				if transformFunc != nil {
-					vertPos = transformFunc(vertPos, tri.ID*3+v)
+					vertPos = transformFunc(vertPos, tri.ID*3+i)
 				}
 				if vertNormal != nil {
-					model.Mesh.vertexSkinnedNormals[tri.ID*3+v] = vertNormal
-					model.Mesh.vertexSkinnedPositions[tri.ID*3+v] = vertPos
+					model.Mesh.MeshBuffer.SkinnedNormal.Set(tri.ID*3+i, float32(vertNormal[0]), float32(vertNormal[1]), float32(vertNormal[2]))
+					model.Mesh.MeshBuffer.SkinnedPosition.Set(tri.ID*3+i, float32(vertPos[0]), float32(vertPos[1]), float32(vertPos[2]))
 				}
-				transformed := model.Mesh.vertexTransforms[tri.ID*3+v]
-				x, y, z, w := fastMatrixMultVecW(vpMatrix, vertPos)
-				transformed[0] = x
-				transformed[1] = y
-				transformed[2] = z
-				transformed[3] = w
 
-				if w > 0 && w < far {
+				tx, ty, tz, tw := fastMatrixMultVecW(vpMatrix, vertPos)
+
+				model.Mesh.MeshBuffer.Transform.Set(tri.ID*3+i, tx, ty, tz, tw)
+
+				if tw > 0 && tw < far {
 					outOfBounds = false
 				}
 
-				if w < depth {
-					depth = w
+				if tw < depth {
+					depth = tw
 				}
 
 			}
@@ -514,40 +514,45 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		mvp := fastMatrixMult(base, vpMatrix)
 
+		vertVec := vector.Vector{0, 0, 0}
+
 		for i := 0; i < len(meshPart.sortingTriangles); i++ {
 
 			triID := meshPart.sortingTriangles[i].ID
-			depth := math.MaxFloat64
+			depth := float32(math.MaxFloat32)
 
-			triRef := model.Mesh.Triangles[triID]
+			// triRef := model.Mesh.Triangles[triID]
 			// TODO: Replace this distance check with a broadphase check; we could also use it to easily reject
 			// triangles that lie outside of the camera frustum.
-			if fastVectorDistanceSquared(camPos, triRef.Center) > (camFarSquared)+triRef.MaxSpan {
-				meshPart.sortingTriangles[i].rendered = false
-				continue
-			}
+			// if fastVectorDistanceSquared(camPos, triRef.Center) > (camFarSquared)+triRef.MaxSpan {
+			// 	meshPart.sortingTriangles[i].rendered = false
+			// 	continue
+			// }
 
 			meshPart.sortingTriangles[i].rendered = true
 
 			outOfBounds := true
 
 			for i := 0; i < 3; i++ {
-				v0 := model.Mesh.VertexPositions[triID*3+i]
+
+				x, y, z := model.Mesh.MeshBuffer.Position.XYZ(triID*3 + i)
+				setVector(vertVec, x, y, z)
 
 				if transformFunc != nil {
-					v0 = transformFunc(v0.Clone(), triID*3+i)
+					vertVec = transformFunc(vertVec.Clone(), triID*3+i)
 				}
 
-				t0 := model.Mesh.vertexTransforms[triID*3+i]
-				t0[0], t0[1], t0[2], t0[3] = fastMatrixMultVecW(mvp, v0)
+				tx, ty, tz, tw := fastMatrixMultVecW(mvp, vertVec)
 
-				if t0[3] < depth {
-					depth = t0[3]
+				if tw < depth {
+					depth = tw
 				}
 
-				if t0[3] > 0 && t0[3] < far {
+				if tw > 0 && tw < far {
 					outOfBounds = false
 				}
+
+				model.Mesh.MeshBuffer.Transform.Set(triID*3+i, tx, ty, tz, tw)
 
 			}
 

@@ -182,9 +182,18 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 	var triCenter vector.Vector
 
 	if model.Skinned {
-		v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
-		v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
-		v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
+
+		v0 := vector.Vector{0, 0, 0}
+		v1 := vector.Vector{0, 0, 0}
+		v2 := vector.Vector{0, 0, 0}
+
+		x, y, z := model.Mesh.MeshBuffer.SkinnedPosition.XYZ(triIndex * 3)
+		setVector(v0, x, y, z)
+		x, y, z = model.Mesh.MeshBuffer.SkinnedPosition.XYZ(triIndex*3 + 1)
+		setVector(v1, x, y, z)
+		x, y, z = model.Mesh.MeshBuffer.SkinnedPosition.XYZ(triIndex*3 + 2)
+		setVector(v2, x, y, z)
+
 		triCenter = vector.Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
 	} else {
 		triCenter = model.Mesh.Triangles[triIndex].Center
@@ -201,27 +210,29 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 	// 	return light
 	// }
 
-	var vertPos, vertNormal vector.Vector
-
 	for i := 0; i < 3; i++ {
 
 		if model.Skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[triIndex*3+i]
-			vertNormal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+			x, y, z := model.Mesh.MeshBuffer.SkinnedPosition.XYZ(triIndex*3 + i)
+			setVector(lightingVertexPos, x, y, z)
+			x, y, z = model.Mesh.MeshBuffer.SkinnedNormal.XYZ(triIndex*3 + i)
+			setVector(lightingVertexNormal, x, y, z)
 		} else {
-			vertPos = model.Mesh.VertexPositions[triIndex*3+i]
-			vertNormal = model.Mesh.VertexNormals[triIndex*3+i]
+			x, y, z := model.Mesh.MeshBuffer.Position.XYZ(triIndex*3 + i)
+			setVector(lightingVertexPos, x, y, z)
+			x, y, z = model.Mesh.MeshBuffer.Normal.XYZ(triIndex*3 + i)
+			setVector(lightingVertexNormal, x, y, z)
 		}
 
-		lightVec := vector.In(fastVectorSub(point.workingPosition, vertPos)).Unit()
-		diffuse := dot(vertNormal, vector.Vector(lightVec))
+		lightVec := vector.In(fastVectorSub(point.workingPosition, lightingVertexPos)).Unit()
+		diffuse := dot(lightingVertexNormal, vector.Vector(lightVec))
 
 		if diffuse < 0 {
 			diffuse = 0
 		}
 
 		var diffuseFactor float64
-		distance := fastVectorDistanceSquared(point.workingPosition, vertPos)
+		distance := fastVectorDistanceSquared(point.workingPosition, lightingVertexPos)
 
 		if point.Distance == 0 {
 			diffuseFactor = diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
@@ -321,14 +332,16 @@ func (sun *DirectionalLight) Light(triIndex int, model *Model) [9]float32 {
 
 	light := [9]float32{}
 
+	normal := vector.Vector{0, 0, 0}
+
 	for i := 0; i < 3; i++ {
 
-		var normal vector.Vector
 		if model.Skinned {
-			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
-			normal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+			x, y, z := model.Mesh.MeshBuffer.SkinnedNormal.XYZ(triIndex*3 + i)
+			setVector(lightingVertexNormal, x, y, z)
 		} else {
-			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[triIndex*3+i])
+			x, y, z := model.Mesh.MeshBuffer.Normal.XYZ(triIndex*3 + i)
+			setVector(lightingVertexNormal, x, y, z)
 		}
 
 		diffuseFactor := dot(normal, sun.workingForward)
@@ -525,6 +538,9 @@ func (cube *CubeLight) beginModel(model *Model) {
 
 }
 
+var lightingVertexPos = vector.Vector{0, 0, 0}
+var lightingVertexNormal = vector.Vector{0, 0, 0}
+
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
 func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 
@@ -559,21 +575,23 @@ func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 	// 	return light
 	// }
 
-	var vertPos, vertNormal vector.Vector
-
 	for i := 0; i < 3; i++ {
 
 		if model.Skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[triIndex*3+i]
-			vertNormal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+			x, y, z := model.Mesh.MeshBuffer.SkinnedPosition.XYZ(triIndex*3 + i)
+			setVector(lightingVertexPos, x, y, z)
+			x, y, z = model.Mesh.MeshBuffer.SkinnedNormal.XYZ(triIndex*3 + i)
+			setVector(lightingVertexNormal, x, y, z)
 		} else {
-			vertPos = model.Mesh.VertexPositions[triIndex*3+i]
-			vertNormal = model.Mesh.VertexNormals[triIndex*3+i]
+			x, y, z := model.Mesh.MeshBuffer.Position.XYZ(triIndex*3 + i)
+			setVector(lightingVertexPos, x, y, z)
+			x, y, z = model.Mesh.MeshBuffer.Normal.XYZ(triIndex*3 + i)
+			setVector(lightingVertexNormal, x, y, z)
 		}
 
 		var diffuse, diffuseFactor float64
 
-		diffuse = dot(vertNormal, vector.Vector(cube.workingAngle))
+		diffuse = dot(lightingVertexNormal, vector.Vector(cube.workingAngle))
 
 		if cube.Bleed > 0 {
 
@@ -596,10 +614,10 @@ func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 			if cube.Distance == 0 {
 				diffuseFactor = diffuse
 			} else {
-				diffuseFactor = diffuse * ((cube.workingDistanceSquared - fastVectorDistanceSquared(vertPos, cube.workingPosition)) / cube.workingDistanceSquared)
+				diffuseFactor = diffuse * ((cube.workingDistanceSquared - fastVectorDistanceSquared(lightingVertexPos, cube.workingPosition)) / cube.workingDistanceSquared)
 			}
 
-			if !cube.workingDimensions.Inside(vertPos) {
+			if !cube.workingDimensions.Inside(lightingVertexPos) {
 				diffuseFactor = 0
 			}
 

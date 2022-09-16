@@ -338,16 +338,14 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
-			// Blender max is 8 vertex color channels
-			for colorChannelIndex := 0; colorChannelIndex < 8; colorChannelIndex++ {
+			// Blender max is 8 vertex color channels; we'll support 4
+			for colorChannelIndex := 0; colorChannelIndex < 4; colorChannelIndex++ {
 
 				colorChannelName := "COLOR_" + strconv.Itoa(colorChannelIndex)
 
 				if vertexColorAccessor, vcExists := v.Attributes[colorChannelName]; vcExists {
 
-					vcBuffer := [][4]uint16{}
-
-					colors, err := modeler.ReadColor64(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
+					colors, err := modeler.ReadColor64(doc, doc.Accessors[vertexColorAccessor], [][4]uint16{})
 
 					if err != nil {
 						return nil, err
@@ -363,7 +361,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							float32(colorData[3])/math.MaxUint16,
 						)
 						color.ConvertTosRGB()
-						vertexData[i].Colors = append(vertexData[i].Colors, color)
+						vertexData[i].Colors[colorChannelIndex] = color
 						vertexData[i].ActiveColorChannel = 0
 
 					}

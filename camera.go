@@ -798,12 +798,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			backfaceCulling = mat.BackfaceCulling
 		}
 
-		srcW := 0.0
-		srcH := 0.0
+		srcW := float32(0.0)
+		srcH := float32(0.0)
 
 		if mat != nil && mat.Texture != nil {
-			srcW = float64(mat.Texture.Bounds().Dx())
-			srcH = float64(mat.Texture.Bounds().Dy())
+			srcW = float32(mat.Texture.Bounds().Dx())
+			srcH = float32(mat.Texture.Bounds().Dy())
 		}
 
 		if lighting {
@@ -831,6 +831,10 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		maxSpan := model.Mesh.Dimensions.MaxSpan()
 		modelPos := model.WorldPosition()
 
+		v0 := vector.Vector{0, 0, 0, 0}
+		v1 := vector.Vector{0, 0, 0, 0}
+		v2 := vector.Vector{0, 0, 0, 0}
+
 		// Here we do all vertex transforms first because of data locality (it's faster to access all vertex transformations, then go back and do all UV values, etc)
 
 		for t := range meshPart.sortingTriangles {
@@ -842,9 +846,15 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			meshPart.sortingTriangles[t].rendered = false
 
 			vertIndex := meshPart.sortingTriangles[t].ID * 3
-			v0 := mesh.vertexTransforms[vertIndex]
-			v1 := mesh.vertexTransforms[vertIndex+1]
-			v2 := mesh.vertexTransforms[vertIndex+2]
+
+			x, y, z, w := mesh.MeshBuffer.Transform.XYZW(vertIndex)
+			setVector(v0, x, y, z, w)
+
+			x, y, z, w = mesh.MeshBuffer.Transform.XYZW(vertIndex + 1)
+			setVector(v1, x, y, z, w)
+
+			x, y, z, w = mesh.MeshBuffer.Transform.XYZW(vertIndex + 2)
+			setVector(v2, x, y, z, w)
 
 			p0 = camera.clipToScreen(v0, p0, vertIndex, model, float64(camWidth), float64(camHeight))
 			p1 = camera.clipToScreen(v1, p1, vertIndex+1, model, float64(camWidth), float64(camHeight))
@@ -878,7 +888,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 
 			// Enforce maximum vertex count; note that this is lazy, which is NOT really a good way of doing this, as you can't really know ahead of time how many triangles may render.
-			if vertexListIndex/3 >= ebiten.MaxIndicesNum/3 {
+			if vertexListIndex/3 >= ebiten.MaxIndicesCount/3 {
 				if model.DynamicBatchOwner == nil {
 					panic("error in rendering mesh [" + model.Mesh.Name + "] of model [" + model.name + "]. At " + fmt.Sprintf("%d", len(model.Mesh.Triangles)) + " triangles, it exceeds the maximum of 21845 rendered triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into models")
 				} else {
@@ -928,22 +938,27 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				vertIndex := tri.ID*3 + i
 
+				u, v := mesh.MeshBuffer.UV.UV(vertIndex)
+
 				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
-				u := float32(mesh.VertexUVs[vertIndex][0] * srcW)
+				u *= srcW
 				// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
 				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
-				v := float32((1 - mesh.VertexUVs[vertIndex][1]) * srcH)
+				v = (1 - v) * srcH
 
 				colorVertexList[vertexListIndex+i].SrcX = u
 				colorVertexList[vertexListIndex+i].SrcY = v
 
 				// Vertex colors
 
-				if activeChannel := mesh.VertexActiveColorChannel[vertIndex]; activeChannel >= 0 {
-					colorVertexList[vertexListIndex+i].ColorR = mesh.VertexColors[vertIndex][activeChannel].R * mpColor.R
-					colorVertexList[vertexListIndex+i].ColorG = mesh.VertexColors[vertIndex][activeChannel].G * mpColor.G
-					colorVertexList[vertexListIndex+i].ColorB = mesh.VertexColors[vertIndex][activeChannel].B * mpColor.B
-					colorVertexList[vertexListIndex+i].ColorA = mesh.VertexColors[vertIndex][activeChannel].A * mpColor.A
+				if activeChannel := mesh.MeshBuffer.VertexActiveColorChannel[vertIndex]; activeChannel >= 0 {
+
+					r, g, b, a := mesh.MeshBuffer.VertexColor.RGBA(vertIndex, activeChannel)
+
+					colorVertexList[vertexListIndex+i].ColorR = r * mpColor.R
+					colorVertexList[vertexListIndex+i].ColorG = g * mpColor.G
+					colorVertexList[vertexListIndex+i].ColorB = b * mpColor.B
+					colorVertexList[vertexListIndex+i].ColorA = a * mpColor.A
 				} else {
 					colorVertexList[vertexListIndex+i].ColorR = mpColor.R
 					colorVertexList[vertexListIndex+i].ColorG = mpColor.G
@@ -951,20 +966,23 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					colorVertexList[vertexListIndex+i].ColorA = mpColor.A
 				}
 
+				_, _, _, w := mesh.MeshBuffer.Transform.XYZW(vertIndex)
+
+				depth := ((w + float32(near)) / float32(far)) + 0.03
+
 				if camera.RenderDepth {
 
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
-					depth := (mesh.vertexTransforms[vertIndex][2]+near)/far + 0.03
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
 						depth = 1
 					}
 
-					depthVertexList[vertexListIndex+i].ColorR = float32(depth)
-					depthVertexList[vertexListIndex+i].ColorG = float32(depth)
-					depthVertexList[vertexListIndex+i].ColorB = float32(depth)
+					depthVertexList[vertexListIndex+i].ColorR = depth
+					depthVertexList[vertexListIndex+i].ColorG = depth
+					depthVertexList[vertexListIndex+i].ColorB = depth
 					depthVertexList[vertexListIndex+i].ColorA = 1
 
 					// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
@@ -978,7 +996,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
-					depth := float32((mesh.vertexTransforms[vertIndex][2]+near)/far + 0.03)
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -1316,6 +1333,10 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	camWidth, camHeight := camera.resultColorTexture.Size()
 
+	a0 := vector.Vector{0, 0, 0, 0}
+	a1 := vector.Vector{0, 0, 0, 0}
+	a2 := vector.Vector{0, 0, 0, 0}
+
 	for _, m := range allModels {
 
 		if model, isModel := m.(*Model); isModel {
@@ -1333,11 +1354,20 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
 
-				for i := 0; i < len(model.Mesh.vertexTransforms); i += 3 {
+				for i := 0; i < model.Mesh.VertexCount; i += 3 {
 
-					v0 := camera.ClipToScreen(model.Mesh.vertexTransforms[i])
-					v1 := camera.ClipToScreen(model.Mesh.vertexTransforms[i+1])
-					v2 := camera.ClipToScreen(model.Mesh.vertexTransforms[i+2])
+					x, y, z, w := model.Mesh.MeshBuffer.Transform.XYZW(i)
+					setVector(a0, x, y, z, w)
+
+					x, y, z, w = model.Mesh.MeshBuffer.Transform.XYZW(i + 1)
+					setVector(a1, x, y, z, w)
+
+					x, y, z, w = model.Mesh.MeshBuffer.Transform.XYZW(i + 2)
+					setVector(a2, x, y, z, w)
+
+					v0 := camera.ClipToScreen(a0)
+					v1 := camera.ClipToScreen(a1)
+					v2 := camera.ClipToScreen(a2)
 
 					if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
 						(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
@@ -1683,9 +1713,18 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
 
-						v0 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3]))
-						v1 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3+1]))
-						v2 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3+2]))
+						x, y, z := mesh.MeshBuffer.Position.XYZ(tri.ID * 3)
+						a0 := vector.Vector{float64(x), float64(y), float64(z)}
+
+						x, y, z = mesh.MeshBuffer.Position.XYZ(tri.ID*3 + 1)
+						a1 := vector.Vector{float64(x), float64(y), float64(z)}
+
+						x, y, z = mesh.MeshBuffer.Position.XYZ(tri.ID*3 + 2)
+						a2 := vector.Vector{float64(x), float64(y), float64(z)}
+
+						v0 := camera.ClipToScreen(mvpMatrix.MultVecW(a0))
+						v1 := camera.ClipToScreen(mvpMatrix.MultVecW(a1))
+						v2 := camera.ClipToScreen(mvpMatrix.MultVecW(a2))
 
 						if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
 							(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
