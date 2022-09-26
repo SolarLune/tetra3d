@@ -96,9 +96,22 @@ func (g *Game) Update() error {
 		vector.In(cubeLight.LightingAngle).Rotate(-0.1, vector.X)
 	}
 
+	if ebiten.IsKeyPressed(ebiten.KeyUp) {
+		cubeLight.Bleed += 0.05
+		if cubeLight.Bleed > 1 {
+			cubeLight.Bleed = 1
+		}
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+		cubeLight.Bleed -= 0.05
+		if cubeLight.Bleed < 0 {
+			cubeLight.Bleed = 0
+		}
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyE) {
 		if cubeLight.Distance == 0 {
-			cubeLight.Distance = 30
+			cubeLight.Distance = 25
 		} else {
 			cubeLight.Distance = 0
 		}
@@ -224,7 +237,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis example shows a Cube Light.\nCube Lights are volumes that shine from the top down.\nIf the light's distance is greater than 0, then the\nlight will be brighter towards the top.\nTriangles that lie outside the (AABB)\nvolume remain unlit.\n\n1 Key: Toggle light groups being active\n2 Key: Toggle all lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis example shows a Cube Light.\nCube Lights are volumes that shine from the top down.\nIf the light's distance is greater than 0, then the\nlight will be brighter towards the top.\nTriangles that lie outside the (AABB)\nvolume remain unlit.\n\nE Key: Toggle light distance\nLeft / Right Arrow Key: Rotate Light\nUp / Down Arrow Key: Increase / Decrease Bleed\n2 Key: Toggle all lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		g.Camera.DebugDrawText(screen, txt, 0, 150, 1, colors.LightGray())
 	}
 

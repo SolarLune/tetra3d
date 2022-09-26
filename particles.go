@@ -2,7 +2,6 @@ package tetra3d
 
 import (
 	"math/rand"
-	"sort"
 
 	"github.com/kvartborg/vector"
 )
@@ -125,29 +124,7 @@ func (part *Particle) Update(dt float64) {
 	}
 
 	if curve := part.ParticleSystem.Settings.ColorCurve; curve != nil && len(curve.Points) > 0 {
-
-		perc := part.Life / part.Lifetime
-
-		var c *Color
-
-		for i := 0; i < len(curve.Points); i++ {
-
-			c = curve.Points[i].Color
-
-			if i >= len(curve.Points)-1 || curve.Points[i].Percentage > perc {
-				break
-			}
-
-			if curve.Points[i].Percentage <= perc && curve.Points[i+1].Percentage >= perc {
-				c = curve.Points[i].Color.Clone()
-				c.Mix(curve.Points[i+1].Color, float32((perc-curve.Points[i].Percentage)/(curve.Points[i+1].Percentage-curve.Points[i].Percentage)))
-				break
-			}
-
-		}
-
-		part.Model.Color = c
-
+		part.Model.Color = curve.Color(part.Life / part.Lifetime)
 	}
 
 }
@@ -515,53 +492,4 @@ func (ran *VectorRange) Value() vector.Vector {
 	}
 
 	return vec
-}
-
-// ColorCurvePoint indicates a point in a color curve, from one color to another.
-type ColorCurvePoint struct {
-	Color      *Color
-	Percentage float64
-}
-
-// Clone creates a duplicated the ColorcurvePoint.
-func (point *ColorCurvePoint) Clone() *ColorCurvePoint {
-	return &ColorCurvePoint{
-		Color:      point.Color,
-		Percentage: point.Percentage,
-	}
-}
-
-type ColorCurve struct {
-	Points []*ColorCurvePoint
-}
-
-// NewColorCurve creats a new ColorCurve.
-func NewColorCurve() *ColorCurve {
-	return &ColorCurve{
-		Points: []*ColorCurvePoint{},
-	}
-}
-
-// Clone creates a duplicate ColorCurve.
-func (cc *ColorCurve) Clone() *ColorCurve {
-	ncc := NewColorCurve()
-	for _, point := range cc.Points {
-		ncc.Points = append(ncc.Points, point.Clone())
-	}
-	return ncc
-}
-
-// Add adds a point to the ColorCure with the color and percentage provided (from 0-1).
-func (cc *ColorCurve) Add(color *Color, percentage float64) {
-	cc.AddRGBA(color.R, color.G, color.B, color.A, percentage)
-}
-
-// AddRGBA adds a point to the ColorCurve, with r, g, b, and a being the color and the percentage being a number between 0 and 1 indicating the .
-func (cc *ColorCurve) AddRGBA(r, g, b, a float32, percentage float64) {
-	cc.Points = append(cc.Points, &ColorCurvePoint{
-		Color:      NewColor(r, g, b, a),
-		Percentage: percentage,
-	})
-
-	sort.Slice(cc.Points, func(i, j int) bool { return cc.Points[i].Percentage < cc.Points[j].Percentage })
 }

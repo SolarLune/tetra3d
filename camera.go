@@ -115,7 +115,7 @@ func NewCamera(w, h int) *Camera {
 				return encodeDepth(color.r)
 			}
 
-			return vec4(0.0, 0.0, 0.0, 0.0)
+			discard()
 
 		}
 
@@ -143,7 +143,7 @@ func NewCamera(w, h int) *Camera {
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 			tex := imageSrc0At(texCoord)
 			if (tex.a == 0) {
-				return vec4(0.0, 0.0, 0.0, 0.0)
+				discard()
 			} else {
 				return vec4(encodeDepth(color.r).rgb, tex.a)
 			}
@@ -177,7 +177,7 @@ func NewCamera(w, h int) *Camera {
 				return texture
 			}
 
-			return vec4(0.0, 0.0, 0.0, 0.0)
+			discard()
 
 		}
 
@@ -215,13 +215,16 @@ func NewCamera(w, h int) *Camera {
 					colorTex.rgb -= Fog.rgb * d * colorTex.a
 				} else if Fog.a == 3 {
 					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
+				} else if Fog.a == 4 {
+					colorTex.a *= abs(1-d)
+					colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
 				}
 
 				return colorTex
 			}
 
 			// This should be discard as well, rather than alpha 0
-			return vec4(0.0, 0.0, 0.0, 0.0)
+			discard()
 
 		}
 
@@ -450,7 +453,7 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 	radius := sphere.WorldRadius()
 
 	diff := fastVectorSub(sphere.WorldPosition(), camera.WorldPosition())
-	pcZ := diff.Dot(camera.cameraForward)
+	pcZ := dot(diff, camera.cameraForward)
 
 	if pcZ > camera.Far+radius || pcZ < camera.Near-radius {
 		return false
@@ -461,7 +464,7 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 		d := camera.sphereFactorY * radius
 		pcZ *= camera.sphereFactorTang
 
-		pcY := diff.Dot(camera.cameraUp)
+		pcY := dot(diff, camera.cameraUp)
 
 		if pcY > pcZ+d || pcY < -pcZ-d {
 			return false
@@ -470,7 +473,7 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 		pcZ *= camera.AspectRatio()
 		d = camera.sphereFactorX * radius
 
-		pcX := diff.Dot(camera.cameraRight)
+		pcX := dot(diff, camera.cameraRight)
 
 		if pcX > pcZ+d || pcX < -pcZ-d {
 			return false
@@ -481,13 +484,13 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 		width := camera.OrthoScale
 		height := width / camera.AspectRatio()
 
-		pcY := diff.Dot(camera.cameraUp)
+		pcY := dot(diff, camera.cameraUp)
 
 		if -height/2-radius > pcY || pcY > height/2+radius {
 			return false
 		}
 
-		pcX := diff.Dot(camera.cameraRight)
+		pcX := dot(diff, camera.cameraRight)
 
 		if -width/2-radius > pcX || pcX > width/2+radius {
 			return false
@@ -657,8 +660,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	depths := map[*Model]float64{}
 
-	sorting := len(solids) > 0 && !camera.RenderDepth
-
 	for _, model := range models {
 
 		if !model.visible {
@@ -705,7 +706,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
 				} else {
 					solids = append(solids, renderPair{model, meshPart})
-					if sorting {
+					if !camera.RenderDepth {
 						depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
 					}
 				}
@@ -725,7 +726,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				}
 			}
 
-			if sorting || modelIsTransparent {
+			if !camera.RenderDepth || modelIsTransparent {
 				depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
 			}
 
@@ -734,7 +735,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	}
 
 	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
-	if sorting {
+	if !camera.RenderDepth {
 
 		sort.SliceStable(solids, func(i, j int) bool {
 			return depths[solids[i].Model] > depths[solids[j].Model]
@@ -955,7 +956,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
-					depth := (mesh.vertexTransforms[vertIndex][2]+near)/far + 0.03
+					margin := 1.0
+					depth := mesh.vertexTransforms[vertIndex][2] / (far + margin)
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -1355,16 +1357,27 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			}
 
-		} else if curve, isCurve := m.(*Path); isCurve {
+		} else if path, isPath := m.(*Path); isPath {
 
-			points := curve.Children()
-			if curve.Closed {
+			points := path.Children()
+			if path.Closed {
 				points = append(points, points[0])
 			}
 			for i := 0; i < len(points)-1; i++ {
-				px := camera.WorldToScreen(points[i].WorldPosition())
-				py := camera.WorldToScreen(points[i+1].WorldPosition())
-				ebitenutil.DrawLine(screen, px[0], px[1], py[0], py[1], color.ToRGBA64())
+				p1 := camera.WorldToScreen(points[i].WorldPosition())
+				p2 := camera.WorldToScreen(points[i+1].WorldPosition())
+				ebitenutil.DrawLine(screen, p1[0], p1[1], p2[0], p2[1], color.ToRGBA64())
+			}
+
+		} else if grid, isGrid := m.(*Grid); isGrid {
+
+			for _, point := range grid.Points() {
+				p1 := camera.WorldToScreen(point.WorldPosition())
+				ebitenutil.DrawCircle(screen, p1[0], p1[1], 8, color.ToRGBA64())
+				for _, connection := range point.Connections {
+					p2 := camera.WorldToScreen(connection.WorldPosition())
+					ebitenutil.DrawLine(screen, p1[0], p1[1], p2[0], p2[1], color.ToRGBA64())
+				}
 			}
 
 		}

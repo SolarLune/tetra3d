@@ -111,6 +111,44 @@ func (dim Dimensions) reform() {
 
 }
 
+// NewDimensionsFromPoints creates a new Dimensions struct from the given series of positions.
+func NewDimensionsFromPoints(points ...vector.Vector) Dimensions {
+	dim := Dimensions{
+		{math.MaxFloat64, math.MaxFloat64, math.MaxFloat64},
+		{-math.MaxFloat64, -math.MaxFloat64, -math.MaxFloat64},
+	}
+
+	for _, point := range points {
+
+		if dim[0][0] > point[0] {
+			dim[0][0] = point[0]
+		}
+
+		if dim[0][1] > point[1] {
+			dim[0][1] = point[1]
+		}
+
+		if dim[0][2] > point[2] {
+			dim[0][2] = point[2]
+		}
+
+		if dim[1][0] < point[0] {
+			dim[1][0] = point[0]
+		}
+
+		if dim[1][1] < point[1] {
+			dim[1][1] = point[1]
+		}
+
+		if dim[1][2] < point[2] {
+			dim[1][2] = point[2]
+		}
+
+	}
+
+	return dim
+}
+
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one
 // manually if you want to construct a Mesh via code).
 type Mesh struct {
@@ -533,6 +571,17 @@ func (vs *VertexSelection) SetColor(channelIndex int, color *Color) {
 
 	for i := range vs.Indices {
 		vs.Mesh.VertexColors[i][channelIndex].Set(color.ToFloat32s())
+	}
+
+}
+
+// SetNormal sets the normal of all vertices contained within the VertexSelection to the provided normal vector.
+func (vs *VertexSelection) SetNormal(normal vector.Vector) {
+
+	for i := range vs.Indices {
+		vs.Mesh.VertexNormals[i][0] = normal[0]
+		vs.Mesh.VertexNormals[i][1] = normal[1]
+		vs.Mesh.VertexNormals[i][2] = normal[2]
 	}
 
 }

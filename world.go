@@ -1,10 +1,11 @@
 package tetra3d
 
 const (
-	FogOff       = iota // No fog
-	FogAdd              // Additive blended fog
-	FogMultiply         // Multiplicative blended fog
-	FogOverwrite        // Color overwriting fog (mixing base with fog color over depth distance)
+	FogOff         = iota // No fog
+	FogAdd                // Additive blended fog
+	FogMultiply           // Multiplicative blended fog
+	FogOverwrite          // Color overwriting fog (mixing base with fog color over depth distance)
+	FogTransparent        // Fog influences transparency of the render
 )
 
 type FogMode int

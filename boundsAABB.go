@@ -228,7 +228,7 @@ func (box *BoundingAABB) Collision(other BoundingObject) *Collision {
 				inter.MTV = inter.MTV.Invert()
 				vector.In(inter.Normal).Invert()
 			}
-			intersection.CollidedBoundingObject = otherBounds
+			intersection.BoundingObject = otherBounds
 		}
 		return intersection
 
@@ -242,7 +242,7 @@ func (box *BoundingAABB) Collision(other BoundingObject) *Collision {
 				inter.MTV = inter.MTV.Invert()
 				vector.In(inter.Normal).Invert()
 			}
-			intersection.CollidedBoundingObject = otherBounds
+			intersection.BoundingObject = otherBounds
 		}
 		return intersection
 

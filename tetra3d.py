@@ -52,6 +52,7 @@ worldFogCompositeModes = [
     ("ADDITIVE", "Additive", "Additive fog - this fog mode brightens objects in the distance, with full effect being adding the color given to the object's color at maximum distance (according to the camera's far range)", 0, 1),
     ("MULTIPLY", "Multiply", "Multiplicative fog - this fog mode darkens objects in the distance, with full effect being multiplying the object's color by the fog color at maximum distance (according to the camera's far range)", 0, 2),
     ("OVERWRITE", "Overwrite", "Overwrite fog - this fog mode overwrites the object's color with the fog color, with maximum distance being the camera's far distance", 0, 3),
+    ("TRANSPARENT", "Transparent", "Transparent fog - this fog mode fades the object out over distance, such that at maximum distance / fog range, the object is wholly transparent.", 0, 4),
 ]
 
 gamePropTypes = [
@@ -234,6 +235,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         row.operator("object.tetra3dcopynodepath", text="Copy Node Path to Clipboard", icon="COPYDOWN")
         
         row = self.layout.row()
+        row.enabled = context.object.t3dObjectType__ == 'MESH'
         row.prop(context.object, "t3dVisible__")
         row = self.layout.row()
         row.prop(context.object, "t3dBoundsType__")
@@ -359,12 +361,12 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
         row.prop(context.world, "t3dClearColor__")
         box = self.layout.box()
         row = box.row()
-        row.label(text="Fog Mode:")
-        row.prop(context.world, "t3dFogMode__", text="Fog Mode:", expand=True)
+        row.prop(context.world, "t3dFogMode__")
 
         if context.world.t3dFogMode__ != "OFF":
-            # box = self.layout.row()
-            box.prop(context.world, "t3dFogColor__")
+
+            if context.world.t3dFogMode__ != "TRANSPARENT":
+                box.prop(context.world, "t3dFogColor__")
             
             box.prop(context.world, "t3dFogRangeStart__", slider=True)
             box.prop(context.world, "t3dFogRangeEnd__", slider=True)

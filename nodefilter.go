@@ -159,3 +159,14 @@ func (nc NodeFilter) Lights() []ILight {
 	}
 	return lights
 }
+
+// Grids returns a slice of the Grids contained within the NodeFilter.
+func (nc NodeFilter) Grids() []*Grid {
+	grids := make([]*Grid, 0, len(nc))
+	for _, n := range nc {
+		if m, ok := n.(*Grid); ok {
+			grids = append(grids, m)
+		}
+	}
+	return grids
+}

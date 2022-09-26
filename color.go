@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"image/color"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -266,4 +267,93 @@ func (color *Color) HSV() (float64, float64, float64) {
 		}
 	}
 	return h / 360, s, v
+}
+
+// ColorCurvePoint indicates an individual color point in a color curve.
+type ColorCurvePoint struct {
+	Color      *Color
+	Percentage float64
+}
+
+// Clone creates a duplicated the ColorcurvePoint.
+func (point *ColorCurvePoint) Clone() *ColorCurvePoint {
+	return &ColorCurvePoint{
+		Color:      point.Color,
+		Percentage: point.Percentage,
+	}
+}
+
+// ColorCurve represents a range of colors that a value of 0 to 1 can interpolate between.
+type ColorCurve struct {
+	Points []*ColorCurvePoint
+}
+
+// NewColorCurve creats a new ColorCurve.
+func NewColorCurve() *ColorCurve {
+	return &ColorCurve{
+		Points: []*ColorCurvePoint{},
+	}
+}
+
+// Clone creates a duplicate ColorCurve.
+func (cc *ColorCurve) Clone() *ColorCurve {
+	ncc := NewColorCurve()
+	for _, point := range cc.Points {
+		ncc.Points = append(ncc.Points, point.Clone())
+	}
+	return ncc
+}
+
+// Add adds a color point to the ColorCurve with the color and percentage provided (from 0-1).
+func (cc *ColorCurve) Add(color *Color, percentage float64) {
+	cc.AddRGBA(color.R, color.G, color.B, color.A, percentage)
+}
+
+// AddRGBA adds a point to the ColorCurve, with r, g, b, and a being the color and the percentage being a number between 0 and 1 indicating the .
+func (cc *ColorCurve) AddRGBA(r, g, b, a float32, percentage float64) {
+
+	if percentage > 1 {
+		percentage = 1
+	} else if percentage < 0 {
+		percentage = 0
+	}
+
+	cc.Points = append(cc.Points, &ColorCurvePoint{
+		Color:      NewColor(r, g, b, a),
+		Percentage: percentage,
+	})
+
+	sort.Slice(cc.Points, func(i, j int) bool { return cc.Points[i].Percentage < cc.Points[j].Percentage })
+}
+
+// Color returns the Color for the given percentage in the color curve. For example, if you have a curve composed of
+// the colors {0, 0, 0, 0} at 0 and {1, 1, 1, 1} at 1, then calling Curve.Color(0.5) would return {0.5, 0.5, 0.5, 0.5}.
+func (cc *ColorCurve) Color(perc float64) *Color {
+
+	if perc > 1 {
+		perc = 1
+	} else if perc < 0 {
+		perc = 0
+	}
+
+	var c *Color
+
+	for i := 0; i < len(cc.Points); i++ {
+
+		c = cc.Points[i].Color
+
+		if i >= len(cc.Points)-1 || cc.Points[i].Percentage >= perc {
+			break
+		}
+
+		if cc.Points[i].Percentage <= perc && cc.Points[i+1].Percentage >= perc {
+			c = cc.Points[i].Color.Clone()
+			c.Mix(cc.Points[i+1].Color, float32((perc-cc.Points[i].Percentage)/(cc.Points[i+1].Percentage-cc.Points[i].Percentage)))
+			break
+		}
+
+	}
+
+	return c
+
 }

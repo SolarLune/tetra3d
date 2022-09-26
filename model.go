@@ -415,17 +415,17 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	modelTransform := model.Transform()
-	p, _, r := modelTransform.Inverted().Decompose()
+	// p, _, r := modelTransform.Inverted().Decompose()
 
-	s := model.WorldScale()
+	// s := model.WorldScale()
 
-	p[0] *= s[0]
-	p[1] *= s[1]
-	p[2] *= s[2]
+	// p[0] *= s[0]
+	// p[1] *= s[1]
+	// p[2] *= s[2]
 
-	camPos := r.MultVec(camera.WorldPosition()).Add(p)
+	// camPos := r.MultVec(camera.WorldPosition()).Add(p)
 
-	camFarSquared := camera.Far * camera.Far
+	// camFarSquared := camera.Far * camera.Far
 
 	far := camera.Far
 
@@ -470,7 +470,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				transformed[2] = z
 				transformed[3] = w
 
-				if w > 0 && w < far {
+				if w >= 0 && z < far {
 					outOfBounds = false
 				}
 
@@ -502,13 +502,20 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			lookat := NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y)
 
 			if mat.BillboardMode == BillboardModeXZ {
-				lookat = lookat.SetRow(1, vector.Vector{0, 1, 0, 0})
+				lookat.SetRow(1, vector.Vector{0, 1, 0, 0})
+				x := lookat.Row(0)
+				x[1] = 0
+				lookat.SetRow(0, x.Unit())
+
+				z := lookat.Row(2)
+				z[1] = 0
+				lookat.SetRow(2, z.Unit())
 			}
 
 			// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
 			p, s, r := base.Decompose()
-
-			base = r.Mult(lookat).Mult(NewMatrix4Scale(s[0], s[1], s[2])).SetRow(3, vector.Vector{p[0], p[1], p[2], 1})
+			base = r.Mult(lookat).Mult(NewMatrix4Scale(s[0], s[1], s[2]))
+			base.SetRow(3, vector.Vector{p[0], p[1], p[2], 1})
 
 		}
 
@@ -519,13 +526,13 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			triID := meshPart.sortingTriangles[i].ID
 			depth := math.MaxFloat64
 
-			triRef := model.Mesh.Triangles[triID]
+			// triRef := model.Mesh.Triangles[triID]
 			// TODO: Replace this distance check with a broadphase check; we could also use it to easily reject
 			// triangles that lie outside of the camera frustum.
-			if fastVectorDistanceSquared(camPos, triRef.Center) > (camFarSquared)+triRef.MaxSpan {
-				meshPart.sortingTriangles[i].rendered = false
-				continue
-			}
+			// if fastVectorDistanceSquared(camPos, triRef.Center) > (camFarSquared)+triRef.MaxSpan {
+			// 	meshPart.sortingTriangles[i].rendered = false
+			// 	continue
+			// }
 
 			meshPart.sortingTriangles[i].rendered = true
 
@@ -538,14 +545,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 					v0 = transformFunc(v0.Clone(), triID*3+i)
 				}
 
-				t0 := model.Mesh.vertexTransforms[triID*3+i]
-				t0[0], t0[1], t0[2], t0[3] = fastMatrixMultVecW(mvp, v0)
+				transformed := model.Mesh.vertexTransforms[triID*3+i]
+				transformed[0], transformed[1], transformed[2], transformed[3] = fastMatrixMultVecW(mvp, v0)
 
-				if t0[3] < depth {
-					depth = t0[3]
+				if transformed[3] < depth {
+					depth = transformed[3]
 				}
 
-				if t0[3] > 0 && t0[3] < far {
+				if transformed[3] >= 0 && transformed[2] < far {
 					outOfBounds = false
 				}
 

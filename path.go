@@ -8,7 +8,7 @@ import (
 
 type IPath interface {
 	Distance() float64
-	Points() []vector.Vector
+	points() []vector.Vector
 	isClosed() bool
 }
 
@@ -42,7 +42,7 @@ func (navigator *Navigator) AdvancePercentage(percentage float64) {
 
 	navigator.finished = false
 
-	if !navigator.HasPath() || len(navigator.Path.Points()) <= 1 {
+	if !navigator.HasPath() || len(navigator.Path.points()) <= 1 {
 		navigator.finished = true
 		return
 	}
@@ -111,7 +111,7 @@ func (navigator *Navigator) WorldPosition() vector.Vector {
 	totalDistance := navigator.Path.Distance()
 	d := navigator.Percentage
 
-	points := navigator.Path.Points()
+	points := navigator.Path.points()
 
 	if len(points) == 0 {
 		return nil
@@ -143,7 +143,7 @@ func (navigator *Navigator) WorldPosition() vector.Vector {
 func (navigator *Navigator) TouchingNode(margin float64) vector.Vector {
 
 	wp := navigator.WorldPosition()
-	for _, p := range navigator.Path.Points() {
+	for _, p := range navigator.Path.points() {
 		if p.Sub(wp).Magnitude() <= margin {
 			return p
 		}
@@ -170,7 +170,7 @@ func (navigator *Navigator) Clone() *Navigator {
 }
 
 func (navigator *Navigator) HasPath() bool {
-	return navigator.Path != nil && len(navigator.Path.Points()) > 0
+	return navigator.Path != nil && len(navigator.Path.points()) > 0
 }
 
 func (navigator *Navigator) SetPath(path IPath) {
@@ -243,7 +243,7 @@ func (path *Path) Distance() float64 {
 	return dist
 }
 
-func (path *Path) Points() []vector.Vector {
+func (path *Path) points() []vector.Vector {
 	points := make([]vector.Vector, 0, len(path.Children()))
 	for _, c := range path.children {
 		points = append(points, c.WorldPosition())

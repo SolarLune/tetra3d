@@ -1,6 +1,6 @@
 # Tetra3D
 
-[Ebiten Discord](https://discord.gg/fXM7VYASTu)
+[Ebitengine Discord](https://discord.gg/fXM7VYASTu)
 
 ![Tetra3D Logo](https://thumbs.gfycat.com/DifferentZealousFowl-size_restricted.gif)
 
@@ -18,9 +18,9 @@ If you want to support development, feel free to check out my [itch.io](https://
 
 ## What is Tetra3D?
 
-Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebiten](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing (by use of shaders to compare and write depth and composite the result onto the finished texture). Depth testing can be turned off for a performance increase in exchange for no visual inter-object intersection.
+Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebitengine](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing (by use of shaders to compare and write depth and composite the result onto the finished texture). Depth testing can be turned off for a slight performance increase in exchange for no visual inter-object intersection.
 
-Tetra's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a largely-software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebiten game, or a relatively simple fully 3D game (i.e. something on the level of a PS1 or N64 game). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
+Tetra3D's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a largely-software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebitengine game, or a relatively simple fully 3D game (i.e. something on the level of a PS1, or N64 game). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
 In general, Tetra3D's just a renderer, so you can target higher resolutions (like 1080p or 4K) _or_ lower resolutions. Anything's fine as long as the target GPU can handle generating the color and depth textures at your desired resolution (assuming you have depth texture rendering on).
 
@@ -30,9 +30,9 @@ Tetra3D also gives you a Blender add-on to make the Blender > Tetra3D developmen
 
 Because there's not really too much of an ability to do 3D for gamedev in Go apart from [g3n](http://g3n.rocks), [go-gl](https://github.com/go-gl/gl) and [Raylib-go](https://github.com/gen2brain/raylib-go). I like Go, I like janky 3D, and so, here we are.
 
-It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebiten but wanted to display just a few GUI elements or objects in 3D, Tetra3D should work well for you.
+It's also interesting to have the ability to spontaneously do things in 3D sometimes. For example, if you were making a 2D game with Ebitengine but wanted to display just a few GUI elements or objects in 3D, Tetra3D should work well for you.
 
-Finally, while this hybrid renderer is not by any means fast, it is relatively simple and easy to use. Any platforms that Ebiten supports _should_ also work for Tetra3D automatically.
+Finally, while this hybrid renderer is not by any means fast, it is relatively simple and easy to use. Any platforms that Ebiten supports _should_ also work for Tetra3D automatically. Basing a 3D framework off of an existing 2D framework also means any improvements or refinements to Ebitengine may be of help to Tetra3D, and it keeps the codebase small and unified between platforms.
 
 ## Why Tetra3D? Why is it named that?
 
@@ -42,9 +42,9 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 `go get github.com/solarlune/tetra3d`
 
-Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebiten](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
+Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebitengine](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
 
-The Blender add-on is not required, but is provided as well, and can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). The add-on provides some useful helper functionality that makes using Tetra3D simpler - for more information, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
+There is an optional Blender add-on as well (`tetra3d.py`) that can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). The add-on provides some useful helper functionality that makes using Tetra3D simpler - for more information, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
 
 ## How do you use it?
 
@@ -97,10 +97,11 @@ func NewGame() *Game {
 
 	// The ExportedScene of a Library is the scene that was active when the file was exported.
 
-	// We'll clone the ExportedScene so we don't edit it irreversibly.
+	// We'll clone the ExportedScene so we don't change it irreversibly; making a clone
+	// of a Tetra3D resource makes a deep copy of it.
 	g.GameScene = library.ExportedScene.Clone()
 
-	// Tetra3D uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Back), 
+	// Tetra3D uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Forward), 
 	// in comparison to Blender's coordinate system (+X = Right, +Y = Forward, 
 	// +Z = Up). Note that when loading models in via GLTF or DAE, models are
 	// converted automatically (so up is +Z in Blender and +Y in Tetra3D automatically).
@@ -111,30 +112,34 @@ func NewGame() *Game {
 	// g.Camera = tetra3d.NewCamera(ScreenWidth, ScreenHeight)
 
 	// However, we can also just grab an existing camera from the scene if it 
-	// were exported from the GLTF file. The loading options struct would 
-	// specify the camera's backing texture size (defaulting to 1920x1080 if either
+	// were exported from the GLTF file. The loading options struct speciies the camera's
+	// backing texture size (defaulting to 1920x1080 if either
 	// no loading options are passed, or the default loading options struct is used
 	// unaltered).
 
 	g.Camera = g.GameScene.Root.Get("Camera").(*tetra3d.Camera)
 
-	// A Camera implements the tetra3d.INode interface, which means it can be placed
+	// Camera implements the tetra3d.INode interface, which means it can be placed
 	// in 3D space and can be parented to another Node somewhere in the scene tree.
 	// Models, Lights, and Nodes (which are essentially "empties" one can
 	// use for positioning and parenting) can, as well.
 
-	// We can place Models, Cameras, and other Nodes with node.SetWorldPositionVecVec() or 
-	// node.SetLocalPositionVecVec(). Both functions take a 3D vector.Vector from kvartborg's 
-	// vector package.
+	// We can place Models, Cameras, and other Nodes with node.SetWorldPositionVec() or 
+	// node.SetLocalPositionVec(). Both functions take a 3D vector.Vector from kvartborg's 
+	// vector package, and there's an additional variant that just takes the components directly,
+	// for convenience.
 
 	// The *World variants position Nodes in absolute space; the Local variants
-	// position Nodes relative to their parents' positioning and transforms.
+	// position Nodes relative to their parents' positioning and transforms (and is
+	// more performant.)
 	// You can also move Nodes using Node.Move(x, y, z) / Node.MoveVec(vector).
 
 	// Each Scene has a tree that starts with the Root Node. To add Nodes to the Scene, 
 	// parent them to the Scene's base, like so:
 
 	// g.GameScene.Root.AddChildren(object)
+
+	// To remove them, either use Node.RemoveChildren() or Node.Unparent().
 
 	// For Cameras, we don't actually need to have them in the scene to view it, since
 	// the presence of the Camera in the Scene node tree doesn't impact what it would see.

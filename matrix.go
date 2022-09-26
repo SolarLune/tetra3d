@@ -66,8 +66,8 @@ func (matrix *Matrix4) Set(other Matrix4) {
 // BlenderToTetra returns a Matrix with the rows altered such that Blender's +Z is now Tetra's +Y and Blender's +Y is now Tetra's -Z.
 func (matrix Matrix4) BlenderToTetra() Matrix4 {
 	newMat := matrix.Clone()
-	newMat = newMat.SetRow(1, matrix.Row(2).Invert())
-	newMat = newMat.SetRow(2, matrix.Row(1))
+	newMat.SetRow(1, matrix.Row(2).Invert())
+	newMat.SetRow(2, matrix.Row(1))
 	return newMat
 }
 
@@ -177,9 +177,9 @@ func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, Matrix4) {
 	position := vector.Vector{matrix[3][0], matrix[3][1], matrix[3][2]}
 
 	rotation := NewMatrix4()
-	rotation = rotation.SetRow(0, matrix.Row(0).Unit())
-	rotation = rotation.SetRow(1, matrix.Row(1).Unit())
-	rotation = rotation.SetRow(2, matrix.Row(2).Unit())
+	rotation.SetRow(0, matrix.Row(0).Unit())
+	rotation.SetRow(1, matrix.Row(1).Unit())
+	rotation.SetRow(2, matrix.Row(2).Unit())
 
 	in := matrix.Mult(rotation.Transposed())
 
@@ -410,20 +410,17 @@ func (matrix Matrix4) Column(columnIndex int) vector.Vector {
 }
 
 // SetRow returns a clone of the Matrix4 with the row in rowIndex set to the 4D vector passed.
-func (matrix Matrix4) SetRow(rowIndex int, vec vector.Vector) Matrix4 {
-	// TODO: Would probably be better to make this simply functions that alter a Matrix4, rather than making a copy of the Matrix4 and returning that copy.
+func (matrix *Matrix4) SetRow(rowIndex int, vec vector.Vector) {
 	for i := range matrix[rowIndex] {
 		matrix[rowIndex][i] = vec[i]
 	}
-	return matrix
 }
 
 // SetColumn returns a clone of the Matrix4 with the column in columnIndex set to the 4D vector passed.
-func (matrix Matrix4) SetColumn(columnIndex int, columnData vector.Vector) Matrix4 {
+func (matrix *Matrix4) SetColumn(columnIndex int, columnData vector.Vector) {
 	for i := range matrix {
 		matrix[i][columnIndex] = columnData[i]
 	}
-	return matrix
 }
 
 // Rotated returns a clone of the Matrix4 rotated along the local axis by the angle given (in radians). This rotation works as though

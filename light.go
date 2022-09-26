@@ -52,7 +52,7 @@ func (amb *AmbientLight) Clone() INode {
 
 	clone.Node = amb.Node.Clone().(*Node)
 	for _, child := range amb.children {
-		child.setParent(amb)
+		child.setParent(clone)
 	}
 
 	return clone
@@ -118,6 +118,7 @@ type PointLight struct {
 
 	distanceSquared float64
 	workingPosition vector.Vector
+	out             [9]float32
 }
 
 // NewPointLight creates a new Point light.
@@ -127,6 +128,7 @@ func NewPointLight(name string, r, g, b, energy float32) *PointLight {
 		Energy: energy,
 		Color:  NewColor(r, g, b, 1),
 		On:     true,
+		out:    [9]float32{},
 	}
 }
 
@@ -171,8 +173,6 @@ func (point *PointLight) beginModel(model *Model) {
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
 func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 
-	light := [9]float32{}
-
 	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
@@ -193,7 +193,10 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 	dist := fastVectorDistanceSquared(point.workingPosition, triCenter)
 
 	if point.Distance > 0 && dist > point.distanceSquared+model.Mesh.Triangles[triIndex].MaxSpan {
-		return light
+		for i := 0; i < 9; i++ {
+			point.out[i] = 0
+		}
+		return point.out
 	}
 
 	// If you're on the other side of the plane, just assume it's not visible.
@@ -229,13 +232,13 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 			diffuseFactor = diffuse * math.Max(math.Min(1.0-(math.Pow((distance/point.distanceSquared), 4)), 1), 0)
 		}
 
-		light[(i * 3)] = point.Color.R * float32(diffuseFactor) * point.Energy
-		light[(i*3)+1] = point.Color.G * float32(diffuseFactor) * point.Energy
-		light[(i*3)+2] = point.Color.B * float32(diffuseFactor) * point.Energy
+		point.out[(i * 3)] = point.Color.R * float32(diffuseFactor) * point.Energy
+		point.out[(i*3)+1] = point.Color.G * float32(diffuseFactor) * point.Energy
+		point.out[(i*3)+2] = point.Color.B * float32(diffuseFactor) * point.Energy
 
 	}
 
-	return light
+	return point.out
 
 }
 
@@ -278,6 +281,8 @@ type DirectionalLight struct {
 
 	workingForward       vector.Vector // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
 	workingModelRotation Matrix4       // Similarly, this is an internal rotational transform (without the transformation row) for the Model being lit.
+
+	out [9]float32
 }
 
 // NewDirectionalLight creates a new Directional Light with the specified RGB color and energy (assuming 1.0 energy is standard / "100%" lighting).
@@ -287,6 +292,7 @@ func NewDirectionalLight(name string, r, g, b, energy float32) *DirectionalLight
 		Color:  NewColor(r, g, b, 1),
 		Energy: energy,
 		On:     true,
+		out:    [9]float32{},
 	}
 }
 
@@ -299,7 +305,7 @@ func (sun *DirectionalLight) Clone() INode {
 
 	clone.Node = sun.Node.Clone().(*Node)
 	for _, child := range sun.children {
-		child.setParent(sun)
+		child.setParent(clone)
 	}
 
 	return clone
@@ -319,8 +325,6 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
 func (sun *DirectionalLight) Light(triIndex int, model *Model) [9]float32 {
 
-	light := [9]float32{}
-
 	for i := 0; i < 3; i++ {
 
 		var normal vector.Vector
@@ -336,13 +340,13 @@ func (sun *DirectionalLight) Light(triIndex int, model *Model) [9]float32 {
 			diffuseFactor = 0
 		}
 
-		light[i*3] = sun.Color.R * float32(diffuseFactor) * sun.Energy
-		light[i*3+1] = sun.Color.G * float32(diffuseFactor) * sun.Energy
-		light[i*3+2] = sun.Color.B * float32(diffuseFactor) * sun.Energy
+		sun.out[i*3] = sun.Color.R * float32(diffuseFactor) * sun.Energy
+		sun.out[i*3+1] = sun.Color.G * float32(diffuseFactor) * sun.Energy
+		sun.out[i*3+2] = sun.Color.B * float32(diffuseFactor) * sun.Energy
 
 	}
 
-	return light
+	return sun.out
 
 }
 
@@ -388,6 +392,8 @@ type CubeLight struct {
 	workingPosition        vector.Vector
 	workingAngle           vector.Vector
 	workingDistanceSquared float64
+
+	out [9]float32
 }
 
 // NewCubeLight creates a new CubeLight with the given dimensions.
@@ -401,6 +407,7 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 		Color:         NewColor(1, 1, 1, 1),
 		On:            true,
 		LightingAngle: vector.Vector{0, -1, 0},
+		out:           [9]float32{},
 	}
 	return cube
 }
@@ -423,6 +430,10 @@ func (cube *CubeLight) Clone() INode {
 	newCube.Bleed = cube.Bleed
 	newCube.LightingAngle = cube.LightingAngle.Clone()
 	newCube.SetWorldTransform(cube.Transform())
+	newCube.Node = cube.Node.Clone().(*Node)
+	for _, child := range newCube.children {
+		child.setParent(newCube)
+	}
 	return newCube
 }
 
@@ -528,8 +539,6 @@ func (cube *CubeLight) beginModel(model *Model) {
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
 func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 
-	light := [9]float32{}
-
 	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
@@ -561,6 +570,10 @@ func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 
 	var vertPos, vertNormal vector.Vector
 
+	for i := 0; i < 9; i++ {
+		cube.out[i] = 0
+	}
+
 	for i := 0; i < 3; i++ {
 
 		if model.Skinned {
@@ -581,7 +594,8 @@ func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 				diffuse = 0
 			}
 
-			diffuse = cube.Bleed + math.Max(diffuse-(1-cube.Bleed), 0)
+			// diffuse += cube.Bleed
+			diffuse = cube.Bleed + ((1 - cube.Bleed) * diffuse)
 
 			if diffuse > 1 {
 				diffuse = 1
@@ -609,13 +623,13 @@ func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 			continue
 		}
 
-		light[(i * 3)] = cube.Color.R * float32(diffuseFactor) * cube.Energy
-		light[(i*3)+1] = cube.Color.G * float32(diffuseFactor) * cube.Energy
-		light[(i*3)+2] = cube.Color.B * float32(diffuseFactor) * cube.Energy
+		cube.out[(i * 3)] = cube.Color.R * float32(diffuseFactor) * cube.Energy
+		cube.out[(i*3)+1] = cube.Color.G * float32(diffuseFactor) * cube.Energy
+		cube.out[(i*3)+2] = cube.Color.B * float32(diffuseFactor) * cube.Energy
 
 	}
 
-	return light
+	return cube.out
 
 }
 

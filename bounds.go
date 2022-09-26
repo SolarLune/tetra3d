@@ -43,18 +43,18 @@ func (intersection *Intersection) SlideAgainstNormal(movementVec vector.Vector) 
 // colliding sphere / aabb, the closest point in the capsule, the center of the closest triangle, etc) to the
 // contact point.
 type Collision struct {
-	CollidedBoundingObject INode // The BoundingObject collided with
+	BoundingObject INode // The BoundingObject collided with
 	// The root colliding object; this can be the same or different from the CollidedBoundingObject, depending
 	// on which object was tested against (either an individual BoundingObject, or the parent / grandparent of a tree
 	// that contains one or more BoundingObjects)
-	CollidedRoot  INode
+	Root          INode
 	Intersections []*Intersection // The slice of Intersections, one for each object or triangle intersected with, arranged in order of distance (far to close).
 }
 
 func newCollision(collidedObject INode) *Collision {
 	return &Collision{
-		CollidedBoundingObject: collidedObject,
-		Intersections:          []*Intersection{},
+		BoundingObject: collidedObject,
+		Intersections:  []*Intersection{},
 	}
 }
 
@@ -244,7 +244,8 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 
 	triTrans := triangles.Transform()
 	invertedTransform := triTrans.Inverted()
-	transformNoLoc := triTrans.SetRow(3, vector.Vector{0, 0, 0, 1})
+	transformNoLoc := triTrans.Clone()
+	transformNoLoc.SetRow(3, vector.Vector{0, 0, 0, 1})
 	spherePos := invertedTransform.MultVec(sphere.WorldPosition())
 	sphereRadius := sphere.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
 
@@ -273,7 +274,7 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 			result.add(
 				&Intersection{
 					StartingPoint: spherePos,
-					ContactPoint:  triangles.Transform().MultVec(closest),
+					ContactPoint:  triTrans.MultVec(closest),
 					MTV:           transformNoLoc.MultVec(delta.Unit().Scale(sphereRadius - mag)),
 					Triangle:      tri,
 					Normal:        transformNoLoc.MultVec(tri.Normal).Unit(),
@@ -381,7 +382,8 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 	boxSize := box.Dimensions.Size().Scale(0.5)
 
 	transform := triangles.Transform()
-	transformNoLoc := transform.SetRow(3, vector.Vector{0, 0, 0, 1})
+	transformNoLoc := transform.Clone()
+	transformNoLoc.SetRow(3, vector.Vector{0, 0, 0, 1})
 
 	result := newCollision(triangles)
 
@@ -676,7 +678,8 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	triTrans := triangles.Transform()
 	invertedTransform := triTrans.Inverted()
-	transformNoLoc := triTrans.SetRow(3, vector.Vector{0, 0, 0, 1})
+	transformNoLoc := triTrans.Clone()
+	transformNoLoc.SetRow(3, vector.Vector{0, 0, 0, 1})
 
 	capsuleRadius := capsule.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
 	capsuleRadiusSquared := math.Pow(capsuleRadius, 2)
@@ -821,7 +824,7 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...INode) []*Col
 		if c, ok := checking.(BoundingObject); ok {
 
 			if collision := node.(BoundingObject).Collision(c); collision != nil {
-				collision.CollidedRoot = parent
+				collision.Root = parent
 				collisions = append(collisions, collision)
 			}
 

@@ -384,14 +384,14 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 			by := mat.Column(1)
 			bz := mat.Column(2)
 
-			mat = mat.SetColumn(1, bz)
-			mat = mat.SetColumn(2, by.Invert())
+			mat.SetColumn(1, bz)
+			mat.SetColumn(2, by.Invert())
 
 			by = mat.Row(1)
 			bz = mat.Row(2)
 
-			mat = mat.SetRow(1, bz)
-			mat = mat.SetRow(2, by.Invert())
+			mat.SetRow(1, bz)
+			mat.SetRow(2, by.Invert())
 
 		}
 

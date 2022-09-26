@@ -121,8 +121,13 @@ type INode interface {
 	WorldRotation() Matrix4
 	// SetWorldRotation sets an object's global, world rotation to the provided rotation Matrix4.
 	SetWorldRotation(rotation Matrix4)
+	// WorldPosition returns the node's world position, taking into account its parenting hierarchy.
 	WorldPosition() vector.Vector
+	// SetWorldPositionVec sets the world position of the given object using the provided position vector.
+	// Note that this isn't as performant as setting the position locally.
 	SetWorldPositionVec(position vector.Vector)
+	// SetWorldPosition sets the world position of the given object using the provided position arguments.
+	// Note that this isn't as performant as setting the position locally.
 	SetWorldPosition(x, y, z float64)
 	// WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components).
 	WorldScale() vector.Vector
@@ -161,9 +166,6 @@ type INode interface {
 	Get(path string) INode
 
 	// HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.
-	// Nodes will have a "+" next to their name, Models an "M", and Cameras a "C".
-	// BoundingSpheres will have BS, BoundingAABB AABB, BoundingCapsule CAP, and BoundingTriangles TRI.
-	// Lights will have an L next to their name.
 	// This is a useful function to debug the layout of a node tree, for example.
 	HierarchyAsString() string
 
@@ -427,7 +429,7 @@ func (node *Node) Clone() INode {
 	newNode.rotation = node.rotation.Clone()
 	newNode.visible = node.visible
 	newNode.data = node.data
-	newNode.isTransformDirty = true
+
 	newNode.tags = node.tags.Clone()
 	newNode.animationPlayer = node.animationPlayer.Clone()
 	newNode.library = node.library
@@ -447,6 +449,8 @@ func (node *Node) Clone() INode {
 			model.ReassignBones(newNode)
 		}
 	}
+
+	newNode.dirtyTransform()
 
 	newNode.isBone = node.isBone
 	if newNode.isBone {
@@ -812,6 +816,7 @@ func (node *Node) addChildren(parent INode, children ...INode) {
 			child.Parent().RemoveChildren(child)
 		}
 		child.setParent(parent)
+		child.dirtyTransform()
 		node.children = append(node.children, child)
 	}
 }
@@ -830,6 +835,7 @@ func (node *Node) RemoveChildren(children ...INode) {
 			if c == child {
 				// child.updateLocalTransform(nil)
 				child.setParent(nil)
+				child.dirtyTransform()
 				node.children[i] = nil
 				node.children = append(node.children[:i], node.children[i+1:]...)
 				break
@@ -883,10 +889,10 @@ func (node *Node) Tags() *Tags {
 }
 
 // HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.
-// Nodes will have a "+" next to their name, Models an "M", and Cameras a "C".
-// BoundingSpheres will have BS, BoundingAABB AABB, BoundingCapsule CAP, and BoundingTriangles TRI.
-// Lights will have an L next to their name.
 // This is a useful function to debug the layout of a node tree, for example.
+// All Nodes except for the top-level Node will show their type by means of a prefix ("MODEL" for Models, for example).
+// All Nodes listed in the hierarchy will also show their world positions, truncated to the first 2 decimals.
+
 func (node *Node) HierarchyAsString() string {
 
 	var printNode func(node INode, level int) string
@@ -895,36 +901,46 @@ func (node *Node) HierarchyAsString() string {
 
 		prefix := ""
 
-		nodeType := node.Type()
-
-		if nodeType.Is(NodeTypeModel) {
-			prefix = "MODEL"
-		} else if nodeType.Is(NodeTypeCamera) {
-			prefix = "CAM"
-		} else if nodeType.Is(NodeTypePath) {
-			prefix = "PATH"
-		} else if nodeType.Is(NodeTypeGrid) {
-			prefix = "GRID"
-		} else if nodeType.Is(NodeTypeGridPoint) {
-			prefix = "GPOINT"
-		} else if nodeType.Is(NodeTypeAmbientLight) {
-			prefix = "AMB"
-		} else if nodeType.Is(NodeTypeDirectionalLight) {
-			prefix = "DIR"
-		} else if nodeType.Is(NodeTypePointLight) {
-			prefix = "POINT"
-		} else if nodeType.Is(NodeTypeCubeLight) {
-			prefix = "CUBE"
-		} else if nodeType.Is(NodeTypeBoundingSphere) {
-			prefix = "BS"
-		} else if nodeType.Is(NodeTypeBoundingAABB) {
-			prefix = "AABB"
-		} else if nodeType.Is(NodeTypeBoundingCapsule) {
-			prefix = "CAP"
-		} else if nodeType.Is(NodeTypeBoundingTriangles) {
-			prefix = "TRI"
+		// We do this because calling Node.HierarchyAsString() will always return the base Node's
+		// type, which is NodeTypeNode, unless we override this function, essentially, for each
+		// "more specific type". To avoid doing this, I'm just going to have the first level node
+		// look like : [-] .
+		if level == 0 {
+			prefix = "-"
 		} else {
-			prefix = "NODE"
+
+			nodeType := node.Type()
+
+			if nodeType.Is(NodeTypeModel) {
+				prefix = "MODEL"
+			} else if nodeType.Is(NodeTypeCamera) {
+				prefix = "CAM"
+			} else if nodeType.Is(NodeTypePath) {
+				prefix = "PATH"
+			} else if nodeType.Is(NodeTypeGrid) {
+				prefix = "GRID"
+			} else if nodeType.Is(NodeTypeGridPoint) {
+				prefix = "GPOINT"
+			} else if nodeType.Is(NodeTypeAmbientLight) {
+				prefix = "AMB"
+			} else if nodeType.Is(NodeTypeDirectionalLight) {
+				prefix = "DIR"
+			} else if nodeType.Is(NodeTypePointLight) {
+				prefix = "POINT"
+			} else if nodeType.Is(NodeTypeCubeLight) {
+				prefix = "CUBE"
+			} else if nodeType.Is(NodeTypeBoundingSphere) {
+				prefix = "BS"
+			} else if nodeType.Is(NodeTypeBoundingAABB) {
+				prefix = "AABB"
+			} else if nodeType.Is(NodeTypeBoundingCapsule) {
+				prefix = "CAP"
+			} else if nodeType.Is(NodeTypeBoundingTriangles) {
+				prefix = "TRI"
+			} else {
+				prefix = "NODE"
+			}
+
 		}
 
 		str := ""
@@ -933,10 +949,14 @@ func (node *Node) HierarchyAsString() string {
 			str += "    "
 		}
 
-		wp := node.LocalPosition()
-		wpStr := "[" + strconv.FormatFloat(wp[0], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[1], 'f', -1, 64) + ", " + strconv.FormatFloat(wp[2], 'f', -1, 64) + "]"
+		wp := node.WorldPosition()
+		floatTruncation := 2
+		wpStr := "[" + strconv.FormatFloat(wp[0], 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp[1], 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp[2], 'f', floatTruncation, 64) + "]"
 
-		str += "\\-: [" + prefix + "] " + node.Name() + " : " + wpStr + "\n"
+		if level > 0 {
+			str += "\\-"
+		}
+		str += "[" + prefix + "] " + node.Name() + " : " + wpStr + "\n"
 
 		for _, child := range node.Children() {
 			str += printNode(child, level+1)

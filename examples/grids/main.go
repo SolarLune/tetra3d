@@ -67,7 +67,7 @@ func (cube *CubeElement) Update() {
 
 func (cube *CubeElement) ChooseNewTarget() {
 	grid := cube.Root.Get("Network").(*tetra3d.Grid)
-	closest := grid.NearestPoint(cube.Model.WorldPosition())
+	closest := grid.NearestGridPoint(cube.Model.WorldPosition())
 	cube.Navigator.SetPath(closest.PathTo(grid.RandomPoint()))
 }
 
