@@ -322,11 +322,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Normal loading
 - [X] -- Transform / full scene loading
 - [X] **Lighting**
+- [X] -- Smooth shading
 - [X] -- Ambient lights
 - [X] -- Point lights
 - [X] -- Directional lights
 - [X] -- Cube (AABB volume) lights
-- [X] -- Smooth shading
+- [X] -- Lighting Groups
 - [X] -- Ability to bake lighting to vertex colors
 - [X] -- Ability to bake ambient occlusion to vertex colors
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
