@@ -263,7 +263,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
 - [X] -- Offscreen Rendering
 - [X] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
-- [ ] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
+- [x] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
 - [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
 - [ ] -- Draw triangle in 3D space through a function (could be useful for 3D lines, for example)
 - [ ] -- Easy dynamic 3D Text (to make this simple, it might be best to allow the user to render the text as he wishes, and then make a function to map it (or any other *Image) to a plane of variable size).
@@ -303,7 +303,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Camera loading
 - [X] -- Loading world color in as ambient lighting
 - [ ] -- Separate .bin loading
-- [ ] -- Support for multiple scenes in a single Blend file (this used to work fine, but a regression with the GLTF exporter has broken this)
+- [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
 - [X] **Blender Add-on**
 - [X] -- Export GLTF on save / on command via button
 - [X] -- Bounds node creation
@@ -315,6 +315,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Material data export
 - [X] -- Option to pack textures or leave them as a path
 - [X] -- Path / 3D Curve support
+- [X] -- Grid support (for pathfinding / linking 3D points together)
 - [X] **DAE model loading**
 - [X] -- Vertex colors loading
 - [X] -- UV map loading
