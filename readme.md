@@ -341,6 +341,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Contact point reporting
 - [X] -- Varying collision shapes
 - [X] -- Checking multiple collisions at the same time
+- [X] -- Composing collision shapes out of multiple sub-shapes (this can be done by simply creating them, parenting them to some node, and then testing against that node)
 - [X] -- Bounding / Broadphase collision checking
 
 
