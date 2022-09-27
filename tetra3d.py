@@ -449,6 +449,9 @@ def export():
     
     globalSet("t3dCollections__", collections)
 
+    # set global camera resolution
+    globalSet("t3dCameraResolution__", [bpy.context.scene.render.resolution_x, bpy.context.scene.render.resolution_y])
+
     worlds = {}
 
     for world in bpy.data.worlds:
