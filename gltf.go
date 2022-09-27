@@ -20,6 +20,7 @@ import (
 )
 
 type GLTFLoadOptions struct {
+	ResolveCameraRes          bool
 	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
 	CameraDepth               bool // If cameras should render depth or not
 	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
@@ -37,6 +38,7 @@ type GLTFLoadOptions struct {
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
 func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 	return &GLTFLoadOptions{
+		ResolveCameraRes:          true,
 		CameraWidth:               1920,
 		CameraHeight:              1080,
 		CameraDepth:               true,
@@ -101,6 +103,18 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		if doc.Scenes[0].Extras != nil {
 
 			globalExporterSettings := doc.Scenes[0].Extras.(map[string]interface{})
+
+			if gltfLoadOptions.ResolveCameraRes {
+				if cr, exists := globalExporterSettings["t3dCameraResolution__"]; exists {
+					res := cr.([]interface{})
+					if w, ok := res[0].(float64); ok {
+						(*gltfLoadOptions).CameraWidth = int(w)
+					}
+					if h, ok := res[1].(float64); ok {
+						(*gltfLoadOptions).CameraHeight = int(h)
+					}
+				}
+			}
 
 			if et, exists := globalExporterSettings["t3dPackTextures__"]; exists {
 				t3dExport = true
