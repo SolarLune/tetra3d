@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.2.43",
+        "generator" : "Khronos glTF Blender I/O v3.3.27",
         "version" : "2.0"
     },
     "scene" : 0,
@@ -24,6 +24,10 @@
                         ]
                     }
                 },
+                "t3dCameraResolution__" : [
+                    1920,
+                    1080
+                ],
                 "t3dWorlds__" : {
                     "World" : {
                         "ambient color" : [
@@ -339,17 +343,20 @@
         {
             "buffer" : 0,
             "byteLength" : 71868,
-            "byteOffset" : 0
+            "byteOffset" : 0,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 71868,
-            "byteOffset" : 71868
+            "byteOffset" : 71868,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 23460,
-            "byteOffset" : 143736
+            "byteOffset" : 143736,
+            "target" : 34963
         }
     ],
     "buffers" : [

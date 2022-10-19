@@ -1010,41 +1010,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
-	getOrDefaultInt := func(propMap map[string]interface{}, key string, defaultValue int) int {
-		if value, keyExists := propMap[key]; keyExists {
-			return int(value.(float64))
-		}
-		return defaultValue
-	}
-
-	getOrDefaultString := func(propMap map[string]interface{}, key string, defaultValue string) string {
-		if value, keyExists := propMap[key]; keyExists {
-			return value.(string)
-		}
-		return defaultValue
-	}
-
-	getOrDefaultFloat := func(propMap map[string]interface{}, key string, defaultValue float64) float64 {
-		if value, keyExists := propMap[key]; keyExists {
-			return value.(float64)
-		}
-		return defaultValue
-	}
-
-	getOrDefaultBool := func(propMap map[string]interface{}, key string, defaultValue bool) bool {
-		if value, keyExists := propMap[key]; keyExists {
-			return value.(float64) > 0
-		}
-		return defaultValue
-	}
-
-	getIfExistingMap := func(propMap map[string]interface{}, key string) map[string]interface{} {
-		if value, keyExists := propMap[key]; keyExists && value != nil {
-			return value.(map[string]interface{})
-		}
-		return nil
-	}
-
 	findNode := func(objName string) INode {
 		for _, obj := range objects {
 			if obj.Name() == objName {
@@ -1054,17 +1019,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		return nil
 	}
 
-	getOrDefaultFloatArray := func(propMap map[string]interface{}, key string, defaultValue []float64) []float64 {
-		if value, keyExists := propMap[key]; keyExists {
-			values := make([]float64, 0, len(value.([]interface{})))
-			for _, v := range value.([]interface{}) {
-				values = append(values, v.(float64))
-			}
-			return values
-		}
-		return defaultValue
-	}
-
 	// At this point, parenting should be set up.
 	for obj, node := range objToNode {
 
@@ -1072,49 +1026,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
 
 				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {
+
 					for _, p := range gameProps.([]interface{}) {
 
-						property := p.(map[string]interface{})
-
-						propType := getOrDefaultInt(property, "valueType", 0)
-
-						// Property types:
-
-						// bool, int, float, string, reference (string)
-
-						name := getOrDefaultString(property, "name", "New Property")
-						var value interface{}
-
-						if propType == 0 {
-							value = getOrDefaultBool(property, "valueBool", false)
-						} else if propType == 1 {
-							value = getOrDefaultInt(property, "valueInt", 0)
-						} else if propType == 2 {
-							value = getOrDefaultFloat(property, "valueFloat", 0)
-						} else if propType == 3 {
-							value = getOrDefaultString(property, "valueString", "")
-						} else if propType == 4 {
-							scene := ""
-							// Can be nil if it was set to something and then set to nothing
-							if ref := getIfExistingMap(property, "valueReferenceScene"); ref != nil {
-								scene = getOrDefaultString(ref, "name", "")
-							}
-							if ref := getIfExistingMap(property, "valueReference"); ref != nil {
-								value = scene + ":" + getOrDefaultString(ref, "name", "")
-							}
-						} else if propType == 5 {
-							colorValues := getOrDefaultFloatArray(property, "valueColor", []float64{1, 1, 1, 1})
-							color := NewColor(float32(colorValues[0]), float32(colorValues[1]), float32(colorValues[2]), float32(colorValues[3]))
-							color.ConvertTosRGB()
-							value = color
-						} else if propType == 6 {
-							vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float64{0, 0, 0})
-							vec := vector.Vector{}
-							for _, v := range vecValues {
-								vec = append(vec, v)
-							}
-							value = vec
-						}
+						name, value := handleGameProperties(p)
 
 						obj.Tags().Set(name, value)
 
@@ -1281,6 +1196,24 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			if wn, exists := extras["t3dCurrentWorld__"]; exists {
 				scene.World = library.Worlds[wn.(string)]
 			}
+
+			if gameProps, exists := extras["t3dGameProperties__"]; exists {
+
+				for _, p := range gameProps.([]interface{}) {
+
+					name, value := handleGameProperties(p)
+
+					scene.Tags().Set(name, value)
+
+				}
+			}
+
+			for tagName, data := range extras {
+				if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
+					scene.Tags().Set(tagName, data)
+				}
+			}
+
 		}
 
 	}
@@ -1316,5 +1249,99 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	library.ExportedScene = library.Scenes[*doc.Scene]
 
 	return library, nil
+
+}
+
+func handleGameProperties(p interface{}) (string, interface{}) {
+
+	getOrDefaultInt := func(propMap map[string]interface{}, key string, defaultValue int) int {
+		if value, keyExists := propMap[key]; keyExists {
+			return int(value.(float64))
+		}
+		return defaultValue
+	}
+
+	getOrDefaultString := func(propMap map[string]interface{}, key string, defaultValue string) string {
+		if value, keyExists := propMap[key]; keyExists {
+			return value.(string)
+		}
+		return defaultValue
+	}
+
+	getOrDefaultFloat := func(propMap map[string]interface{}, key string, defaultValue float64) float64 {
+		if value, keyExists := propMap[key]; keyExists {
+			return value.(float64)
+		}
+		return defaultValue
+	}
+
+	getOrDefaultBool := func(propMap map[string]interface{}, key string, defaultValue bool) bool {
+		if value, keyExists := propMap[key]; keyExists {
+			return value.(float64) > 0
+		}
+		return defaultValue
+	}
+
+	getIfExistingMap := func(propMap map[string]interface{}, key string) map[string]interface{} {
+		if value, keyExists := propMap[key]; keyExists && value != nil {
+			return value.(map[string]interface{})
+		}
+		return nil
+	}
+
+	getOrDefaultFloatArray := func(propMap map[string]interface{}, key string, defaultValue []float64) []float64 {
+		if value, keyExists := propMap[key]; keyExists {
+			values := make([]float64, 0, len(value.([]interface{})))
+			for _, v := range value.([]interface{}) {
+				values = append(values, v.(float64))
+			}
+			return values
+		}
+		return defaultValue
+	}
+
+	property := p.(map[string]interface{})
+
+	propType := getOrDefaultInt(property, "valueType", 0)
+
+	// Property types:
+
+	// bool, int, float, string, reference (string)
+
+	name := getOrDefaultString(property, "name", "New Property")
+	var value interface{}
+
+	if propType == 0 {
+		value = getOrDefaultBool(property, "valueBool", false)
+	} else if propType == 1 {
+		value = getOrDefaultInt(property, "valueInt", 0)
+	} else if propType == 2 {
+		value = getOrDefaultFloat(property, "valueFloat", 0)
+	} else if propType == 3 {
+		value = getOrDefaultString(property, "valueString", "")
+	} else if propType == 4 {
+		scene := ""
+		// Can be nil if it was set to something and then set to nothing
+		if ref := getIfExistingMap(property, "valueReferenceScene"); ref != nil {
+			scene = getOrDefaultString(ref, "name", "")
+		}
+		if ref := getIfExistingMap(property, "valueReference"); ref != nil {
+			value = scene + ":" + getOrDefaultString(ref, "name", "")
+		}
+	} else if propType == 5 {
+		colorValues := getOrDefaultFloatArray(property, "valueColor", []float64{1, 1, 1, 1})
+		color := NewColor(float32(colorValues[0]), float32(colorValues[1]), float32(colorValues[2]), float32(colorValues[3]))
+		color.ConvertTosRGB()
+		value = color
+	} else if propType == 6 {
+		vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float64{0, 0, 0})
+		vec := vector.Vector{}
+		for _, v := range vecValues {
+			vec = append(vec, v)
+		}
+		value = vec
+	}
+
+	return name, value
 
 }

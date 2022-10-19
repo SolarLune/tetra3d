@@ -27,6 +27,7 @@ type Game struct {
 	Camera       *tetra3d.Camera
 	CameraTilt   float64
 	CameraRotate float64
+	CamLocked    bool
 
 	DrawDebugText     bool
 	DrawDebugDepth    bool
@@ -45,9 +46,11 @@ func NewGame() *Game {
 		Height:            448,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
+		CamLocked:         true,
 	}
 
 	game.Init()
+	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 	return game
 }
@@ -173,8 +176,6 @@ func (g *Game) Init() {
 	g.Camera.SetLocalPositionVec(vector.Vector{0, 2, 5})
 	g.Scene.Root.AddChildren(g.Camera)
 
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
 }
 
 func (g *Game) Update() error {
@@ -232,23 +233,41 @@ func (g *Game) Update() error {
 
 	// Rotating the camera with the mouse
 
-	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
 	mv := vector.Vector{float64(mx), float64(my)}
 
-	diff := mv.Sub(g.PrevMousePosition)
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+		g.CamLocked = !g.CamLocked
 
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
+		if g.CamLocked {
+			ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+		} else {
+			ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		}
 
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
+		g.PrevMousePosition = mv.Clone()
 
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
+	}
 
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
+	if g.CamLocked {
+
+		// Rotate and tilt the camera according to mouse movements
+
+		diff := mv.Sub(g.PrevMousePosition)
+
+		g.CameraTilt -= diff[1] * 0.005
+		g.CameraRotate -= diff[0] * 0.005
+
+		g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
+
+		tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
+		rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
+
+		// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
+		g.Camera.SetLocalRotation(tilt.Mult(rotate))
+
+	}
 
 	g.PrevMousePosition = mv.Clone()
 
@@ -300,7 +319,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example shows how particle systems work.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example shows how particle systems work.\nF2: Lock / Unlock mouse\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		g.Camera.DebugDrawText(screen, txt, 0, 120, 1, colors.LightGray())
 	}
 }

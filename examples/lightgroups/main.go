@@ -35,6 +35,8 @@ type Game struct {
 	DrawDebugDepth    bool
 	PrevMousePosition vector.Vector
 
+	CamLocked bool
+
 	Time float64
 }
 
@@ -43,7 +45,10 @@ func NewGame() *Game {
 		Width:             796,
 		Height:            448,
 		PrevMousePosition: vector.Vector{},
+		CamLocked:         true,
 	}
+
+	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 	game.Init()
 
@@ -72,8 +77,6 @@ func (g *Game) Init() {
 
 	rt := g.Scene.Root.Get("OnlyRed").(*tetra3d.Model)
 	rt.LightGroup = tetra3d.NewLightGroup(g.Scene.Root.Get("RedLight").(*tetra3d.PointLight))
-
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
 
@@ -116,6 +119,17 @@ func (g *Game) Update() error {
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
 		pos[1] -= moveSpd
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+		g.CamLocked = !g.CamLocked
+
+		if g.CamLocked {
+			ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+		} else {
+			ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		}
+
 	}
 
 	g.Camera.SetLocalPositionVec(pos)
@@ -215,7 +229,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.DrawDebugText {
 		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis example shows light groups.\nLight groups allow you to control\nwhich lights influence Models\nwhile having them remain available for others.\n\nThere's two point lights in this scene - a red one\nand a green one. The left cube is only\nlit by the green light, while the right\nis only lit by the red one.\n\n1 Key: Toggle light groups being active\n2 Key: Toggle all lighting\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis example shows light groups.\nLight groups allow you to control\nwhich lights influence Models\nwhile having them remain available for others.\n\nThere's two point lights in this scene - a red one\nand a green one. The left cube is only\nlit by the green light, while the right\nis only lit by the red one.\n\n1 Key: Toggle light groups being active\n2 Key: Toggle all lighting\nF2: Lock / Unlock Mouse\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 		g.Camera.DebugDrawText(screen, txt, 0, 150, 1, colors.LightGray())
 	}
 }

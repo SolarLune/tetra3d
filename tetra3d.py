@@ -91,6 +91,17 @@ class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
         context.object.t3dGameProperties__.add()
         return {'FINISHED'}
 
+class SCENE_OT_tetra3dAddProp(bpy.types.Operator):
+    bl_idname = "scene.tetra3daddprop"
+    bl_label = "Add Game Property"
+    bl_description= "Adds a game property to the current Scene"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        context.scene.t3dGameProperties__.add()
+        return {'FINISHED'}
+
+
 class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
     bl_idname = "object.tetra3ddeleteprop"
     bl_label = "Delete Game Property"
@@ -101,6 +112,18 @@ class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
 
     def execute(self, context):
         context.object.t3dGameProperties__.remove(self.index)
+        return {'FINISHED'}
+
+class SCENE_OT_tetra3dDeleteProp(bpy.types.Operator):
+    bl_idname = "scene.tetra3ddeleteprop"
+    bl_label = "Delete Game Property"
+    bl_description= "Deletes a game property from the current scene"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+
+    def execute(self, context):
+        context.scene.t3dGameProperties__.remove(self.index)
         return {'FINISHED'}
 
 class OBJECT_OT_tetra3dReorderProps(bpy.types.Operator):
@@ -117,6 +140,22 @@ class OBJECT_OT_tetra3dReorderProps(bpy.types.Operator):
             context.object.t3dGameProperties__.move(self.index, self.index-1)
         else:
             context.object.t3dGameProperties__.move(self.index, self.index+1)
+        return {'FINISHED'}
+
+class SCENE_OT_tetra3dReorderProps(bpy.types.Operator):
+    bl_idname = "scene.tetra3dreorderprops"
+    bl_label = "Re-order Game Property"
+    bl_description= "Moves a game property up or down in the list"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+    moveUp : bpy.props.BoolProperty()
+
+    def execute(self, context):
+        if self.moveUp:
+            context.scene.t3dGameProperties__.move(self.index, self.index-1)
+        else:
+            context.scene.t3dGameProperties__.move(self.index, self.index+1)
         return {'FINISHED'}
 
 def copyProp(fromProp, toProp):
@@ -202,6 +241,16 @@ class OBJECT_OT_tetra3dClearProps(bpy.types.Operator):
         for o in context.selected_objects:
             o.t3dGameProperties__.clear()
 
+        return {'FINISHED'}
+
+class SCENE_OT_tetra3dClearProps(bpy.types.Operator):
+   bl_idname = "scene.tetra3dclearprops"
+   bl_label = "Clear Game Properties"
+   bl_description= "Clears all game properties from the scene"
+   bl_options = {'REGISTER', 'UNDO'}
+
+   def execute(self, context):
+        context.scene.t3dGameProperties__.clear()
         return {'FINISHED'}
 
 
@@ -295,28 +344,71 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             deleteOptions.index = index
 
             row = box.row()
-            row.prop(prop, "valueType")
-            if prop.valueType == "bool":
-                row.prop(prop, "valueBool")
-            elif prop.valueType == "int":
-                row.prop(prop, "valueInt")
-            elif prop.valueType == "float":
-                row.prop(prop, "valueFloat")
-            elif prop.valueType == "string":
-                row.prop(prop, "valueString")
-            elif prop.valueType == "reference":
-                row.prop(prop, "valueReferenceScene")
-                if prop.valueReferenceScene != None:
-                    row.prop_search(prop, "valueReference", prop.valueReferenceScene, "objects")
-                else:
-                    row.prop(prop, "valueReference")
-            elif prop.valueType == "color":
-                row.prop(prop, "valueColor")
-            elif prop.valueType == "vector3d":
-                row.prop(prop, "valueVector3D")
+            handleT3DProperty(row, prop)
         
         row = self.layout.row()
         row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+        
+
+class SCENE_PT_tetra3d(bpy.types.Panel):
+    bl_idname = "SCENE_PT_tetra3d"
+    bl_label = "Tetra3d Scene Properties"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "scene"
+
+    @classmethod
+    def poll(self,context):
+        return context.scene is not None
+
+    def draw(self, context):
+
+        row = self.layout.row()
+        row.operator("scene.tetra3daddprop", text="Add Game Property", icon="PLUS")
+
+        for index, prop in enumerate(context.scene.t3dGameProperties__):
+            box = self.layout.box()
+            row = box.row()
+            row.prop(prop, "name")
+            
+            moveUpOptions = row.operator(SCENE_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
+            moveUpOptions.index = index
+            moveUpOptions.moveUp = True
+
+            moveDownOptions = row.operator(SCENE_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
+            moveDownOptions.index = index
+            moveDownOptions.moveUp = False
+
+            deleteOptions = row.operator(SCENE_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
+            deleteOptions.index = index
+
+            row = box.row()
+            handleT3DProperty(row, prop)
+        
+        row = self.layout.row()
+        row.operator("scene.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+
+def handleT3DProperty(row, prop):
+
+    row.prop(prop, "valueType")
+    if prop.valueType == "bool":
+        row.prop(prop, "valueBool")
+    elif prop.valueType == "int":
+        row.prop(prop, "valueInt")
+    elif prop.valueType == "float":
+        row.prop(prop, "valueFloat")
+    elif prop.valueType == "string":
+        row.prop(prop, "valueString")
+    elif prop.valueType == "reference":
+        row.prop(prop, "valueReferenceScene")
+        if prop.valueReferenceScene != None:
+            row.prop_search(prop, "valueReference", prop.valueReferenceScene, "objects")
+        else:
+            row.prop(prop, "valueReference")
+    elif prop.valueType == "color":
+        row.prop(prop, "valueColor")
+    elif prop.valueType == "vector3d":
+        row.prop(prop, "valueVector3D")
         
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"
@@ -742,6 +834,8 @@ def register():
     bpy.utils.register_class(RENDER_PT_tetra3d)
     bpy.utils.register_class(MATERIAL_PT_tetra3d)
     bpy.utils.register_class(WORLD_PT_tetra3d)
+    bpy.utils.register_class(SCENE_PT_tetra3d)
+    
     bpy.utils.register_class(OBJECT_OT_tetra3dAddProp)
     bpy.utils.register_class(OBJECT_OT_tetra3dDeleteProp)
     bpy.utils.register_class(OBJECT_OT_tetra3dReorderProps)
@@ -749,12 +843,19 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyOneProperty)
     bpy.utils.register_class(OBJECT_OT_tetra3dClearProps)
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
+    
+    bpy.utils.register_class(SCENE_OT_tetra3dAddProp)
+    bpy.utils.register_class(SCENE_OT_tetra3dDeleteProp)
+    bpy.utils.register_class(SCENE_OT_tetra3dReorderProps)
+    bpy.utils.register_class(SCENE_OT_tetra3dClearProps)
+    
     bpy.utils.register_class(EXPORT_OT_tetra3d)
     
     bpy.utils.register_class(t3dGamePropertyItem__)
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
+        setattr(bpy.types.Scene, propName, prop)
 
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
     get=getExportOnSave, set=setExportOnSave)
@@ -794,6 +895,8 @@ def unregister():
     bpy.utils.unregister_class(RENDER_PT_tetra3d)
     bpy.utils.unregister_class(MATERIAL_PT_tetra3d)
     bpy.utils.unregister_class(WORLD_PT_tetra3d)
+    bpy.utils.unregister_class(SCENE_PT_tetra3d)
+
     bpy.utils.unregister_class(OBJECT_OT_tetra3dAddProp)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dDeleteProp)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dReorderProps)
@@ -801,12 +904,19 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyOneProperty)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dClearProps)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
+
+    bpy.utils.unregister_class(SCENE_OT_tetra3dAddProp)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dDeleteProp)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dReorderProps)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dClearProps)
+
     bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
     bpy.utils.unregister_class(t3dGamePropertyItem__)
     
     for propName, prop in objectProps.items():
         delattr(bpy.types.Object, propName)
+        delattr(bpy.types.Scene, propName)
 
     del bpy.types.Scene.t3dExportOnSave__
     del bpy.types.Scene.t3dExportFilepath__

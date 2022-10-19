@@ -277,8 +277,8 @@ func (grid *Grid) NearestPositionOnGrid(position vector.Vector) vector.Vector {
 
 }
 
-// FurthestPoint returns the furthest grid point to the given world position.
-func (grid *Grid) FurthestPoint(position vector.Vector) *GridPoint {
+// FurthestGridPoint returns the furthest grid point to the given world position.
+func (grid *Grid) FurthestGridPoint(position vector.Vector) *GridPoint {
 
 	points := grid.Points()
 
@@ -316,11 +316,8 @@ func (grid *Grid) FirstPoint() *GridPoint {
 	return gridPoints[0]
 }
 
-// Combine combines the Grid with the other Grids provided. This reparents the others' GridPoints to be
-// under the calling Grid's. If two GridPoints share the same position, they will be merged together.
-// If, for example, A is connected to B and C is connected to D, and B and C share positions, after calling
-// combining Grids, you would end up with A being connected to B, which is connected to D. C would no longer
-// exist.
+// Combine combines the Grid with the other Grids provided. This reparents the other' Grid's GridPoints (and other children)
+// to be under the calling Grid's. If two GridPoints share the same position, they will be merged together.
 // After combining a Grid with others, the other Grids will automatically be unparented (as their GridPoints will
 // have been absorbed).
 func (grid *Grid) Combine(others ...*Grid) {
@@ -331,7 +328,7 @@ func (grid *Grid) Combine(others ...*Grid) {
 			continue
 		}
 
-		for _, p := range other.Points() {
+		for _, p := range other.Children() {
 			pos := p.WorldPosition()
 			grid.AddChildren(p)
 			p.SetWorldPositionVec(pos)

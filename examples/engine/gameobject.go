@@ -56,7 +56,7 @@ func (player *Player) Update() {
 
 	for _, col := range collisions {
 
-		if col.CollidedBoundingObject.Tags().Has("death") {
+		if col.BoundingObject.Tags().Has("death") {
 			player.node.Unparent() // Unparenting is the equivalent of destroying the node
 		}
 
