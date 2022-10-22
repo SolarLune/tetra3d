@@ -95,7 +95,7 @@ func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 func (nf NodeFilter) ByTags(tagNames ...string) NodeFilter {
 	out := make([]INode, 0, len(nf))
 	for _, node := range nf {
-		if node.Tags().Has(tagNames...) {
+		if node.Properties().Has(tagNames...) {
 			out = append(out, node)
 		}
 	}
@@ -128,10 +128,10 @@ func (nf NodeFilter) Empty() bool {
 
 // BoundingObjects returns a slice of the BoundingObjects contained within the NodeFilter. This is particularly useful when you're using
 // NodeFilters to filter down a selection of Nodes that you then need to pass into BoundingObject.CollisionTest().
-func (nc NodeFilter) BoundingObjects() []BoundingObject {
-	boundings := make([]BoundingObject, 0, len(nc))
+func (nc NodeFilter) BoundingObjects() []IBoundingObject {
+	boundings := make([]IBoundingObject, 0, len(nc))
 	for _, n := range nc {
-		if b, ok := n.(BoundingObject); ok {
+		if b, ok := n.(IBoundingObject); ok {
 			boundings = append(boundings, b)
 		}
 	}

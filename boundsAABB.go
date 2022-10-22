@@ -134,7 +134,8 @@ func (box *BoundingAABB) AddChildren(children ...INode) {
 	box.addChildren(box, children...)
 }
 
-// ClosestPoint returns the closest point, to the point given, on the inside or surface of the BoundingAABB.
+// ClosestPoint returns the closest point, to the point given, on the inside or surface of the BoundingAABB
+// in world space.
 func (box *BoundingAABB) ClosestPoint(point vector.Vector) vector.Vector {
 	out := point.Clone()
 	pos := box.WorldPosition()
@@ -202,15 +203,15 @@ func aabbNormalGuess(dir vector.Vector) vector.Vector {
 
 }
 
-// Colliding returns true if the BoundingAABB is colliding with another BoundingObject.
-func (box *BoundingAABB) Colliding(other BoundingObject) bool {
+// Colliding returns true if the BoundingAABB collides with another IBoundingObject.
+func (box *BoundingAABB) Colliding(other IBoundingObject) bool {
 	return box.Collision(other) != nil
 }
 
-// Collision returns the Collision between the BoundingAABB and the other BoundingObject. If
+// Collision returns the Collision between the BoundingAABB and the other IBoundingObject. If
 // there is no intersection, the function returns nil. (Note that BoundingAABB > BoundingTriangles collision
 // is buggy at the moment.)
-func (box *BoundingAABB) Collision(other BoundingObject) *Collision {
+func (box *BoundingAABB) Collision(other IBoundingObject) *Collision {
 
 	if other == box {
 		return nil

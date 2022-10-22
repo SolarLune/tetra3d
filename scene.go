@@ -11,7 +11,7 @@ type Scene struct {
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
 	Root  INode
 	World *World
-	tags  *Tags
+	props *Properties
 }
 
 // NewScene creates a new Scene by the name given.
@@ -21,7 +21,7 @@ func NewScene(name string) *Scene {
 		Name:  name,
 		Root:  NewNode("Root"),
 		World: NewWorld("World"),
-		tags:  NewTags(),
+		props: NewProperties(),
 	}
 
 	scene.Root.(*Node).scene = scene
@@ -40,7 +40,7 @@ func (scene *Scene) Clone() *Scene {
 	newScene.Root.(*Node).scene = newScene
 
 	newScene.World = scene.World // Here, we simply reference the same world; we don't clone it, since a single world can be shared across multiple Scenes
-	newScene.tags = scene.tags.Clone()
+	newScene.props = scene.props.Clone()
 
 	return newScene
 
@@ -51,6 +51,6 @@ func (scene *Scene) Library() *Library {
 	return scene.library
 }
 
-func (scene *Scene) Tags() *Tags {
-	return scene.tags
+func (scene *Scene) Properties() *Properties {
+	return scene.props
 }

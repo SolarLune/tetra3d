@@ -45,13 +45,13 @@ func (sphere *BoundingSphere) WorldRadius() float64 {
 }
 
 // Colliding returns true if the BoundingSphere is intersecting the other BoundingObject.
-func (sphere *BoundingSphere) Colliding(other BoundingObject) bool {
+func (sphere *BoundingSphere) Colliding(other IBoundingObject) bool {
 	return sphere.Collision(other) != nil
 }
 
 // Collision returns a Collision if the BoundingSphere is intersecting another BoundingObject. If
 // no intersection is reported, Collision returns nil.
-func (sphere *BoundingSphere) Collision(other BoundingObject) *Collision {
+func (sphere *BoundingSphere) Collision(other IBoundingObject) *Collision {
 
 	if other == sphere {
 		return nil

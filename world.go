@@ -22,21 +22,23 @@ type World struct {
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
 	// ranging from 0 to 1. The first indicates the start of the fog, and the second the end, in
 	// terms of total depth of the near / far clipping plane. The default is [0, 1].
-	FogRange     []float32
-	LightingOn   bool          // If lighting is enabled when rendering the scene.
-	AmbientLight *AmbientLight // Ambient lighting for this world
+	DitheredFogSize float32 // If greater than zero, how large the dithering effect is for transparent fog. If <= 0, dithering is disabled.
+	FogRange        []float32
+	LightingOn      bool          // If lighting is enabled when rendering the scene.
+	AmbientLight    *AmbientLight // Ambient lighting for this world
 }
 
 // NewWorld creates a new World with the specified name and default values for fog, lighting, etc).
 func NewWorld(name string) *World {
 
 	return &World{
-		Name:         name,
-		FogColor:     NewColor(0, 0, 0, 0),
-		FogRange:     []float32{0, 1},
-		LightingOn:   true,
-		ClearColor:   NewColor(0.08, 0.09, 0.1, 1),
-		AmbientLight: NewAmbientLight("ambient light", 1, 1, 1, 0),
+		Name:            name,
+		FogColor:        NewColor(0, 0, 0, 0),
+		FogRange:        []float32{0, 1},
+		LightingOn:      true,
+		DitheredFogSize: 0,
+		ClearColor:      NewColor(0.08, 0.09, 0.1, 1),
+		AmbientLight:    NewAmbientLight("ambient light", 1, 1, 1, 0),
 	}
 
 }
@@ -53,6 +55,7 @@ func (world *World) Clone() *World {
 	newWorld.FogRange[1] = world.FogRange[1]
 	newWorld.LightingOn = world.LightingOn
 	newWorld.AmbientLight = world.AmbientLight.Clone().(*AmbientLight)
+	newWorld.DitheredFogSize = world.DitheredFogSize
 
 	return newWorld
 

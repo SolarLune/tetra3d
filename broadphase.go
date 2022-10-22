@@ -122,10 +122,10 @@ func (bp *Broadphase) Resize(gridSize int) {
 
 }
 
-// GetTrianglesFromBounding retursn a set (map[int]bool) of triangle IDs, based on where the BoundingObject is
+// TrianglesFromBounding returns a set (a map[int]bool) of triangle IDs, based on where the BoundingObject is
 // in relation to the Broadphase owning BoundingTriangles instance. The returned set contains each triangle only
 // once, of course.
-func (bp *Broadphase) GetTrianglesFromBounding(boundingObject BoundingObject) map[int]bool {
+func (bp *Broadphase) TrianglesFromBounding(boundingObject IBoundingObject) map[int]bool {
 
 	if bp.GridSize <= 0 {
 		trianglesSet := make(map[int]bool, len(bp.BoundingTriangles.Mesh.Triangles))

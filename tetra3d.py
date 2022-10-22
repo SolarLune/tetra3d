@@ -87,20 +87,13 @@ class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
     bl_description= "Adds a game property to the currently selected object. A game property gets added to an Object's Tags object in Tetra3D"
     bl_options = {'REGISTER', 'UNDO'}
 
-    def execute(self, context):
-        context.object.t3dGameProperties__.add()
-        return {'FINISHED'}
-
-class SCENE_OT_tetra3dAddProp(bpy.types.Operator):
-    bl_idname = "scene.tetra3daddprop"
-    bl_label = "Add Game Property"
-    bl_description= "Adds a game property to the current Scene"
-    bl_options = {'REGISTER', 'UNDO'}
+    mode : bpy.props.StringProperty()
 
     def execute(self, context):
-        context.scene.t3dGameProperties__.add()
+        
+        target = getattr(context, self.mode)
+        target.t3dGameProperties__.add()
         return {'FINISHED'}
-
 
 class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
     bl_idname = "object.tetra3ddeleteprop"
@@ -109,21 +102,12 @@ class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     index : bpy.props.IntProperty()
+    mode : bpy.props.StringProperty()
 
     def execute(self, context):
-        context.object.t3dGameProperties__.remove(self.index)
-        return {'FINISHED'}
 
-class SCENE_OT_tetra3dDeleteProp(bpy.types.Operator):
-    bl_idname = "scene.tetra3ddeleteprop"
-    bl_label = "Delete Game Property"
-    bl_description= "Deletes a game property from the current scene"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    index : bpy.props.IntProperty()
-
-    def execute(self, context):
-        context.scene.t3dGameProperties__.remove(self.index)
+        target = getattr(context, self.mode)
+        target.t3dGameProperties__.remove(self.index)
         return {'FINISHED'}
 
 class OBJECT_OT_tetra3dReorderProps(bpy.types.Operator):
@@ -134,28 +118,43 @@ class OBJECT_OT_tetra3dReorderProps(bpy.types.Operator):
 
     index : bpy.props.IntProperty()
     moveUp : bpy.props.BoolProperty()
+    mode : bpy.props.StringProperty()
 
     def execute(self, context):
+
+        target = getattr(context, self.mode)
+
         if self.moveUp:
-            context.object.t3dGameProperties__.move(self.index, self.index-1)
+            target.t3dGameProperties__.move(self.index, self.index-1)
         else:
-            context.object.t3dGameProperties__.move(self.index, self.index+1)
+            target.t3dGameProperties__.move(self.index, self.index+1)
+
         return {'FINISHED'}
 
-class SCENE_OT_tetra3dReorderProps(bpy.types.Operator):
-    bl_idname = "scene.tetra3dreorderprops"
-    bl_label = "Re-order Game Property"
-    bl_description= "Moves a game property up or down in the list"
+class OBJECT_OT_tetra3dSetVector(bpy.types.Operator):
+    bl_idname = "object.t3dsetvec"
+    bl_label = "" ## We don't want the label to show
+    bl_description= "Sets vector value"
     bl_options = {'REGISTER', 'UNDO'}
 
     index : bpy.props.IntProperty()
-    moveUp : bpy.props.BoolProperty()
+    mode : bpy.props.StringProperty()
+
+    @classmethod
+    def description(cls, context, properties):
+        if properties.mode == "object location":
+            return "Set to object world position"
+        else:
+            return "Set to 3D Cursor position"
 
     def execute(self, context):
-        if self.moveUp:
-            context.scene.t3dGameProperties__.move(self.index, self.index-1)
-        else:
-            context.scene.t3dGameProperties__.move(self.index, self.index+1)
+        if self.mode == "object location":
+            context.object.t3dGameProperties__[self.index].valueVector3D = context.object.location
+        elif self.mode == "object 3D cursor":
+            context.object.t3dGameProperties__[self.index].valueVector3D = context.scene.cursor.location
+        elif self.mode == "scene 3D cursor":
+            context.scene.t3dGameProperties__[self.index].valueVector3D = context.scene.cursor.location
+
         return {'FINISHED'}
 
 def copyProp(fromProp, toProp):
@@ -236,23 +235,10 @@ class OBJECT_OT_tetra3dClearProps(bpy.types.Operator):
 
    def execute(self, context):
 
-        obj = context.object
-
         for o in context.selected_objects:
             o.t3dGameProperties__.clear()
 
         return {'FINISHED'}
-
-class SCENE_OT_tetra3dClearProps(bpy.types.Operator):
-   bl_idname = "scene.tetra3dclearprops"
-   bl_label = "Clear Game Properties"
-   bl_description= "Clears all game properties from the scene"
-   bl_options = {'REGISTER', 'UNDO'}
-
-   def execute(self, context):
-        context.scene.t3dGameProperties__.clear()
-        return {'FINISHED'}
-
 
 def objectNodePath(object):
 
@@ -321,8 +307,17 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.separator()
         row = self.layout.row()
-        row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
+
+        if context.object.instance_type == "COLLECTION":
+            row.prop(context.object, "t3dShareProperties__")
+            row = self.layout.row()
+
+        add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
+        add.mode = "object"
+
+        # No option to copy props to different scene properties
         row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
+
 
         for index, prop in enumerate(context.object.t3dGameProperties__):
             box = self.layout.box()
@@ -332,23 +327,26 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
             moveUpOptions.index = index
             moveUpOptions.moveUp = True
+            moveUpOptions.mode = "object"
 
             moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
             moveDownOptions.index = index
             moveDownOptions.moveUp = False
+            moveDownOptions.mode = "object"
 
             copy = row.operator(OBJECT_OT_tetra3dCopyOneProperty.bl_idname, text="", icon="COPYDOWN")
             copy.index = index
 
             deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
             deleteOptions.index = index
+            deleteOptions.mode = "object"
 
-            row = box.row()
-            handleT3DProperty(row, prop)
+            handleT3DProperty(index, box, prop, "object")
         
         row = self.layout.row()
+
+        # No scene equivalent for this, so there is no mode property for this class
         row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
-        
 
 class SCENE_PT_tetra3d(bpy.types.Panel):
     bl_idname = "SCENE_PT_tetra3d"
@@ -364,31 +362,36 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
     def draw(self, context):
 
         row = self.layout.row()
-        row.operator("scene.tetra3daddprop", text="Add Game Property", icon="PLUS")
+        add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
+        add.mode = "scene"
 
         for index, prop in enumerate(context.scene.t3dGameProperties__):
             box = self.layout.box()
             row = box.row()
             row.prop(prop, "name")
             
-            moveUpOptions = row.operator(SCENE_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
+            moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
             moveUpOptions.index = index
             moveUpOptions.moveUp = True
+            moveUpOptions.mode = "scene"
 
-            moveDownOptions = row.operator(SCENE_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
+            moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
             moveDownOptions.index = index
             moveDownOptions.moveUp = False
+            moveDownOptions.mode = "scene"
 
-            deleteOptions = row.operator(SCENE_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
+            deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
             deleteOptions.index = index
+            deleteOptions.mode = "scene"
 
-            row = box.row()
-            handleT3DProperty(row, prop)
+            handleT3DProperty(index, box, prop, "scene")
         
         row = self.layout.row()
         row.operator("scene.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
 
-def handleT3DProperty(row, prop):
+def handleT3DProperty(index, box, prop, operatorType):
+
+    row = box.row()
 
     row.prop(prop, "valueType")
     if prop.valueType == "bool":
@@ -408,7 +411,23 @@ def handleT3DProperty(row, prop):
     elif prop.valueType == "color":
         row.prop(prop, "valueColor")
     elif prop.valueType == "vector3d":
+        row = box.row()
         row.prop(prop, "valueVector3D")
+
+        if operatorType == "object":
+            
+            setCur = row.operator("object.t3dsetvec", text="", icon="OBJECT_ORIGIN")
+            setCur.index = index
+            setCur.mode = "object location"
+            
+            setCur = row.operator("object.t3dsetvec", text="", icon="PIVOT_CURSOR")
+            setCur.index = index
+            setCur.mode = "object 3D cursor"
+
+        else:
+            setCur = row.operator("object.t3dsetvec", text="", icon="PIVOT_CURSOR")
+            setCur.index = index
+            setCur.mode = "scene 3D cursor"
         
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"
@@ -459,6 +478,8 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
 
             if context.world.t3dFogMode__ != "TRANSPARENT":
                 box.prop(context.world, "t3dFogColor__")
+            else:
+                box.prop(context.world, "t3dTransparentFogDithered__")
             
             box.prop(context.world, "t3dFogRangeStart__", slider=True)
             box.prop(context.world, "t3dFogRangeEnd__", slider=True)
@@ -568,6 +589,8 @@ def export():
             worldData["clear color"] = world.t3dClearColor__
         if "t3dFogMode__" in world:
             worldData["fog mode"] = world.t3dFogMode__
+        if "t3dTransparentFogDithered__" in world:
+            worldData["dithered transparency"] = world.t3dTransparentFogDithered__
         if "t3dFogColor__" in world:
             worldData["fog color"] = world.t3dFogColor__
         if "t3dFogRangeStart__" in world:
@@ -741,7 +764,8 @@ objectProps = {
     "t3dSphereCustomEnabled__" : bpy.props.BoolProperty(name="Custom Sphere Size", description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)", default=False),
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
     "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
-    "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is")
+    "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
+    "t3dShareProperties__" : bpy.props.BoolProperty(name="Copy Game Properties to Top-Level Instanced Nodes", description="If enabled, properties set on the collection instance are cloned to its instanced top-level nodes", default=False)
 }
 
 def getExportOnSave(self):
@@ -843,11 +867,8 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyOneProperty)
     bpy.utils.register_class(OBJECT_OT_tetra3dClearProps)
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
-    
-    bpy.utils.register_class(SCENE_OT_tetra3dAddProp)
-    bpy.utils.register_class(SCENE_OT_tetra3dDeleteProp)
-    bpy.utils.register_class(SCENE_OT_tetra3dReorderProps)
-    bpy.utils.register_class(SCENE_OT_tetra3dClearProps)
+
+    bpy.utils.register_class(OBJECT_OT_tetra3dSetVector)
     
     bpy.utils.register_class(EXPORT_OT_tetra3d)
     
@@ -855,7 +876,8 @@ def register():
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
-        setattr(bpy.types.Scene, propName, prop)
+        
+    bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
 
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
     get=getExportOnSave, set=setExportOnSave)
@@ -883,6 +905,7 @@ def register():
     bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="Fog color", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")
+    bpy.types.World.t3dTransparentFogDithered__ = bpy.props.FloatProperty(name="Dithered Transparency Size", description="How large bayer matrix dithering is when using transparent fog. If set to 0, dithering is disabled", default=1, min=0, step=1)
 
     bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
     bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
@@ -905,18 +928,16 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_tetra3dClearProps)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
 
-    bpy.utils.unregister_class(SCENE_OT_tetra3dAddProp)
-    bpy.utils.unregister_class(SCENE_OT_tetra3dDeleteProp)
-    bpy.utils.unregister_class(SCENE_OT_tetra3dReorderProps)
-    bpy.utils.unregister_class(SCENE_OT_tetra3dClearProps)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dSetVector)
 
     bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
     bpy.utils.unregister_class(t3dGamePropertyItem__)
     
-    for propName, prop in objectProps.items():
+    for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
-        delattr(bpy.types.Scene, propName)
+
+    del bpy.types.Scene.t3dGameProperties__
 
     del bpy.types.Scene.t3dExportOnSave__
     del bpy.types.Scene.t3dExportFilepath__
@@ -935,6 +956,7 @@ def unregister():
     del bpy.types.World.t3dFogMode__
     del bpy.types.World.t3dFogRangeStart__
     del bpy.types.World.t3dFogRangeEnd__
+    del bpy.types.World.t3dTransparentFogDithered
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)

@@ -178,7 +178,7 @@ type Mesh struct {
 	VertexColorChannelNames map[string]int
 	Dimensions              Dimensions
 	triIndex                int
-	Tags                    *Tags
+	Properties              *Properties
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,
@@ -191,7 +191,7 @@ func NewMesh(name string) *Mesh {
 		Dimensions:              Dimensions{{0, 0, 0}, {0, 0, 0}},
 		VertexColorChannelNames: map[string]int{},
 		triIndex:                0,
-		Tags:                    NewTags(),
+		Properties:              NewProperties(),
 
 		vertexTransforms:         []vector.Vector{},
 		VertexPositions:          []vector.Vector{},
@@ -213,7 +213,7 @@ func NewMesh(name string) *Mesh {
 func (mesh *Mesh) Clone() *Mesh {
 	newMesh := NewMesh(mesh.Name)
 	newMesh.library = mesh.library
-	newMesh.Tags = mesh.Tags.Clone()
+	newMesh.Properties = mesh.Properties.Clone()
 	newMesh.triIndex = mesh.triIndex
 
 	newMesh.allocateVertexBuffers(mesh.VertexMax)

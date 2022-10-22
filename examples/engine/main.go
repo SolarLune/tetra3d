@@ -67,7 +67,7 @@ func (g *Game) Init() {
 
 	for _, o := range g.Scene.Root.Children() {
 
-		if o.Tags().Has("gameobject") {
+		if o.Properties().Has("gameobject") {
 			g.SetGameObject(o)
 		}
 
@@ -83,7 +83,7 @@ func (g *Game) Init() {
 
 func (g *Game) SetGameObject(o tetra3d.INode) {
 
-	switch o.Tags().GetAsString("gameobject") {
+	switch o.Properties().Get("gameobject").AsString() {
 
 	case "player":
 		player := NewPlayer(o)

@@ -50,13 +50,13 @@ func (capsule *BoundingCapsule) WorldRadius() float64 {
 }
 
 // Colliding returns true if the BoundingCapsule is intersecting the other BoundingObject.
-func (capsule *BoundingCapsule) Colliding(other BoundingObject) bool {
+func (capsule *BoundingCapsule) Colliding(other IBoundingObject) bool {
 	return capsule.Collision(other) != nil
 }
 
 // Collision returns a Collision struct if the BoundingCapsule is intersecting another BoundingObject. If
 // no intersection is reported, Collision returns nil.
-func (capsule *BoundingCapsule) Collision(other BoundingObject) *Collision {
+func (capsule *BoundingCapsule) Collision(other IBoundingObject) *Collision {
 
 	if other == capsule {
 		return nil

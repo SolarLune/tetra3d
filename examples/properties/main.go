@@ -70,10 +70,10 @@ func (g *Game) Init() {
 
 	for _, o := range g.Scene.Root.Children() {
 
-		if o.Tags().Has("parented to") {
+		if o.Properties().Has("parented to") {
 
 			// Object reference properties are composed of [Scene Name]:[Object Name]. If the scene to search is not set in Blender, that portion will be blank.
-			link := strings.Split(o.Tags().GetAsString("parented to"), ":")
+			link := strings.Split(o.Properties().Get("parented to").AsString(), ":")
 
 			ot := o.Transform()
 			g.Scene.Root.Get(link[1]).AddChildren(o)
@@ -93,11 +93,11 @@ func (g *Game) Update() error {
 
 	for _, o := range g.Scene.Root.Children() {
 
-		if o.Tags().Has("turn") {
-			o.Rotate(0, 1, 0, 0.02*o.Tags().GetAsFloat("turn"))
+		if o.Properties().Has("turn") {
+			o.Rotate(0, 1, 0, 0.02*o.Properties().Get("turn").AsFloat64())
 		}
 
-		if o.Tags().Has("wave") {
+		if o.Properties().Has("wave") {
 			o.Move(0, math.Sin(g.Time*math.Pi)*0.02, 0)
 		}
 

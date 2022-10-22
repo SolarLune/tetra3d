@@ -76,9 +76,6 @@ func (g *Game) Init() {
 
 	g.Scene.Root.Get("Water").(*tetra3d.Model).Color.A = 0.6
 
-	g.Scene.World.FogMode = tetra3d.FogOverwrite
-	g.Scene.World.FogColor = tetra3d.NewColor(0.8, 0.9, 1, 1)
-
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 	water := g.Scene.Root.Get("Water").(*tetra3d.Model)

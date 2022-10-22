@@ -8,10 +8,8 @@ import (
 )
 
 type Intersection struct {
-	// The contact point between the two intersecting objects. Note that this may be the average
-	// between the two overlapping shapes, rather than the point of contact specifically.
-	StartingPoint vector.Vector // The starting point for the intersection; either the center of the object for sphere / aabb, the center of the closest point for capsules, or the triangle position for triangless.
-	ContactPoint  vector.Vector // The contact point for the intersection.
+	StartingPoint vector.Vector // The starting point for the initiating object in the intersection in world space; either the center of the object for sphere / aabb, the center of the closest point for capsules, or the triangle position for triangles.
+	ContactPoint  vector.Vector // The contact point for the intersection on the second, collided object in world space (i.e. the point of collision on the triangle in a Sphere>Triangles test).
 	MTV           vector.Vector // MTV represents the minimum translation vector to remove the calling object from the intersecting object.
 	Triangle      *Triangle     // Triangle represents the triangle that was intersected in intersection tests that involve triangle meshes; if no triangle mesh was tested against, then this will be nil.
 	Normal        vector.Vector
@@ -44,7 +42,7 @@ func (intersection *Intersection) SlideAgainstNormal(movementVec vector.Vector) 
 // contact point.
 type Collision struct {
 	BoundingObject INode // The BoundingObject collided with
-	// The root colliding object; this can be the same or different from the CollidedBoundingObject, depending
+	// The root colliding object; this can be the same or different from Collision.BoundingObject, depending
 	// on which object was tested against (either an individual BoundingObject, or the parent / grandparent of a tree
 	// that contains one or more BoundingObjects)
 	Root          INode
@@ -130,7 +128,7 @@ func (result *Collision) AverageSlope() float64 {
 	return slope / slopeCount
 }
 
-// AverageContactPoint returns the average contact point out of the contact points of all Intersections
+// AverageContactPoint returns the average world contact point out of the contact points of all Intersections
 // contained within the Collision.
 func (result *Collision) AverageContactPoint() vector.Vector {
 
@@ -147,15 +145,15 @@ func (result *Collision) AverageContactPoint() vector.Vector {
 	return contactPoint
 }
 
-// BoundingObject represents a Node type that can be tested for collision. The exposed functions are essentially just
-// concerning whether an object that implements BoundingObject is colliding with another BoundingObject, and
+// IBoundingObject represents a Node type that can be tested for collision. The exposed functions are essentially just
+// concerning whether an object that implements IBoundingObject is colliding with another IBoundingObject, and
 // if so, by how much.
-type BoundingObject interface {
+type IBoundingObject interface {
 	// Colliding returns true if the BoundingObject is intersecting the other BoundingObject.
-	Colliding(other BoundingObject) bool
+	Colliding(other IBoundingObject) bool
 	// Collision returns a Collision if the BoundingObject is intersecting another BoundingObject. If
 	// no intersection is reported, Collision returns nil.
-	Collision(other BoundingObject) *Collision
+	Collision(other IBoundingObject) *Collision
 	// CollisionTest performs an collision test if the bounding object were to move in the given direction in world space.
 	// It returns all valid Collisions across all recursive children of the INodes slice passed in as others, testing against BoundingObjects in those trees.
 	// To exemplify this, if you had a Model that had a BoundingObject child, and then tested the Model for collision,
@@ -176,7 +174,6 @@ type BoundingObject interface {
 
 // The below set of bt functions are used to test for intersection between BoundingObject pairs.
 // I forget now, but I guess when I wrote this, bt* stood for Bounding Test, haha.
-
 func btSphereSphere(sphereA, sphereB *BoundingSphere) *Collision {
 
 	spherePos := sphereA.WorldPosition()
@@ -246,12 +243,13 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 	invertedTransform := triTrans.Inverted()
 	transformNoLoc := triTrans.Clone()
 	transformNoLoc.SetRow(3, vector.Vector{0, 0, 0, 1})
-	spherePos := invertedTransform.MultVec(sphere.WorldPosition())
+	sphereWorldPosition := sphere.WorldPosition()
+	spherePos := invertedTransform.MultVec(sphereWorldPosition)
 	sphereRadius := sphere.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.GetTrianglesFromBounding(sphere)
+	tris := triangles.Broadphase.TrianglesFromBounding(sphere)
 
 	for triID := range tris {
 
@@ -273,7 +271,7 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 		if mag := delta.Magnitude(); mag <= sphereRadius {
 			result.add(
 				&Intersection{
-					StartingPoint: spherePos,
+					StartingPoint: sphereWorldPosition,
 					ContactPoint:  triTrans.MultVec(closest),
 					MTV:           transformNoLoc.MultVec(delta.Unit().Scale(sphereRadius - mag)),
 					Triangle:      tri,
@@ -387,7 +385,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.GetTrianglesFromBounding(box)
+	tris := triangles.Broadphase.TrianglesFromBounding(box)
 
 	for triID := range tris {
 
@@ -695,7 +693,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.GetTrianglesFromBounding(capsule)
+	tris := triangles.Broadphase.TrianglesFromBounding(capsule)
 
 	spherePos := vector.Vector{0, 0, 0}
 
@@ -745,7 +743,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 			result.add(
 				&Intersection{
-					StartingPoint: closest,
+					StartingPoint: closestCapsulePoint,
 					ContactPoint:  triTrans.MultVec(closest),
 					MTV:           transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadiusSquared - mag)),
 					Triangle:      tri,
@@ -809,9 +807,12 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...INode) []*Col
 
 	var ogPos vector.Vector
 
+	moving := false
+
 	// If dx, dy, and dz are 0, we don't need to reposition the node for the collision test.
 	if dx != 0 || dy != 0 || dz != 0 {
 		ogPos = node.LocalPosition()
+		moving = true
 		node.Move(dx, dy, dz)
 	}
 
@@ -821,9 +822,9 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...INode) []*Col
 
 	test = func(checking, parent INode) {
 
-		if c, ok := checking.(BoundingObject); ok {
+		if c, ok := checking.(IBoundingObject); ok {
 
-			if collision := node.(BoundingObject).Collision(c); collision != nil {
+			if collision := node.(IBoundingObject).Collision(c); collision != nil {
 				collision.Root = parent
 				collisions = append(collisions, collision)
 			}
@@ -846,7 +847,7 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...INode) []*Col
 			fastVectorDistanceSquared(collisions[j].AverageContactPoint(), collisions[j].Intersections[0].StartingPoint)
 	})
 
-	if dx != 0 || dy != 0 || dz != 0 {
+	if moving {
 		node.SetLocalPositionVec(ogPos)
 	}
 

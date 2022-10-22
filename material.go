@@ -38,7 +38,7 @@ type Material struct {
 	TexturePath       string               // The path to the texture, if it was not packed into the exporter.
 	TextureFilterMode ebiten.Filter        // Texture filtering mode
 	TextureWrapMode   ebiten.Address       // Texture wrapping mode
-	Tags              *Tags                // Tags is a Tags object, allowing you to specify auxiliary data on the Material. This is loaded from GLTF files if / Blender's Custom Properties if the setting is enabled on the export menu.
+	Properties        *Properties          // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
 	BackfaceCulling   bool                 // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
 	TriangleSortMode  int                  // TriangleSortMode influences how triangles with this Material are sorted.
 	Shadeless         bool                 // If the material should be shadeless (unlit) or not
@@ -66,7 +66,7 @@ func NewMaterial(name string) *Material {
 	return &Material{
 		Name:                  name,
 		Color:                 NewColor(1, 1, 1, 1),
-		Tags:                  NewTags(),
+		Properties:            NewProperties(),
 		TextureFilterMode:     ebiten.FilterNearest,
 		TextureWrapMode:       ebiten.AddressRepeat,
 		BackfaceCulling:       true,
@@ -84,7 +84,7 @@ func (material *Material) Clone() *Material {
 	newMat.library = material.library
 	newMat.Color = material.Color.Clone()
 	newMat.Texture = material.Texture
-	newMat.Tags = material.Tags.Clone()
+	newMat.Properties = material.Properties.Clone()
 	newMat.BackfaceCulling = material.BackfaceCulling
 	newMat.TriangleSortMode = material.TriangleSortMode
 	newMat.Shadeless = material.Shadeless

@@ -20,8 +20,9 @@ import (
 )
 
 type GLTFLoadOptions struct {
-	ResolveCameraRes          bool
-	CameraWidth, CameraHeight int  // Width and height of loaded Cameras. Defaults to 1920x1080.
+	// Width and height of loaded Cameras. Defaults to -1 each, which will then instead load the size from the camera's resolution as exported in the GLTF file;
+	// if the camera resolution isn't set there, cameras will load with a 1920x1080 camera size.
+	CameraWidth, CameraHeight int
 	CameraDepth               bool // If cameras should render depth or not
 	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
 	// DependentLibraryResolver is a function that takes a relative path (string) to the blend file representing the dependent Library that the loading
@@ -38,9 +39,8 @@ type GLTFLoadOptions struct {
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
 func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 	return &GLTFLoadOptions{
-		ResolveCameraRes:          true,
-		CameraWidth:               1920,
-		CameraHeight:              1080,
+		CameraWidth:               -1,
+		CameraHeight:              -1,
 		CameraDepth:               true,
 		DefaultToAutoTransparency: true,
 	}
@@ -98,22 +98,35 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	t3dExport := false
 
+	camWidth := gltfLoadOptions.CameraWidth
+	camHeight := gltfLoadOptions.CameraHeight
+	camSetSize := false
+
+	if gltfLoadOptions.CameraWidth < 0 && gltfLoadOptions.CameraHeight < 0 {
+		camWidth = 1920
+		camHeight = 1080
+	} else {
+		camSetSize = true
+	}
+
 	if len(doc.Scenes) > 0 {
 
 		if doc.Scenes[0].Extras != nil {
 
 			globalExporterSettings := doc.Scenes[0].Extras.(map[string]interface{})
 
-			if gltfLoadOptions.ResolveCameraRes {
+			if !camSetSize {
+
 				if cr, exists := globalExporterSettings["t3dCameraResolution__"]; exists {
 					res := cr.([]interface{})
 					if w, ok := res[0].(float64); ok {
-						(*gltfLoadOptions).CameraWidth = int(w)
+						camWidth = int(w)
 					}
 					if h, ok := res[1].(float64); ok {
-						(*gltfLoadOptions).CameraHeight = int(h)
+						camHeight = int(h)
 					}
 				}
+
 			}
 
 			if et, exists := globalExporterSettings["t3dPackTextures__"]; exists {
@@ -221,9 +234,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				}
 
+				// Non-Tetra3D custom data
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-						newMat.Tags.Set(tagName, data)
+						newMat.Properties.Get(tagName).Set(data)
 					}
 				}
 			}
@@ -285,9 +299,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					}
 				}
 
+				// Non-Tetra3D custom data
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-						newMesh.Tags.Set(tagName, data)
+						newMesh.Properties.Get(tagName).Set(data)
 					}
 				}
 
@@ -621,7 +636,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			gltfCam := doc.Cameras[*node.Camera]
 
-			newCam := NewCamera(gltfLoadOptions.CameraWidth, gltfLoadOptions.CameraHeight)
+			newCam := NewCamera(camWidth, camHeight)
 			newCam.name = node.Name
 			newCam.RenderDepth = gltfLoadOptions.CameraDepth
 
@@ -889,9 +904,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					}
 				}
 
+				// Non-Tetra3D custom data
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-						obj.Tags().Set(tagName, data)
+						obj.Properties().Get(tagName).Set(data)
 					}
 				}
 			}
@@ -1031,7 +1047,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 						name, value := handleGameProperties(p)
 
-						obj.Tags().Set(name, value)
+						obj.Properties().Get(name).Set(value)
 
 					}
 				}
@@ -1062,6 +1078,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		if node.Extras != nil {
 			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
+
+				shareProperties := false
+				if c, exists := dataMap["t3dShareProperties__"]; exists && c.(float64) > 0 {
+					shareProperties = true
+				}
 
 				if c, exists := dataMap["t3dInstanceCollection__"]; exists {
 					collection := collections[c.(string)]
@@ -1097,6 +1118,12 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 						} else {
 							log.Println("Error in instantiating linked element:", cloneName, "from:", path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
+						}
+
+						if shareProperties {
+							for k, v := range obj.Properties().props {
+								clone.Properties().Get(k).Set(v.Value)
+							}
 						}
 
 					}
@@ -1155,6 +1182,9 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						world.FogMode = FogTransparent
 					}
 				}
+				if v, exists := props["dithered transparency"]; exists {
+					world.DitheredFogSize = float32(v.(float64))
+				}
 
 				if v, exists := props["fog color"]; exists {
 					wcc := v.([]interface{})
@@ -1203,14 +1233,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 					name, value := handleGameProperties(p)
 
-					scene.Tags().Set(name, value)
+					scene.Properties().Get(name).Set(value)
 
 				}
 			}
 
+			// Non-Tetra3D custom data
 			for tagName, data := range extras {
 				if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-					scene.Tags().Set(tagName, data)
+					scene.Properties().Get(tagName).Set(data)
 				}
 			}
 
@@ -1335,11 +1366,7 @@ func handleGameProperties(p interface{}) (string, interface{}) {
 		value = color
 	} else if propType == 6 {
 		vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float64{0, 0, 0})
-		vec := vector.Vector{}
-		for _, v := range vecValues {
-			vec = append(vec, v)
-		}
-		value = vec
+		value = vector.Vector{vecValues[0], vecValues[2], -vecValues[1]}
 	}
 
 	return name, value

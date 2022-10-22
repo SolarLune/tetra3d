@@ -88,13 +88,13 @@ func (bt *BoundingTriangles) AddChildren(children ...INode) {
 }
 
 // Colliding returns true if the BoundingTriangles object is intersecting the other specified BoundingObject.
-func (bt *BoundingTriangles) Colliding(other BoundingObject) bool {
+func (bt *BoundingTriangles) Colliding(other IBoundingObject) bool {
 	return bt.Collision(other) != nil
 }
 
 // Collision returns a Collision if the BoundingTriangles object is intersecting another BoundingObject. If
 // no intersection is reported, Collision returns nil. (Note that BoundingTriangles > AABB collision is buggy at the moment.)
-func (bt *BoundingTriangles) Collision(other BoundingObject) *Collision {
+func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 
 	if other == bt {
 		return nil

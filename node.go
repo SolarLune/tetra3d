@@ -129,6 +129,12 @@ type INode interface {
 	// SetWorldPosition sets the world position of the given object using the provided position arguments.
 	// Note that this isn't as performant as setting the position locally.
 	SetWorldPosition(x, y, z float64)
+	// SetWorldX sets the x component of the Node's world position.
+	SetWorldX(x float64)
+	// SetWorldY sets the y component of the Node's world position.
+	SetWorldY(x float64)
+	// SetWorldZ sets the z component of the Node's world position.
+	SetWorldZ(x float64)
 	// WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components).
 	WorldScale() vector.Vector
 	// SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
@@ -173,8 +179,8 @@ type INode interface {
 	// passing it to Get() called on the scene root node will return this node. The path returned will not contain the root node's name ("Root").
 	Path() string
 
-	// Tags represents an unordered set of string tags that can be used to identify this object.
-	Tags() *Tags
+	// Properties returns this object's game Properties struct.
+	Properties() *Properties
 
 	// IsBone returns if the Node is a "bone" (a node that was a part of an armature and so can play animations back to influence a skinned mesh).
 	IsBone() bool
@@ -186,43 +192,117 @@ type INode interface {
 	setOriginalLocalPosition(vector.Vector)
 }
 
-// Tags is an unordered set of string tags to values, representing a means of identifying Nodes or carrying data on Nodes.
-type Tags struct {
-	tags map[string]interface{}
+type Property struct {
+	Value interface{}
 }
 
-// NewTags returns a new Tags object.
-func NewTags() *Tags {
-	return &Tags{map[string]interface{}{}}
+func (prop *Property) Set(value interface{}) {
+	prop.Value = value
 }
 
-func (tags *Tags) Clone() *Tags {
-	newTags := NewTags()
-	for k, v := range tags.tags {
-		newTags.Set(k, v)
+// IsString returns true if the property associated with the specified tag is a string.
+func (prop *Property) IsString() bool {
+	if _, ok := prop.Value.(string); ok {
+		return true
+	}
+	return false
+}
+
+// AsString returns the value associated with the specified tag (key) as a string.
+// Note that this does not sanity check to ensure the tag is a string first.
+func (prop *Property) AsString() string {
+	return prop.Value.(string)
+}
+
+// IsFloat returns true if the value associated with the specified tag is a float64.
+func (prop *Property) IsFloat64() bool {
+	if _, ok := prop.Value.(float64); ok {
+		return true
+	}
+	return false
+}
+
+// AsFloat returns the value associated with the specified tag (key) as a float64.
+// Note that this does not sanity check to ensure the tag is a float64 first.
+func (prop *Property) AsFloat64() float64 {
+	return prop.Value.(float64)
+}
+
+// IsInt returns true if the value associated with the specified tag is an int.
+func (prop *Property) IsInt() bool {
+	if _, ok := prop.Value.(int); ok {
+		return true
+	}
+	return false
+}
+
+// AsInt returns the value associated with the specified tag (key) as a float.
+// Note that this does not sanity check to ensure the tag is an int first.
+func (prop *Property) AsInt() int {
+	return prop.Value.(int)
+}
+
+// IsColor returns true if the value associated with the specified tag is a color
+func (prop *Property) IsColor() bool {
+	if _, ok := prop.Value.(*Color); ok {
+		return true
+	}
+	return false
+}
+
+// AsColor returns the value associated with the specified tag (key) as a *Color clone.
+// Note that this does not sanity check to ensure the tag is a Color first.
+func (prop *Property) AsColor() *Color {
+	return prop.Value.(*Color).Clone()
+}
+
+// IsVector returns true if the value associated with the specified tag is a vector.
+func (prop *Property) IsVector() bool {
+	if _, ok := prop.Value.(vector.Vector); ok {
+		return true
+	}
+	return false
+}
+
+// AsPosition returns the value associated with the specified tag (key) as a 3D position vector.Vector clone.
+// The axes are corrected to account for the difference between Blender's axis order and Tetra3D's.
+// Note that this does not sanity check to ensure the tag is a vector first.
+func (prop *Property) AsVector() vector.Vector {
+	return prop.Value.(vector.Vector).Clone()
+}
+
+// Properties is an unordered set of string tags to values, representing a means of identifying Nodes or carrying data on Nodes.
+type Properties struct {
+	props map[string]*Property
+}
+
+// NewProperties returns a new Tags object.
+func NewProperties() *Properties {
+	return &Properties{map[string]*Property{}}
+}
+
+func (props *Properties) Clone() *Properties {
+	newTags := NewProperties()
+	for k, v := range props.props {
+		newTags.Get(k).Set(v.Value)
 	}
 	return newTags
 }
 
 // Clear clears the Tags object of all tags.
-func (tags *Tags) Clear() {
-	tags.tags = map[string]interface{}{}
-}
-
-// Set sets all the tag specified to the Tags object.
-func (tags *Tags) Set(tagName string, value interface{}) {
-	tags.tags[tagName] = value
+func (props *Properties) Clear() {
+	props.props = map[string]*Property{}
 }
 
 // Remove removes the tag specified from the Tags object.
-func (tags *Tags) Remove(tag string) {
-	delete(tags.tags, tag)
+func (props *Properties) Remove(tag string) {
+	delete(props.props, tag)
 }
 
 // Has returns true if the Tags object has all of the tags specified, and false otherwise.
-func (tags *Tags) Has(nodeTags ...string) bool {
+func (props *Properties) Has(nodeTags ...string) bool {
 	for _, t := range nodeTags {
-		if _, exists := tags.tags[t]; !exists {
+		if _, exists := props.props[t]; !exists {
 			return false
 		}
 	}
@@ -231,120 +311,11 @@ func (tags *Tags) Has(nodeTags ...string) bool {
 
 // Get returns the value associated with the specified tag (key). If a tag with the
 // passed name (tagName) doesn't exist, Get will return nil.
-func (tags *Tags) Get(tagName string) interface{} {
-	if tag, ok := tags.tags[tagName]; ok {
-		return tag
+func (props *Properties) Get(tagName string) *Property {
+	if _, ok := props.props[tagName]; !ok {
+		props.props[tagName] = &Property{}
 	}
-	return nil
-}
-
-// IsString returns true if the value associated with the specified tag is a string. If the
-// tag doesn't exist or the tag's value isn't a string type, this returns false.
-func (tags *Tags) IsString(tagName string) bool {
-	if _, exists := tags.tags[tagName]; exists {
-		if _, ok := tags.tags[tagName].(string); ok {
-			return true
-		}
-	}
-	return false
-}
-
-// GetAsString returns the value associated with the specified tag (key) as a string.
-// If the tag doesn't exist, it will return an empty string.
-// Note that this does not sanity check to ensure the tag is a string first.
-func (tags *Tags) GetAsString(tagName string) string {
-
-	if !tags.Has(tagName) {
-		return ""
-	}
-
-	return tags.tags[tagName].(string)
-}
-
-// IsFloat returns true if the value associated with the specified tag is a float64. If the
-// tag doesn't exist or the tag's value isn't a float64 type, this returns false.
-func (tags *Tags) IsFloat(tagName string) bool {
-	if _, exists := tags.tags[tagName]; exists {
-		if _, ok := tags.tags[tagName].(float64); ok {
-			return true
-		}
-	}
-	return false
-}
-
-// GetAsFloat returns the value associated with the specified tag (key) as a float64.
-// Note that this does not sanity check to ensure the tag exists first.
-// If the tag doesn't exist, it will return 0.
-// Note that this does not sanity check to ensure the tag is a float64 first.
-func (tags *Tags) GetAsFloat(tagName string) float64 {
-	if !tags.Has(tagName) {
-		return 0
-	}
-	return tags.tags[tagName].(float64)
-}
-
-// IsInt returns true if the value associated with the specified tag is a int. If the
-// tag doesn't exist or the tag's value isn't an int type, this returns false.
-func (tags *Tags) IsInt(tagName string) bool {
-	if _, exists := tags.tags[tagName]; exists {
-		if _, ok := tags.tags[tagName].(int); ok {
-			return true
-		}
-	}
-	return false
-}
-
-// GetAsInt returns the value associated with the specified tag (key) as a float.
-// If the tag doesn't exist, it will return 0.
-// Note that this does not sanity check to ensure the tag is an int first.
-func (tags *Tags) GetAsInt(tagName string) int {
-	if !tags.Has(tagName) {
-		return 0
-	}
-	return tags.tags[tagName].(int)
-}
-
-// IsColor returns true if the value associated with the specified tag is a color. If the
-// tag doesn't exist or the tag's value isn't a *Color type, this returns false.
-func (tags *Tags) IsColor(tagName string) bool {
-	if _, exists := tags.tags[tagName]; exists {
-		if _, ok := tags.tags[tagName].(*Color); ok {
-			return true
-		}
-	}
-	return false
-}
-
-// GetAsColor returns the value associated with the specified tag (key) as a *Color.
-// If the tag doesn't exist, it will return a new color set to opaque white.
-// Note that this does not sanity check to ensure the tag is a Color first.
-func (tags *Tags) GetAsColor(tagName string) *Color {
-	if !tags.Has(tagName) {
-		return NewColor(1, 1, 1, 1)
-	}
-	return tags.tags[tagName].(*Color)
-}
-
-// IsVector returns true if the value associated with the specified tag is a vector. If the
-// tag doesn't exist or the tag's value isn't a vector.Vector, this returns false.
-func (tags *Tags) IsVector(tagName string) bool {
-	if _, exists := tags.tags[tagName]; exists {
-		if _, ok := tags.tags[tagName].(vector.Vector); ok {
-			return true
-		}
-	}
-	return false
-}
-
-// GetAsVector returns the value associated with the specified tag (key) as a *Color.
-// Note that this does not sanity check to ensure the tag exists first.
-// If the tag doesn't exist, it will return {0, 0, 0}.
-// Note that this does not sanity check to ensure the tag is a vector first.
-func (tags *Tags) GetAsVector(tagName string) vector.Vector {
-	if !tags.Has(tagName) {
-		return vector.Vector{0, 0, 0}
-	}
-	return tags.tags[tagName].(vector.Vector)
+	return props.props[tagName]
 }
 
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
@@ -361,7 +332,7 @@ type Node struct {
 	parent                INode
 	cachedTransform       Matrix4
 	isTransformDirty      bool
-	tags                  *Tags // Tags is an unordered set of string tags, representing a means of identifying Nodes.
+	props                 *Properties // Tags is an unordered set of string tags, representing a means of identifying Nodes.
 	animationPlayer       *AnimationPlayer
 	inverseBindMatrix     Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 	isBone                bool
@@ -382,7 +353,7 @@ func NewNode(name string) *Node {
 		children:         []INode{},
 		visible:          true,
 		isTransformDirty: true,
-		tags:             NewTags(),
+		props:            NewProperties(),
 		// We set this just in case we call a transform property getter before setting it and caching anything
 		cachedTransform:       NewMatrix4(),
 		originalLocalPosition: vector.Vector{0, 0, 0},
@@ -430,7 +401,7 @@ func (node *Node) Clone() INode {
 	newNode.visible = node.visible
 	newNode.data = node.data
 
-	newNode.tags = node.tags.Clone()
+	newNode.props = node.props.Clone()
 	newNode.animationPlayer = node.animationPlayer.Clone()
 	newNode.library = node.library
 
@@ -645,6 +616,27 @@ func (node *Node) SetWorldPositionVec(position vector.Vector) {
 // SetWorldPosition sets the object's world position (position relative to the world origin point of {0, 0, 0}).
 func (node *Node) SetWorldPosition(x, y, z float64) {
 	node.SetWorldPositionVec(vector.Vector{x, y, z})
+}
+
+// SetWorldX sets the X component of the object's world position.
+func (node *Node) SetWorldX(x float64) {
+	v := node.WorldPosition()
+	v[0] = x
+	node.SetWorldPositionVec(v)
+}
+
+// SetWorldY sets the Y component of the object's world position.
+func (node *Node) SetWorldY(y float64) {
+	v := node.WorldPosition()
+	v[1] = y
+	node.SetWorldPositionVec(v)
+}
+
+// SetWorldZ sets the Z component of the object's world position.
+func (node *Node) SetWorldZ(z float64) {
+	v := node.WorldPosition()
+	v[0] = z
+	node.SetWorldPositionVec(v)
 }
 
 // LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
@@ -884,8 +876,8 @@ func (node *Node) SetVisible(visible bool, recursive bool) {
 }
 
 // Tags represents an unordered set of string tags that can be used to identify this object.
-func (node *Node) Tags() *Tags {
-	return node.tags
+func (node *Node) Properties() *Properties {
+	return node.props
 }
 
 // HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.

@@ -309,13 +309,15 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Bounds node creation
 - [X] -- Game property export (less clunky version of Blender's vanilla custom properties)
 - [X] -- Collection / group substitution
-- [ ] -- -- Overwriting properties through collection instance
+- [X] -- -- Overwriting properties through collection instance
+- [ ] -- -- (Not done as well as I would like currently; ideally, you can view and manually override each individual property of top-level objects in the collection?)
 - [ ] -- Optional camera size export
 - [X] -- Linking collections from external files
 - [X] -- Material data export
 - [X] -- Option to pack textures or leave them as a path
 - [X] -- Path / 3D Curve support
 - [X] -- Grid support (for pathfinding / linking 3D points together)
+- [ ] -- Toggleable option for drawing property status to screen for each object using the gpu and blf modules
 - [X] **DAE model loading**
 - [X] -- Vertex colors loading
 - [X] -- UV map loading
@@ -355,6 +357,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
 - [ ] **Optimization**
+- [ ] -- Reusing vertex indices for adjacent triangles (I believe this is possible to implement; I didn't initially because I thought that would make adjacent triangles, each with their own UV values impossible; in truth, the modeler probably automatically splits these vertices out into unique ones as necessary)
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?
 - [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)?

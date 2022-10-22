@@ -195,6 +195,9 @@ func NewCamera(w, h int) *Camera {
 
 		var Fog vec4
 		var FogRange [2]float
+		var DitherSize float
+
+		var BayerMatrix [16]float
 
 		func decodeDepth(rgba vec4) float {
 			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
@@ -217,6 +220,11 @@ func NewCamera(w, h int) *Camera {
 					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
 				} else if Fog.a == 4 {
 					colorTex.a *= abs(1-d)
+					if DitherSize > 0 {
+						yc := int(position.y / DitherSize)%4
+						xc := int(position.x / DitherSize)%4
+						colorTex.a *= step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
+					}
 					colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
 				}
 
@@ -596,6 +604,14 @@ type renderPair struct {
 	MeshPart *MeshPart
 }
 
+// Bayer Matrix for transparency dithering
+var bayerMatrix = []float32{
+	1.0 / 17.0, 9.0 / 17.0, 3.0 / 17.0, 11.0 / 17.0,
+	13.0 / 17.0, 5.0 / 17.0, 15.0 / 17.0, 7.0 / 17.0,
+	4.0 / 17.0, 12.0 / 17.0, 2.0 / 17.0, 10.0 / 17.0,
+	16.0 / 17.0, 8.0 / 17.0, 14.0 / 17.0, 6.0 / 17.0,
+}
+
 // Render renders all of the models passed using the provided Scene's properties (fog, for example). Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 // Note that for Models, each MeshPart of a Model has a maximum renderable triangle count of 21845.
@@ -637,8 +653,10 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	if scene != nil && scene.World != nil {
 
 		rectShaderOptions.Uniforms = map[string]interface{}{
-			"Fog":      scene.World.fogAsFloatSlice(),
-			"FogRange": scene.World.FogRange,
+			"Fog":         scene.World.fogAsFloatSlice(),
+			"FogRange":    scene.World.FogRange,
+			"DitherSize":  scene.World.DitheredFogSize,
+			"BayerMatrix": bayerMatrix,
 		}
 
 	} else {
@@ -1580,7 +1598,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 	for _, n := range allModels {
 
-		if b, isBounds := n.(BoundingObject); isBounds {
+		if b, isBounds := n.(IBoundingObject); isBounds {
 
 			switch bounds := b.(type) {
 
