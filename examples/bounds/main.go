@@ -121,7 +121,7 @@ func (g *Game) Update() error {
 	}
 
 	move := vector.Vector{0, 0, 0}
-	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
+	bounds := g.Controlling.Children()[0].(tetra3d.IBoundingObject)
 	solids := g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject)
 
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
