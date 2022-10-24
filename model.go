@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -63,7 +64,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 	model.Node.onTransformUpdate = model.TransformUpdate
 
 	if mesh != nil {
-		model.skinVectorPool = NewVectorPool(mesh.VertexCount*2, true) // Both position and normal
+		model.skinVectorPool = NewVectorPool(len(mesh.VertexPositions)*2, true) // Both position and normal
 	}
 
 	radius := 0.0
@@ -190,7 +191,7 @@ func (model *Model) DynamicBatchAdd(meshPart *MeshPart, batchedModels ...*Model)
 
 		triCount := model.DynamicBatchTriangleCount()
 
-		if triCount+len(other.Mesh.Triangles) > maxTriangleCount {
+		if triCount+len(other.Mesh.Triangles) > MaxTriangleCount {
 			return errors.New("too many triangles in dynamic merge")
 		}
 
@@ -240,13 +241,13 @@ func (model *Model) DynamicBatchTriangleCount() int {
 	return count
 }
 
-// Merge statically merges the provided models into the calling Model's mesh, such that their vertex properties (position, normal, UV, etc) are part of the calling Model's Mesh.
+// StaticMerge statically merges the provided models into the calling Model's mesh, such that their vertex properties (position, normal, UV, etc) are part of the calling Model's Mesh.
 // You can use this to merge several objects initially dynamically placed into the calling Model's mesh, thereby pulling back to a single draw call. Note that models are merged into MeshParts
 // (saving draw calls) based on maximum vertex count and shared materials (so to get any benefit from merging, ensure the merged models share materials; if they all have unique
 // materials, they will be turned into individual MeshParts, thereby forcing multiple draw calls). Also note that as the name suggests, this is static merging, which means that
 // after merging, the new vertices are static - part of the merging Model.
 // For more information, see this Wiki page on batching / merging: https://github.com/SolarLune/Tetra3d/wiki/Merging-and-Batching-Draw-Calls
-func (model *Model) Merge(models ...*Model) {
+func (model *Model) StaticMerge(models ...*Model) {
 
 	totalSize := 0
 	for _, other := range models {
@@ -260,8 +261,8 @@ func (model *Model) Merge(models ...*Model) {
 		return
 	}
 
-	if model.Mesh.triIndex*3+totalSize > model.Mesh.VertexMax {
-		model.Mesh.allocateVertexBuffers(model.Mesh.VertexMax + totalSize)
+	if int(model.Mesh.triIndex)+totalSize > len(model.Mesh.VertexPositions) {
+		model.Mesh.allocateVertexBuffers(len(model.Mesh.VertexPositions) + totalSize)
 	}
 
 	for _, other := range models {
@@ -288,7 +289,7 @@ func (model *Model) Merge(models ...*Model) {
 			var targetPart *MeshPart
 
 			for _, mp := range model.Mesh.MeshParts {
-				if mp.Material == otherPart.Material && mp.TriangleCount()+otherPart.TriangleCount() < maxTriangleCount {
+				if mp.Material == otherPart.Material && mp.TriangleCount()+otherPart.TriangleCount() < MaxTriangleCount {
 					targetPart = mp
 					break
 				}
@@ -299,24 +300,33 @@ func (model *Model) Merge(models ...*Model) {
 			}
 
 			verts := []VertexInfo{}
+			indices := []int{}
 
-			for triIndex := otherPart.TriangleStart; triIndex < otherPart.TriangleEnd; triIndex++ {
-				for i := 0; i < 3; i++ {
-					vertInfo := otherPart.Mesh.GetVertexInfo(triIndex*3 + i)
-					vec := vector.Vector{vertInfo.X, vertInfo.Y, vertInfo.Z}
-					x, y, z := fastMatrixMultVec(inverted, vec)
-					vertInfo.X = x
-					vertInfo.Y = y
-					vertInfo.Z = z
-					verts = append(verts, vertInfo)
-				}
-			}
+			otherPart.ForEachVertexIndex(func(vertIndex int) {
 
-			targetPart.AddTriangles(verts...)
+				vertInfo := otherPart.Mesh.GetVertexInfo(vertIndex)
+				vec := vector.Vector{vertInfo.X, vertInfo.Y, vertInfo.Z}
+				x, y, z := fastMatrixMultVec(inverted, vec)
+				vertInfo.X = x
+				vertInfo.Y = y
+				vertInfo.Z = z
+				verts = append(verts, vertInfo)
+
+			})
+
+			otherPart.ForEachTri(func(tri *Triangle) {
+				indices = append(indices, tri.VertexIndices...)
+			})
+
+			model.Mesh.AddVertices(verts...)
+
+			targetPart.AddTriangles(indices...)
 
 		}
 
 	}
+
+	fmt.Println(len(model.Mesh.MeshParts))
 
 	model.Mesh.UpdateBounds()
 
@@ -447,7 +457,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
 		for i := 0; i < len(meshPart.sortingTriangles); i++ {
 
-			tri := meshPart.sortingTriangles[i]
+			tri := meshPart.sortingTriangles[i].Triangle
 
 			depth := math.MaxFloat32
 
@@ -455,15 +465,15 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			for v := 0; v < 3; v++ {
 
-				vertPos, vertNormal := model.skinVertex(tri.ID*3+v, lightingOn)
+				vertPos, vertNormal := model.skinVertex(tri.VertexIndices[i], lightingOn)
 				if transformFunc != nil {
-					vertPos = transformFunc(vertPos, tri.ID*3+v)
+					vertPos = transformFunc(vertPos, tri.VertexIndices[i])
 				}
 				if vertNormal != nil {
-					model.Mesh.vertexSkinnedNormals[tri.ID*3+v] = vertNormal
-					model.Mesh.vertexSkinnedPositions[tri.ID*3+v] = vertPos
+					model.Mesh.vertexSkinnedNormals[tri.VertexIndices[i]] = vertNormal
+					model.Mesh.vertexSkinnedPositions[tri.VertexIndices[i]] = vertPos
 				}
-				transformed := model.Mesh.vertexTransforms[tri.ID*3+v]
+				transformed := model.Mesh.vertexTransforms[tri.VertexIndices[i]]
 				x, y, z, w := fastMatrixMultVecW(vpMatrix, vertPos)
 				transformed[0] = x
 				transformed[1] = y
@@ -523,7 +533,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		for i := 0; i < len(meshPart.sortingTriangles); i++ {
 
-			triID := meshPart.sortingTriangles[i].ID
+			tri := meshPart.sortingTriangles[i].Triangle
 			depth := math.MaxFloat64
 
 			// triRef := model.Mesh.Triangles[triID]
@@ -539,13 +549,13 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			outOfBounds := true
 
 			for i := 0; i < 3; i++ {
-				v0 := model.Mesh.VertexPositions[triID*3+i]
+				v0 := model.Mesh.VertexPositions[tri.VertexIndices[i]]
 
 				if transformFunc != nil {
-					v0 = transformFunc(v0.Clone(), triID*3+i)
+					v0 = transformFunc(v0.Clone(), tri.VertexIndices[i])
 				}
 
-				transformed := model.Mesh.vertexTransforms[triID*3+i]
+				transformed := model.Mesh.vertexTransforms[tri.VertexIndices[i]]
 				transformed[0], transformed[1], transformed[2], transformed[3] = fastMatrixMultVecW(mvp, v0)
 
 				if transformed[3] < depth {
@@ -578,11 +588,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	// Preliminary tests indicate sort.SliceStable is faster than sort.Slice for our purposes
 
 	if sortMode == TriangleSortModeBackToFront {
-		sort.SliceStable(meshPart.sortingTriangles, func(i, j int) bool {
+		sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
 			return meshPart.sortingTriangles[i].depth > meshPart.sortingTriangles[j].depth
 		})
 	} else if sortMode == TriangleSortModeFrontToBack {
-		sort.SliceStable(meshPart.sortingTriangles, func(i, j int) bool {
+		sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
 			return meshPart.sortingTriangles[i].depth < meshPart.sortingTriangles[j].depth
 		})
 	}
@@ -637,7 +647,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 		ao := [3]float32{0, 0, 0}
 
-		verts := tri.VertexIndices()
+		verts := tri.VertexIndices
 
 		for _, other := range model.Mesh.Triangles {
 
@@ -705,7 +715,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 			ao := [3]float32{0, 0, 0}
 
-			verts := tri.VertexIndices()
+			verts := tri.VertexIndices
 
 			transformedTriVerts := [3]vector.Vector{
 				transform.MultVec(model.Mesh.VertexPositions[verts[0]]),
@@ -715,7 +725,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 			for _, otherTri := range other.Mesh.Triangles {
 
-				otherVerts := otherTri.VertexIndices()
+				otherVerts := otherTri.VertexIndices
 
 				span := tri.MaxSpan
 				if otherTri.MaxSpan > span {
@@ -800,7 +810,7 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 
 		for i := 0; i < 3; i++ {
 
-			channel := model.Mesh.VertexColors[(tri.ID*3)+i][targetChannel]
+			channel := model.Mesh.VertexColors[tri.VertexIndices[i]][targetChannel]
 			channel.R = lightResults[i*3]
 			channel.G = lightResults[i*3+1]
 			channel.B = lightResults[i*3+2]

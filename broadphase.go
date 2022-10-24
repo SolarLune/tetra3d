@@ -18,7 +18,7 @@ type Broadphase struct {
 	cellSize          float64
 	Center            *Node
 	aabb              *BoundingAABB
-	TriSets           [][][][]int
+	TriSets           [][][][]uint16
 	BoundingTriangles *BoundingTriangles
 }
 
@@ -47,14 +47,14 @@ func (bp *Broadphase) Clone() *Broadphase {
 	newBroadphase.GridSize = bp.GridSize
 	newBroadphase.cellSize = bp.cellSize
 
-	ts := make([][][][]int, len(bp.TriSets))
+	ts := make([][][][]uint16, len(bp.TriSets))
 
 	for i := range bp.TriSets {
-		ts[i] = make([][][]int, len(bp.TriSets[i]))
+		ts[i] = make([][][]uint16, len(bp.TriSets[i]))
 		for j := range bp.TriSets[i] {
-			ts[i][j] = make([][]int, len(bp.TriSets[i][j]))
+			ts[i][j] = make([][]uint16, len(bp.TriSets[i][j]))
 			for k := range bp.TriSets[i][j] {
-				ts[i][j][k] = make([]int, len(bp.TriSets[i][j][k]))
+				ts[i][j][k] = make([]uint16, len(bp.TriSets[i][j][k]))
 				copy(ts[i][j][k], bp.TriSets[i][j][k])
 			}
 		}
@@ -82,17 +82,17 @@ func (bp *Broadphase) Resize(gridSize int) {
 	bp.aabb.internalSize[2] = cellSize
 	bp.aabb.updateSize()
 
-	bp.TriSets = make([][][][]int, gridSize)
+	bp.TriSets = make([][][][]uint16, gridSize)
 
 	hg := float64(bp.GridSize) / 2
 
 	for i := 0; i < gridSize; i++ {
-		bp.TriSets[i] = make([][][]int, gridSize)
+		bp.TriSets[i] = make([][][]uint16, gridSize)
 		for j := 0; j < gridSize; j++ {
-			bp.TriSets[i][j] = make([][]int, gridSize)
+			bp.TriSets[i][j] = make([][]uint16, gridSize)
 			for k := 0; k < gridSize; k++ {
 
-				bp.TriSets[i][j][k] = []int{}
+				bp.TriSets[i][j][k] = []uint16{}
 
 				bp.aabb.SetLocalPositionVec(vector.Vector{
 					(float64(i) - hg + 0.5) * bp.cellSize,
@@ -125,17 +125,17 @@ func (bp *Broadphase) Resize(gridSize int) {
 // TrianglesFromBounding returns a set (a map[int]bool) of triangle IDs, based on where the BoundingObject is
 // in relation to the Broadphase owning BoundingTriangles instance. The returned set contains each triangle only
 // once, of course.
-func (bp *Broadphase) TrianglesFromBounding(boundingObject IBoundingObject) map[int]bool {
+func (bp *Broadphase) TrianglesFromBounding(boundingObject IBoundingObject) map[uint16]bool {
 
 	if bp.GridSize <= 0 {
-		trianglesSet := make(map[int]bool, len(bp.BoundingTriangles.Mesh.Triangles))
+		trianglesSet := make(map[uint16]bool, len(bp.BoundingTriangles.Mesh.Triangles))
 		for _, tri := range bp.BoundingTriangles.Mesh.Triangles {
 			trianglesSet[tri.ID] = true
 		}
 		return trianglesSet
 	}
 
-	trianglesSet := make(map[int]bool, len(bp.TriSets))
+	trianglesSet := make(map[uint16]bool, len(bp.TriSets))
 
 	hg := float64(bp.GridSize) / 2
 

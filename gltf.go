@@ -432,18 +432,14 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
+			newMesh.AddVertices(vertexData...)
+
 			indexBuffer := []uint32{}
 
 			indices, err := modeler.ReadIndices(doc, doc.Accessors[*v.Indices], indexBuffer)
 
 			if err != nil {
 				return nil, err
-			}
-
-			newVerts := make([]VertexInfo, len(indices))
-
-			for i := 0; i < len(indices); i++ {
-				newVerts[i] = vertexData[indices[i]]
 			}
 
 			var mat *Material
@@ -453,9 +449,13 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				mat = library.Materials[gltfMat.Name]
 			}
 
-			mp := newMesh.AddMeshPart(mat)
+			newIndices := make([]int, len(indices))
 
-			mp.AddTriangles(newVerts...)
+			for i, j := range indices {
+				newIndices[i] = int(j)
+			}
+
+			newMesh.AddMeshPart(mat, newIndices...)
 
 			newMesh.UpdateBounds()
 

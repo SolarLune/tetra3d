@@ -16,9 +16,9 @@ type ILight interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model)
 
-	Light(triIndex int, model *Model) [9]float32 // Light returns the R, G, and B colors used to light the vertices of the given triangle.
-	IsOn() bool                                  // isOn is simply used to tell if a "generic" Light is on or not.
-	SetOn(on bool)                               // SetOn sets whether the light is on or not
+	Light(triIndex uint16, model *Model) [9]float32 // Light returns the R, G, and B colors used to light the vertices of the given triangle.
+	IsOn() bool                                     // isOn is simply used to tell if a "generic" Light is on or not.
+	SetOn(on bool)                                  // SetOn sets whether the light is on or not
 }
 
 //---------------//
@@ -69,7 +69,7 @@ func (amb *AmbientLight) beginRender() {
 func (amb *AmbientLight) beginModel(model *Model) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(triIndex int, model *Model) [9]float32 {
+func (amb *AmbientLight) Light(triIndex uint16, model *Model) [9]float32 {
 	return amb.result
 }
 
@@ -171,7 +171,7 @@ func (point *PointLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
+func (point *PointLight) Light(triIndex uint16, model *Model) [9]float32 {
 
 	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
@@ -179,12 +179,14 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
+	tri := model.Mesh.Triangles[triIndex]
+
 	var triCenter vector.Vector
 
 	if model.Skinned {
-		v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
-		v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
-		v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
+		v0 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
+		v1 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
+		v2 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
 		triCenter = vector.Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
 	} else {
 		triCenter = model.Mesh.Triangles[triIndex].Center
@@ -209,11 +211,11 @@ func (point *PointLight) Light(triIndex int, model *Model) [9]float32 {
 	for i := 0; i < 3; i++ {
 
 		if model.Skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[triIndex*3+i]
-			vertNormal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+			vertPos = model.Mesh.vertexSkinnedPositions[tri.VertexIndices[i]]
+			vertNormal = model.Mesh.vertexSkinnedNormals[tri.VertexIndices[i]]
 		} else {
-			vertPos = model.Mesh.VertexPositions[triIndex*3+i]
-			vertNormal = model.Mesh.VertexNormals[triIndex*3+i]
+			vertPos = model.Mesh.VertexPositions[tri.VertexIndices[i]]
+			vertNormal = model.Mesh.VertexNormals[tri.VertexIndices[i]]
 		}
 
 		lightVec := vector.In(fastVectorSub(point.workingPosition, vertPos)).Unit()
@@ -323,16 +325,18 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(triIndex int, model *Model) [9]float32 {
+func (sun *DirectionalLight) Light(triIndex uint16, model *Model) [9]float32 {
+
+	tri := model.Mesh.Triangles[triIndex]
 
 	for i := 0; i < 3; i++ {
 
 		var normal vector.Vector
 		if model.Skinned {
 			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
-			normal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+			normal = model.Mesh.vertexSkinnedNormals[tri.VertexIndices[i]]
 		} else {
-			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[triIndex*3+i])
+			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[tri.VertexIndices[i]])
 		}
 
 		diffuseFactor := dot(normal, sun.workingForward)
@@ -537,7 +541,7 @@ func (cube *CubeLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
+func (cube *CubeLight) Light(triIndex uint16, model *Model) [9]float32 {
 
 	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
@@ -569,6 +573,7 @@ func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 	// }
 
 	var vertPos, vertNormal vector.Vector
+	tri := model.Mesh.Triangles[triIndex]
 
 	for i := 0; i < 9; i++ {
 		cube.out[i] = 0
@@ -577,11 +582,11 @@ func (cube *CubeLight) Light(triIndex int, model *Model) [9]float32 {
 	for i := 0; i < 3; i++ {
 
 		if model.Skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[triIndex*3+i]
-			vertNormal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+			vertPos = model.Mesh.vertexSkinnedPositions[tri.VertexIndices[i]]
+			vertNormal = model.Mesh.vertexSkinnedNormals[tri.VertexIndices[i]]
 		} else {
-			vertPos = model.Mesh.VertexPositions[triIndex*3+i]
-			vertNormal = model.Mesh.VertexNormals[triIndex*3+i]
+			vertPos = model.Mesh.VertexPositions[tri.VertexIndices[i]]
+			vertNormal = model.Mesh.VertexNormals[tri.VertexIndices[i]]
 		}
 
 		var diffuse, diffuseFactor float64
@@ -775,7 +780,7 @@ func (cube *CubeLight) Type() NodeType {
 
 // func (poly *PolygonLight) beginModel(model *Model) {}
 
-// func (poly *PolygonLight) Light(triIndex int, model *Model) [9]float32 {
+// func (poly *PolygonLight) Light(triIndex uint16, model *Model) [9]float32 {
 
 // 	light := [9]float32{}
 

@@ -261,9 +261,9 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 			continue
 		}
 
-		v0 := triangles.Mesh.VertexPositions[tri.ID*3]
-		v1 := triangles.Mesh.VertexPositions[tri.ID*3+1]
-		v2 := triangles.Mesh.VertexPositions[tri.ID*3+2]
+		v0 := triangles.Mesh.VertexPositions[tri.VertexIndices[0]]
+		v1 := triangles.Mesh.VertexPositions[tri.VertexIndices[1]]
+		v2 := triangles.Mesh.VertexPositions[tri.VertexIndices[2]]
 
 		closest := closestPointOnTri(spherePos, v0, v1, v2)
 		delta := fastVectorSub(spherePos, closest)
@@ -391,9 +391,9 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 		tri := triangles.Mesh.Triangles[triID]
 
-		v0 := transform.MultVec(triangles.Mesh.VertexPositions[tri.ID*3]).Sub(boxPos)
-		v1 := transform.MultVec(triangles.Mesh.VertexPositions[tri.ID*3+1]).Sub(boxPos)
-		v2 := transform.MultVec(triangles.Mesh.VertexPositions[tri.ID*3+2]).Sub(boxPos)
+		v0 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[0]]).Sub(boxPos)
+		v1 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[1]]).Sub(boxPos)
+		v2 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[2]]).Sub(boxPos)
 		// tc := v0.Add(v1).Add(v2).Scale(1.0 / 3.0)
 
 		ab := v1.Sub(v0).Unit()
@@ -501,13 +501,11 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 
 		mesh := meshPart.Mesh
 
-		for i := meshPart.TriangleStart; i < meshPart.TriangleEnd; i++ {
+		meshPart.ForEachTri(func(tri *Triangle) {
 
-			tri := mesh.Triangles[i]
-
-			v0 := transformA.MultVec(mesh.VertexPositions[tri.ID*3])
-			v1 := transformA.MultVec(mesh.VertexPositions[tri.ID*3+1])
-			v2 := transformA.MultVec(mesh.VertexPositions[tri.ID*3+2])
+			v0 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndices[0]])
+			v1 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndices[1]])
+			v2 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndices[2]])
 
 			transformedA = append(transformedA,
 				[]vector.Vector{
@@ -519,7 +517,7 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 				},
 			)
 
-		}
+		})
 
 	}
 
@@ -529,13 +527,11 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 
 		mesh := meshPart.Mesh
 
-		for i := meshPart.TriangleStart; i < meshPart.TriangleEnd; i++ {
+		meshPart.ForEachTri(func(tri *Triangle) {
 
-			tri := mesh.Triangles[i]
-
-			v0 := transformB.MultVec(mesh.VertexPositions[tri.ID*3])
-			v1 := transformB.MultVec(mesh.VertexPositions[tri.ID*3+1])
-			v2 := transformB.MultVec(mesh.VertexPositions[tri.ID*3+2])
+			v0 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndices[0]])
+			v1 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndices[1]])
+			v2 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndices[2]])
 
 			bTris = append(bTris, tri)
 
@@ -549,7 +545,7 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 				},
 			)
 
-		}
+		})
 
 	}
 
@@ -713,9 +709,9 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 			closestCapsulePoint = capsuleBottom
 		}
 
-		v0 := triangles.Mesh.VertexPositions[tri.ID*3]
-		v1 := triangles.Mesh.VertexPositions[tri.ID*3+1]
-		v2 := triangles.Mesh.VertexPositions[tri.ID*3+2]
+		v0 := triangles.Mesh.VertexPositions[tri.VertexIndices[0]]
+		v1 := triangles.Mesh.VertexPositions[tri.VertexIndices[1]]
+		v2 := triangles.Mesh.VertexPositions[tri.VertexIndices[2]]
 
 		closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
 		closestSub[0] = closest[0] - capsuleBottom[0]

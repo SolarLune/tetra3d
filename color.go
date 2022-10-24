@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"image/color"
 	"math"
+	"math/rand"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +22,21 @@ func NewColor(r, g, b, a float32) *Color {
 // Clone returns a clone of the Color instance.
 func (color *Color) Clone() *Color {
 	return NewColor(color.R, color.G, color.B, color.A)
+}
+
+func (color *Color) RandomizeRGB(min, max float32, grayscale bool) *Color {
+	diff := max - min
+	if grayscale {
+		r := min + (diff * rand.Float32())
+		color.R = r
+		color.G = r
+		color.B = r
+	} else {
+		color.R = min + (diff * rand.Float32())
+		color.G = min + (diff * rand.Float32())
+		color.B = min + (diff * rand.Float32())
+	}
+	return color
 }
 
 // Set sets the RGBA components of the Color to the r, g, b, and a arguments provided. The components are expected to range from 0 to 1.

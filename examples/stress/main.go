@@ -88,12 +88,19 @@ func (g *Game) Init() {
 	// you want to freely position in your modeler, for example, before combining them for
 	// increased render speed in-game. Note that the maximum number of rendered triangles
 	// in a single draw call is 21845.
-	merged.Merge(cubes...)
+	merged.StaticMerge(cubes...)
+
+	// for i := 0; i < 6; i++ {
+	// 	c := merged.Clone()
+	// 	c.Move(0, float64(i)*4, 0)
+	// 	g.Scene.Root.AddChildren(c)
+	// }
 
 	// After merging the cubes, the merged mesh has multiple MeshParts, but because the cube Models
 	// shared a single Mesh (which has a single Material (aptly named "Cube")), the MeshParts also
 	// share the same Material. This being the case, we don't need to set the image on all MeshParts'
 	// Materials; just the first one is fine.
+
 	mat := merged.Mesh.MeshParts[0].Material
 	mat.Shadeless = true
 	mat.Texture = ebiten.NewImageFromImage(img)

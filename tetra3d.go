@@ -14,8 +14,9 @@ var colorVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesNum)
 var depthVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesNum)
 var indexList = make([]uint16, ebiten.MaxIndicesNum)
 var vertexListIndex = 0
+var indexListIndex = 0
 
-const maxTriangleCount = 21845
+const MaxTriangleCount = 21845
 
 func init() {
 	defaultImg.Fill(color.White)

@@ -240,6 +240,8 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 		hasColor := false
 		nx, ny, nz := 0.0, 0.0, 0.0
 
+		indices := []int{}
+
 		for i := 0; i < len(triangleIndices); i++ {
 
 			triIndex := triangleIndices[i]
@@ -274,6 +276,8 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 			if i%len(triangleOrder) == len(triangleOrder)-1 {
 
+				indices = append(indices, i)
+
 				vert := NewVertex(x, y, z, u, v)
 
 				if hasColor {
@@ -288,15 +292,13 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 				verts = append(verts, vert)
 
-				// normals[vert] = vector.Vector{nx, ny, nz}
-
 			}
 
 		}
 
-		mesh := NewMesh(geo.Name)
+		mesh := NewMesh(geo.Name, verts...)
 		mat := daeURLsToMaterials[geo.Triangles.MaterialName]
-		mesh.AddMeshPart(mat).AddTriangles(verts...)
+		mesh.AddMeshPart(mat).AddTriangles(indices...)
 		mesh.library = scenes
 
 		// if len(normals) > 0 {

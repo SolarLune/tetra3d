@@ -5,7 +5,6 @@ import (
 	"log"
 	"math"
 
-	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/kvartborg/vector"
 )
 
@@ -157,11 +156,12 @@ type Mesh struct {
 
 	MeshParts []*MeshPart // The various mesh parts (collections of triangles, rendered with a single material).
 	Triangles []*Triangle // The various triangles composing the Mesh.
+	Indices   []int       // The indices of each triangle
+	triIndex  int
 
 	// Vertices are stored as a struct-of-arrays for simplified and faster rendering.
 	// Each vertex property (position, normal, UV, colors, weights, bones, etc) is stored
-	// here and indexed in order of triangle ID * 3 + vertex (so the first triangle, 0, has
-	// the vertices 0, 1, and 2, while the 10th triangle would have the vertices 30, 31, and 32).
+	// here and indexed in order of index.
 	vertexTransforms         []vector.Vector
 	VertexPositions          []vector.Vector
 	VertexNormals            []vector.Vector
@@ -172,25 +172,23 @@ type Mesh struct {
 	VertexActiveColorChannel []int
 	VertexWeights            [][]float32
 	VertexBones              [][]uint16
-	VertexCount              int
-	VertexMax                int
+	vertsAddStart            int
+	vertsAddEnd              int
 
 	VertexColorChannelNames map[string]int
 	Dimensions              Dimensions
-	triIndex                int
 	Properties              *Properties
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,
 // or NewMesh will panic.
-func NewMesh(name string) *Mesh {
+func NewMesh(name string, verts ...VertexInfo) *Mesh {
 
 	mesh := &Mesh{
 		Name:                    name,
 		MeshParts:               []*MeshPart{},
 		Dimensions:              Dimensions{{0, 0, 0}, {0, 0, 0}},
 		VertexColorChannelNames: map[string]int{},
-		triIndex:                0,
 		Properties:              NewProperties(),
 
 		vertexTransforms:         []vector.Vector{},
@@ -205,6 +203,10 @@ func NewMesh(name string) *Mesh {
 		VertexWeights:            [][]float32{},
 	}
 
+	if len(verts) > 0 {
+		mesh.AddVertices(verts...)
+	}
+
 	return mesh
 
 }
@@ -216,7 +218,7 @@ func (mesh *Mesh) Clone() *Mesh {
 	newMesh.Properties = mesh.Properties.Clone()
 	newMesh.triIndex = mesh.triIndex
 
-	newMesh.allocateVertexBuffers(mesh.VertexMax)
+	newMesh.allocateVertexBuffers(len(mesh.VertexPositions))
 
 	for i := range mesh.VertexPositions {
 		newMesh.VertexPositions[i] = mesh.VertexPositions[i].Clone()
@@ -265,22 +267,21 @@ func (mesh *Mesh) Clone() *Mesh {
 		newMesh.vertexSkinnedPositions[v] = mesh.vertexSkinnedPositions[v].Clone()
 	}
 
-	newMesh.VertexCount = mesh.VertexCount
-	newMesh.VertexMax = mesh.VertexMax
-
 	newMesh.Triangles = make([]*Triangle, 0, len(mesh.Triangles))
 
 	for _, part := range mesh.MeshParts {
 		newPart := part.Clone()
 
-		for i := newPart.TriangleStart; i < newPart.TriangleEnd; i++ {
-			newTri := mesh.Triangles[i].Clone()
-			newTri.MeshPart = newPart
-			newMesh.Triangles = append(newMesh.Triangles, newTri)
-		}
+		part.ForEachTri(
+			func(tri *Triangle) {
+				newTri := tri.Clone()
+				newTri.MeshPart = newPart
+				newMesh.Triangles = append(newMesh.Triangles, newTri)
+			},
+		)
 
 		newMesh.MeshParts = append(newMesh.MeshParts, newPart)
-		newPart.Mesh = newMesh
+		newPart.AssignToMesh(newMesh)
 	}
 
 	for channelName, index := range mesh.VertexColorChannelNames {
@@ -294,49 +295,51 @@ func (mesh *Mesh) Clone() *Mesh {
 
 // allocateVertexBuffers allows us to allocate the slices for vertex properties all at once rather than resizing multiple times as
 // we append to a slice and have its backing buffer automatically expanded (which is slower).
-func (mesh *Mesh) allocateVertexBuffers(size int) {
+func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 
-	newVP := make([]vector.Vector, size)
+	if cap(mesh.VertexPositions) >= vertexCount {
+		return
+	}
+
+	newVP := make([]vector.Vector, 0, vertexCount)
 	copy(newVP, mesh.VertexPositions)
 	mesh.VertexPositions = newVP
 
-	newVN := make([]vector.Vector, size)
+	newVN := make([]vector.Vector, 0, vertexCount)
 	copy(newVN, mesh.VertexNormals)
 	mesh.VertexNormals = newVN
 
-	newVUVs := make([]vector.Vector, size)
+	newVUVs := make([]vector.Vector, 0, vertexCount)
 	copy(newVUVs, mesh.VertexUVs)
 	mesh.VertexUVs = newVUVs
 
-	newVC := make([][]*Color, size)
+	newVC := make([][]*Color, 0, vertexCount)
 	copy(newVC, mesh.VertexColors)
 	mesh.VertexColors = newVC
 
-	newActiveChannel := make([]int, size)
+	newActiveChannel := make([]int, 0, vertexCount)
 	copy(newActiveChannel, mesh.VertexActiveColorChannel)
 	mesh.VertexActiveColorChannel = newActiveChannel
 
-	newBones := make([][]uint16, size)
+	newBones := make([][]uint16, 0, vertexCount)
 	copy(newBones, mesh.VertexBones)
 	mesh.VertexBones = newBones
 
-	newWeights := make([][]float32, size)
+	newWeights := make([][]float32, 0, vertexCount)
 	copy(newWeights, mesh.VertexWeights)
 	mesh.VertexWeights = newWeights
 
-	newTransforms := make([]vector.Vector, size)
+	newTransforms := make([]vector.Vector, 0, vertexCount)
 	copy(newTransforms, mesh.vertexTransforms)
 	mesh.vertexTransforms = newTransforms
 
-	newNormals := make([]vector.Vector, size)
+	newNormals := make([]vector.Vector, 0, vertexCount)
 	copy(newNormals, mesh.vertexSkinnedNormals)
 	mesh.vertexSkinnedNormals = newNormals
 
-	newPositions := make([]vector.Vector, size)
+	newPositions := make([]vector.Vector, 0, vertexCount)
 	copy(newPositions, mesh.vertexSkinnedPositions)
 	mesh.vertexSkinnedPositions = newPositions
-
-	mesh.VertexMax = size
 
 }
 
@@ -413,9 +416,12 @@ func (mesh *Mesh) Materials() []*Material {
 }
 
 // AddMeshPart allows you to add a new MeshPart to the Mesh with the given Material (with a nil Material reference also being valid).
-func (mesh *Mesh) AddMeshPart(material *Material) *MeshPart {
+func (mesh *Mesh) AddMeshPart(material *Material, indices ...int) *MeshPart {
 	mp := NewMeshPart(mesh, material)
 	mesh.MeshParts = append(mesh.MeshParts, mp)
+	if len(indices) > 0 {
+		mp.AddTriangles(indices...)
+	}
 	return mp
 }
 
@@ -427,6 +433,36 @@ func (mesh *Mesh) FindMeshPart(materialName string) *MeshPart {
 		}
 	}
 	return nil
+}
+
+func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
+
+	mesh.vertsAddStart = len(mesh.VertexPositions)
+	mesh.vertsAddEnd = mesh.vertsAddStart + len(verts)
+
+	if len(verts) == 0 {
+		panic("Error: Mesh.AddVertices() given 0 vertices.")
+	}
+
+	mesh.allocateVertexBuffers(len(mesh.VertexPositions) + len(verts))
+
+	for i := 0; i < len(verts); i++ {
+
+		vertInfo := verts[i]
+		mesh.VertexPositions = append(mesh.VertexPositions, vector.Vector{vertInfo.X, vertInfo.Y, vertInfo.Z})
+		mesh.VertexNormals = append(mesh.VertexNormals, vector.Vector{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ})
+		mesh.VertexUVs = append(mesh.VertexUVs, vector.Vector{vertInfo.U, vertInfo.V})
+		mesh.VertexColors = append(mesh.VertexColors, vertInfo.Colors)
+		mesh.VertexActiveColorChannel = append(mesh.VertexActiveColorChannel, vertInfo.ActiveColorChannel)
+		mesh.VertexBones = append(mesh.VertexBones, vertInfo.Bones)
+		mesh.VertexWeights = append(mesh.VertexWeights, vertInfo.Weights)
+
+		mesh.vertexTransforms = append(mesh.vertexTransforms, vector.Vector{0, 0, 0, 0})
+		mesh.vertexSkinnedNormals = append(mesh.vertexSkinnedNormals, vector.Vector{0, 0, 0})
+		mesh.vertexSkinnedPositions = append(mesh.vertexSkinnedPositions, vector.Vector{0, 0, 0})
+
+	}
+
 }
 
 // Library returns the Library from which this Mesh was loaded. If it was created through code, this function will return nil.
@@ -499,9 +535,9 @@ func (mesh *Mesh) AutoNormal() {
 
 	for _, tri := range mesh.Triangles {
 		tri.RecalculateNormal()
-		mesh.VertexNormals[tri.ID*3] = tri.Normal
-		mesh.VertexNormals[tri.ID*3+1] = tri.Normal
-		mesh.VertexNormals[tri.ID*3+2] = tri.Normal
+		for i := 0; i < 3; i++ {
+			mesh.VertexNormals[tri.VertexIndices[i]] = tri.Normal
+		}
 	}
 
 }
@@ -546,7 +582,7 @@ func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
 // SelectAll selects all vertices on the source Mesh.
 func (vs *VertexSelection) SelectAll() *VertexSelection {
 
-	for i := 0; i < vs.Mesh.VertexMax; i++ {
+	for i := 0; i < len(vs.Mesh.VertexPositions); i++ {
 		vs.Indices[i] = true
 	}
 
@@ -556,9 +592,16 @@ func (vs *VertexSelection) SelectAll() *VertexSelection {
 // SelectMeshPart selects all vertices in the Mesh belonging to the specified MeshPart.
 func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
 
-	for i := meshPart.TriangleStart * 3; i < meshPart.TriangleEnd*3; i++ {
-		vs.Indices[i] = true
-	}
+	meshPart.ForEachTri(
+
+		func(tri *Triangle) {
+
+			for _, index := range tri.VertexIndices {
+				vs.Indices[int(index)] = true
+			}
+
+		},
+	)
 
 	return vs
 
@@ -641,27 +684,20 @@ func (vs *VertexSelection) MoveVec(vec vector.Vector) {
 // NewCube creates a new Cube Mesh and gives it a new material (suitably named "Cube").
 func NewCube() *Mesh {
 
-	mesh := NewMesh("Cube")
-	mp := mesh.AddMeshPart(NewMaterial("Cube"))
-	mp.AddTriangles(
+	mesh := NewMesh("Cube",
+
 		// Top
 
 		NewVertex(-1, 1, -1, 0, 0),
 		NewVertex(1, 1, 1, 1, 1),
 		NewVertex(1, 1, -1, 1, 0),
-
 		NewVertex(-1, 1, 1, 0, 1),
-		NewVertex(1, 1, 1, 1, 1),
-		NewVertex(-1, 1, -1, 0, 0),
 
 		// Bottom
 
 		NewVertex(1, -1, -1, 1, 0),
 		NewVertex(1, -1, 1, 1, 1),
 		NewVertex(-1, -1, -1, 0, 0),
-
-		NewVertex(-1, -1, -1, 0, 0),
-		NewVertex(1, -1, 1, 1, 1),
 		NewVertex(-1, -1, 1, 0, 1),
 
 		// Front
@@ -669,19 +705,13 @@ func NewCube() *Mesh {
 		NewVertex(-1, 1, 1, 0, 0),
 		NewVertex(1, -1, 1, 1, 1),
 		NewVertex(1, 1, 1, 1, 0),
-
 		NewVertex(-1, -1, 1, 0, 1),
-		NewVertex(1, -1, 1, 1, 1),
-		NewVertex(-1, 1, 1, 0, 0),
 
 		// Back
 
 		NewVertex(1, 1, -1, 1, 0),
 		NewVertex(1, -1, -1, 1, 1),
 		NewVertex(-1, 1, -1, 0, 0),
-
-		NewVertex(-1, 1, -1, 0, 0),
-		NewVertex(1, -1, -1, 1, 1),
 		NewVertex(-1, -1, -1, 0, 1),
 
 		// Right
@@ -689,9 +719,6 @@ func NewCube() *Mesh {
 		NewVertex(1, 1, -1, 1, 0),
 		NewVertex(1, 1, 1, 1, 1),
 		NewVertex(1, -1, -1, 0, 0),
-
-		NewVertex(1, -1, -1, 0, 0),
-		NewVertex(1, 1, 1, 1, 1),
 		NewVertex(1, -1, 1, 0, 1),
 
 		// Left
@@ -699,10 +726,40 @@ func NewCube() *Mesh {
 		NewVertex(-1, -1, -1, 0, 0),
 		NewVertex(-1, 1, 1, 1, 1),
 		NewVertex(-1, 1, -1, 1, 0),
-
 		NewVertex(-1, -1, 1, 0, 1),
-		NewVertex(-1, 1, 1, 1, 1),
-		NewVertex(-1, -1, -1, 0, 0),
+	)
+
+	mesh.AddMeshPart(
+
+		NewMaterial("Cube"),
+
+		// Top
+		0, 1, 2,
+		3, 1, 0,
+
+		// Bottom
+		4, 5, 6,
+		6, 5, 7,
+
+		// Front
+
+		8, 9, 10,
+		11, 9, 8,
+
+		// Back
+
+		12, 13, 14,
+		14, 13, 15,
+
+		// Right
+
+		16, 17, 18,
+		18, 17, 19,
+
+		// Left
+
+		20, 21, 22,
+		23, 21, 20,
 	)
 
 	mesh.UpdateBounds()
@@ -718,106 +775,135 @@ func NewIcosphere(detailLevel int) *Mesh {
 	// Code cribbed from http://blog.andreaskahler.com/2009/06/creating-icosphere-mesh-in-code.html, thank you very much Andreas!
 
 	mesh := NewMesh("Icosphere")
-	part := mesh.AddMeshPart(NewMaterial("Icosphere"))
+	// part := mesh.AddMeshPart(NewMaterial("Icosphere"))
 
-	t := (1.0 + math.Sqrt(5)) / 2
+	// t := (1.0 + math.Sqrt(5)) / 2
 
-	v0 := NewVertex(-1, t, 0, 0, 0)
-	v1 := NewVertex(1, t, 0, 0, 0)
-	v2 := NewVertex(-1, -t, 0, 0, 0)
-	v3 := NewVertex(1, -t, 0, 0, 0)
+	// v0 := NewVertex(-1, t, 0, 0, 0)
+	// v1 := NewVertex(1, t, 0, 0, 0)
+	// v2 := NewVertex(-1, -t, 0, 0, 0)
+	// v3 := NewVertex(1, -t, 0, 0, 0)
 
-	v4 := NewVertex(0, -1, t, 0, 0)
-	v5 := NewVertex(0, 1, t, 0, 0)
-	v6 := NewVertex(0, -1, -t, 0, 0)
-	v7 := NewVertex(0, 1, -t, 0, 0)
+	// v4 := NewVertex(0, -1, t, 0, 0)
+	// v5 := NewVertex(0, 1, t, 0, 0)
+	// v6 := NewVertex(0, -1, -t, 0, 0)
+	// v7 := NewVertex(0, 1, -t, 0, 0)
 
-	v8 := NewVertex(t, 0, -1, 0, 0)
-	v9 := NewVertex(t, 0, 1, 0, 0)
-	v10 := NewVertex(-t, 0, -1, 0, 0)
-	v11 := NewVertex(-t, 0, 1, 0, 0)
+	// v8 := NewVertex(t, 0, -1, 0, 0)
+	// v9 := NewVertex(t, 0, 1, 0, 0)
+	// v10 := NewVertex(-t, 0, -1, 0, 0)
+	// v11 := NewVertex(-t, 0, 1, 0, 0)
 
-	triangles := []VertexInfo{
+	// indices := []uint32{
+	// 	0, 11, 5,
+	// 	0, 5, 1,
+	// 	0, 1, 7,
+	// 	0, 7, 10,
+	// 	0, 10, 11,
 
-		v0, v11, v5,
-		v0, v5, v1,
-		v0, v1, v7,
-		v0, v7, v10,
-		v0, v10, v11,
+	// 	1, 5, 9,
+	// 	5, 11, 4,
+	// 	11, 10, 2,
+	// 	10, 7, 6,
+	// 	7, 1, 8,
 
-		v1, v5, v9,
-		v5, v11, v4,
-		v11, v10, v2,
-		v10, v7, v6,
-		v7, v1, v8,
+	// 	3, 9, 4,
+	// 	3, 4, 2,
+	// 	3, 2, 6,
+	// 	3, 6, 8,
+	// 	3, 8, 9,
 
-		v3, v9, v4,
-		v3, v4, v2,
-		v3, v2, v6,
-		v3, v6, v8,
-		v3, v8, v9,
+	// 	4, 9, 5,
+	// 	2, 4, 11,
+	// 	6, 2, 10,
+	// 	8, 6, 7,
+	// 	9, 8, 1,
+	// }
 
-		v4, v9, v5,
-		v2, v4, v11,
-		v6, v2, v10,
-		v8, v6, v7,
-		v9, v8, v1,
-	}
+	// vertices := []VertexInfo{
+	// 	v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11,
+	// }
 
-	if detailLevel > 0 {
+	// type cacheStorage struct {
+	// 	v0, v1 int
+	// }
 
-		for i := 0; i < detailLevel+1; i++ {
+	// cache := map[cacheStorage]int{}
 
-			newFaces := make([]VertexInfo, 0, len(triangles)*4)
+	// getMiddlePoint := func(index0, index1 int) int {
 
-			for triIndex := 0; triIndex < len(triangles); triIndex += 3 {
+	// 	if v, exists := cache[cacheStorage{index0, index1}]; exists {
+	// 		return v
+	// 	}
 
-				a := vector.Vector{triangles[triIndex].X, triangles[triIndex].Y, triangles[triIndex].Z}
-				b := vector.Vector{triangles[triIndex+1].X, triangles[triIndex+1].Y, triangles[triIndex+1].Z}
-				c := vector.Vector{triangles[triIndex+2].X, triangles[triIndex+2].Y, triangles[triIndex+2].Z}
+	// 	a := vector.Vector{vertices[index0].X, vertices[index0].Y, vertices[index0].Z}
+	// 	b := vector.Vector{vertices[index1].X, vertices[index1].Y, vertices[index1].Z}
+	// 	midA := a.Add(b.Sub(a).Scale(0.5))
+	// 	midAVert := NewVertex(midA[0], midA[1], midA[2], 0, 0)
+	// 	vertices = append(vertices, midAVert)
 
-				midA := a.Add(b.Sub(a).Scale(0.5))
-				midB := b.Add(c.Sub(b).Scale(0.5))
-				midC := c.Add(a.Sub(c).Scale(0.5))
+	// 	cache[cacheStorage{index0, index1}] = len(vertices)
+	// 	return len(vertices)
 
-				midAVert := NewVertex(midA[0], midA[1], midA[2], 0, 0)
-				midBVert := NewVertex(midB[0], midB[1], midB[2], 0, 0)
-				midCVert := NewVertex(midC[0], midC[1], midC[2], 0, 0)
+	// }
 
-				newFaces = append(newFaces,
-					triangles[triIndex], midAVert, midCVert,
-					triangles[triIndex+1], midBVert, midAVert,
-					triangles[triIndex+2], midCVert, midBVert,
-					midAVert, midBVert, midCVert,
-					// triangles[triIndex], triangles[triIndex+1], triangles[triIndex+2],
-				)
+	// if detailLevel > 0 {
 
-			}
+	// 	for i := 0; i < detailLevel+1; i++ {
 
-			triangles = newFaces
+	// 		newFaces := make([]VertexInfo, 0, len(vertices)*4)
+	// 		newIndices := make([]int, 0, len(indices)*4)
 
-		}
+	// 		for triIndex := 0; triIndex < len(vertices); triIndex += 3 {
 
-	}
+	// 			a := vector.Vector{vertices[triIndex].X, vertices[triIndex].Y, vertices[triIndex].Z}
+	// 			b := vector.Vector{vertices[triIndex+1].X, vertices[triIndex+1].Y, vertices[triIndex+1].Z}
+	// 			c := vector.Vector{vertices[triIndex+2].X, vertices[triIndex+2].Y, vertices[triIndex+2].Z}
 
-	for i := range triangles {
+	// 			midA := a.Add(b.Sub(a).Scale(0.5))
+	// 			midB := b.Add(c.Sub(b).Scale(0.5))
+	// 			midC := c.Add(a.Sub(c).Scale(0.5))
 
-		v := vector.Vector{triangles[i].X, triangles[i].Y, triangles[i].Z}.Unit() // Make it spherical
-		triangles[i].X = v[0]
-		triangles[i].Y = v[1]
-		triangles[i].Z = v[2]
+	// 			midAVert := NewVertex(midA[0], midA[1], midA[2], 0, 0)
+	// 			midBVert := NewVertex(midB[0], midB[1], midB[2], 0, 0)
+	// 			midCVert := NewVertex(midC[0], midC[1], midC[2], 0, 0)
 
-		triangles[i].U = 0
-		triangles[i].V = 0
-		if i%3 == 1 {
-			triangles[i].U = 1
-		} else if i%3 == 2 {
-			triangles[i].V = 1
-		}
+	// 			newFaces = append(newFaces,
+	// 				vertices[triIndex], midAVert, midCVert,
+	// 				vertices[triIndex+1], midBVert, midAVert,
+	// 				vertices[triIndex+2], midCVert, midBVert,
+	// 				midAVert, midBVert, midCVert,
+	// 			)
+	// 			newIndices = append(newIndices)
 
-	}
+	// 		}
 
-	part.AddTriangles(triangles...)
+	// 		vertices = newFaces
+
+	// 	}
+
+	// }
+
+	// for i := range vertices {
+
+	// 	v := vector.Vector{vertices[i].X, vertices[i].Y, vertices[i].Z}.Unit() // Make it spherical
+	// 	vertices[i].X = v[0]
+	// 	vertices[i].Y = v[1]
+	// 	vertices[i].Z = v[2]
+
+	// 	vertices[i].U = 0
+	// 	vertices[i].V = 0
+	// 	if i%3 == 1 {
+	// 		vertices[i].U = 1
+	// 	} else if i%3 == 2 {
+	// 		vertices[i].V = 1
+	// 	}
+
+	// }
+
+	// part.AddTriangles(
+	// 	indices,
+	// 	vertices...)
 
 	mesh.AutoNormal()
 
@@ -829,16 +915,16 @@ func NewIcosphere(detailLevel int) *Mesh {
 // NewPlane creates a new plane Mesh and gives it a new material (suitably named "Plane").
 func NewPlane() *Mesh {
 
-	mesh := NewMesh("Plane")
-	part := mesh.AddMeshPart(NewMaterial("Plane"))
-	part.AddTriangles(
+	mesh := NewMesh("Plane",
 		NewVertex(1, 0, -1, 1, 0),
 		NewVertex(-1, 0, -1, 0, 0),
 		NewVertex(1, 0, 1, 1, 1),
-
-		NewVertex(-1, 0, -1, 0, 0),
 		NewVertex(-1, 0, 1, 0, 1),
-		NewVertex(1, 0, 1, 1, 1),
+	)
+
+	mesh.AddMeshPart(NewMaterial("Plane"),
+		0, 1, 2,
+		1, 3, 2,
 	)
 
 	mesh.UpdateBounds()
@@ -848,69 +934,69 @@ func NewPlane() *Mesh {
 
 }
 
-func NewWeirdDebuggingStatueThing() *Mesh {
+// func NewWeirdDebuggingStatueThing() *Mesh {
 
-	mesh := NewMesh("Weird Statue")
+// 	mesh := NewMesh("Weird Statue")
 
-	part := mesh.AddMeshPart(NewMaterial("Weird Statue"))
+// 	part := mesh.AddMeshPart(NewMaterial("Weird Statue"))
 
-	part.AddTriangles(
+// 	part.AddTriangles(
 
-		NewVertex(1, 0, -1, 1, 0),
-		NewVertex(-1, 0, -1, 0, 0),
-		NewVertex(1, 0, 1, 1, 1),
+// 		NewVertex(1, 0, -1, 1, 0),
+// 		NewVertex(-1, 0, -1, 0, 0),
+// 		NewVertex(1, 0, 1, 1, 1),
 
-		NewVertex(-1, 0, -1, 0, 0),
-		NewVertex(-1, 0, 1, 0, 1),
-		NewVertex(1, 0, 1, 1, 1),
+// 		NewVertex(-1, 0, -1, 0, 0),
+// 		NewVertex(-1, 0, 1, 0, 1),
+// 		NewVertex(1, 0, 1, 1, 1),
 
-		NewVertex(-1, 2, -1, 0, 0),
-		NewVertex(1, 2, 1, 1, 1),
-		NewVertex(1, 0, -1, 1, 0),
+// 		NewVertex(-1, 2, -1, 0, 0),
+// 		NewVertex(1, 2, 1, 1, 1),
+// 		NewVertex(1, 0, -1, 1, 0),
 
-		NewVertex(-1, 0, 1, 0, 1),
-		NewVertex(1, 2, 1, 1, 1),
-		NewVertex(-1, 2, -1, 0, 0),
-	)
+// 		NewVertex(-1, 0, 1, 0, 1),
+// 		NewVertex(1, 2, 1, 1, 1),
+// 		NewVertex(-1, 2, -1, 0, 0),
+// 	)
 
-	mesh.UpdateBounds()
+// 	mesh.UpdateBounds()
 
-	return mesh
+// 	return mesh
 
-}
+// }
 
 // sortingTriangle is used specifically for sorting triangles when rendering. Less data means more data fits in cache,
 // which means sorting is faster.
 type sortingTriangle struct {
-	ID       int
+	Triangle *Triangle
 	depth    float32
 	rendered bool
 }
 
 // A Triangle represents the smallest renderable object in Tetra3D. A triangle contains very little data, and is mainly used to help identify triads of vertices.
 type Triangle struct {
-	ID int // Unique identifier number (index) in the Mesh. You can use the ID to find a triangle's vertices
-	// using the formula: Mesh.VertexPositions[TriangleIndex*3+i], with i being the index of the vertex in the triangle
-	// (so either 0, 1, or 2).
-	MaxSpan  float64       // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
-	Center   vector.Vector // The untransformed center of the Triangle.
-	Normal   vector.Vector // The physical normal of the triangle (i.e. the direction the triangle is facing). This is different from the visual normals of a triangle's vertices (i.e. a selection of vertices can have inverted normals to be see through, for example).
-	MeshPart *MeshPart     // The specific MeshPart this Triangle belongs to.
+	ID            uint16
+	VertexIndices []int         // Vertex indices that compose the triangle
+	MaxSpan       float64       // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
+	Center        vector.Vector // The untransformed center of the Triangle.
+	Normal        vector.Vector // The physical normal of the triangle (i.e. the direction the triangle is facing). This is different from the visual normals of a triangle's vertices (i.e. a selection of vertices can have inverted normals to be see through, for example).
+	MeshPart      *MeshPart     // The specific MeshPart this Triangle belongs to.
 }
 
 // NewTriangle creates a new Triangle, and requires a reference to its owning MeshPart, along with its id within that MeshPart.
-func NewTriangle(meshPart *MeshPart, id int) *Triangle {
+func NewTriangle(meshPart *MeshPart, id uint16, indices ...int) *Triangle {
 	tri := &Triangle{
-		MeshPart: meshPart,
-		ID:       id,
-		Center:   vector.Vector{0, 0, 0},
+		ID:            id,
+		MeshPart:      meshPart,
+		VertexIndices: []int{indices[0], indices[1], indices[2]},
+		Center:        vector.Vector{0, 0, 0},
 	}
 	return tri
 }
 
 // Clone clones the Triangle, keeping a reference to the same Material.
 func (tri *Triangle) Clone() *Triangle {
-	newTri := NewTriangle(tri.MeshPart, tri.ID)
+	newTri := NewTriangle(tri.MeshPart, tri.ID, tri.VertexIndices...)
 	newTri.MeshPart = tri.MeshPart
 	newTri.Center = tri.Center.Clone()
 	newTri.Normal = tri.Normal.Clone()
@@ -923,9 +1009,14 @@ func (tri *Triangle) RecalculateCenter() {
 
 	verts := tri.MeshPart.Mesh.VertexPositions
 
-	tri.Center[0] = (verts[tri.ID*3][0] + verts[tri.ID*3+1][0] + verts[tri.ID*3+2][0]) / 3
-	tri.Center[1] = (verts[tri.ID*3][1] + verts[tri.ID*3+1][1] + verts[tri.ID*3+2][1]) / 3
-	tri.Center[2] = (verts[tri.ID*3][2] + verts[tri.ID*3+1][2] + verts[tri.ID*3+2][2]) / 3
+	indices := tri.VertexIndices
+
+	// tri.Center[0] = (verts[indices[0]] + verts[indices[0]] + verts[tri.ID*3+2][0]) / 3
+	// tri.Center[1] = (verts[indices[1]] + verts[indices[0]] + verts[tri.ID*3+2][1]) / 3
+	// tri.Center[2] = (verts[indices[2]] + verts[indices[0]] + verts[tri.ID*3+2][2]) / 3
+	tri.Center[0] = (verts[indices[0]][0] + verts[indices[1]][0] + verts[indices[2]][0]) / 3
+	tri.Center[1] = (verts[indices[0]][1] + verts[indices[1]][1] + verts[indices[2]][1]) / 3
+	tri.Center[2] = (verts[indices[0]][2] + verts[indices[1]][2] + verts[indices[2]][2]) / 3
 
 	// Determine the maximum span of the triangle; this is done for bounds checking, since we can reject triangles early if we
 	// can easily tell we're too far away from them.
@@ -933,28 +1024,28 @@ func (tri *Triangle) RecalculateCenter() {
 
 	for i := 0; i < 3; i++ {
 
-		if dim[0][0] > verts[tri.ID*3+i][0] {
-			dim[0][0] = verts[tri.ID*3+i][0]
+		if dim[0][0] > verts[indices[i]][0] {
+			dim[0][0] = verts[indices[i]][0]
 		}
 
-		if dim[0][1] > verts[tri.ID*3+i][1] {
-			dim[0][1] = verts[tri.ID*3+i][1]
+		if dim[0][1] > verts[indices[i]][1] {
+			dim[0][1] = verts[indices[i]][1]
 		}
 
-		if dim[0][2] > verts[tri.ID*3+i][2] {
-			dim[0][2] = verts[tri.ID*3+i][2]
+		if dim[0][2] > verts[indices[i]][2] {
+			dim[0][2] = verts[indices[i]][2]
 		}
 
-		if dim[1][0] < verts[tri.ID*3+i][0] {
-			dim[1][0] = verts[tri.ID*3+i][0]
+		if dim[1][0] < verts[indices[i]][0] {
+			dim[1][0] = verts[indices[i]][0]
 		}
 
-		if dim[1][1] < verts[tri.ID*3+i][1] {
-			dim[1][1] = verts[tri.ID*3+i][1]
+		if dim[1][1] < verts[indices[i]][1] {
+			dim[1][1] = verts[indices[i]][1]
 		}
 
-		if dim[1][2] < verts[tri.ID*3+i][2] {
-			dim[1][2] = verts[tri.ID*3+i][2]
+		if dim[1][2] < verts[indices[i]][2] {
+			dim[1][2] = verts[indices[i]][2]
 		}
 
 	}
@@ -967,17 +1058,13 @@ func (tri *Triangle) RecalculateCenter() {
 // individual position. Also note that vertex normals (visual normals) are automatically set when loading Meshes from model files.
 func (tri *Triangle) RecalculateNormal() {
 	verts := tri.MeshPart.Mesh.VertexPositions
-	tri.Normal = calculateNormal(verts[tri.ID*3], verts[tri.ID*3+1], verts[tri.ID*3+2])
-}
-
-func (tri *Triangle) VertexIndices() [3]int {
-	return [3]int{tri.ID * 3, tri.ID*3 + 1, tri.ID*3 + 2}
+	tri.Normal = calculateNormal(verts[tri.VertexIndices[0]], verts[tri.VertexIndices[1]], verts[tri.VertexIndices[2]])
 }
 
 func (tri *Triangle) SharesVertexPositions(other *Triangle) []int {
 
-	triIndices := tri.VertexIndices()
-	otherIndices := other.VertexIndices()
+	triIndices := tri.VertexIndices
+	otherIndices := other.VertexIndices
 
 	mesh := tri.MeshPart.Mesh
 	otherMesh := other.MeshPart.Mesh
@@ -1001,6 +1088,12 @@ func (tri *Triangle) SharesVertexPositions(other *Triangle) []int {
 
 }
 
+func (tri *Triangle) ForEachVertexIndex(vertFunc func(vertexIndex int)) {
+	for _, vi := range tri.VertexIndices {
+		vertFunc(vi)
+	}
+}
+
 func calculateNormal(p1, p2, p3 vector.Vector) vector.Vector {
 
 	v0 := p2.Sub(p1)
@@ -1016,8 +1109,11 @@ func calculateNormal(p1, p2, p3 vector.Vector) vector.Vector {
 type MeshPart struct {
 	Mesh             *Mesh
 	Material         *Material
+	VertexIndexStart int
+	VertexIndexEnd   int
 	TriangleStart    int
 	TriangleEnd      int
+
 	sortingTriangles []sortingTriangle
 }
 
@@ -1026,87 +1122,121 @@ func NewMeshPart(mesh *Mesh, material *Material) *MeshPart {
 	return &MeshPart{
 		Mesh:             mesh,
 		Material:         material,
-		TriangleStart:    -1,
-		TriangleEnd:      -1,
 		sortingTriangles: []sortingTriangle{},
+		TriangleStart:    math.MaxInt,
+		VertexIndexStart: -1,
 	}
 }
 
 // Clone clones the MeshPart, returning the copy.
 func (part *MeshPart) Clone() *MeshPart {
-	newMP := &MeshPart{
-		Mesh:          part.Mesh,
-		Material:      part.Material,
-		TriangleStart: part.TriangleStart,
-		TriangleEnd:   part.TriangleEnd,
-	}
+
+	newMP := NewMeshPart(part.Mesh, part.Material)
 
 	for i := 0; i < len(part.sortingTriangles); i++ {
 		newMP.sortingTriangles = append(newMP.sortingTriangles, sortingTriangle{
-			ID: part.sortingTriangles[i].ID,
+			Triangle: part.sortingTriangles[i].Triangle,
 		})
 	}
 
+	newMP.VertexIndexStart = part.VertexIndexStart
+	newMP.VertexIndexEnd = part.VertexIndexEnd
+	newMP.TriangleStart = part.TriangleStart
+	newMP.TriangleEnd = part.TriangleEnd
+
 	newMP.Material = part.Material
 	return newMP
+}
+
+func (part *MeshPart) AssignToMesh(mesh *Mesh) {
+
+	for _, p := range mesh.MeshParts {
+		if p == part {
+			return
+		}
+	}
+
+	newSorts := make([]sortingTriangle, 0, len(part.sortingTriangles))
+	for _, tri := range part.sortingTriangles {
+		newSorts = append(newSorts, sortingTriangle{
+			Triangle: part.Mesh.Triangles[tri.Triangle.ID],
+		})
+	}
+	part.sortingTriangles = newSorts
+
+	mesh.MeshParts = append(mesh.MeshParts, part)
+
 }
 
 // func (part *MeshPart) allocateSortingBuffer(size int) {
 // 	part.sortingTriangles = make([]sortingTriangle, size)
 // }
 
-// AddTriangles adds triangles to the MeshPart using the provided VertexInfo slice. Note that
-func (part *MeshPart) AddTriangles(verts ...VertexInfo) {
+func (part *MeshPart) ForEachTri(triFunc func(tri *Triangle)) {
+	for i := part.TriangleStart; i <= part.TriangleEnd; i++ {
+		triFunc(part.Mesh.Triangles[i])
+	}
+}
+
+func (part *MeshPart) ForEachVertexIndex(vertFunc func(vertIndex int)) {
+	for i := part.VertexIndexStart; i < part.VertexIndexEnd; i++ {
+		vertFunc(i)
+	}
+}
+
+// AddTriangles adds triangles to the MeshPart using the provided VertexInfo slice.
+func (part *MeshPart) AddTriangles(indices ...int) {
 
 	mesh := part.Mesh
 
-	if part.TriangleEnd > -1 && part.TriangleEnd < mesh.triIndex {
-		panic("Error: Cannot add triangles to MeshPart non-contiguously (i.e. partA.AddTriangles(), partB.AddTriangles(), partA.AddTriangles() ).")
+	if len(indices) == 0 || len(indices)%3 > 0 {
+		panic("Error: MeshPart.AddTriangles() not given enough vertex indices to construct complete triangles (i.e. multiples of 3 vertices).")
 	}
 
-	if len(verts) == 0 || len(verts)%3 > 0 {
-		panic("Error: MeshPart.AddTriangles() not given enough vertices to construct complete triangles (i.e. multiples of 3 vertices).")
+	// for _, i := range indices {
+	// 	if int(i) > len(mesh.VertexPositions) {
+	// 		panic("Error: Cannot add triangles to MeshPart with indices > length of vertices passed. Errorful index: " + strconv.Itoa(int(i)))
+	// 	}
+	// }
+
+	if part.VertexIndexStart < 0 {
+		part.VertexIndexStart = part.Mesh.vertsAddStart
 	}
+	part.VertexIndexEnd = part.Mesh.vertsAddEnd
 
-	if part.TriangleStart < 0 {
-		part.TriangleStart = mesh.triIndex
-	}
+	// for _, index := range indices {
 
-	if mesh.triIndex*3+len(verts) > part.Mesh.VertexMax {
-		part.Mesh.allocateVertexBuffers(part.Mesh.VertexMax + len(verts))
-	}
+	// 	// index += uint32(part.VertexIndexEnd)
 
-	for i := 0; i < len(verts); i += 3 {
+	// 	if index < uint32(part.VertexIndexStart) {
+	// 		part.VertexIndexStart = int(index)
+	// 	}
+	// 	if index > uint32(part.VertexIndexEnd) {
+	// 		part.VertexIndexEnd = int(index)
+	// 	}
+	// }
 
-		for j := 0; j < 3; j++ {
-			vertInfo := verts[i+j]
-			index := (mesh.triIndex * 3) + j
-			mesh.VertexPositions[index] = vector.Vector{vertInfo.X, vertInfo.Y, vertInfo.Z}
-			mesh.VertexNormals[index] = vector.Vector{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ}
-			mesh.VertexUVs[index] = vector.Vector{vertInfo.U, vertInfo.V}
-			mesh.VertexColors[index] = vertInfo.Colors
-			mesh.VertexActiveColorChannel[index] = vertInfo.ActiveColorChannel
-			mesh.VertexBones[index] = vertInfo.Bones
-			mesh.VertexWeights[index] = vertInfo.Weights
+	for i := 0; i < len(indices); i += 3 {
 
-			mesh.vertexTransforms[index] = vector.Vector{0, 0, 0, 0}
-			mesh.vertexSkinnedNormals[index] = vector.Vector{0, 0, 0}
-			mesh.vertexSkinnedPositions[index] = vector.Vector{0, 0, 0}
+		if mesh.triIndex < part.TriangleStart {
+			part.TriangleStart = mesh.triIndex
+		}
+		if mesh.triIndex > part.TriangleEnd {
+			part.TriangleEnd = mesh.triIndex
 		}
 
-		newTri := NewTriangle(part, mesh.triIndex)
+		newTri := NewTriangle(part, uint16(mesh.triIndex), indices[i]+part.Mesh.vertsAddStart, indices[i+1]+part.Mesh.vertsAddStart, indices[i+2]+part.Mesh.vertsAddStart)
 		newTri.RecalculateCenter()
 		newTri.RecalculateNormal()
 		part.sortingTriangles = append(part.sortingTriangles, sortingTriangle{
-			ID: mesh.triIndex,
+			Triangle: newTri,
 		})
 		mesh.Triangles = append(mesh.Triangles, newTri)
 		mesh.triIndex++
-		mesh.VertexCount += 3
 
 	}
 
-	if part.TriangleCount() >= ebiten.MaxIndicesNum/3 {
+	if part.TriangleCount() >= MaxTriangleCount {
 		matName := "nil"
 		if part.Material != nil {
 			matName = part.Material.Name
@@ -1114,27 +1244,32 @@ func (part *MeshPart) AddTriangles(verts ...VertexInfo) {
 		log.Println("warning: mesh [" + part.Mesh.Name + "] has part with material named [" + matName + "], which has " + fmt.Sprintf("%d", part.TriangleCount()) + " triangles. This exceeds the renderable maximum of 21845 triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into multiple models. Otherwise, the game will crash if it renders over the maximum number of triangles.")
 	}
 
-	part.TriangleEnd = mesh.triIndex
-
 }
 
 // TriangleCount returns the total number of triangles in the MeshPart, specifically.
 func (part *MeshPart) TriangleCount() int {
-	return part.TriangleEnd - part.TriangleStart + 1
+	return part.TriangleEnd - part.TriangleStart
 }
 
 // ApplyMatrix applies a transformation matrix to the vertices referenced by the MeshPart.
 func (part *MeshPart) ApplyMatrix(matrix Matrix4) {
 	mesh := part.Mesh
-	for triIndex := part.TriangleStart; triIndex < part.TriangleEnd; triIndex++ {
-		for i := 0; i < 3; i++ {
-			x, y, z := fastMatrixMultVec(matrix, mesh.VertexPositions[triIndex*3+i])
-			vert := mesh.VertexPositions[triIndex*3+i]
-			vert[0] = x
-			vert[1] = y
-			vert[2] = z
-		}
-	}
+
+	part.ForEachTri(
+
+		func(tri *Triangle) {
+
+			for _, index := range tri.VertexIndices {
+				vert := mesh.VertexPositions[index]
+				x, y, z := fastMatrixMultVec(matrix, vert)
+				vert[0] = x
+				vert[1] = y
+				vert[2] = z
+			}
+
+		},
+	)
+
 }
 
 type VertexInfo struct {
