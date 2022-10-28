@@ -429,6 +429,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	far := camera.Far
 
+	zeroVec := vector.Vector{0, 0, 0}
+
 	if model.Skinned {
 
 		lightingOn := false
@@ -499,7 +501,12 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		if mat != nil && mat.BillboardMode != BillboardModeNone {
 
-			lookat := NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y)
+			var lookat Matrix4
+			if camera.Perspective {
+				lookat = NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y)
+			} else {
+				lookat = NewLookAtMatrix(zeroVec, camera.WorldRotation().Forward(), vector.Y)
+			}
 
 			if mat.BillboardMode == BillboardModeXZ {
 				lookat.SetRow(1, vector.Vector{0, 1, 0, 0})

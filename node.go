@@ -635,7 +635,7 @@ func (node *Node) SetWorldY(y float64) {
 // SetWorldZ sets the Z component of the object's world position.
 func (node *Node) SetWorldZ(z float64) {
 	v := node.WorldPosition()
-	v[0] = z
+	v[2] = z
 	node.SetWorldPositionVec(v)
 }
 

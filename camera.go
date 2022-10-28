@@ -69,6 +69,7 @@ type Camera struct {
 	clipAlphaCompositeShader *ebiten.Shader
 	clipAlphaRenderShader    *ebiten.Shader
 	colorShader              *ebiten.Shader
+	sprite3DShader           *ebiten.Shader
 
 	// Visibility check variables
 	cameraForward          vector.Vector
@@ -245,6 +246,36 @@ func NewCamera(w, h int) *Camera {
 		panic(err)
 	}
 
+	sprite3DShaderText := []byte(
+		`package main
+
+		var SpriteDepth float
+
+		func decodeDepth(rgba vec4) float {
+			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+		}
+
+		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+
+			resultDepth := imageSrc1At(texCoord)
+
+			if resultDepth.a == 0 || decodeDepth(resultDepth) > SpriteDepth {
+				return imageSrc0At(texCoord)
+			}
+
+			discard()
+
+		}
+
+		`,
+	)
+
+	cam.sprite3DShader, err = ebiten.NewShader(sprite3DShaderText)
+
+	if err != nil {
+		panic(err)
+	}
+
 	if w != 0 && h != 0 {
 		cam.Resize(w, h)
 	}
@@ -305,6 +336,12 @@ func (camera *Camera) Resize(w, h int) {
 	camera.clipAlphaIntermediate = ebiten.NewImage(w, h)
 	camera.sphereFactorCalculated = false
 
+}
+
+// Size returns the width and height of the camera's backing color texture. All of the Camera's textures are the same size, so these
+// same size values can also be used for the depth texture, the accumulation buffer, etc.
+func (camera *Camera) Size() (w, h int) {
+	return camera.resultColorTexture.Size()
 }
 
 // ViewMatrix returns the Camera's view matrix.
@@ -393,14 +430,14 @@ func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
 
 // WorldToScreen transforms a 3D position in the world to screen coordinates.
 func (camera *Camera) WorldToScreen(vert vector.Vector) vector.Vector {
-	v := NewMatrix4Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
-	return camera.ClipToScreen(v.MultVecW(vector.Vector{0, 0, 0}))
+	mat := camera.ViewMatrix().Mult(camera.Projection())
+	return camera.ClipToScreen(mat.MultVecW(vert))
 }
 
 // WorldToClip transforms a 3D position in the world to clip coordinates (before screen normalization).
 func (camera *Camera) WorldToClip(vert vector.Vector) vector.Vector {
-	v := NewMatrix4Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
-	return v.MultVecW(vector.Vector{0, 0, 0})
+	mat := camera.ViewMatrix().Mult(camera.Projection())
+	return mat.MultVecW(vert)
 }
 
 // PointInFrustum returns true if the point is visible through the camera frustum.
@@ -905,19 +942,19 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				}
 			}
 
-			colorVertexList[vertexListIndex].DstX = float32(int(p0[0]))
-			colorVertexList[vertexListIndex].DstY = float32(int(p0[1]))
-			colorVertexList[vertexListIndex+1].DstX = float32(int(p1[0]))
-			colorVertexList[vertexListIndex+1].DstY = float32(int(p1[1]))
-			colorVertexList[vertexListIndex+2].DstX = float32(int(p2[0]))
-			colorVertexList[vertexListIndex+2].DstY = float32(int(p2[1]))
+			colorVertexList[vertexListIndex].DstX = float32(p0[0])
+			colorVertexList[vertexListIndex].DstY = float32(p0[1])
+			colorVertexList[vertexListIndex+1].DstX = float32(p1[0])
+			colorVertexList[vertexListIndex+1].DstY = float32(p1[1])
+			colorVertexList[vertexListIndex+2].DstX = float32(p2[0])
+			colorVertexList[vertexListIndex+2].DstY = float32(p2[1])
 
-			depthVertexList[vertexListIndex].DstX = float32(int(p0[0]))
-			depthVertexList[vertexListIndex].DstY = float32(int(p0[1]))
-			depthVertexList[vertexListIndex+1].DstX = float32(int(p1[0]))
-			depthVertexList[vertexListIndex+1].DstY = float32(int(p1[1]))
-			depthVertexList[vertexListIndex+2].DstX = float32(int(p2[0]))
-			depthVertexList[vertexListIndex+2].DstY = float32(int(p2[1]))
+			depthVertexList[vertexListIndex].DstX = float32(p0[0])
+			depthVertexList[vertexListIndex].DstY = float32(p0[1])
+			depthVertexList[vertexListIndex+1].DstX = float32(p1[0])
+			depthVertexList[vertexListIndex+1].DstY = float32(p1[1])
+			depthVertexList[vertexListIndex+2].DstX = float32(p2[0])
+			depthVertexList[vertexListIndex+2].DstY = float32(p2[1])
 
 			meshPart.sortingTriangles[t].rendered = true
 
@@ -1272,6 +1309,88 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	camera.DebugInfo.frameTime += time.Since(frametimeStart)
 
 	camera.DebugInfo.frameCount++
+
+}
+
+func encodeDepth(depth float64) *Color {
+
+	r := math.Floor(depth*255) / 255
+	_, f := math.Modf(depth * 255)
+	g := math.Floor(f*255) / 255
+	_, f = math.Modf(depth * 255 * 255)
+	b := f
+
+	if r < 0 {
+		r = 0
+	} else if r > 1 {
+		r = 1
+	}
+	if g < 0 {
+		g = 0
+	} else if g > 1 {
+		g = 1
+	}
+	if b < 0 {
+		b = 0
+	} else if b > 1 {
+		b = 1
+	}
+
+	return NewColor(float32(r), float32(g), float32(b), 1)
+
+}
+
+type SpriteRender3d struct {
+	Image         *ebiten.Image
+	Options       *ebiten.DrawImageOptions
+	WorldPosition vector.Vector
+}
+
+// DrawImageIn3D draws an image on the screen in 2D, but at the screen position of the 3D world position provided
+// and with depth intersection.
+// This allows you to render 2D elements "at" a 3D position, and can be very useful in situations where you want
+// a sprite to render at 100% size and no perspective or skewing, but still look like it's in the 3D space (like in
+// a game with a fixed camera viewpoint).
+func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...SpriteRender3d) {
+
+	// TODO: Replace this with a more performant alternative, where we minimize shader / texture switches.
+
+	for _, rs := range renderSettings {
+
+		camera.colorIntermediate.Clear()
+
+		px := camera.WorldToScreen(rs.WorldPosition)
+
+		_, _, d, _ := fastMatrixMultVecW(camera.ViewMatrix().Mult(camera.Projection()), rs.WorldPosition)
+
+		depth := float32(d / camera.Far)
+
+		if depth < 0 {
+			depth = 0
+		}
+		if depth > 1 {
+			depth = 1
+		}
+
+		opt := rs.Options
+
+		if opt == nil {
+			opt = &ebiten.DrawImageOptions{}
+		}
+		opt.GeoM.Translate(px[0], px[1])
+
+		camera.colorIntermediate.DrawImage(rs.Image, opt)
+
+		colorTextureW, colorTextureH := camera.resultColorTexture.Size()
+		rectShaderOptions := &ebiten.DrawRectShaderOptions{}
+		rectShaderOptions.Images[0] = camera.colorIntermediate
+		rectShaderOptions.Images[1] = camera.resultDepthTexture
+		rectShaderOptions.Uniforms = map[string]interface{}{
+			"SpriteDepth": depth,
+		}
+		screen.DrawRectShader(colorTextureW, colorTextureH, camera.sprite3DShader, rectShaderOptions)
+
+	}
 
 }
 

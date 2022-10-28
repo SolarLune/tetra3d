@@ -243,6 +243,7 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 	invertedTransform := triTrans.Inverted()
 	transformNoLoc := triTrans.Clone()
 	transformNoLoc.SetRow(3, vector.Vector{0, 0, 0, 1})
+
 	sphereWorldPosition := sphere.WorldPosition()
 	spherePos := invertedTransform.MultVec(sphereWorldPosition)
 	sphereRadius := sphere.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
@@ -680,7 +681,6 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 	transformNoLoc.SetRow(3, vector.Vector{0, 0, 0, 1})
 
 	capsuleRadius := capsule.WorldRadius() * math.Abs(math.Max(invertedTransform[0][0], math.Max(invertedTransform[1][1], invertedTransform[2][2])))
-	capsuleRadiusSquared := math.Pow(capsuleRadius, 2)
 
 	capsuleTop := invertedTransform.MultVec(capsule.lineTop())
 	capsuleBottom := invertedTransform.MultVec(capsule.lineBottom())
@@ -739,13 +739,13 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 		delta := fastVectorSub(spherePos, closest)
 
-		if mag := fastVectorMagnitudeSquared(delta); mag <= capsuleRadiusSquared {
+		if mag := delta.Magnitude(); mag <= capsuleRadius {
 
 			result.add(
 				&Intersection{
 					StartingPoint: closestCapsulePoint,
 					ContactPoint:  triTrans.MultVec(closest),
-					MTV:           transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadiusSquared - mag)),
+					MTV:           transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - mag)),
 					Triangle:      tri,
 					Normal:        transformNoLoc.MultVec(tri.Normal).Unit(),
 				},

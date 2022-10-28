@@ -172,20 +172,20 @@ func (matrix Matrix4) Forward() vector.Vector {
 // Decompose decomposes the Matrix4 and returns three components - the position (a 3D vector.Vector), scale (another 3D vector.Vector), and rotation (an AxisAngle)
 // indicated by the Matrix4. Note that this is mainly used when loading a mesh from a 3D modeler - this being the case, it may not be the most precise, and negative
 // scales are not supported.
-func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, Matrix4) {
+func (matrix Matrix4) Decompose() (position, scale vector.Vector, rotation Matrix4) {
 
-	position := vector.Vector{matrix[3][0], matrix[3][1], matrix[3][2]}
+	position = vector.Vector{matrix[3][0], matrix[3][1], matrix[3][2]}
 
-	rotation := NewMatrix4()
+	rotation = NewMatrix4()
 	rotation.SetRow(0, matrix.Row(0).Unit())
 	rotation.SetRow(1, matrix.Row(1).Unit())
 	rotation.SetRow(2, matrix.Row(2).Unit())
 
 	in := matrix.Mult(rotation.Transposed())
 
-	scale := vector.Vector{in.Row(0).Magnitude(), in.Row(1).Magnitude(), in.Row(2).Magnitude()}
+	scale = vector.Vector{in.Row(0).Magnitude(), in.Row(1).Magnitude(), in.Row(2).Magnitude()}
 
-	return position, scale, rotation
+	return
 
 }
 

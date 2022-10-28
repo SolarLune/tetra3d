@@ -41,8 +41,8 @@ type Game struct {
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             1920,
-		Height:            1080,
+		Width:             640,
+		Height:            360,
 		PrevMousePosition: vector.Vector{},
 		DrawDebugText:     true,
 	}
@@ -66,7 +66,7 @@ func (g *Game) Init() {
 	library.Materials["Gate"].BackfaceCulling = false
 	g.Scene = library.Scenes[0]
 
-	g.Camera = tetra3d.NewCamera(1920, 1080)
+	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Far = 30
 	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 15})
 	g.Scene.Root.AddChildren(g.Camera)
@@ -242,7 +242,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			"They can overlap (bad), but also show things\n" +
 			"underneath (good).\n" +
 			"1 Key: Toggle transparency, currently: " + transparencyOn +
-			"\nF2: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+			"\nF2: Toggle wireframe\nF3: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
 
 		g.Camera.DebugDrawText(screen, txt, 0, 140, 1, colors.White())
 

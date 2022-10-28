@@ -255,7 +255,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Perspective projection
 - [X] -- Orthographic projection (it's kinda jank, but it works)
 - [x] -- Automatic billboarding
-- [ ] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space) (not sure?)
+- [x] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space) (not sure?)
 - [X] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [X] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [X] -- A more advanced / accurate depth buffer
