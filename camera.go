@@ -142,7 +142,7 @@ func NewCamera(w, h int) *Camera {
 		}
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
-			tex := imageSrc0At(texCoord)
+			tex := imageSrc0UnsafeAt(texCoord)
 			if (tex.a == 0) {
 				discard()
 			} else {
@@ -171,8 +171,8 @@ func NewCamera(w, h int) *Camera {
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
-			depthValue := imageSrc0At(texCoord)
-			texture := imageSrc1At(texCoord)
+			depthValue := imageSrc0UnsafeAt(texCoord)
+			texture := imageSrc1UnsafeAt(texCoord)
 
 			if depthValue.a == 0 || decodeDepth(depthValue) > texture.r {
 				return texture
@@ -191,7 +191,7 @@ func NewCamera(w, h int) *Camera {
 		panic(err)
 	}
 
-	colorShaderText := []byte(
+	cam.colorShader, err = ebiten.NewShader([]byte(
 		`package main
 
 		var Fog vec4
@@ -206,10 +206,10 @@ func NewCamera(w, h int) *Camera {
 		
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
-			depth := imageSrc1At(texCoord)
+			depth := imageSrc1UnsafeAt(texCoord)
 			
 			if depth.a > 0 {
-				colorTex := imageSrc0At(texCoord)
+				colorTex := imageSrc0UnsafeAt(texCoord)
 				
 				d := smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
 
@@ -238,9 +238,7 @@ func NewCamera(w, h int) *Camera {
 		}
 
 		`,
-	)
-
-	cam.colorShader, err = ebiten.NewShader(colorShaderText)
+	))
 
 	if err != nil {
 		panic(err)
@@ -257,10 +255,10 @@ func NewCamera(w, h int) *Camera {
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
-			resultDepth := imageSrc1At(texCoord)
+			resultDepth := imageSrc1UnsafeAt(texCoord)
 
 			if resultDepth.a == 0 || decodeDepth(resultDepth) > SpriteDepth {
-				return imageSrc0At(texCoord)
+				return imageSrc0UnsafeAt(texCoord)
 			}
 
 			discard()

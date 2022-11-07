@@ -138,29 +138,34 @@ func (g *Game) Update() error {
 		move[2] = moveSpd
 	}
 
-	// Let's do gravity first
+	// Collision checking:
 
-	down := vector.Vector{0, -0.3, 0}
-	g.Controlling.MoveVec(down)
+	// OK, so the general idea here is we're doing collision testing by moving the object into the position we want.
 
-	// OK, so the general idea here is we're doing collision testing by moving the object into the position we want
+	// We'll break down movement into two stages - vertical, and horizontal. This allows us to easily check for the ground
+	// and then check for walls or other obstacles.
+
+	// First, vertical. Let's do gravity first:
+
+	g.Controlling.Move(0, -0.3, 0)
+
+	// Now check for collision.
+
 	for _, col := range bounds.CollisionTest(0, 0, 0, solids...) {
-		mtv := col.AverageMTV()
-		mtv[0] = 0
-		mtv[2] = 0
-		mtv[1] += 0.1
-		g.Controlling.MoveVec(mtv)
-		break
+		if col.AverageSlope() < tetra3d.ToRadians(30) {
+			mtv := col.AverageMTV()
+			g.Controlling.Move(0, mtv.Magnitude()+0.05, 0)
+		}
 	}
+
+	// Now try moving horizontally:
 
 	g.Controlling.MoveVec(move)
 
 	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
 	for _, col := range bounds.CollisionTest(0, 0, 0, solids...) {
-		g.Controlling.MoveVec(col.AverageMTV())
-		move = col.SlideAgainstAverageNormal(move)
-		move[1] = 0 // We don't want to move up
-		// break
+		mtv := col.AverageMTV()
+		g.Controlling.Move(mtv[0], 0, mtv[2])
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
