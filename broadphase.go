@@ -1,7 +1,7 @@
 package tetra3d
 
 import (
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 // Broadphase is a utility object specifically created to assist with quickly ruling out
@@ -213,7 +213,7 @@ func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
 // package tetra3d
 
 // import (
-// 	"github.com/kvartborg/vector"
+// 	"github.com/quartercastle/vector"
 // )
 
 // type Broadphase struct {

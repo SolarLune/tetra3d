@@ -3,7 +3,7 @@ package tetra3d
 import (
 	"math"
 
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 // BoundingSphere represents a 3D sphere.

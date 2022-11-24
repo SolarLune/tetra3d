@@ -3,7 +3,7 @@ package tetra3d
 import (
 	"math/rand"
 
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 const (

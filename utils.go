@@ -1,6 +1,6 @@
 package tetra3d
 
-import "github.com/kvartborg/vector"
+import "github.com/quartercastle/vector"
 
 type FinishMode int
 

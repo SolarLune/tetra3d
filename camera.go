@@ -10,7 +10,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text"
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 	"golang.org/x/image/font/basicfont"
 )
 

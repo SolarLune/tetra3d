@@ -3,7 +3,7 @@ package tetra3d
 import (
 	"math"
 
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 // BoundingCapsule represents a 3D capsule, whose primary purpose is to perform intersection testing between itself and other Bounding Nodes.

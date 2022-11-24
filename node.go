@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 // NodeType represents a Node's type. Node types are categorized, and can be said to extend or "be of" more general types.

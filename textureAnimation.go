@@ -2,7 +2,7 @@ package tetra3d
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 // TextureAnimation is an animation struct. The TextureAnimation.Frames value is a []vector.Vector, with each Vector representing

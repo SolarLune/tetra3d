@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 	"github.com/solarlune/tetra3d"
 )
 

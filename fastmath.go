@@ -3,7 +3,7 @@ package tetra3d
 import (
 	"math"
 
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 // The goal of fastmath.go is to provide vector operations that don't clone the vector to use. This means the main usage is not to use the results

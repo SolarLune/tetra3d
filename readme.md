@@ -42,7 +42,7 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 `go get github.com/solarlune/tetra3d`
 
-Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebitengine](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
+Tetra depends on quartercastle's [vector](https://github.com/quartercastle/vector) package, and [Ebitengine](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
 
 There is an optional Blender add-on as well (`tetra3d.py`) that can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). The add-on provides some useful helper functionality that makes using Tetra3D simpler - for more information, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
 
@@ -125,7 +125,7 @@ func NewGame() *Game {
 	// use for positioning and parenting) can, as well.
 
 	// We can place Models, Cameras, and other Nodes with node.SetWorldPositionVec() or 
-	// node.SetLocalPositionVec(). Both functions take a 3D vector.Vector from kvartborg's 
+	// node.SetLocalPositionVec(). Both functions take a 3D vector.Vector from quartercastle's 
 	// vector package, and there's an additional variant that just takes the components directly,
 	// for convenience.
 

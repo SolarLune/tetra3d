@@ -3,7 +3,7 @@ package tetra3d
 import (
 	"strconv"
 
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 type IPath interface {

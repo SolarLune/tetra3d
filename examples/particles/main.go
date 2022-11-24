@@ -12,7 +12,7 @@ import (
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 

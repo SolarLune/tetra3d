@@ -6,7 +6,7 @@ import (
 	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 // Dimensions represents the minimum and maximum spatial dimensions of a Mesh arranged in a 2-space Vector slice.

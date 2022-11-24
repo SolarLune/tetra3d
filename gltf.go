@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 	"github.com/qmuntal/gltf"
 	"github.com/qmuntal/gltf/ext/lightspuntual"
 	"github.com/qmuntal/gltf/modeler"

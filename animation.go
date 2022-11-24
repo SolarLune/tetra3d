@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/kvartborg/vector"
+	"github.com/quartercastle/vector"
 )
 
 const (
