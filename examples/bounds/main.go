@@ -121,7 +121,7 @@ func (g *Game) Update() error {
 	}
 
 	move := vector.Vector{0, 0, 0}
-	bounds := g.Controlling.Children()[0].(tetra3d.BoundingObject)
+	bounds := g.Controlling.Children()[0].(tetra3d.IBoundingObject)
 	solids := g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject)
 
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
@@ -140,16 +140,11 @@ func (g *Game) Update() error {
 
 	// Let's do gravity first
 
-	down := vector.Vector{0, -0.3, 0}
-	g.Controlling.MoveVec(down)
+	move[1] -= 0.3
 
 	// OK, so the general idea here is we're doing collision testing by moving the object into the position we want
-	for _, col := range bounds.CollisionTest(0, 0, 0, solids...) {
-		mtv := col.AverageMTV()
-		mtv[0] = 0
-		mtv[2] = 0
-		mtv[1] += 0.1
-		g.Controlling.MoveVec(mtv)
+	for _, col := range bounds.CollisionTest(0, 0, -0.3, solids...) {
+		move[1] = col.AverageMTV()[1]
 		break
 	}
 

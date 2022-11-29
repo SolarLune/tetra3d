@@ -95,6 +95,13 @@ func vectorCross(vecA, vecB, failsafeVec vector.Vector) vector.Vector {
 	return cross
 }
 
+func vectorCrossUnsafe(v0, v1, out vector.Vector) vector.Vector {
+	out[0] = v0[1]*v1[2] - v1[1]*v0[2]
+	out[1] = v0[2]*v1[0] - v1[2]*v0[0]
+	out[2] = v0[0]*v1[1] - v1[0]*v0[1]
+	return out
+}
+
 // vectorsEqual returns if two >=3D vectors are basically equal in position.
 func vectorsEqual(a, b vector.Vector) bool {
 	m := 0.0001
@@ -213,4 +220,21 @@ func ToRadians(degrees float64) float64 {
 // ToDegrees is a helper function to easily convert radians to degrees for human readability.
 func ToDegrees(radians float64) float64 {
 	return radians / math.Pi * 180
+}
+
+func clamp(value, min, max float64) float64 {
+	if value < min {
+		return min
+	} else if value > max {
+		return max
+	}
+	return value
+}
+
+func pow(value float64, power int) float64 {
+	x := value
+	for i := 0; i < power; i++ {
+		x *= x
+	}
+	return x
 }

@@ -16,9 +16,10 @@ type ILight interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model)
 
-	Light(triIndex uint16, model *Model) [9]float32 // Light returns the R, G, and B colors used to light the vertices of the given triangle.
-	IsOn() bool                                     // isOn is simply used to tell if a "generic" Light is on or not.
-	SetOn(on bool)                                  // SetOn sets whether the light is on or not
+	Light(meshPart *MeshPart, model *Model, targetColors []*Color) // Light lights the triangles
+	// Light(triangles []sortingTriangle, model *Model, targetColors []*Color) // Light lights the triangles
+	IsOn() bool    // isOn is simply used tfo tell if a "generic" Light is on or not.
+	SetOn(on bool) // SetOn sets whether the light is on or not
 }
 
 //---------------//
@@ -32,7 +33,7 @@ type AmbientLight struct {
 	Energy float32
 	On     bool // If the light is on and contributing to the scene.
 
-	result [9]float32
+	result [3]float32
 }
 
 // NewAmbientLight returns a new AmbientLight.
@@ -60,17 +61,16 @@ func (amb *AmbientLight) Clone() INode {
 }
 
 func (amb *AmbientLight) beginRender() {
-	r := amb.Color.R * amb.Energy
-	g := amb.Color.G * amb.Energy
-	b := amb.Color.B * amb.Energy
-	amb.result = [9]float32{r, g, b, r, g, b, r, g, b}
+	amb.result = [3]float32{amb.Color.R * amb.Energy, amb.Color.G * amb.Energy, amb.Color.B * amb.Energy}
 }
 
 func (amb *AmbientLight) beginModel(model *Model) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(triIndex uint16, model *Model) [9]float32 {
-	return amb.result
+func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
+	meshPart.ForEachVertexIndex(func(vertIndex int) {
+		targetColors[vertIndex].AddRGBA(amb.result[0], amb.result[1], amb.result[2], 0)
+	})
 }
 
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
@@ -118,7 +118,6 @@ type PointLight struct {
 
 	distanceSquared float64
 	workingPosition vector.Vector
-	out             [9]float32
 }
 
 // NewPointLight creates a new Point light.
@@ -128,7 +127,6 @@ func NewPointLight(name string, r, g, b, energy float32) *PointLight {
 		Energy: energy,
 		Color:  NewColor(r, g, b, 1),
 		On:     true,
-		out:    [9]float32{},
 	}
 }
 
@@ -171,51 +169,54 @@ func (point *PointLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (point *PointLight) Light(triIndex uint16, model *Model) [9]float32 {
-
-	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
+func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-	tri := model.Mesh.Triangles[triIndex]
+	meshPart.ForEachVertexIndex(func(index int) {
 
-	var triCenter vector.Vector
+		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
-	if model.Skinned {
-		v0 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
-		v1 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
-		v2 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
-		triCenter = vector.Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
-	} else {
-		triCenter = model.Mesh.Triangles[triIndex].Center
-	}
+		if point.Distance > 0 {
 
-	dist := fastVectorDistanceSquared(point.workingPosition, triCenter)
+			dist := fastVectorDistanceSquared(point.workingPosition, model.Mesh.VertexPositions[index])
+			if dist > point.distanceSquared {
+				return
+			}
 
-	if point.Distance > 0 && dist > point.distanceSquared+model.Mesh.Triangles[triIndex].MaxSpan {
-		for i := 0; i < 9; i++ {
-			point.out[i] = 0
+			// var triCenter vector.Vector
+
+			// if model.Skinned {
+			// 	v0 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
+			// 	v1 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
+			// 	v2 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
+			// 	triCenter = vector.Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
+			// } else {
+			// 	triCenter = tri.Center
+			// }
+
+			// dist := fastVectorDistanceSquared(point.workingPosition, triCenter)
+			// if dist > (point.distanceSquared + (tri.MaxSpan * tri.MaxSpan)) {
+			// 	return
+			// }
+
 		}
-		return point.out
-	}
 
-	// If you're on the other side of the plane, just assume it's not visible.
-	// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
-	// 	return light
-	// }
+		// If you're on the other side of the plane, just assume it's not visible.
+		// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
+		// 	return light
+		// }
 
-	var vertPos, vertNormal vector.Vector
-
-	for i := 0; i < 3; i++ {
+		var vertPos, vertNormal vector.Vector
 
 		if model.Skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[tri.VertexIndices[i]]
-			vertNormal = model.Mesh.vertexSkinnedNormals[tri.VertexIndices[i]]
+			vertPos = model.Mesh.vertexSkinnedPositions[index]
+			vertNormal = model.Mesh.vertexSkinnedNormals[index]
 		} else {
-			vertPos = model.Mesh.VertexPositions[tri.VertexIndices[i]]
-			vertNormal = model.Mesh.VertexNormals[tri.VertexIndices[i]]
+			vertPos = model.Mesh.VertexPositions[index]
+			vertNormal = model.Mesh.VertexNormals[index]
 		}
 
 		lightVec := vector.In(fastVectorSub(point.workingPosition, vertPos)).Unit()
@@ -231,16 +232,17 @@ func (point *PointLight) Light(triIndex uint16, model *Model) [9]float32 {
 		if point.Distance == 0 {
 			diffuseFactor = diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
 		} else {
-			diffuseFactor = diffuse * math.Max(math.Min(1.0-(math.Pow((distance/point.distanceSquared), 4)), 1), 0)
+			diffuseFactor = diffuse * clamp(1.0-(pow((distance/point.distanceSquared), 4)), 0, 1)
 		}
 
-		point.out[(i * 3)] = point.Color.R * float32(diffuseFactor) * point.Energy
-		point.out[(i*3)+1] = point.Color.G * float32(diffuseFactor) * point.Energy
-		point.out[(i*3)+2] = point.Color.B * float32(diffuseFactor) * point.Energy
+		targetColors[index].AddRGBA(
+			point.Color.R*float32(diffuseFactor)*point.Energy,
+			point.Color.G*float32(diffuseFactor)*point.Energy,
+			point.Color.B*float32(diffuseFactor)*point.Energy,
+			0,
+		)
 
-	}
-
-	return point.out
+	})
 
 }
 
@@ -283,8 +285,6 @@ type DirectionalLight struct {
 
 	workingForward       vector.Vector // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
 	workingModelRotation Matrix4       // Similarly, this is an internal rotational transform (without the transformation row) for the Model being lit.
-
-	out [9]float32
 }
 
 // NewDirectionalLight creates a new Directional Light with the specified RGB color and energy (assuming 1.0 energy is standard / "100%" lighting).
@@ -294,7 +294,6 @@ func NewDirectionalLight(name string, r, g, b, energy float32) *DirectionalLight
 		Color:  NewColor(r, g, b, 1),
 		Energy: energy,
 		On:     true,
-		out:    [9]float32{},
 	}
 }
 
@@ -325,32 +324,32 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(triIndex uint16, model *Model) [9]float32 {
+func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
 
-	tri := model.Mesh.Triangles[triIndex]
-
-	for i := 0; i < 3; i++ {
+	meshPart.ForEachVertexIndex(func(index int) {
 
 		var normal vector.Vector
 		if model.Skinned {
 			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
-			normal = model.Mesh.vertexSkinnedNormals[tri.VertexIndices[i]]
+			normal = model.Mesh.vertexSkinnedNormals[index]
 		} else {
-			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[tri.VertexIndices[i]])
+			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[index])
 		}
 
 		diffuseFactor := dot(normal, sun.workingForward)
-		if diffuseFactor < 0 {
-			diffuseFactor = 0
+
+		if diffuseFactor <= 0 {
+			return
 		}
 
-		sun.out[i*3] = sun.Color.R * float32(diffuseFactor) * sun.Energy
-		sun.out[i*3+1] = sun.Color.G * float32(diffuseFactor) * sun.Energy
-		sun.out[i*3+2] = sun.Color.B * float32(diffuseFactor) * sun.Energy
+		targetColors[index].AddRGBA(
+			sun.Color.R*float32(diffuseFactor)*sun.Energy,
+			sun.Color.G*float32(diffuseFactor)*sun.Energy,
+			sun.Color.B*float32(diffuseFactor)*sun.Energy,
+			0,
+		)
 
-	}
-
-	return sun.out
+	})
 
 }
 
@@ -396,8 +395,6 @@ type CubeLight struct {
 	workingPosition        vector.Vector
 	workingAngle           vector.Vector
 	workingDistanceSquared float64
-
-	out [9]float32
 }
 
 // NewCubeLight creates a new CubeLight with the given dimensions.
@@ -411,7 +408,6 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 		Color:         NewColor(1, 1, 1, 1),
 		On:            true,
 		LightingAngle: vector.Vector{0, -1, 0},
-		out:           [9]float32{},
 	}
 	return cube
 }
@@ -541,52 +537,48 @@ func (cube *CubeLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (cube *CubeLight) Light(triIndex uint16, model *Model) [9]float32 {
+func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
 
-	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
+	// forEachVertexIndexInTriangles(triangles, func(index int, tri *Triangle) {
+	meshPart.ForEachVertexIndex(func(index int) {
 
-	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
-	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
-	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
+		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
-	// var triCenter vector.Vector
+		// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
+		// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
+		// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-	// if model.Skinned {
-	// 	v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
-	// 	v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
-	// 	v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
-	// 	vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0)
-	// 	triCenter = v0
-	// } else {
-	// 	triCenter = model.Mesh.Triangles[triIndex].Center
-	// }
+		// var triCenter vector.Vector
 
-	// dist := fastVectorDistanceSquared(cube.workingPosition, triCenter)
+		// if model.Skinned {
+		// 	v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
+		// 	v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
+		// 	v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
+		// 	vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0)
+		// 	triCenter = v0
+		// } else {
+		// 	triCenter = model.Mesh.Triangles[triIndex].Center
+		// }
 
-	// if cube.Distance > 0 && dist > distanceSquared {
-	// 	return light
-	// }
+		// dist := fastVectorDistanceSquared(cube.workingPosition, triCenter)
 
-	// If you're on the other side of the plane, just assume it's not visible.
-	// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
-	// 	return light
-	// }
+		// if cube.Distance > 0 && dist > distanceSquared {
+		// 	return light
+		// }
 
-	var vertPos, vertNormal vector.Vector
-	tri := model.Mesh.Triangles[triIndex]
+		// If you're on the other side of the plane, just assume it's not visible.
+		// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
+		// 	return light
+		// }
 
-	for i := 0; i < 9; i++ {
-		cube.out[i] = 0
-	}
-
-	for i := 0; i < 3; i++ {
+		var vertPos, vertNormal vector.Vector
 
 		if model.Skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[tri.VertexIndices[i]]
-			vertNormal = model.Mesh.vertexSkinnedNormals[tri.VertexIndices[i]]
+			vertPos = model.Mesh.vertexSkinnedPositions[index]
+			vertNormal = model.Mesh.vertexSkinnedNormals[index]
 		} else {
-			vertPos = model.Mesh.VertexPositions[tri.VertexIndices[i]]
-			vertNormal = model.Mesh.VertexNormals[tri.VertexIndices[i]]
+			vertPos = model.Mesh.VertexPositions[index]
+			vertNormal = model.Mesh.VertexNormals[index]
 		}
 
 		var diffuse, diffuseFactor float64
@@ -609,7 +601,7 @@ func (cube *CubeLight) Light(triIndex uint16, model *Model) [9]float32 {
 		}
 
 		if diffuse < 0 {
-			continue
+			return
 		} else {
 
 			if cube.Distance == 0 {
@@ -624,17 +616,18 @@ func (cube *CubeLight) Light(triIndex uint16, model *Model) [9]float32 {
 
 		}
 
-		if diffuseFactor < 0 {
-			continue
+		if diffuseFactor <= 0 {
+			return
 		}
 
-		cube.out[(i * 3)] = cube.Color.R * float32(diffuseFactor) * cube.Energy
-		cube.out[(i*3)+1] = cube.Color.G * float32(diffuseFactor) * cube.Energy
-		cube.out[(i*3)+2] = cube.Color.B * float32(diffuseFactor) * cube.Energy
+		targetColors[index].AddRGBA(
+			cube.Color.R*float32(diffuseFactor)*cube.Energy,
+			cube.Color.G*float32(diffuseFactor)*cube.Energy,
+			cube.Color.B*float32(diffuseFactor)*cube.Energy,
+			0,
+		)
 
-	}
-
-	return cube.out
+	})
 
 }
 

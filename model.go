@@ -2,7 +2,6 @@ package tetra3d
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -40,13 +39,13 @@ type Model struct {
 	// a traditional GPU vertex shader, but is fine for simple / low-poly mesh transformations).
 	// This function is run after skinning the vertex if the material belongs to a mesh that is skinned by an armature.
 	// Note that the VertexTransformFunction must return the vector passed.
-	VertexTransformFunction func(vertexPosition vector.Vector, vertexIndex int) vector.Vector
+	VertexTransformFunction func(vertexPosition vector.Vector, vertexIndex int)
 
 	// VertexClipFunction is a function that runs on the clipped result of each vertex position rendered with the material.
 	// The function takes the vertex position along with the vertex index in the mesh.
 	// This program runs after the vertex position is clipped to screen coordinates.
 	// Note that the VertexClipFunction must return the vector passed.
-	VertexClipFunction func(vertexPosition vector.Vector, vertexIndex int) vector.Vector
+	VertexClipFunction func(vertexPosition vector.Vector, vertexIndex int)
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -64,7 +63,7 @@ func NewModel(mesh *Mesh, name string) *Model {
 	model.Node.onTransformUpdate = model.TransformUpdate
 
 	if mesh != nil {
-		model.skinVectorPool = NewVectorPool(len(mesh.VertexPositions)*2, true) // Both position and normal
+		model.skinVectorPool = NewVectorPool(len(mesh.Triangles)*3*2, true) // Both position and normal
 	}
 
 	radius := 0.0
@@ -265,6 +264,8 @@ func (model *Model) StaticMerge(models ...*Model) {
 		model.Mesh.allocateVertexBuffers(len(model.Mesh.VertexPositions) + totalSize)
 	}
 
+	vec := vector.Vector{0, 0, 0}
+
 	for _, other := range models {
 
 		if model == other {
@@ -299,13 +300,16 @@ func (model *Model) StaticMerge(models ...*Model) {
 				targetPart = model.Mesh.AddMeshPart(otherPart.Material)
 			}
 
-			verts := []VertexInfo{}
-			indices := []int{}
+			// Optimize these two
+			verts := make([]VertexInfo, 0, otherPart.VertexIndexCount())
+			indices := make([]int, 0, otherPart.TriangleCount()*3)
 
 			otherPart.ForEachVertexIndex(func(vertIndex int) {
 
 				vertInfo := otherPart.Mesh.GetVertexInfo(vertIndex)
-				vec := vector.Vector{vertInfo.X, vertInfo.Y, vertInfo.Z}
+				vec[0] = vertInfo.X
+				vec[1] = vertInfo.Y
+				vec[2] = vertInfo.Z
 				x, y, z := fastMatrixMultVec(inverted, vec)
 				vertInfo.X = x
 				vertInfo.Y = y
@@ -314,11 +318,13 @@ func (model *Model) StaticMerge(models ...*Model) {
 
 			})
 
-			otherPart.ForEachTri(func(tri *Triangle) {
-				indices = append(indices, tri.VertexIndices...)
-			})
-
 			model.Mesh.AddVertices(verts...)
+
+			otherPart.ForEachTri(func(tri *Triangle) {
+				for _, i := range tri.VertexIndices {
+					indices = append(indices, i-otherPart.VertexIndexStart)
+				}
+			})
 
 			targetPart.AddTriangles(indices...)
 
@@ -326,14 +332,12 @@ func (model *Model) StaticMerge(models ...*Model) {
 
 	}
 
-	fmt.Println(len(model.Mesh.MeshParts))
-
 	model.Mesh.UpdateBounds()
 
 	model.BoundingSphere.SetLocalPositionVec(model.Mesh.Dimensions.Center())
 	model.BoundingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
 
-	model.skinVectorPool = NewVectorPool(len(model.Mesh.VertexPositions)*2, true)
+	model.skinVectorPool = NewVectorPool(len(model.Mesh.Triangles)*3*2, true)
 
 }
 
@@ -371,7 +375,7 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 
 }
 
-func (model *Model) skinVertex(vertID int, transformNormal bool) (vector.Vector, vector.Vector) {
+func (model *Model) skinVertex(vertID int) (vector.Vector, vector.Vector) {
 
 	// Avoid reallocating a new matrix for every vertex; that's wasteful
 	model.skinMatrix.Clear()
@@ -394,190 +398,253 @@ func (model *Model) skinVertex(vertID int, transformNormal bool) (vector.Vector,
 			model.skinMatrix = bone.boneInfluence
 			break // I think we can end here if the weight percentage is 100%, right?
 		} else {
-			model.skinMatrix = model.skinMatrix.Add(bone.boneInfluence.ScaleByScalar(weightPerc))
+			model.skinMatrix = model.skinMatrix.Add(bone.boneInfluence.ScaleByScalar(weightPerc)) // TODO: We should NOT be cloning a matrix for each vertex like this
 		}
 
 	}
 
 	vertOut := model.skinVectorPool.MultVecW(model.skinMatrix, model.Mesh.VertexPositions[vertID])
 
-	if transformNormal {
-		model.skinMatrix[3][0] = 0
-		model.skinMatrix[3][1] = 0
-		model.skinMatrix[3][2] = 0
-		model.skinMatrix[3][3] = 1
+	model.skinMatrix[3][0] = 0
+	model.skinMatrix[3][1] = 0
+	model.skinMatrix[3][2] = 0
+	model.skinMatrix[3][3] = 1
 
-		normal = model.skinVectorPool.MultVecW(model.skinMatrix, model.Mesh.VertexNormals[vertID])
-	}
+	normal = model.skinVectorPool.MultVecW(model.skinMatrix, model.Mesh.VertexNormals[vertID])
 
 	return vertOut, normal
 
 }
 
+var transformedVertexPositions = [3]vector.Vector{
+	{0, 0},
+	{0, 0},
+	{0, 0},
+}
+
 // ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
 // matrix, a camera, and the MeshPart being rendered.
-func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, scene *Scene) {
+func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, scene *Scene) []sortingTriangle {
 
-	var transformFunc func(vertPos vector.Vector, index int) vector.Vector
+	var transformFunc func(vertPos vector.Vector, index int)
 
 	if model.VertexTransformFunction != nil {
 		transformFunc = model.VertexTransformFunction
 	}
 
 	modelTransform := model.Transform()
-	// p, _, r := modelTransform.Inverted().Decompose()
-
-	// s := model.WorldScale()
-
-	// p[0] *= s[0]
-	// p[1] *= s[1]
-	// p[2] *= s[2]
-
-	// camPos := r.MultVec(camera.WorldPosition()).Add(p)
-
-	// camFarSquared := camera.Far * camera.Far
 
 	far := camera.Far
 
-	if model.Skinned {
+	sortingTriIndex := 0
 
-		lightingOn := false
-		if scene != nil {
-			if scene.World != nil {
-				lightingOn = scene.World.LightingOn && (meshPart.Material == nil || !meshPart.Material.Shadeless)
-			} else {
-				lightingOn = meshPart.Material == nil || !meshPart.Material.Shadeless
-			}
+	mat := meshPart.Material
+	mesh := meshPart.Mesh
+	base := modelTransform
+
+	camPos := camera.WorldPosition()
+
+	if mat != nil && mat.BillboardMode != BillboardModeNone {
+
+		lookat := NewLookAtMatrix(model.WorldPosition(), camPos, vector.Y)
+
+		if mat.BillboardMode == BillboardModeXZ {
+			lookat.SetRow(1, vector.Vector{0, 1, 0, 0})
+			x := lookat.Row(0)
+			x[1] = 0
+			lookat.SetRow(0, x.Unit())
+
+			z := lookat.Row(2)
+			z[1] = 0
+			lookat.SetRow(2, z.Unit())
 		}
 
-		model.skinVectorPool.Reset()
+		// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
+		p, s, r := base.Decompose()
+		base = r.Mult(lookat).Mult(NewMatrix4Scale(s[0], s[1], s[2]))
+		base.SetRow(3, vector.Vector{p[0], p[1], p[2], 1})
 
-		t := time.Now()
+	}
+
+	mvp := fastMatrixMult(base, vpMatrix)
+
+	// Reslice to fill the capacity
+	meshPart.sortingTriangles = meshPart.sortingTriangles[:cap(meshPart.sortingTriangles)]
+
+	if model.Skinned {
+		model.skinVectorPool.Reset()
+	}
+
+	for ti := meshPart.TriangleStart; ti <= meshPart.TriangleEnd; ti++ {
+
+		tri := mesh.Triangles[ti]
+
+		meshPart.sortingTriangles[sortingTriIndex].Triangle = mesh.Triangles[ti]
+		depth := math.MaxFloat64
+
+		outOfBounds := true
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
-		for i := 0; i < len(meshPart.sortingTriangles); i++ {
 
-			tri := meshPart.sortingTriangles[i].Triangle
+		for i := 0; i < 3; i++ {
 
-			depth := math.MaxFloat32
+			if model.Skinned {
 
-			outOfBounds := true
+				t := time.Now()
 
-			for v := 0; v < 3; v++ {
-
-				vertPos, vertNormal := model.skinVertex(tri.VertexIndices[i], lightingOn)
+				vertPos, vertNormal := model.skinVertex(tri.VertexIndices[i])
 				if transformFunc != nil {
-					vertPos = transformFunc(vertPos, tri.VertexIndices[i])
+					transformFunc(vertPos, tri.VertexIndices[i])
 				}
 				if vertNormal != nil {
-					model.Mesh.vertexSkinnedNormals[tri.VertexIndices[i]] = vertNormal
-					model.Mesh.vertexSkinnedPositions[tri.VertexIndices[i]] = vertPos
+					mesh.vertexSkinnedNormals[tri.VertexIndices[i]] = vertNormal
+					mesh.vertexSkinnedPositions[tri.VertexIndices[i]] = vertPos
 				}
-				transformed := model.Mesh.vertexTransforms[tri.VertexIndices[i]]
+				transformed := mesh.vertexTransforms[tri.VertexIndices[i]]
 				x, y, z, w := fastMatrixMultVecW(vpMatrix, vertPos)
 				transformed[0] = x
 				transformed[1] = y
 				transformed[2] = z
 				transformed[3] = w
 
-				if w >= 0 && z < far {
-					outOfBounds = false
-				}
+				camera.DebugInfo.animationTime += time.Since(t)
 
-				if w < depth {
-					depth = w
-				}
+			} else {
 
-			}
-
-			if outOfBounds {
-				meshPart.sortingTriangles[i].rendered = false
-				continue
-			}
-
-			meshPart.sortingTriangles[i].depth = float32(depth)
-
-		}
-
-		camera.DebugInfo.animationTime += time.Since(t)
-
-	} else {
-
-		mat := meshPart.Material
-
-		base := modelTransform
-
-		if mat != nil && mat.BillboardMode != BillboardModeNone {
-
-			lookat := NewLookAtMatrix(model.WorldPosition(), camera.WorldPosition(), vector.Y)
-
-			if mat.BillboardMode == BillboardModeXZ {
-				lookat.SetRow(1, vector.Vector{0, 1, 0, 0})
-				x := lookat.Row(0)
-				x[1] = 0
-				lookat.SetRow(0, x.Unit())
-
-				z := lookat.Row(2)
-				z[1] = 0
-				lookat.SetRow(2, z.Unit())
-			}
-
-			// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
-			p, s, r := base.Decompose()
-			base = r.Mult(lookat).Mult(NewMatrix4Scale(s[0], s[1], s[2]))
-			base.SetRow(3, vector.Vector{p[0], p[1], p[2], 1})
-
-		}
-
-		mvp := fastMatrixMult(base, vpMatrix)
-
-		for i := 0; i < len(meshPart.sortingTriangles); i++ {
-
-			tri := meshPart.sortingTriangles[i].Triangle
-			depth := math.MaxFloat64
-
-			// triRef := model.Mesh.Triangles[triID]
-			// TODO: Replace this distance check with a broadphase check; we could also use it to easily reject
-			// triangles that lie outside of the camera frustum.
-			// if fastVectorDistanceSquared(camPos, triRef.Center) > (camFarSquared)+triRef.MaxSpan {
-			// 	meshPart.sortingTriangles[i].rendered = false
-			// 	continue
-			// }
-
-			meshPart.sortingTriangles[i].rendered = true
-
-			outOfBounds := true
-
-			for i := 0; i < 3; i++ {
-				v0 := model.Mesh.VertexPositions[tri.VertexIndices[i]]
+				v0 := mesh.VertexPositions[tri.VertexIndices[i]]
 
 				if transformFunc != nil {
-					v0 = transformFunc(v0.Clone(), tri.VertexIndices[i])
+					v0 = v0.Clone()
+					transformFunc(v0, tri.VertexIndices[i])
 				}
 
-				transformed := model.Mesh.vertexTransforms[tri.VertexIndices[i]]
+				transformed := mesh.vertexTransforms[tri.VertexIndices[i]]
 				transformed[0], transformed[1], transformed[2], transformed[3] = fastMatrixMultVecW(mvp, v0)
 
-				if transformed[3] < depth {
-					depth = transformed[3]
-				}
-
-				if transformed[3] >= 0 && transformed[2] < far {
-					outOfBounds = false
-				}
-
 			}
 
-			if outOfBounds {
-				meshPart.sortingTriangles[i].rendered = false
-				continue
+			w := mesh.vertexTransforms[tri.VertexIndices[i]][3]
+
+			if w < depth {
+				depth = w
 			}
 
-			meshPart.sortingTriangles[i].depth = float32(depth)
+			if !camera.Perspective {
+				w = 1.0
+			}
+
+			// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
+			// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
+			if w < 0 {
+				w = 0.000001
+			}
+
+			transformedVertexPositions[i][0] = mesh.vertexTransforms[tri.VertexIndices[i]][0] / w
+			transformedVertexPositions[i][1] = mesh.vertexTransforms[tri.VertexIndices[i]][1] / w
+
+			if mesh.vertexTransforms[tri.VertexIndices[i]][3] >= 0 && mesh.vertexTransforms[tri.VertexIndices[i]][2] < far {
+				outOfBounds = false
+			}
 
 		}
 
+		if outOfBounds {
+			continue
+		}
+
+		// Backface culling
+
+		if !outOfBounds && meshPart.Material != nil && meshPart.Material.BackfaceCulling {
+
+			v0 := transformedVertexPositions[0]
+			v1 := transformedVertexPositions[1]
+			v2 := transformedVertexPositions[2]
+
+			n0x := v0[0] - v1[0]
+			n0y := v0[1] - v1[1]
+
+			n1x := v1[0] - v2[0]
+			n1y := v1[1] - v2[1]
+
+			// Essentially calculating the cross product, but only for the important dimension (Z, which is "in / out" in this context)
+			nor := (n0x * n1y) - (n1x * n0y)
+
+			// We use this method of backface culling because it helps to ensure
+			// there's fewer graphical glitches when looking from very near a surface outwards; this
+			// doesn't help if a surface does not have backface culling, of course...
+			if nor < 0 {
+				outOfBounds = true
+			}
+
+			// Old methods of backface culling; performant, but causes graphical glitches.
+
+			// if backfaceCulling {
+
+			// 	camera.backfacePool.Reset()
+			// 	n0 := camera.backfacePool.Sub(p0, p1)
+			// 	n1 := camera.backfacePool.Sub(p1, p2)
+			// 	nor := camera.backfacePool.Cross(n0, n1)
+
+			// 	if nor[2] > 0 {
+			// 		continue
+			// 	}
+
+			// }
+			// if model.Skinned {
+			// 	v0 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices[0]]
+			// 	v1 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices[1]]
+			// 	v2 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices[2]]
+
+			// 	backfaceTriNormal[0] = (v0[0] + v1[0] + v2[0]) / 3
+			// 	backfaceTriNormal[1] = (v0[1] + v1[1] + v2[1]) / 3
+			// 	backfaceTriNormal[2] = (v0[2] + v1[2] + v2[2]) / 3
+
+			// 	interimVec[0] = camPos[0] - model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]][0]
+			// 	interimVec[1] = camPos[1] - model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]][1]
+			// 	interimVec[2] = camPos[2] - model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]][2]
+
+			// 	if dot(backfaceTriNormal, interimVec) < 0 {
+			// 		continue
+			// 	}
+
+			// } else {
+
+			// 	interimVec[0] = invertedCamPos[0] - tri.Center[0]
+			// 	interimVec[1] = invertedCamPos[1] - tri.Center[1]
+			// 	interimVec[2] = invertedCamPos[2] - tri.Center[2]
+
+			// 	if dot(tri.Normal, interimVec) < 0 {
+			// 		continue
+			// 	}
+
+			// }
+
+		}
+
+		if !outOfBounds {
+
+			// If all transformed vertices are wholly out of bounds to the right, left, top, or bottom of the screen, then we can assume
+			// the triangle does not need to be rendered
+			if (transformedVertexPositions[0][0] < -0.5 && transformedVertexPositions[1][0] < -0.5 && transformedVertexPositions[2][0] < -0.5) ||
+				(transformedVertexPositions[0][0] > 0.5 && transformedVertexPositions[1][0] > 0.5 && transformedVertexPositions[2][0] > 0.5) ||
+				(transformedVertexPositions[0][1] < -0.5 && transformedVertexPositions[1][1] < -0.5 && transformedVertexPositions[2][1] < -0.5) ||
+				(transformedVertexPositions[0][1] > 0.5 && transformedVertexPositions[1][1] > 0.5 && transformedVertexPositions[2][1] > 0.5) {
+				outOfBounds = true
+			}
+
+		}
+
+		if outOfBounds {
+			continue
+		}
+
+		meshPart.sortingTriangles[sortingTriIndex].depth = float32(depth)
+
+		sortingTriIndex++
+
 	}
+
+	meshPart.sortingTriangles = meshPart.sortingTriangles[:sortingTriIndex]
 
 	sortMode := TriangleSortModeBackToFront
 
@@ -596,6 +663,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			return meshPart.sortingTriangles[i].depth < meshPart.sortingTriangles[j].depth
 		})
 	}
+
+	return meshPart.sortingTriangles
 
 }
 
@@ -792,31 +861,27 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 
 	}
 
-	for _, tri := range model.Mesh.Triangles {
+	// TODO: Switch Mesh.VertexColors around so instead of [vertex index][channel] it's [channel][vertex index]; this way we could directly pass
+	// a vertex channel into Light.Light().
 
-		lightResults := [9]float32{}
+	targetColors := make([]*Color, len(model.Mesh.VertexColors))
 
-		for _, light := range allLights {
+	for i := 0; i < len(targetColors); i++ {
+		targetColors[i] = NewColor(0, 0, 0, 1)
+	}
 
-			if light.IsOn() {
-				lightColors := light.Light(tri.ID, model)
+	for _, light := range allLights {
 
-				for i := range lightColors {
-					lightResults[i] += lightColors[i]
-				}
+		if light.IsOn() {
+			for _, mp := range model.Mesh.MeshParts {
+				light.Light(mp, model, targetColors)
 			}
-
 		}
 
-		for i := 0; i < 3; i++ {
+	}
 
-			channel := model.Mesh.VertexColors[tri.VertexIndices[i]][targetChannel]
-			channel.R = lightResults[i*3]
-			channel.G = lightResults[i*3+1]
-			channel.B = lightResults[i*3+2]
-
-		}
-
+	for i := 0; i < len(model.Mesh.VertexColors); i++ {
+		model.Mesh.VertexColors[i][targetChannel].Set(targetColors[i].ToFloat32s())
 	}
 
 }

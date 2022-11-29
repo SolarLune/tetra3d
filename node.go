@@ -144,9 +144,9 @@ type INode interface {
 	Move(x, y, z float64)
 	// MoveVec moves a Node in local space using the vector provided.
 	MoveVec(moveVec vector.Vector)
-	// Rotate rotates a Node locally on the given vector with the given axis, by the angle provided in radians.
+	// Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
 	Rotate(x, y, z, angle float64)
-	// RotateVec rotates a Node locally on the given vector, by the angle provided in radians.
+	// RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
 	RotateVec(vec vector.Vector, angle float64)
 	// Grow scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
 	Grow(x, y, z float64)
@@ -744,7 +744,7 @@ func (node *Node) MoveVec(vec vector.Vector) {
 	node.Move(vec[0], vec[1], vec[2])
 }
 
-// Rotate rotates a Node locally on a vector with the given axis, by the angle provided in radians.
+// Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
 func (node *Node) Rotate(x, y, z, angle float64) {
 	if x == 0 && y == 0 && z == 0 {
 		return
@@ -754,7 +754,7 @@ func (node *Node) Rotate(x, y, z, angle float64) {
 	node.SetLocalRotation(localRot)
 }
 
-// RotateVec rotates a Node locally on the given vector, by the angle provided in radians.
+// RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
 func (node *Node) RotateVec(vec vector.Vector, angle float64) {
 	node.Rotate(vec[0], vec[1], vec[2], angle)
 }

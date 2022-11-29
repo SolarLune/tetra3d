@@ -142,9 +142,10 @@ func (g *Game) Update() error {
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
 	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
-	// Spinning the tetrahedron in the logo
-	tetra := g.Scene.Root.Get("LogoGroup/Tetra")
-	tetra.SetLocalRotation(tetra.LocalRotation().Rotated(0, 1, 0, 0.05))
+	// Spinning the tetrahedron in the logo around its local orientation
+	for _, g := range g.Scene.Root.ChildrenRecursive().ByTags("spin") {
+		g.Rotate(0, 1, 0, 0.05)
+	}
 
 	g.PrevMousePosition = mv.Clone()
 
@@ -178,7 +179,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	screen.Fill(color.RGBA{60, 70, 80, 255})
+	screen.Fill(g.Scene.World.ClearColor.ToRGBA64())
 
 	// Clear the Camera
 	g.Camera.Clear()
@@ -191,7 +192,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Offscreen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("Screen"))
+	g.Camera.Render(g.Scene, g.Scene.Root.ChildrenRecursive().ByName("screen", false, false).Models()...)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.

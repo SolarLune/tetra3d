@@ -170,10 +170,12 @@ type Mesh struct {
 	VertexUVs                []vector.Vector
 	VertexColors             [][]*Color
 	VertexActiveColorChannel []int
-	VertexWeights            [][]float32
-	VertexBones              [][]uint16
-	vertsAddStart            int
-	vertsAddEnd              int
+	VertexWeights            [][]float32 // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
+	VertexBones              [][]uint16  // TODO: Replace this with [][8]uint16 (or however many the maximum number of bones affecting a single vertex is for GLTF)
+
+	vertexLights  []*Color
+	vertsAddStart int
+	vertsAddEnd   int
 
 	VertexColorChannelNames map[string]int
 	Dimensions              Dimensions
@@ -196,6 +198,7 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 		VertexNormals:            []vector.Vector{},
 		vertexSkinnedNormals:     []vector.Vector{},
 		vertexSkinnedPositions:   []vector.Vector{},
+		vertexLights:             []*Color{},
 		VertexUVs:                []vector.Vector{},
 		VertexColors:             [][]*Color{},
 		VertexActiveColorChannel: []int{},
@@ -224,11 +227,15 @@ func (mesh *Mesh) Clone() *Mesh {
 		newMesh.VertexPositions[i] = mesh.VertexPositions[i].Clone()
 	}
 
-	for i := range mesh.VertexPositions {
+	for i := range mesh.VertexNormals {
 		newMesh.VertexNormals[i] = mesh.VertexNormals[i].Clone()
 	}
 
-	for i := range mesh.VertexPositions {
+	for i := range mesh.vertexLights {
+		newMesh.vertexLights[i] = mesh.vertexLights[i].Clone()
+	}
+
+	for i := range mesh.VertexUVs {
 		newMesh.VertexUVs[i] = mesh.VertexUVs[i].Clone()
 	}
 
@@ -301,45 +308,27 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 		return
 	}
 
-	newVP := make([]vector.Vector, 0, vertexCount)
-	copy(newVP, mesh.VertexPositions)
-	mesh.VertexPositions = newVP
+	mesh.VertexPositions = append(make([]vector.Vector, 0, vertexCount), mesh.VertexPositions...)
 
-	newVN := make([]vector.Vector, 0, vertexCount)
-	copy(newVN, mesh.VertexNormals)
-	mesh.VertexNormals = newVN
+	mesh.VertexNormals = append(make([]vector.Vector, 0, vertexCount), mesh.VertexNormals...)
 
-	newVUVs := make([]vector.Vector, 0, vertexCount)
-	copy(newVUVs, mesh.VertexUVs)
-	mesh.VertexUVs = newVUVs
+	mesh.vertexLights = append(make([]*Color, 0, vertexCount), mesh.vertexLights...)
 
-	newVC := make([][]*Color, 0, vertexCount)
-	copy(newVC, mesh.VertexColors)
-	mesh.VertexColors = newVC
+	mesh.VertexUVs = append(make([]vector.Vector, 0, vertexCount), mesh.VertexUVs...)
 
-	newActiveChannel := make([]int, 0, vertexCount)
-	copy(newActiveChannel, mesh.VertexActiveColorChannel)
-	mesh.VertexActiveColorChannel = newActiveChannel
+	mesh.VertexColors = append(make([][]*Color, 0, vertexCount), mesh.VertexColors...)
 
-	newBones := make([][]uint16, 0, vertexCount)
-	copy(newBones, mesh.VertexBones)
-	mesh.VertexBones = newBones
+	mesh.VertexActiveColorChannel = append(make([]int, 0, vertexCount), mesh.VertexActiveColorChannel...)
 
-	newWeights := make([][]float32, 0, vertexCount)
-	copy(newWeights, mesh.VertexWeights)
-	mesh.VertexWeights = newWeights
+	mesh.VertexBones = append(make([][]uint16, 0, vertexCount), mesh.VertexBones...)
 
-	newTransforms := make([]vector.Vector, 0, vertexCount)
-	copy(newTransforms, mesh.vertexTransforms)
-	mesh.vertexTransforms = newTransforms
+	mesh.VertexWeights = append(make([][]float32, 0, vertexCount), mesh.VertexWeights...)
 
-	newNormals := make([]vector.Vector, 0, vertexCount)
-	copy(newNormals, mesh.vertexSkinnedNormals)
-	mesh.vertexSkinnedNormals = newNormals
+	mesh.vertexTransforms = append(make([]vector.Vector, 0, vertexCount), mesh.vertexTransforms...)
 
-	newPositions := make([]vector.Vector, 0, vertexCount)
-	copy(newPositions, mesh.vertexSkinnedPositions)
-	mesh.vertexSkinnedPositions = newPositions
+	mesh.vertexSkinnedNormals = append(make([]vector.Vector, 0, vertexCount), mesh.vertexSkinnedNormals...)
+
+	mesh.vertexSkinnedPositions = append(make([]vector.Vector, 0, vertexCount), mesh.vertexSkinnedPositions...)
 
 }
 
@@ -457,7 +446,8 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 		mesh.VertexBones = append(mesh.VertexBones, vertInfo.Bones)
 		mesh.VertexWeights = append(mesh.VertexWeights, vertInfo.Weights)
 
-		mesh.vertexTransforms = append(mesh.vertexTransforms, vector.Vector{0, 0, 0, 0})
+		mesh.vertexLights = append(mesh.vertexLights, NewColor(0, 0, 0, 1))
+		mesh.vertexTransforms = append(mesh.vertexTransforms, vector.Vector{0, 0, 0, 0}) // x, y, z, w
 		mesh.vertexSkinnedNormals = append(mesh.vertexSkinnedNormals, vector.Vector{0, 0, 0})
 		mesh.vertexSkinnedPositions = append(mesh.vertexSkinnedPositions, vector.Vector{0, 0, 0})
 
@@ -970,7 +960,6 @@ func NewPlane() *Mesh {
 type sortingTriangle struct {
 	Triangle *Triangle
 	depth    float32
-	rendered bool
 }
 
 // A Triangle represents the smallest renderable object in Tetra3D. A triangle contains very little data, and is mainly used to help identify triads of vertices.
@@ -1014,6 +1003,7 @@ func (tri *Triangle) RecalculateCenter() {
 	// tri.Center[0] = (verts[indices[0]] + verts[indices[0]] + verts[tri.ID*3+2][0]) / 3
 	// tri.Center[1] = (verts[indices[1]] + verts[indices[0]] + verts[tri.ID*3+2][1]) / 3
 	// tri.Center[2] = (verts[indices[2]] + verts[indices[0]] + verts[tri.ID*3+2][2]) / 3
+
 	tri.Center[0] = (verts[indices[0]][0] + verts[indices[1]][0] + verts[indices[2]][0]) / 3
 	tri.Center[1] = (verts[indices[0]][1] + verts[indices[1]][1] + verts[indices[2]][1]) / 3
 	tri.Center[2] = (verts[indices[0]][2] + verts[indices[1]][2] + verts[indices[2]][2]) / 3
@@ -1124,7 +1114,7 @@ func NewMeshPart(mesh *Mesh, material *Material) *MeshPart {
 		Material:         material,
 		sortingTriangles: []sortingTriangle{},
 		TriangleStart:    math.MaxInt,
-		VertexIndexStart: -1,
+		VertexIndexStart: mesh.vertsAddStart,
 	}
 }
 
@@ -1184,6 +1174,10 @@ func (part *MeshPart) ForEachVertexIndex(vertFunc func(vertIndex int)) {
 	}
 }
 
+func (part *MeshPart) VertexIndexCount() int {
+	return part.VertexIndexEnd - part.VertexIndexStart
+}
+
 // AddTriangles adds triangles to the MeshPart using the provided VertexInfo slice.
 func (part *MeshPart) AddTriangles(indices ...int) {
 
@@ -1199,9 +1193,6 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 	// 	}
 	// }
 
-	if part.VertexIndexStart < 0 {
-		part.VertexIndexStart = part.Mesh.vertsAddStart
-	}
 	part.VertexIndexEnd = part.Mesh.vertsAddEnd
 
 	// for _, index := range indices {
@@ -1225,7 +1216,7 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 			part.TriangleEnd = mesh.triIndex
 		}
 
-		newTri := NewTriangle(part, uint16(mesh.triIndex), indices[i]+part.Mesh.vertsAddStart, indices[i+1]+part.Mesh.vertsAddStart, indices[i+2]+part.Mesh.vertsAddStart)
+		newTri := NewTriangle(part, uint16(mesh.triIndex), indices[i]+part.VertexIndexStart, indices[i+1]+part.VertexIndexStart, indices[i+2]+part.VertexIndexStart)
 		newTri.RecalculateCenter()
 		newTri.RecalculateNormal()
 		part.sortingTriangles = append(part.sortingTriangles, sortingTriangle{
@@ -1248,7 +1239,7 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 
 // TriangleCount returns the total number of triangles in the MeshPart, specifically.
 func (part *MeshPart) TriangleCount() int {
-	return part.TriangleEnd - part.TriangleStart
+	return part.TriangleEnd - part.TriangleStart + 1
 }
 
 // ApplyMatrix applies a transformation matrix to the vertices referenced by the MeshPart.

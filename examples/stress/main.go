@@ -35,11 +35,14 @@ type Game struct {
 	CameraTilt        float64
 	CameraRotate      float64
 	PrevMousePosition vector.Vector
+	CameraLocked      bool
 
 	DrawDebugText      bool
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
 	DrawDebugNormals   bool
+
+	Time float64
 }
 
 func NewGame() *Game {
@@ -65,7 +68,7 @@ func (g *Game) Init() {
 	}
 
 	// When creating a new mesh, it has no MeshParts.
-	merged := tetra3d.NewModel(tetra3d.NewMesh("merged"), "merged cubes")
+	merged := tetra3d.NewModel(tetra3d.NewMesh("merged cubes"), "merged cubes")
 
 	// Here, we'll store all of the cubes we'll merge together.
 	cubes := []*tetra3d.Model{}
@@ -73,12 +76,14 @@ func (g *Game) Init() {
 	// We can reuse the mesh for all of the models.
 	cubeMesh := tetra3d.NewCube()
 
-	for i := 0; i < 31; i++ {
-		for j := 0; j < 31; j++ {
-			for k := 0; k < 6; k++ {
-				// Create a new Model, position it, and add it to the cubes slice.
+	// Create a new Model, position it, and add it to the cubes slice.
+	// for x := 0; x < 100; x++ {
+	// 	for j := 0; j < 100; j++ {
+	for x := 0; x < 10; x++ {
+		for z := 0; z < 10; z++ {
+			for y := 0; y < 10; y++ {
 				cube := tetra3d.NewModel(cubeMesh, "Cube")
-				cube.SetLocalPositionVec(vector.Vector{float64(i * 3), float64(k * 3), float64(-j * 3)})
+				// cube.SetLocalPosition(3*float64(x), 3*float64(y), -3*float64(z))
 				cubes = append(cubes, cube)
 			}
 		}
@@ -108,20 +113,37 @@ func (g *Game) Init() {
 	// Add the merged result model, and we're done, basically.
 	g.Scene.Root.AddChildren(merged)
 
+	for x := 0; x < 8; x++ {
+		m2 := merged.Clone()
+		m2.Move(4*float64(x+1), 0, 0)
+		g.Scene.Root.AddChildren(m2)
+	}
+
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Far = 180
 	g.Camera.SetLocalPositionVec(vector.Vector{0, 0, 15})
 
 	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMaximum)
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+
+	go func() {
+		for {
+			fmt.Println("FPS:", ebiten.ActualFPS())
+			time.Sleep(time.Second)
+		}
+	}()
 
 }
 
 func (g *Game) Update() error {
 
+	// c := g.Scene.Root.Get("merged cubes")
+	// c.Move(0, math.Sin(g.Time*math.Pi)*0.01, 0)
+
 	var err error
 
 	moveSpd := 0.1
+
+	// g.Time += 1.0 / 60.0
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
 		err = errors.New("quit")
@@ -171,16 +193,29 @@ func (g *Game) Update() error {
 
 	diff := mv.Sub(g.PrevMousePosition)
 
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
+	if g.CameraLocked {
 
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
+		g.CameraTilt -= diff[1] * 0.005
+		g.CameraRotate -= diff[0] * 0.005
 
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
+		g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
 
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
+		tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
+		rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
+
+		// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
+		g.Camera.SetLocalRotation(tilt.Mult(rotate))
+
+	}
+
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		g.CameraLocked = !g.CameraLocked
+		if g.CameraLocked {
+			ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+		} else {
+			ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		}
+	}
 
 	g.PrevMousePosition = mv.Clone()
 

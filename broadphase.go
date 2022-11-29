@@ -104,9 +104,9 @@ func (bp *Broadphase) Resize(gridSize int) {
 
 				for _, tri := range bp.BoundingTriangles.Mesh.Triangles {
 
-					v0 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3]
-					v1 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3+1]
-					v2 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3+2]
+					v0 := bp.BoundingTriangles.Mesh.VertexPositions[tri.VertexIndices[0]]
+					v1 := bp.BoundingTriangles.Mesh.VertexPositions[tri.VertexIndices[1]]
+					v2 := bp.BoundingTriangles.Mesh.VertexPositions[tri.VertexIndices[2]]
 					closestOnTri := closestPointOnTri(center, v0, v1, v2)
 					if bp.aabb.PointInside(closestOnTri) {
 						bp.TriSets[i][j][k] = append(bp.TriSets[i][j][k], tri.ID)

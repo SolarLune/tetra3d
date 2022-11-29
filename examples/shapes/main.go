@@ -132,11 +132,11 @@ func (g *Game) Update() error {
 	// Limit camera tilting
 	g.CameraTilt = math.Max(math.Min(g.CameraTilt, tetra3d.ToRadians(80)), tetra3d.ToRadians(-80))
 
-	// tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	// rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
+	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
+	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
 
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	// g.Camera.SetLocalRotation(tilt.Mult(rotate))
+	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
 	g.PrevMousePosition = mv.Clone()
 

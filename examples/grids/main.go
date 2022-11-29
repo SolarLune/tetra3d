@@ -103,6 +103,7 @@ func NewGame() *Game {
 }
 
 func (g *Game) Init() {
+
 	data, err := tetra3d.LoadGLTFData(grids, nil)
 	if err != nil {
 		panic(err)

@@ -1,6 +1,6 @@
 package tetra3d
 
-// tetra3d is a 3D software renderer written for video games by usage of Ebiten. It's kinda jank, but it's pretty fun. Check it out!
+// tetra3d is a 3D hybrid software/hardware renderer written for video games by usage of Ebitengine.
 
 import (
 	"image/color"
@@ -10,11 +10,12 @@ import (
 
 var defaultImg = ebiten.NewImage(1, 1)
 
-var colorVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesNum)
-var depthVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesNum)
-var indexList = make([]uint16, ebiten.MaxIndicesNum)
+var colorVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesCount)
+var depthVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesCount)
+var indexList = make([]uint16, ebiten.MaxIndicesCount)
 var vertexListIndex = 0
 var indexListIndex = 0
+var indexListStart = 0
 
 const MaxTriangleCount = 21845
 

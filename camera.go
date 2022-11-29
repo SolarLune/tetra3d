@@ -57,7 +57,7 @@ type Camera struct {
 	AccumulateColorMode           int                      // The mode to use when rendering previous frames to the accumulation buffer. Defaults to AccumulateColorModeNone.
 	AccumulateDrawOptions         *ebiten.DrawImageOptions // Draw image options to use when rendering frames to the accumulation buffer; use this to fade out or color previous frames.
 
-	Near, Far   float64 // The near and far clipping plane.
+	Near, Far   float64 // The near and far clipping plane. Near defaults to 0.1, Far to 100 (unless these settings are loaded from a camera in a GLTF file).
 	Perspective bool    // If the Camera has a perspective projection. If not, it would be orthographic
 	FieldOfView float64 // Vertical field of view in degrees for a perspective projection camera
 	OrthoScale  float64 // Scale of the view for an orthographic projection camera in units horizontally
@@ -378,7 +378,7 @@ func (camera *Camera) clipToScreen(vert, outVec vector.Vector, vertID int, model
 	outVec[3] = 1
 
 	if model != nil && model.VertexClipFunction != nil {
-		outVec = model.VertexClipFunction(outVec, vertID)
+		model.VertexClipFunction(outVec, vertID)
 	}
 
 	return outVec
@@ -670,9 +670,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	// Reusing vectors rather than reallocating for all triangles for all models
 	clipped := vector.Vector{0, 0, 0, 0}
-	p0 := vector.Vector{0, 0, 0}
-	p1 := vector.Vector{0, 0, 0}
-	p2 := vector.Vector{0, 0, 0}
 
 	solids := []renderPair{}
 	transparents := []renderPair{}
@@ -811,12 +808,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			camera.DebugInfo.BatchedParts++
 		}
 
-		model.ProcessVertices(vpMatrix, camera, meshPart, scene)
-
-		backfaceCulling := true
-		if mat != nil {
-			backfaceCulling = mat.BackfaceCulling
-		}
+		sortingTris := model.ProcessVertices(vpMatrix, camera, meshPart, scene)
 
 		srcW := 0.0
 		srcH := 0.0
@@ -848,8 +840,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		mesh := model.Mesh
-		// maxSpan := model.Mesh.Dimensions.MaxSpan()
-		// modelPos := model.WorldPosition()
+		maxSpan := model.Mesh.Dimensions.MaxSpan()
+		modelPos := model.WorldPosition()
 
 		// Here we do all vertex transforms first because of data locality (it's faster to access all vertex transformations, then go back and do all UV values, etc)
 
@@ -857,6 +849,37 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		if meshPart.Material != nil {
 			mpColor.MultiplyRGBA(meshPart.Material.Color.ToFloat32s())
+		}
+
+		if lighting && len(sortingTris) > 0 {
+
+			t := time.Now()
+
+			meshPart.ForEachVertexIndex(func(vertIndex int) {
+				meshPart.Mesh.vertexLights[vertIndex].Set(0, 0, 0, 1)
+			})
+
+			for _, light := range lights {
+
+				// Skip calculating lighting for objects that are too far away from light sources.
+				if point, ok := light.(*PointLight); ok && point.Distance > 0 {
+					dist := maxSpan + point.Distance
+					if fastVectorDistanceSquared(modelPos, point.WorldPosition()) > dist*dist {
+						continue
+					}
+				} else if cube, ok := light.(*CubeLight); ok && cube.Distance > 0 {
+					dist := maxSpan + cube.Distance
+					if fastVectorDistanceSquared(modelPos, cube.WorldPosition()) > dist*dist {
+						continue
+					}
+				}
+
+				light.Light(meshPart, model, mesh.vertexLights)
+
+			}
+
+			camera.DebugInfo.lightTime += time.Since(t)
+
 		}
 
 		meshPart.ForEachVertexIndex(
@@ -880,16 +903,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				// meshPart.sortingTriangles[t].rendered = visible
 
-				colorVertexList[vertexListIndex].DstX = float32(int(clipped[0]))
-				colorVertexList[vertexListIndex].DstY = float32(int(clipped[1]))
+				colorVertexList[vertexListIndex].DstX = float32(clipped[0])
+				colorVertexList[vertexListIndex].DstY = float32(clipped[1])
 
-				colorVertexList[vertexListIndex].ColorR = 1
-				colorVertexList[vertexListIndex].ColorG = 1
-				colorVertexList[vertexListIndex].ColorB = 1
-				colorVertexList[vertexListIndex].ColorA = 1
-
-				depthVertexList[vertexListIndex].DstX = float32(int(clipped[0]))
-				depthVertexList[vertexListIndex].DstY = float32(int(clipped[1]))
+				depthVertexList[vertexListIndex].DstX = float32(clipped[0])
+				depthVertexList[vertexListIndex].DstY = float32(clipped[1])
 
 				depthVertexList[vertexListIndex].ColorR = 1
 				depthVertexList[vertexListIndex].ColorG = 1
@@ -902,8 +920,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
 				uvV := float32((1 - mesh.VertexUVs[vertIndex][1]) * srcH)
 
-				colorVertexList[vertIndex].SrcX = uvU
-				colorVertexList[vertIndex].SrcY = uvV
+				colorVertexList[vertexListIndex].SrcX = uvU
+				colorVertexList[vertexListIndex].SrcY = uvV
 
 				// Vertex colors
 
@@ -917,6 +935,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					colorVertexList[vertexListIndex].ColorG = mpColor.G
 					colorVertexList[vertexListIndex].ColorB = mpColor.B
 					colorVertexList[vertexListIndex].ColorA = mpColor.A
+				}
+
+				if lighting {
+					colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights[vertIndex].R
+					colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights[vertIndex].G
+					colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights[vertIndex].B
 				}
 
 				if camera.RenderDepth {
@@ -979,98 +1003,16 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			return
 		}
 
-		i := 0
-
-		indexListIndex = 0
-
-		for _, sortingTri := range meshPart.sortingTriangles {
-
-			if !sortingTri.rendered {
-				continue
-			}
-
-			// // This is a bit of a hacky way to do backface culling; it works, but it uses
-			// // the screen positions of the vertices to determine if the triangle should be culled.
-			// // In truth, it would be better to use the above approach, but that gives us visual
-			// // errors when faces are behind the camera unless we clip triangles. I don't really
-			// // feel like doing that right now, so here we are.
-
-			p0[0] = float64(colorVertexList[sortingTri.Triangle.VertexIndices[0]].DstX)
-			p0[1] = float64(colorVertexList[sortingTri.Triangle.VertexIndices[0]].DstY)
-
-			p1[0] = float64(colorVertexList[sortingTri.Triangle.VertexIndices[1]].DstX)
-			p1[1] = float64(colorVertexList[sortingTri.Triangle.VertexIndices[1]].DstY)
-
-			p2[0] = float64(colorVertexList[sortingTri.Triangle.VertexIndices[2]].DstX)
-			p2[1] = float64(colorVertexList[sortingTri.Triangle.VertexIndices[2]].DstY)
-
-			// We can skip triangles that lie entirely outside of the view horizontally and vertically.
-			if (p0[0] < 0 && p1[0] < 0 && p2[0] < 0) ||
-				(p0[1] < 0 && p1[1] < 0 && p2[1] < 0) ||
-				(p0[0] > float64(camWidth) && p1[0] > float64(camWidth) && p2[0] > float64(camWidth)) ||
-				(p0[1] > float64(camHeight) && p1[1] > float64(camHeight) && p2[1] > float64(camHeight)) {
-				continue
-			}
-
-			if backfaceCulling {
-
-				camera.backfacePool.Reset()
-				n0 := camera.backfacePool.Sub(p0, p1)
-				n1 := camera.backfacePool.Sub(p1, p2)
-				nor := camera.backfacePool.Cross(n0, n1)
-
-				if nor[2] > 0 {
-					continue
-				}
-
-			}
-
-			// if lighting {
-
-			// 			t := time.Now()
-
-			// 			addLightResults := [9]float32{}
-
-			// 			for _, light := range lights {
-
-			// 				if point, ok := light.(*PointLight); ok && point.Distance > 0 {
-			// 					dist := maxSpan + point.Distance
-			// 					if fastVectorDistanceSquared(modelPos, point.WorldPosition()) > dist*dist {
-			// 						continue
-			// 					}
-			// 				} else if cube, ok := light.(*CubeLight); ok && cube.Distance > 0 {
-			// 					dist := maxSpan + cube.Distance
-			// 					if fastVectorDistanceSquared(modelPos, cube.WorldPosition()) > dist*dist {
-			// 						continue
-			// 					}
-			// 				}
-
-			// 				lightResults := light.Light(sortingTri.Triangle.ID, model)
-			// 				for i := 0; i < 9; i++ {
-			// 					addLightResults[i] += lightResults[i]
-			// 				}
-			// 			}
-
-			// 			for i := 0; i < 3; i++ {
-			// 				colorVertexList[vertexListIndex].ColorR *= addLightResults[i*3]
-			// 				colorVertexList[vertexListIndex].ColorG *= addLightResults[i*3+1]
-			// 				colorVertexList[vertexListIndex].ColorB *= addLightResults[i*3+2]
-			// 				vertexListIndex++
-			// 			}
-
-			// 			camera.DebugInfo.lightTime += time.Since(t)
-
-			// 		}
-
-			// }
+		for _, sortingTri := range sortingTris {
 
 			for _, index := range sortingTri.Triangle.VertexIndices {
-				indexList[i] = uint16(index)
-				i++
+				indexList[indexListIndex] = uint16(index - sortingTri.Triangle.MeshPart.VertexIndexStart + indexListStart)
 				indexListIndex++
 			}
 
 		}
+
+		indexListStart = vertexListIndex
 
 		// for i := 0; i < vertexListIndex; i++ {
 		// 	indexList[i] = uint16(i)
@@ -1205,6 +1147,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		camera.DebugInfo.DrawnParts++
 
 		vertexListIndex = 0
+		indexListIndex = 0
+		indexListStart = 0
 
 	}
 
@@ -1362,17 +1306,18 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
 
-				for i := 0; i < len(model.Mesh.vertexTransforms); i += 3 {
+				meshPart.ForEachTri(func(tri *Triangle) {
 
-					v0 := camera.ClipToScreen(model.Mesh.vertexTransforms[i])
-					v1 := camera.ClipToScreen(model.Mesh.vertexTransforms[i+1])
-					v2 := camera.ClipToScreen(model.Mesh.vertexTransforms[i+2])
+					indices := tri.VertexIndices
+					v0 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[0]])
+					v1 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[1]])
+					v2 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[2]])
 
 					if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
 						(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
 						(v0[0] > float64(camWidth) && v1[0] > float64(camWidth) && v2[0] > float64(camWidth)) ||
 						(v0[1] > float64(camHeight) && v1[1] > float64(camHeight) && v2[1] > float64(camHeight)) {
-						continue
+						return
 					}
 
 					c := color.ToRGBA64()
@@ -1380,7 +1325,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 					ebitenutil.DrawLine(screen, float64(v1[0]), float64(v1[1]), float64(v2[0]), float64(v2[1]), c)
 					ebitenutil.DrawLine(screen, float64(v2[0]), float64(v2[1]), float64(v0[0]), float64(v0[1]), c)
 
-				}
+				})
 
 			}
 
@@ -1721,9 +1666,9 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
 
-						v0 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3]))
-						v1 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3+1]))
-						v2 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.ID*3+2]))
+						v0 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]))
+						v1 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]))
+						v2 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]))
 
 						if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
 							(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||

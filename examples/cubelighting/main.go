@@ -69,7 +69,7 @@ func (g *Game) Init() {
 	g.Camera.SetLocalPositionVec(vector.Vector{0, 10, 15})
 	g.Scene.Root.AddChildren(g.Camera)
 
-	for _, cubeLightModel := range g.Scene.Root.ChildrenRecursive().ByName("CubeLightVolume", false).Models() {
+	for _, cubeLightModel := range g.Scene.Root.ChildrenRecursive().ByName("CubeLightVolume", false, false).Models() {
 
 		cubeLight := tetra3d.NewCubeLightFromModel("cube light", cubeLightModel)
 		cubeLight.Energy = 3

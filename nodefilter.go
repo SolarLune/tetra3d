@@ -4,11 +4,11 @@ import (
 	"strings"
 )
 
-// NodeFilter represents a filterable selection of INodes. For example, `
-// filter := scene.Root.ChildrenRecursive()` returns a NodeFilter composed of all nodes
+// NodeFilter represents a filterable selection of INodes. For example,
+// `filter := scene.Root.ChildrenRecursive()` returns a NodeFilter composed of all nodes
 // underneath the root (excluding the root itself). From there, you can use additional
 // functions on the NodeFilter to filter it down further:
-// `filter = filter.ByName("player lamp", true).ByType(tetra3d.NodeTypeLight)`.
+// `filter = filter.ByName("player lamp", true, true).ByType(tetra3d.NodeTypeLight)`.
 type NodeFilter []INode
 
 // First returns the first Node in the NodeFilter; if the NodeFilter is empty, this function returns nil.
@@ -50,19 +50,27 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 	return out
 }
 
-// ByName allows you to filter a given selection of nodes by the given name. If wildcard is true,
-// the nodes' names can contain the name provided; otherwise, they have to match exactly.
+// ByName allows you to filter a given selection of nodes by the given name.
+// If caseSensitive is not true, then names are compared as if they were all toLower()'d.
+// If exactMatch is true, the nodes' names can contain the name provided; otherwise, they have to match exactly.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByName(name string, exactMatch bool) NodeFilter {
+func (nf NodeFilter) ByName(name string, caseSensitive bool, exactMatch bool) NodeFilter {
 	out := make([]INode, 0, len(nf))
 	for _, node := range nf {
 
 		var nameExists bool
 
+		nodeName := node.Name()
+
+		if !caseSensitive {
+			nodeName = strings.ToLower(nodeName)
+			name = strings.ToLower(name)
+		}
+
 		if exactMatch {
-			nameExists = node.Name() == name
+			nameExists = nodeName == name
 		} else {
-			nameExists = strings.Contains(node.Name(), name)
+			nameExists = strings.Contains(nodeName, name)
 		}
 
 		if nameExists {
