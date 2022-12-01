@@ -34,7 +34,7 @@ type Game struct {
 	DrawDebugText      bool
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
-	PrevMousePosition  vector.Vector
+	PrevMousePosition  Vector
 
 	FlashingVertices *tetra3d.VertexSelection
 
@@ -50,7 +50,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             796,
 		Height:            448,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 		DrawDebugText:     true,
 	}
 
@@ -74,7 +74,7 @@ func (g *Game) Init() {
 	g.Cube = g.Scene.Root.Get("Cube").(*tetra3d.Model)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 10})
+	g.Camera.SetLocalPositionVec(Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	// So, the easiest way to select vertices is to just use Mesh.SelectVertices() - it allows us to select vertices that fulfill a set of
@@ -154,7 +154,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 

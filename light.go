@@ -1,11 +1,5 @@
 package tetra3d
 
-import (
-	"math"
-
-	"github.com/kvartborg/vector"
-)
-
 // ILight represents an interface that is fulfilled by an object that emits light, returning the color a vertex should be given that Vertex and its model matrix.
 type ILight interface {
 	// beginRender is used to call any set-up code or to prepare math structures that are used when lighting the scene.
@@ -117,7 +111,7 @@ type PointLight struct {
 	On bool
 
 	distanceSquared float64
-	workingPosition vector.Vector
+	workingPosition Vector
 }
 
 // NewPointLight creates a new Point light.
@@ -181,18 +175,18 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 
 		if point.Distance > 0 {
 
-			dist := fastVectorDistanceSquared(point.workingPosition, model.Mesh.VertexPositions[index])
+			dist := point.workingPosition.DistanceSquared(model.Mesh.VertexPositions[index])
 			if dist > point.distanceSquared {
 				return
 			}
 
-			// var triCenter vector.Vector
+			// var triCenter Vector
 
 			// if model.Skinned {
 			// 	v0 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
 			// 	v1 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
 			// 	v2 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
-			// 	triCenter = vector.Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
+			// 	triCenter = Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
 			// } else {
 			// 	triCenter = tri.Center
 			// }
@@ -209,7 +203,7 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 		// 	return light
 		// }
 
-		var vertPos, vertNormal vector.Vector
+		var vertPos, vertNormal Vector
 
 		if model.Skinned {
 			vertPos = model.Mesh.vertexSkinnedPositions[index]
@@ -219,15 +213,15 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 			vertNormal = model.Mesh.VertexNormals[index]
 		}
 
-		lightVec := vector.In(fastVectorSub(point.workingPosition, vertPos)).Unit()
-		diffuse := dot(vertNormal, vector.Vector(lightVec))
+		lightVec := point.workingPosition.Sub(vertPos).Unit()
+		diffuse := vertNormal.Dot(Vector(lightVec))
 
 		if diffuse < 0 {
 			diffuse = 0
 		}
 
 		var diffuseFactor float64
-		distance := fastVectorDistanceSquared(point.workingPosition, vertPos)
+		distance := point.workingPosition.DistanceSquared(vertPos)
 
 		if point.Distance == 0 {
 			diffuseFactor = diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
@@ -283,8 +277,8 @@ type DirectionalLight struct {
 	Energy float32
 	On     bool // If the light is on and contributing to the scene.
 
-	workingForward       vector.Vector // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
-	workingModelRotation Matrix4       // Similarly, this is an internal rotational transform (without the transformation row) for the Model being lit.
+	workingForward       Vector  // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
+	workingModelRotation Matrix4 // Similarly, this is an internal rotational transform (without the transformation row) for the Model being lit.
 }
 
 // NewDirectionalLight creates a new Directional Light with the specified RGB color and energy (assuming 1.0 energy is standard / "100%" lighting).
@@ -328,7 +322,7 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 
 	meshPart.ForEachVertexIndex(func(index int) {
 
-		var normal vector.Vector
+		var normal Vector
 		if model.Skinned {
 			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
 			normal = model.Mesh.vertexSkinnedNormals[index]
@@ -336,7 +330,7 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[index])
 		}
 
-		diffuseFactor := dot(normal, sun.workingForward)
+		diffuseFactor := normal.Dot(sun.workingForward)
 
 		if diffuseFactor <= 0 {
 			return
@@ -390,10 +384,10 @@ type CubeLight struct {
 	// A value between 0 and 1 indicating how much opposite faces are still lit within the volume (i.e. at LightBleed = 0.0,
 	// faces away from the light are dark; at 1.0, faces away from the light are fully illuminated)
 	Bleed                  float64
-	LightingAngle          vector.Vector // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
+	LightingAngle          Vector // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
 	workingDimensions      Dimensions
-	workingPosition        vector.Vector
-	workingAngle           vector.Vector
+	workingPosition        Vector
+	workingAngle           Vector
 	workingDistanceSquared float64
 }
 
@@ -402,12 +396,12 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 	cube := &CubeLight{
 		Node: NewNode(name),
 		// Dimensions:    Dimensions{{-w / 2, -h / 2, -d / 2}, {w / 2, h / 2, d / 2}},
-		Dimensions:    dimensions.Clone(),
+		Dimensions:    dimensions,
 		Distance:      0,
 		Energy:        1,
 		Color:         NewColor(1, 1, 1, 1),
 		On:            true,
-		LightingAngle: vector.Vector{0, -1, 0},
+		LightingAngle: Vector{0, -1, 0, 0},
 	}
 	return cube
 }
@@ -428,7 +422,7 @@ func (cube *CubeLight) Clone() INode {
 	newCube.Color = cube.Color.Clone()
 	newCube.On = cube.On
 	newCube.Bleed = cube.Bleed
-	newCube.LightingAngle = cube.LightingAngle.Clone()
+	newCube.LightingAngle = cube.LightingAngle
 	newCube.SetWorldTransform(cube.Transform())
 	newCube.Node = cube.Node.Clone().(*Node)
 	for _, child := range newCube.children {
@@ -454,47 +448,45 @@ func (cube *CubeLight) TransformedDimensions() Dimensions {
 		{-1, -1, -1},
 	}
 
-	dimensions := Dimensions{
-		vector.Vector{math.MaxFloat64, math.MaxFloat64, math.MaxFloat64},
-		vector.Vector{-math.MaxFloat64, -math.MaxFloat64, -math.MaxFloat64},
-	}
+	dimensions := NewEmptyDimensions()
 
 	for _, c := range corners {
 
-		position := r.MultVec(vector.Vector{
-			(cube.Dimensions.Width() * c[0] * s[0] / 2),
-			(cube.Dimensions.Height() * c[1] * s[1] / 2),
-			(cube.Dimensions.Depth() * c[2] * s[2] / 2),
+		position := r.MultVec(Vector{
+			(cube.Dimensions.Width() * c[0] * s.X / 2),
+			(cube.Dimensions.Height() * c[1] * s.Y / 2),
+			(cube.Dimensions.Depth() * c[2] * s.Z / 2),
+			0,
 		})
 
-		if dimensions[0][0] > position[0] {
-			dimensions[0][0] = position[0]
+		if dimensions.Min.X > position.X {
+			dimensions.Min.X = position.X
 		}
 
-		if dimensions[0][1] > position[1] {
-			dimensions[0][1] = position[1]
+		if dimensions.Min.Y > position.Y {
+			dimensions.Min.Y = position.Y
 		}
 
-		if dimensions[0][2] > position[2] {
-			dimensions[0][2] = position[2]
+		if dimensions.Min.Z > position.Z {
+			dimensions.Min.Z = position.Z
 		}
 
-		if dimensions[1][0] < position[0] {
-			dimensions[1][0] = position[0]
+		if dimensions.Max.X < position.X {
+			dimensions.Max.X = position.X
 		}
 
-		if dimensions[1][1] < position[1] {
-			dimensions[1][1] = position[1]
+		if dimensions.Max.Y < position.Y {
+			dimensions.Max.Y = position.Y
 		}
 
-		if dimensions[1][2] < position[2] {
-			dimensions[1][2] = position[2]
+		if dimensions.Max.Z < position.Z {
+			dimensions.Max.Z = position.Z
 		}
 
 	}
 
-	vector.In(dimensions[0]).Add(p)
-	vector.In(dimensions[1]).Add(p)
+	dimensions.Min = dimensions.Min.Add(p)
+	dimensions.Max = dimensions.Max.Add(p)
 
 	return dimensions
 
@@ -523,14 +515,14 @@ func (cube *CubeLight) beginModel(model *Model) {
 		// point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
 		cube.workingPosition = r.MultVec(lightStartPos).Add(p)
 
-		cube.workingDimensions[0] = r.MultVec(cube.workingDimensions[0])
-		cube.workingDimensions[1] = r.MultVec(cube.workingDimensions[1])
+		cube.workingDimensions.Min = r.MultVec(cube.workingDimensions.Min)
+		cube.workingDimensions.Max = r.MultVec(cube.workingDimensions.Max)
 
-		vector.In(cube.workingDimensions[0]).Sum(s)
-		vector.In(cube.workingDimensions[0]).Add(p)
+		cube.workingDimensions.Min.Add(s)
+		cube.workingDimensions.Min.Add(p)
 
-		vector.In(cube.workingDimensions[1]).Sum(s)
-		vector.In(cube.workingDimensions[1]).Add(p)
+		cube.workingDimensions.Max.Add(s)
+		cube.workingDimensions.Max.Add(p)
 
 	}
 
@@ -548,7 +540,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 		// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 		// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-		// var triCenter vector.Vector
+		// var triCenter Vector
 
 		// if model.Skinned {
 		// 	v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
@@ -571,7 +563,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 		// 	return light
 		// }
 
-		var vertPos, vertNormal vector.Vector
+		var vertPos, vertNormal Vector
 
 		if model.Skinned {
 			vertPos = model.Mesh.vertexSkinnedPositions[index]
@@ -583,7 +575,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 
 		var diffuse, diffuseFactor float64
 
-		diffuse = dot(vertNormal, vector.Vector(cube.workingAngle))
+		diffuse = vertNormal.Dot(cube.workingAngle)
 
 		if cube.Bleed > 0 {
 
@@ -607,7 +599,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 			if cube.Distance == 0 {
 				diffuseFactor = diffuse
 			} else {
-				diffuseFactor = diffuse * ((cube.workingDistanceSquared - fastVectorDistanceSquared(vertPos, cube.workingPosition)) / cube.workingDistanceSquared)
+				diffuseFactor = diffuse * ((cube.workingDistanceSquared - vertPos.DistanceSquared(cube.workingPosition)) / cube.workingDistanceSquared)
 			}
 
 			if !cube.workingDimensions.Inside(vertPos) {
@@ -716,7 +708,7 @@ func (cube *CubeLight) Type() NodeType {
 
 // 			for x := 0; x < xd; x++ {
 
-// 				gridPos := vector.Vector{
+// 				gridPos := Vector{
 // 					(float64(x) - float64(xd/2)) * gridSize,
 // 					(float64(y) - float64(yd/2)) * gridSize,
 // 					(float64(z) - float64(zd/2)) * gridSize,
@@ -777,7 +769,7 @@ func (cube *CubeLight) Type() NodeType {
 
 // 	light := [9]float32{}
 
-// 	var vertPos, vertNormal vector.Vector
+// 	var vertPos, vertNormal Vector
 
 // 	color := poly.Model.Color
 
@@ -785,7 +777,7 @@ func (cube *CubeLight) Type() NodeType {
 
 // 	distanceSquared := poly.Distance * poly.Distance
 
-// 	lightPos := vector.Vector{0, 0, 0}
+// 	lightPos := Vector{0, 0, 0}
 
 // 	for i := 0; i < 3; i++ {
 
@@ -798,7 +790,7 @@ func (cube *CubeLight) Type() NodeType {
 // 		}
 
 // 		lightVec := vector.In(fastVectorSub(lightPos, vertPos)).Unit()
-// 		diffuse := dot(vertNormal, vector.Vector(lightVec))
+// 		diffuse := dot(vertNormal, Vector(lightVec))
 
 // 		if diffuse < 0 {
 // 			diffuse = 0

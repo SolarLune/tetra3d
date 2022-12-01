@@ -14,7 +14,6 @@ import (
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
@@ -34,7 +33,7 @@ type Game struct {
 	Camera            *tetra3d.Camera
 	CameraTilt        float64
 	CameraRotate      float64
-	PrevMousePosition vector.Vector
+	PrevMousePosition tetra3d.Vector
 	CameraLocked      bool
 
 	DrawDebugText      bool
@@ -50,7 +49,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             398,
 		Height:            224,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: tetra3d.Vector{},
 	}
 
 	game.Init()
@@ -121,7 +120,7 @@ func (g *Game) Init() {
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Far = 180
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 0, 15})
+	g.Camera.SetLocalPositionVec(tetra3d.Vector{0, 0, 15, 0})
 
 	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMaximum)
 
@@ -172,10 +171,10 @@ func (g *Game) Update() error {
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
+		pos.Y += moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
+		pos.Y -= moveSpd
 	}
 
 	g.Camera.SetLocalPositionVec(pos)
@@ -189,14 +188,14 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := tetra3d.NewVector(float64(mx), float64(my), 0)
 
 	diff := mv.Sub(g.PrevMousePosition)
 
 	if g.CameraLocked {
 
-		g.CameraTilt -= diff[1] * 0.005
-		g.CameraRotate -= diff[0] * 0.005
+		g.CameraTilt -= diff.Y * 0.005
+		g.CameraRotate -= diff.X * 0.005
 
 		g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
 
@@ -217,7 +216,7 @@ func (g *Game) Update() error {
 		}
 	}
 
-	g.PrevMousePosition = mv.Clone()
+	g.PrevMousePosition = mv
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")

@@ -3,8 +3,6 @@ package tetra3d
 import (
 	"math"
 	"strconv"
-
-	"github.com/kvartborg/vector"
 )
 
 // Matrix4 represents a 4x4 matrix for translation, scale, and rotation. A Matrix4 in Tetra3D is row-major (i.e. the X axis is matrix[0]).
@@ -100,22 +98,22 @@ func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
 	}
 
 	mat := NewMatrix4()
-	vector := vector.Vector{x, y, z}.Unit()
+	vector := Vector{x, y, z, 1}.Unit()
 	s := math.Sin(angle)
 	c := math.Cos(angle)
 	m := 1 - c
 
-	mat[0][0] = m*vector[0]*vector[0] + c
-	mat[0][1] = m*vector[0]*vector[1] + vector[2]*s
-	mat[0][2] = m*vector[2]*vector[0] - vector[1]*s
+	mat[0][0] = m*vector.X*vector.X + c
+	mat[0][1] = m*vector.X*vector.Y + vector.Z*s
+	mat[0][2] = m*vector.Z*vector.X - vector.Y*s
 
-	mat[1][0] = m*vector[0]*vector[1] - vector[2]*s
-	mat[1][1] = m*vector[1]*vector[1] + c
-	mat[1][2] = m*vector[1]*vector[2] + vector[0]*s
+	mat[1][0] = m*vector.X*vector.Y - vector.Z*s
+	mat[1][1] = m*vector.Y*vector.Y + c
+	mat[1][2] = m*vector.Y*vector.Z + vector.X*s
 
-	mat[2][0] = m*vector[2]*vector[0] + vector[1]*s
-	mat[2][1] = m*vector[1]*vector[2] - vector[0]*s
-	mat[2][2] = m*vector[2]*vector[2] + c
+	mat[2][0] = m*vector.Z*vector.X + vector.Y*s
+	mat[2][1] = m*vector.Y*vector.Z - vector.X*s
+	mat[2][2] = m*vector.Z*vector.Z + c
 
 	return mat
 
@@ -143,38 +141,41 @@ func (matrix Matrix4) ToQuaternion() *Quaternion {
 }
 
 // Right returns the right-facing rotational component of the Matrix4. For an identity matrix, this would be [1, 0, 0], or +X.
-func (matrix Matrix4) Right() vector.Vector {
-	return vector.Vector{
+func (matrix Matrix4) Right() Vector {
+	return Vector{
 		matrix[0][0],
 		matrix[0][1],
 		matrix[0][2],
+		1,
 	}.Unit()
 }
 
 // Up returns the upward rotational component of the Matrix4. For an identity matrix, this would be [0, 1, 0], or +Y.
-func (matrix Matrix4) Up() vector.Vector {
-	return vector.Vector{
+func (matrix Matrix4) Up() Vector {
+	return Vector{
 		matrix[1][0],
 		matrix[1][1],
 		matrix[1][2],
+		1,
 	}.Unit()
 }
 
 // Forward returns the forward rotational component of the Matrix4. For an identity matrix, this would be [0, 0, 1], or +Z (towards camera).
-func (matrix Matrix4) Forward() vector.Vector {
-	return vector.Vector{
+func (matrix Matrix4) Forward() Vector {
+	return Vector{
 		matrix[2][0],
 		matrix[2][1],
 		matrix[2][2],
+		1,
 	}.Unit()
 }
 
-// Decompose decomposes the Matrix4 and returns three components - the position (a 3D vector.Vector), scale (another 3D vector.Vector), and rotation (an AxisAngle)
+// Decompose decomposes the Matrix4 and returns three components - the position (a 3D Vector), scale (another 3D Vector), and rotation (an AxisAngle)
 // indicated by the Matrix4. Note that this is mainly used when loading a mesh from a 3D modeler - this being the case, it may not be the most precise, and negative
 // scales are not supported.
-func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, Matrix4) {
+func (matrix Matrix4) Decompose() (Vector, Vector, Matrix4) {
 
-	position := vector.Vector{matrix[3][0], matrix[3][1], matrix[3][2]}
+	position := Vector{matrix[3][0], matrix[3][1], matrix[3][2], 1}
 
 	rotation := NewMatrix4()
 	rotation.SetRow(0, matrix.Row(0).Unit())
@@ -183,7 +184,7 @@ func (matrix Matrix4) Decompose() (vector.Vector, vector.Vector, Matrix4) {
 
 	in := matrix.Mult(rotation.Transposed())
 
-	scale := vector.Vector{in.Row(0).Magnitude(), in.Row(1).Magnitude(), in.Row(2).Magnitude()}
+	scale := Vector{in.Row(0).Magnitude(), in.Row(1).Magnitude(), in.Row(2).Magnitude(), 1}
 
 	return position, scale, rotation
 
@@ -221,7 +222,7 @@ func (matrix Matrix4) Transposed() Matrix4 {
 // 	newMat[1][1] *= 1 / s[1]
 // 	newMat[2][2] *= 1 / s[2]
 
-// 	newMat = newMat.SetRow(3, vector.Vector{-p[0], -p[1], -p[2], 1})
+// 	newMat = newMat.SetRow(3, Vector{-p[0], -p[1], -p[2], 1})
 
 // 	return newMat
 
@@ -392,35 +393,41 @@ func (matrix Matrix4) IsIdentity() bool {
 }
 
 // Row returns the indiced row from the Matrix4 as a Vector.
-func (matrix Matrix4) Row(rowIndex int) vector.Vector {
-	vec := vector.Vector{0, 0, 0, 0}
-	for i := range matrix[rowIndex] {
-		vec[i] = matrix[rowIndex][i]
+func (matrix Matrix4) Row(rowIndex int) Vector {
+	vec := Vector{
+		matrix[rowIndex][0],
+		matrix[rowIndex][1],
+		matrix[rowIndex][2],
+		matrix[rowIndex][3],
 	}
 	return vec
 }
 
 // Column returns the indiced column from the Matrix4 as a Vector.
-func (matrix Matrix4) Column(columnIndex int) vector.Vector {
-	vec := vector.Vector{0, 0, 0, 0}
-	for i := range matrix {
-		vec[i] = matrix[i][columnIndex]
+func (matrix Matrix4) Column(columnIndex int) Vector {
+	vec := Vector{
+		matrix[0][columnIndex],
+		matrix[1][columnIndex],
+		matrix[2][columnIndex],
+		matrix[3][columnIndex],
 	}
 	return vec
 }
 
 // SetRow returns a clone of the Matrix4 with the row in rowIndex set to the 4D vector passed.
-func (matrix *Matrix4) SetRow(rowIndex int, vec vector.Vector) {
-	for i := range matrix[rowIndex] {
-		matrix[rowIndex][i] = vec[i]
-	}
+func (matrix *Matrix4) SetRow(rowIndex int, vec Vector) {
+	matrix[rowIndex][0] = vec.X
+	matrix[rowIndex][1] = vec.Y
+	matrix[rowIndex][2] = vec.Z
+	matrix[rowIndex][3] = vec.W
 }
 
 // SetColumn returns a clone of the Matrix4 with the column in columnIndex set to the 4D vector passed.
-func (matrix *Matrix4) SetColumn(columnIndex int, columnData vector.Vector) {
-	for i := range matrix {
-		matrix[i][columnIndex] = columnData[i]
-	}
+func (matrix *Matrix4) SetColumn(columnIndex int, vec Vector) {
+	matrix[0][columnIndex] = vec.X
+	matrix[1][columnIndex] = vec.Y
+	matrix[2][columnIndex] = vec.Z
+	matrix[3][columnIndex] = vec.W
 }
 
 // Rotated returns a clone of the Matrix4 rotated along the local axis by the angle given (in radians). This rotation works as though
@@ -463,25 +470,25 @@ func NewProjectionOrthographic(near, far, right, left, top, bottom float64) Matr
 }
 
 // MultVec multiplies the vector provided by the Matrix4, giving a vector that has been rotated, scaled, or translated as desired.
-func (matrix Matrix4) MultVec(vect vector.Vector) vector.Vector {
+func (matrix Matrix4) MultVec(vect Vector) Vector {
 
-	return vector.Vector{
-
-		matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0],
-		matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1],
-		matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2],
+	return Vector{
+		matrix[0][0]*vect.X + matrix[1][0]*vect.Y + matrix[2][0]*vect.Z + matrix[3][0],
+		matrix[0][1]*vect.X + matrix[1][1]*vect.Y + matrix[2][1]*vect.Z + matrix[3][1],
+		matrix[0][2]*vect.X + matrix[1][2]*vect.Y + matrix[2][2]*vect.Z + matrix[3][2],
+		1,
 	}
 
 }
 
 // MultVecW multiplies the vector provided by the Matrix4, including the fourth (W) component, giving a vector that has been rotated, scaled, or translated as desired.
-func (matrix Matrix4) MultVecW(vect vector.Vector) vector.Vector {
+func (matrix Matrix4) MultVecW(vect Vector) Vector {
 
-	return vector.Vector{
-		matrix[0][0]*vect[0] + matrix[1][0]*vect[1] + matrix[2][0]*vect[2] + matrix[3][0],
-		matrix[0][1]*vect[0] + matrix[1][1]*vect[1] + matrix[2][1]*vect[2] + matrix[3][1],
-		matrix[0][2]*vect[0] + matrix[1][2]*vect[1] + matrix[2][2]*vect[2] + matrix[3][2],
-		matrix[0][3]*vect[0] + matrix[1][3]*vect[1] + matrix[2][3]*vect[2] + matrix[3][3],
+	return Vector{
+		matrix[0][0]*vect.X + matrix[1][0]*vect.Y + matrix[2][0]*vect.Z + matrix[3][0],
+		matrix[0][1]*vect.X + matrix[1][1]*vect.Y + matrix[2][1]*vect.Z + matrix[3][1],
+		matrix[0][2]*vect.X + matrix[1][2]*vect.Y + matrix[2][2]*vect.Z + matrix[3][2],
+		matrix[0][3]*vect.X + matrix[1][3]*vect.Y + matrix[2][3]*vect.Z + matrix[3][3],
 	}
 
 }
@@ -618,15 +625,14 @@ func (matrix Matrix4) String() string {
 
 // NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. to is the target's world position,
 // from is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
-func NewLookAtMatrix(from, to, up vector.Vector) Matrix4 {
+func NewLookAtMatrix(from, to, up Vector) Matrix4 {
 	z := to.Sub(from).Unit()
-	x, _ := up.Cross(z)
-	x = x.Unit()
-	y, _ := z.Cross(x)
+	x := up.Cross(z).Unit()
+	y := z.Cross(x)
 	return Matrix4{
-		{x[0], x[1], x[2], 0},
-		{y[0], y[1], y[2], 0},
-		{z[0], z[1], z[2], 0},
+		{x.X, x.Y, x.Z, 0},
+		{y.X, y.Y, y.Z, 0},
+		{z.X, z.Y, z.Z, 0},
 		{0, 0, 0, 1},
 	}
 }

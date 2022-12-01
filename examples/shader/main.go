@@ -33,7 +33,7 @@ type Game struct {
 	DrawDebugText     bool
 	DrawDebugDepth    bool
 	Time              float64
-	PrevMousePosition vector.Vector
+	PrevMousePosition Vector
 }
 
 func NewGame() *Game {
@@ -41,7 +41,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             796,
 		Height:            448,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 		DrawDebugText:     true,
 	}
 
@@ -83,14 +83,14 @@ func (g *Game) Init() {
 
 	// ... And here we specify a "vertex program" - in truth, this operates on CPU, rather than the GPU, but it still is useful.
 	// Much like a Fragment shader, it operates on all vertices that render with the material.
-	model.VertexTransformFunction = func(v vector.Vector, id int) vector.Vector {
+	model.VertexTransformFunction = func(v Vector, id int) Vector {
 		waveHeight := 0.1
 		v[1] += math.Sin(g.Time*math.Pi+v[0])*waveHeight + (waveHeight / 2)
 		return v
 	}
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 2, 5})
+	g.Camera.SetLocalPositionVec(Vector{0, 2, 5})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -148,7 +148,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 

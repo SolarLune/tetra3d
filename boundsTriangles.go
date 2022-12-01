@@ -2,8 +2,6 @@ package tetra3d
 
 import (
 	"math"
-
-	"github.com/kvartborg/vector"
 )
 
 // BoundingTriangles is a Node specifically for detecting a collision between any of the triangles from a mesh instance and another BoundingObject.
@@ -107,7 +105,7 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
-				vector.In(inter.Normal).Invert()
+				inter.Normal = inter.Normal.Invert()
 			}
 			intersection.BoundingObject = otherBounds
 		}
@@ -118,7 +116,7 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
-				vector.In(inter.Normal).Invert()
+				inter.Normal = inter.Normal.Invert()
 			}
 			intersection.BoundingObject = otherBounds
 		}
@@ -132,7 +130,7 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
-				vector.In(inter.Normal).Invert()
+				inter.Normal = inter.Normal.Invert()
 			}
 			intersection.BoundingObject = otherBounds
 		}
@@ -162,11 +160,8 @@ func (bt *BoundingTriangles) CollisionTest(dx, dy, dz float64, others ...INode) 
 // collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
 // object.
 // Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
-func (bt *BoundingTriangles) CollisionTestVec(moveVec vector.Vector, others ...INode) []*Collision {
-	if moveVec == nil {
-		return commonCollisionTest(bt, 0, 0, 0, others...)
-	}
-	return commonCollisionTest(bt, moveVec[0], moveVec[1], moveVec[2], others...)
+func (bt *BoundingTriangles) CollisionTestVec(moveVec Vector, others ...INode) []*Collision {
+	return commonCollisionTest(bt, moveVec.X, moveVec.Y, moveVec.Z, others...)
 }
 
 // Type returns the NodeType for this object.
@@ -175,42 +170,36 @@ func (bt *BoundingTriangles) Type() NodeType {
 }
 
 type collisionPlane struct {
-	Normal     vector.Vector
-	Distance   float64
-	VectorPool *VectorPool
+	Normal   Vector
+	Distance float64
 }
 
 func newCollisionPlane() *collisionPlane {
-	return &collisionPlane{
-		VectorPool: NewVectorPool(16, false),
-	}
+	return &collisionPlane{}
 }
 
-func (plane *collisionPlane) Set(v0, v1, v2 vector.Vector) {
+func (plane *collisionPlane) Set(v0, v1, v2 Vector) {
 
-	first := plane.VectorPool.Sub(v1, v0)
-	second := plane.VectorPool.Sub(v2, v0)
-	normal := plane.VectorPool.Cross(first, second)
-	vector.In(normal).Unit()
-	distance := dot(normal, v0)
+	first := v1.Sub(v0)
+	second := v2.Sub(v0)
+	normal := first.Cross(second).Unit()
+	distance := normal.Dot(v0)
 
 	plane.Normal = normal
 	plane.Distance = distance
 
 }
 
-func (plane *collisionPlane) ClosestPoint(point vector.Vector) vector.Vector {
+func (plane *collisionPlane) ClosestPoint(point Vector) Vector {
 
-	dist := dot(plane.Normal, point) - plane.Distance
-	return plane.VectorPool.Sub(point, plane.Normal.Scale(dist))
+	dist := plane.Normal.Dot(point) - plane.Distance
+	return point.Sub(plane.Normal.Scale(dist))
 
 }
 
 var colPlane = newCollisionPlane()
 
-func closestPointOnTri(point, v0, v1, v2 vector.Vector) vector.Vector {
-
-	colPlane.VectorPool.Reset()
+func closestPointOnTri(point, v0, v1, v2 Vector) Vector {
 
 	colPlane.Set(v0, v1, v2)
 	if planePoint := colPlane.ClosestPoint(point); colPlane.pointInsideTriangle(planePoint, v0, v1, v2) {
@@ -222,10 +211,10 @@ func closestPointOnTri(point, v0, v1, v2 vector.Vector) vector.Vector {
 	ca := colPlane.closestPointOnLine(point, v2, v0)
 
 	closest := ab
-	closestDist := fastVectorDistanceSquared(point, ab)
+	closestDist := point.DistanceSquared(ab)
 
-	bcDist := fastVectorDistanceSquared(point, bc)
-	caDist := fastVectorDistanceSquared(point, ca)
+	bcDist := point.DistanceSquared(bc)
+	caDist := point.DistanceSquared(ca)
 
 	if bcDist < closestDist {
 		closest = bc
@@ -240,18 +229,18 @@ func closestPointOnTri(point, v0, v1, v2 vector.Vector) vector.Vector {
 
 }
 
-func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 vector.Vector) bool {
+func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 Vector) bool {
 
-	ca := plane.VectorPool.Sub(v2, v0)
-	ba := plane.VectorPool.Sub(v1, v0)
-	pa := plane.VectorPool.Sub(point, v0)
+	ca := v2.Sub(v0)
+	ba := v1.Sub(v0)
+	pa := point.Sub(v0)
 
-	dot00 := dot(ca, ca)
-	dot01 := dot(ca, ba)
-	dot02 := dot(ca, pa)
+	dot00 := ca.Dot(ca)
+	dot01 := ca.Dot(ba)
+	dot02 := ca.Dot(pa)
 
-	dot11 := dot(ba, ba)
-	dot12 := dot(ba, pa)
+	dot11 := ba.Dot(ba)
+	dot12 := ba.Dot(pa)
 
 	invDenom := 1.0 / ((dot00 * dot11) - (dot01 * dot01))
 	u := ((dot11 * dot02) - (dot01 * dot12)) * invDenom
@@ -261,21 +250,18 @@ func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 vector.Vector
 
 }
 
-func (plane *collisionPlane) closestPointOnLine(point, start, end vector.Vector) vector.Vector {
+func (plane *collisionPlane) closestPointOnLine(point, start, end Vector) Vector {
 
-	diff := plane.VectorPool.Sub(end, start)
-	dotA := dot(plane.VectorPool.Sub(point, start), diff)
-	dotB := dot(diff, diff)
+	diff := end.Sub(start)
+	dotA := point.Sub(start).Dot(diff)
+	dotB := diff.Dot(diff)
 	d := dotA / dotB
 	if d > 1 {
 		d = 1
 	} else if d < 0 {
 		d = 0
 	}
-	diff[0] *= d
-	diff[1] *= d
-	diff[2] *= d
 
-	return plane.VectorPool.Add(start, diff)
+	return start.Add(diff.Scale(d))
 
 }

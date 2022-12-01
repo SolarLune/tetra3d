@@ -2,13 +2,11 @@ package tetra3d
 
 import (
 	"strconv"
-
-	"github.com/kvartborg/vector"
 )
 
 type IPath interface {
 	Distance() float64
-	points() []vector.Vector
+	points() []Vector
 	isClosed() bool
 }
 
@@ -106,7 +104,7 @@ func (navigator *Navigator) AdvanceDistance(distance float64) {
 }
 
 // WorldPosition returns the position of the PathFollower in world space.
-func (navigator *Navigator) WorldPosition() vector.Vector {
+func (navigator *Navigator) WorldPosition() Vector {
 
 	totalDistance := navigator.Path.Distance()
 	d := navigator.Percentage
@@ -114,7 +112,7 @@ func (navigator *Navigator) WorldPosition() vector.Vector {
 	points := navigator.Path.points()
 
 	if len(points) == 0 {
-		return nil
+		return NewVectorZero()
 	}
 
 	if len(points) == 1 {
@@ -140,16 +138,16 @@ func (navigator *Navigator) WorldPosition() vector.Vector {
 }
 
 // TouchingNode returns if a Navigator is within a distance of margin units to a point in a Grid or Path. If it is not within that distance, TouchingNode returns nil.
-func (navigator *Navigator) TouchingNode(margin float64) vector.Vector {
+func (navigator *Navigator) TouchingNode(margin float64) (point Vector, touching bool) {
 
 	wp := navigator.WorldPosition()
 	for _, p := range navigator.Path.points() {
 		if p.Sub(wp).Magnitude() <= margin {
-			return p
+			return p, true
 		}
 	}
 
-	return nil
+	return Vector{}, false
 
 }
 
@@ -193,7 +191,7 @@ type Path struct {
 
 // NewPath returns a new Path object. A Path is a Node whose children represent points on a path. A Path can be stepped through
 // spatially using a PathFollower. The passed point vectors will become Nodes, children of the Path.
-func NewPath(name string, points ...vector.Vector) *Path {
+func NewPath(name string, points ...Vector) *Path {
 	path := &Path{
 		Node: NewNode(name),
 	}
@@ -243,8 +241,8 @@ func (path *Path) Distance() float64 {
 	return dist
 }
 
-func (path *Path) points() []vector.Vector {
-	points := make([]vector.Vector, 0, len(path.Children()))
+func (path *Path) points() []Vector {
+	points := make([]Vector, 0, len(path.Children()))
 	for _, c := range path.children {
 		points = append(points, c.WorldPosition())
 	}

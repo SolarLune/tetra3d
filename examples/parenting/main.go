@@ -30,7 +30,7 @@ type Game struct {
 	Camera            *tetra3d.Camera
 	CameraTilt        float64
 	CameraRotate      float64
-	PrevMousePosition vector.Vector
+	PrevMousePosition Vector
 
 	DrawDebugText      bool
 	DrawDebugDepth     bool
@@ -43,7 +43,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             398,
 		Height:            224,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 		DrawDebugText:     true,
 	}
 
@@ -75,15 +75,15 @@ func (g *Game) Init() {
 	mat.Texture = loadImage(testImageData)
 
 	parent := tetra3d.NewModel(cubeMesh, "parent")
-	parent.SetLocalPositionVec(vector.Vector{0, -3, 0})
+	parent.SetLocalPositionVec(Vector{0, -3, 0})
 
 	child := tetra3d.NewModel(cubeMesh, "child")
-	child.SetLocalPositionVec(vector.Vector{10, 2, 0})
+	child.SetLocalPositionVec(Vector{10, 2, 0})
 
 	g.Scene.Root.AddChildren(parent, child)
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 0, 15})
+	g.Camera.SetLocalPositionVec(Vector{0, 0, 15})
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -131,7 +131,7 @@ func (g *Game) Update() error {
 	parent.SetLocalPositionVec(position)
 
 	if ebiten.IsKeyPressed(ebiten.KeyG) {
-		child.SetWorldPositionVec(vector.Vector{10, 2, 0})
+		child.SetWorldPositionVec(Vector{10, 2, 0})
 		child.SetWorldRotation(tetra3d.NewMatrix4Rotate(0, 1, 0, 0))
 	}
 
@@ -189,7 +189,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 

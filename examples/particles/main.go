@@ -31,7 +31,7 @@ type Game struct {
 
 	DrawDebugText     bool
 	DrawDebugDepth    bool
-	PrevMousePosition vector.Vector
+	PrevMousePosition Vector
 
 	Time float64
 
@@ -44,7 +44,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             786,
 		Height:            448,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 		DrawDebugText:     true,
 		CamLocked:         true,
 	}
@@ -145,12 +145,12 @@ func (g *Game) Init() {
 	// Similarly to the field system, the ring system spawns particles in a different manner - we want them to spawn in a ring that spins.
 	// To do this, we'll make use of a vector that controls how far out the particles spawn, and then rotate that ring after each spawn.
 
-	ring := vector.Vector{4, 0, 0}
+	ring := Vector{4, 0, 0}
 
 	settings.SpawnOffsetFunction = func(particle *tetra3d.Particle) {
 		particle.Model.MoveVec(ring)
 		// 181 degrees here because 1: we're slowly spinning the ring by 1 degree, and 2: we're spawning two rings (so we spin the ring by 180 degrees)
-		ring = ring.Rotate(tetra3d.ToRadians(181), vector.Vector{0, 1, 0})
+		ring = ring.Rotate(tetra3d.ToRadians(181), Vector{0, 1, 0})
 	}
 
 	settings.SpawnOffset.SetRanges(-0.1, 0.1)
@@ -173,7 +173,7 @@ func (g *Game) Init() {
 	// And that's about it!
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 2, 5})
+	g.Camera.SetLocalPositionVec(Vector{0, 2, 5})
 	g.Scene.Root.AddChildren(g.Camera)
 
 }
@@ -235,7 +235,7 @@ func (g *Game) Update() error {
 
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
 		g.CamLocked = !g.CamLocked

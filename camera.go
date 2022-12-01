@@ -10,7 +10,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text"
-	"github.com/kvartborg/vector"
 	"golang.org/x/image/font/basicfont"
 )
 
@@ -64,16 +63,15 @@ type Camera struct {
 
 	DebugInfo DebugInfo
 
-	backfacePool             *VectorPool
 	depthShader              *ebiten.Shader
 	clipAlphaCompositeShader *ebiten.Shader
 	clipAlphaRenderShader    *ebiten.Shader
 	colorShader              *ebiten.Shader
 
 	// Visibility check variables
-	cameraForward          vector.Vector
-	cameraRight            vector.Vector
-	cameraUp               vector.Vector
+	cameraForward          Vector
+	cameraRight            Vector
+	cameraUp               Vector
 	sphereFactorY          float64
 	sphereFactorX          float64
 	sphereFactorTang       float64
@@ -89,7 +87,6 @@ func NewCamera(w, h int) *Camera {
 		Near:        0.1,
 		Far:         100,
 
-		backfacePool:          NewVectorPool(3, false),
 		AccumulateDrawOptions: &ebiten.DrawImageOptions{},
 	}
 
@@ -310,7 +307,8 @@ func (camera *Camera) Resize(w, h int) {
 // ViewMatrix returns the Camera's view matrix.
 func (camera *Camera) ViewMatrix() Matrix4 {
 
-	transform := NewMatrix4Translate(-camera.WorldPosition()[0], -camera.WorldPosition()[1], -camera.WorldPosition()[2])
+	camPos := camera.WorldPosition().Invert()
+	transform := NewMatrix4Translate(camPos.X, camPos.Y, camPos.Z)
 
 	// We invert the rotation because the Camera is looking down -Z
 	transform = transform.Mult(camera.WorldRotation().Transposed())
@@ -355,10 +353,10 @@ func (camera *Camera) SetOrthographic(orthoScale float64) {
 }
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
-// does this by taking outVec, a vertex (vector.Vector) that it stores the values in and returns, which avoids reallocation.
-func (camera *Camera) clipToScreen(vert, outVec vector.Vector, vertID int, model *Model, width, height float64) vector.Vector {
+// does this by taking outVec, a vertex (Vector) that it stores the values in and returns, which avoids reallocation.
+func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width, height float64) Vector {
 
-	v3 := vert[3]
+	v3 := vert.W
 
 	if !camera.Perspective {
 		v3 = 1.0
@@ -372,41 +370,41 @@ func (camera *Camera) clipToScreen(vert, outVec vector.Vector, vertID int, model
 
 	// Again, this function should only be called with pre-transformed 4D vertex arguments.
 
-	outVec[0] = (vert[0]/v3)*width + (width / 2)
-	outVec[1] = (vert[1]/v3*-1)*height + (height / 2)
-	outVec[2] = vert[2] / v3
-	outVec[3] = 1
+	vert.X = (vert.X/v3)*width + (width / 2)
+	vert.Y = (vert.Y/v3*-1)*height + (height / 2)
+	vert.Z = vert.Z / v3
+	vert.W = 1
 
 	if model != nil && model.VertexClipFunction != nil {
-		model.VertexClipFunction(outVec, vertID)
+		vert = model.VertexClipFunction(vert, vertID)
 	}
 
-	return outVec
+	return vert
 
 }
 
 // ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
-func (camera *Camera) ClipToScreen(vert vector.Vector) vector.Vector {
+func (camera *Camera) ClipToScreen(vert Vector) Vector {
 	width, height := camera.resultColorTexture.Size()
-	return camera.clipToScreen(vert, vector.Vector{0, 0, 0, 0}, 0, nil, float64(width), float64(height))
+	return camera.clipToScreen(vert, 0, nil, float64(width), float64(height))
 }
 
 // WorldToScreen transforms a 3D position in the world to screen coordinates.
-func (camera *Camera) WorldToScreen(vert vector.Vector) vector.Vector {
-	v := NewMatrix4Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
-	return camera.ClipToScreen(v.MultVecW(vector.Vector{0, 0, 0}))
+func (camera *Camera) WorldToScreen(vert Vector) Vector {
+	v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
+	return camera.ClipToScreen(v.MultVecW(NewVectorZero()))
 }
 
 // WorldToClip transforms a 3D position in the world to clip coordinates (before screen normalization).
-func (camera *Camera) WorldToClip(vert vector.Vector) vector.Vector {
-	v := NewMatrix4Translate(vert[0], vert[1], vert[2]).Mult(camera.ViewMatrix().Mult(camera.Projection()))
-	return v.MultVecW(vector.Vector{0, 0, 0})
+func (camera *Camera) WorldToClip(vert Vector) Vector {
+	v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
+	return v.MultVecW(NewVectorZero())
 }
 
 // PointInFrustum returns true if the point is visible through the camera frustum.
-func (camera *Camera) PointInFrustum(point vector.Vector) bool {
+func (camera *Camera) PointInFrustum(point Vector) bool {
 
-	diff := fastVectorSub(point, camera.WorldPosition())
+	diff := point.Sub(camera.WorldPosition())
 	pcZ := diff.Dot(camera.cameraForward)
 	aspectRatio := camera.AspectRatio()
 
@@ -460,8 +458,8 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 
 	radius := sphere.WorldRadius()
 
-	diff := fastVectorSub(sphere.WorldPosition(), camera.WorldPosition())
-	pcZ := dot(diff, camera.cameraForward)
+	diff := sphere.WorldPosition().Sub(camera.WorldPosition())
+	pcZ := diff.Dot(camera.cameraForward)
 
 	if pcZ > camera.Far+radius || pcZ < camera.Near-radius {
 		return false
@@ -472,7 +470,7 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 		d := camera.sphereFactorY * radius
 		pcZ *= camera.sphereFactorTang
 
-		pcY := dot(diff, camera.cameraUp)
+		pcY := diff.Dot(camera.cameraUp)
 
 		if pcY > pcZ+d || pcY < -pcZ-d {
 			return false
@@ -481,7 +479,7 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 		pcZ *= camera.AspectRatio()
 		d = camera.sphereFactorX * radius
 
-		pcX := dot(diff, camera.cameraRight)
+		pcX := diff.Dot(camera.cameraRight)
 
 		if pcX > pcZ+d || pcX < -pcZ-d {
 			return false
@@ -492,13 +490,13 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 		width := camera.OrthoScale
 		height := width / camera.AspectRatio()
 
-		pcY := dot(diff, camera.cameraUp)
+		pcY := diff.Dot(camera.cameraUp)
 
 		if -height/2-radius > pcY || pcY > height/2+radius {
 			return false
 		}
 
-		pcX := dot(diff, camera.cameraRight)
+		pcX := diff.Dot(camera.cameraRight)
 
 		if -width/2-radius > pcX || pcX > width/2+radius {
 			return false
@@ -669,7 +667,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	}
 
 	// Reusing vectors rather than reallocating for all triangles for all models
-	clipped := vector.Vector{0, 0, 0, 0}
+	clipped := Vector{0, 0, 0, 0}
 
 	solids := []renderPair{}
 	transparents := []renderPair{}
@@ -696,7 +694,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 						continue
 					}
 
-					dynamicDepths[child] = camera.WorldToScreen(child.WorldPosition())[2]
+					dynamicDepths[child] = camera.WorldToScreen(child.WorldPosition()).Z
 
 					if !transparent {
 
@@ -719,11 +717,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				if transparent {
 					transparents = append(transparents, renderPair{model, meshPart})
-					depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
+					depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
 				} else {
 					solids = append(solids, renderPair{model, meshPart})
 					if !camera.RenderDepth {
-						depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
+						depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
 					}
 				}
 
@@ -743,7 +741,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 
 			if !camera.RenderDepth || modelIsTransparent {
-				depths[model] = camera.WorldToScreen(model.WorldPosition())[2]
+				depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
 			}
 
 		}
@@ -864,12 +862,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				// Skip calculating lighting for objects that are too far away from light sources.
 				if point, ok := light.(*PointLight); ok && point.Distance > 0 {
 					dist := maxSpan + point.Distance
-					if fastVectorDistanceSquared(modelPos, point.WorldPosition()) > dist*dist {
+					if modelPos.DistanceSquared(point.WorldPosition()) > dist*dist {
 						continue
 					}
 				} else if cube, ok := light.(*CubeLight); ok && cube.Distance > 0 {
 					dist := maxSpan + cube.Distance
-					if fastVectorDistanceSquared(modelPos, cube.WorldPosition()) > dist*dist {
+					if modelPos.DistanceSquared(cube.WorldPosition()) > dist*dist {
 						continue
 					}
 				}
@@ -895,7 +893,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				// triIndex := meshPart.sortingTriangles[t].ID
 				// tri := meshPart.Mesh.Triangles[triIndex]
 
-				clipped = camera.clipToScreen(meshPart.Mesh.vertexTransforms[vertIndex], clipped, vertIndex, model, float64(camWidth), float64(camHeight))
+				clipped = camera.clipToScreen(meshPart.Mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight))
 
 				// if visible {
 				// 	renderedAnything = trueForEachVertexIndex
@@ -903,11 +901,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				// meshPart.sortingTriangles[t].rendered = visible
 
-				colorVertexList[vertexListIndex].DstX = float32(clipped[0])
-				colorVertexList[vertexListIndex].DstY = float32(clipped[1])
+				colorVertexList[vertexListIndex].DstX = float32(clipped.X)
+				colorVertexList[vertexListIndex].DstY = float32(clipped.Y)
 
-				depthVertexList[vertexListIndex].DstX = float32(clipped[0])
-				depthVertexList[vertexListIndex].DstY = float32(clipped[1])
+				depthVertexList[vertexListIndex].DstX = float32(clipped.X)
+				depthVertexList[vertexListIndex].DstY = float32(clipped.Y)
 
 				depthVertexList[vertexListIndex].ColorR = 1
 				depthVertexList[vertexListIndex].ColorG = 1
@@ -915,10 +913,10 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				depthVertexList[vertexListIndex].ColorA = 1
 
 				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
-				uvU := float32(mesh.VertexUVs[vertIndex][0] * srcW)
+				uvU := float32(mesh.VertexUVs[vertIndex].X * srcW)
 				// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
 				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
-				uvV := float32((1 - mesh.VertexUVs[vertIndex][1]) * srcH)
+				uvV := float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
 
 				colorVertexList[vertexListIndex].SrcX = uvU
 				colorVertexList[vertexListIndex].SrcY = uvV
@@ -948,7 +946,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
 					margin := 1.0
-					depth := mesh.vertexTransforms[vertIndex][2] / (far + margin)
+					depth := mesh.vertexTransforms[vertIndex].Z / (far + margin)
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -971,7 +969,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
-					depth := float32((mesh.vertexTransforms[vertIndex][2]+near)/far + 0.03)
+					depth := float32((mesh.vertexTransforms[vertIndex].Z+near)/far + 0.03)
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -1228,7 +1226,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 }
 
-func (camera *Camera) drawCircle(screen *ebiten.Image, position vector.Vector, radius float64, drawColor color.Color) {
+func (camera *Camera) drawCircle(screen *ebiten.Image, position Vector, radius float64, drawColor color.Color) {
 
 	transformedCenter := camera.WorldToScreen(position)
 
@@ -1242,7 +1240,7 @@ func (camera *Camera) drawCircle(screen *ebiten.Image, position vector.Vector, r
 		x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
 		y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
 
-		ebitenutil.DrawLine(screen, transformedCenter[0]+x, transformedCenter[1]+y, transformedCenter[0]+x2, transformedCenter[1]+y2, drawColor)
+		ebitenutil.DrawLine(screen, transformedCenter.X+x, transformedCenter.Y+y, transformedCenter.X+x2, transformedCenter.Y+y2, drawColor)
 	}
 
 }
@@ -1313,17 +1311,17 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 					v1 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[1]])
 					v2 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[2]])
 
-					if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
-						(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
-						(v0[0] > float64(camWidth) && v1[0] > float64(camWidth) && v2[0] > float64(camWidth)) ||
-						(v0[1] > float64(camHeight) && v1[1] > float64(camHeight) && v2[1] > float64(camHeight)) {
+					if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
+						(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
+						(v0.X > float64(camWidth) && v1.X > float64(camWidth) && v2.X > float64(camWidth)) ||
+						(v0.Y > float64(camHeight) && v1.Y > float64(camHeight) && v2.Y > float64(camHeight)) {
 						return
 					}
 
 					c := color.ToRGBA64()
-					ebitenutil.DrawLine(screen, float64(v0[0]), float64(v0[1]), float64(v1[0]), float64(v1[1]), c)
-					ebitenutil.DrawLine(screen, float64(v1[0]), float64(v1[1]), float64(v2[0]), float64(v2[1]), c)
-					ebitenutil.DrawLine(screen, float64(v2[0]), float64(v2[1]), float64(v0[0]), float64(v0[1]), c)
+					ebitenutil.DrawLine(screen, float64(v0.X), float64(v0.Y), float64(v1.X), float64(v1.Y), c)
+					ebitenutil.DrawLine(screen, float64(v1.X), float64(v1.Y), float64(v2.X), float64(v2.Y), c)
+					ebitenutil.DrawLine(screen, float64(v2.X), float64(v2.Y), float64(v0.X), float64(v0.Y), c)
 
 				})
 
@@ -1338,17 +1336,17 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 			for i := 0; i < len(points)-1; i++ {
 				p1 := camera.WorldToScreen(points[i].WorldPosition())
 				p2 := camera.WorldToScreen(points[i+1].WorldPosition())
-				ebitenutil.DrawLine(screen, p1[0], p1[1], p2[0], p2[1], color.ToRGBA64())
+				ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
 			}
 
 		} else if grid, isGrid := m.(*Grid); isGrid {
 
 			for _, point := range grid.Points() {
 				p1 := camera.WorldToScreen(point.WorldPosition())
-				ebitenutil.DrawCircle(screen, p1[0], p1[1], 8, color.ToRGBA64())
+				ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.ToRGBA64())
 				for _, connection := range point.Connections {
 					p2 := camera.WorldToScreen(connection.WorldPosition())
-					ebitenutil.DrawLine(screen, p1[0], p1[1], p2[0], p2[1], color.ToRGBA64())
+					ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
 				}
 			}
 
@@ -1387,7 +1385,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 					screenPos := camera.WorldToScreen(model.Transform().MultVec(sortingTri.Triangle.Center))
 
-					camera.DebugDrawText(screen, fmt.Sprintf("%d", triIndex), screenPos[0], screenPos[1]+(textScale*16), textScale, color)
+					camera.DebugDrawText(screen, fmt.Sprintf("%d", triIndex), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 				}
 
@@ -1420,7 +1418,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 			screenPos := camera.WorldToScreen(model.WorldPosition())
 
-			camera.DebugDrawText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos[0], screenPos[1]+(textScale*16), textScale, color)
+			camera.DebugDrawText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 		}
 
@@ -1451,7 +1449,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 
 				center := camera.WorldToScreen(model.Transform().MultVecW(tri.Center))
 				transformedNormal := camera.WorldToScreen(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(normalLength))))
-				ebitenutil.DrawLine(screen, center[0], center[1], transformedNormal[0], transformedNormal[1], color.ToRGBA64())
+				ebitenutil.DrawLine(screen, center.X, center.Y, transformedNormal.X, transformedNormal.Y, color.ToRGBA64())
 
 			}
 
@@ -1480,7 +1478,7 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 		if node.Parent() != nil && node.Parent() != node.Root() {
 			parentPos := camera.WorldToScreen(node.Parent().WorldPosition())
 			pos := camera.WorldToScreen(node.WorldPosition())
-			ebitenutil.DrawLine(screen, pos[0], pos[1], parentPos[0], parentPos[1], c)
+			ebitenutil.DrawLine(screen, pos.X, pos.Y, parentPos.X, parentPos.Y, c)
 		}
 
 	}
@@ -1586,7 +1584,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 					df := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(radius)))
 					db := camera.WorldToScreen(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(-radius)))
 
-					lines := []vector.Vector{
+					lines := []Vector{
 						u, ur, dr, d, dl, ul,
 						u, uf, df, d, db, ub, u,
 						ul, uf, ur, ub, ul,
@@ -1601,7 +1599,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
-						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], capsuleColor.ToRGBA64())
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, capsuleColor.ToRGBA64())
 
 					}
 
@@ -1614,17 +1612,17 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 					pos := bounds.WorldPosition()
 					size := bounds.Dimensions.Size().Scale(0.5)
 
-					ufr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], size[2]}))
-					ufl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], size[2]}))
-					ubr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], size[1], -size[2]}))
-					ubl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], size[1], -size[2]}))
+					ufr := camera.WorldToScreen(pos.Add(Vector{size.X, size.Y, size.Z, 0}))
+					ufl := camera.WorldToScreen(pos.Add(Vector{-size.X, size.Y, size.Z, 0}))
+					ubr := camera.WorldToScreen(pos.Add(Vector{size.X, size.Y, -size.Z, 0}))
+					ubl := camera.WorldToScreen(pos.Add(Vector{-size.X, size.Y, -size.Z, 0}))
 
-					dfr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], -size[1], size[2]}))
-					dfl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], -size[1], size[2]}))
-					dbr := camera.WorldToScreen(pos.Add(vector.Vector{size[0], -size[1], -size[2]}))
-					dbl := camera.WorldToScreen(pos.Add(vector.Vector{-size[0], -size[1], -size[2]}))
+					dfr := camera.WorldToScreen(pos.Add(Vector{size.X, -size.Y, size.Z, 0}))
+					dfl := camera.WorldToScreen(pos.Add(Vector{-size.X, -size.Y, size.Z, 0}))
+					dbr := camera.WorldToScreen(pos.Add(Vector{size.X, -size.Y, -size.Z, 0}))
+					dbl := camera.WorldToScreen(pos.Add(Vector{-size.X, -size.Y, -size.Z, 0}))
 
-					lines := []vector.Vector{
+					lines := []Vector{
 						ufr, ufl, ubl, ubr, ufr,
 						dfr, dfl, dbl, dbr, dfr,
 						ufr, ufl, dfl, dbl, ubl, ubr, dbr,
@@ -1638,7 +1636,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
-						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], aabbColor.ToRGBA64())
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, aabbColor.ToRGBA64())
 
 					}
 
@@ -1658,7 +1656,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 					camWidth, camHeight := camera.resultColorTexture.Size()
 
-					lines := []vector.Vector{}
+					lines := []Vector{}
 
 					mesh := bounds.Mesh
 
@@ -1670,10 +1668,10 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 						v1 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]))
 						v2 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]))
 
-						if (v0[0] < 0 && v1[0] < 0 && v2[0] < 0) ||
-							(v0[1] < 0 && v1[1] < 0 && v2[1] < 0) ||
-							(v0[0] > float64(camWidth) && v1[0] > float64(camWidth) && v2[0] > float64(camWidth)) ||
-							(v0[1] > float64(camHeight) && v1[1] > float64(camHeight) && v2[1] > float64(camHeight)) {
+						if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
+							(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
+							(v0.X > float64(camWidth) && v1.X > float64(camWidth) && v2.X > float64(camWidth)) ||
+							(v0.Y > float64(camHeight) && v1.Y > float64(camHeight) && v2.Y > float64(camHeight)) {
 							continue
 						}
 
@@ -1691,15 +1689,15 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
-						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, triColor)
 
 						start = lines[i+1]
 						end = lines[i+2]
-						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, triColor)
 
 						start = lines[i+2]
 						end = lines[i]
-						ebitenutil.DrawLine(screen, start[0], start[1], end[0], end[1], triColor)
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, triColor)
 
 					}
 
@@ -1766,7 +1764,7 @@ func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, c
 
 	debugIcosphere.SetLocalPositionVec(sphere.WorldPosition())
 	s := sphere.WorldRadius()
-	debugIcosphere.SetLocalScaleVec(vector.Vector{s, s, s})
+	debugIcosphere.SetLocalScaleVec(Vector{s, s, s, 0})
 	debugIcosphere.Transform()
 	camera.DrawDebugWireframe(screen, debugIcosphere, color)
 

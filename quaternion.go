@@ -170,7 +170,7 @@ func (quat *Quaternion) ToMatrix4() Matrix4 {
 	return m1.Mult(m2)
 }
 
-// func NewLookAtQuaternion(from, to, up vector.Vector) *Quaternion {
+// func NewLookAtQuaternion(from, to, up Vector) *Quaternion {
 // 	// Cribbed from StackOverflow: https://stackoverflow.com/questions/12435671/quaternion-lookat-function
 
 // 	forward := to.Sub(from).Unit()
@@ -192,7 +192,7 @@ func (quat *Quaternion) ToMatrix4() Matrix4 {
 // 	return NewQuaternionFromAxisAngle(rotAxis, rotAngle)
 // }
 
-// func NewQuaternionFromAxisAngle(axis vector.Vector, angle float64) *Quaternion {
+// func NewQuaternionFromAxisAngle(axis Vector, angle float64) *Quaternion {
 // 	// Also cribbed from StackOverflow whoops
 // 	halfAngle := angle * .5
 // 	s := math.Sin(halfAngle)
@@ -216,12 +216,12 @@ func (quat *Quaternion) ToMatrix4() Matrix4 {
 
 // }
 
-// func NewLookAtQuaternion(from, to, up vector.Vector) *Quaternion {
+// func NewLookAtQuaternion(from, to, up Vector) *Quaternion {
 // 	fmt.Println("mat: ", NewLookAtMatrix(from, to, up))
 // 	return NewLookAtMatrix(from, to, up).ToQuaternion()
 // }
 
-// func NewLookAtQuaternion(from, to, up vector.Vector) *Quaternion {
+// func NewLookAtQuaternion(from, to, up Vector) *Quaternion {
 
 // 	forward := to.Sub(from).Unit()
 // 	right, _ := forward.Cross(up)
@@ -310,7 +310,7 @@ func (quat *Quaternion) ToMatrix4() Matrix4 {
 
 // }
 
-// func NewLookAtQuaternion(from, to, up vector.Vector) *Quaternion {
+// func NewLookAtQuaternion(from, to, up Vector) *Quaternion {
 // 	// Cribbed from StackOverflow: https://stackoverflow.com/questions/12435671/quaternion-lookat-function
 // 	diff := to.Sub(from).Unit()
 
@@ -330,7 +330,7 @@ func (quat *Quaternion) ToMatrix4() Matrix4 {
 
 // }
 
-// func NewQuaternionFromAxisAngle(axis vector.Vector, angle float64) *Quaternion {
+// func NewQuaternionFromAxisAngle(axis Vector, angle float64) *Quaternion {
 // 	// Also cribbed from the same StackOverflow site whoops
 // 	s := math.Sin(angle / 2)
 // 	axis = axis.Unit()

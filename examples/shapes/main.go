@@ -37,14 +37,14 @@ type Game struct {
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
 	DrawDebugNormals   bool
-	PrevMousePosition  vector.Vector
+	PrevMousePosition  Vector
 }
 
 func NewGame() *Game {
 	game := &Game{
 		Width:             796,
 		Height:            448,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 		DrawDebugText:     true,
 	}
 
@@ -122,7 +122,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the g.Camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 

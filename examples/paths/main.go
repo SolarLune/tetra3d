@@ -37,7 +37,7 @@ type Game struct {
 	DrawDebugText      bool
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
-	PrevMousePosition  vector.Vector
+	PrevMousePosition  Vector
 }
 
 //go:embed paths.gltf
@@ -47,7 +47,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             796,
 		Height:            448,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 		DrawDebugText:     true,
 		AutoAdvance:       true,
 	}
@@ -70,7 +70,7 @@ func (g *Game) Init() {
 	g.Scene = library.ExportedScene.Clone()
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 10})
+	g.Camera.SetLocalPositionVec(Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	g.PathFollower = tetra3d.NewNavigator(g.Scene.Root.Get("Path").(*tetra3d.Path))
@@ -147,7 +147,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 

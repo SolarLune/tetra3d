@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
 )
 
 // Model represents a singular visual instantiation of a Mesh. A Mesh contains the vertex information (what to draw); a Model references the Mesh to draw it with a specific
@@ -23,11 +22,10 @@ type Model struct {
 	DynamicBatchModels map[*MeshPart][]*Model // Models that are dynamically merged into this one.
 	DynamicBatchOwner  *Model
 
-	Skinned        bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
-	SkinRoot       INode // The root node of the armature skinning this Model.
-	skinMatrix     Matrix4
-	bones          [][]*Node // The bones (nodes) of the Model, assuming it has been skinned. A Mesh's bones slice will point to indices indicating bones in the Model.
-	skinVectorPool *VectorPool
+	Skinned    bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
+	SkinRoot   INode // The root node of the armature skinning this Model.
+	skinMatrix Matrix4
+	bones      [][]*Node // The bones (nodes) of the Model, assuming it has been skinned. A Mesh's bones slice will point to indices indicating bones in the Model.
 
 	// A LightGroup indicates if a Model should be lit by a specific group of Lights. This allows you to control the overall lighting of scenes more accurately.
 	// If a Model has no LightGroup, the Model is lit by the lights present in the Scene.
@@ -39,13 +37,13 @@ type Model struct {
 	// a traditional GPU vertex shader, but is fine for simple / low-poly mesh transformations).
 	// This function is run after skinning the vertex if the material belongs to a mesh that is skinned by an armature.
 	// Note that the VertexTransformFunction must return the vector passed.
-	VertexTransformFunction func(vertexPosition vector.Vector, vertexIndex int)
+	VertexTransformFunction func(vertexPosition Vector, vertexIndex int) Vector
 
 	// VertexClipFunction is a function that runs on the clipped result of each vertex position rendered with the material.
 	// The function takes the vertex position along with the vertex index in the mesh.
 	// This program runs after the vertex position is clipped to screen coordinates.
 	// Note that the VertexClipFunction must return the vector passed.
-	VertexClipFunction func(vertexPosition vector.Vector, vertexIndex int)
+	VertexClipFunction func(vertexPosition Vector, vertexIndex int) Vector
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -61,10 +59,6 @@ func NewModel(mesh *Mesh, name string) *Model {
 	}
 
 	model.Node.onTransformUpdate = model.TransformUpdate
-
-	if mesh != nil {
-		model.skinVectorPool = NewVectorPool(len(mesh.Triangles)*3*2, true) // Both position and normal
-	}
 
 	radius := 0.0
 	if mesh != nil {
@@ -102,7 +96,7 @@ func (model *Model) Clone() INode {
 		child.setParent(newModel)
 	}
 
-	newModel.originalLocalPosition = model.originalLocalPosition.Clone()
+	newModel.originalLocalPosition = model.originalLocalPosition
 
 	if model.LightGroup != nil {
 		newModel.LightGroup = model.LightGroup.Clone()
@@ -127,7 +121,7 @@ func (model *Model) TransformUpdate() {
 	// To combat this, we save the original local positions of the mesh on export to position the bounding sphere in the
 	// correct location.
 
-	var center vector.Vector
+	var center Vector
 
 	// We do this because if a model is skinned and we've parented the model to the armature, then the center is
 	// now from origin relative to the base of the armature on scene export.
@@ -140,19 +134,19 @@ func (model *Model) TransformUpdate() {
 
 	center = rotation.MultVec(center)
 
-	position[0] += center[0] * scale[0]
-	position[1] += center[1] * scale[1]
-	position[2] += center[2] * scale[2]
+	position.X += center.X * scale.X
+	position.Y += center.Y * scale.Y
+	position.Z += center.Z * scale.Z
 	model.BoundingSphere.SetLocalPositionVec(position)
 
-	dim := model.Mesh.Dimensions.Clone()
-	dim[0][0] *= scale[0]
-	dim[0][1] *= scale[1]
-	dim[0][2] *= scale[2]
+	dim := model.Mesh.Dimensions
+	dim.Min.X *= scale.X
+	dim.Min.Y *= scale.Y
+	dim.Min.Z *= scale.Z
 
-	dim[1][0] *= scale[0]
-	dim[1][1] *= scale[1]
-	dim[1][2] *= scale[2]
+	dim.Max.X *= scale.X
+	dim.Max.Y *= scale.Y
+	dim.Max.Z *= scale.Z
 
 	model.BoundingSphere.Radius = dim.MaxSpan() / 2
 
@@ -264,7 +258,7 @@ func (model *Model) StaticMerge(models ...*Model) {
 		model.Mesh.allocateVertexBuffers(len(model.Mesh.VertexPositions) + totalSize)
 	}
 
-	vec := vector.Vector{0, 0, 0}
+	vec := Vector{0, 0, 0, 0}
 
 	for _, other := range models {
 
@@ -275,13 +269,13 @@ func (model *Model) StaticMerge(models ...*Model) {
 		p, s, r := model.Transform().Decompose()
 		op, os, or := other.Transform().Decompose()
 
-		inverted := NewMatrix4Scale(os[0], os[1], os[2])
-		scaleMatrix := NewMatrix4Scale(s[0], s[1], s[2])
+		inverted := NewMatrix4Scale(os.X, os.Y, os.Z)
+		scaleMatrix := NewMatrix4Scale(s.X, s.Y, s.Z)
 		inverted = inverted.Mult(scaleMatrix)
 
 		inverted = inverted.Mult(r.Transposed().Mult(or))
 
-		inverted = inverted.Mult(NewMatrix4Translate(op[0]-p[0], op[1]-p[1], op[2]-p[2]))
+		inverted = inverted.Mult(NewMatrix4Translate(op.X-p.X, op.Y-p.Y, op.Z-p.Z))
 
 		for _, otherPart := range other.Mesh.MeshParts {
 
@@ -307,13 +301,17 @@ func (model *Model) StaticMerge(models ...*Model) {
 			otherPart.ForEachVertexIndex(func(vertIndex int) {
 
 				vertInfo := otherPart.Mesh.GetVertexInfo(vertIndex)
-				vec[0] = vertInfo.X
-				vec[1] = vertInfo.Y
-				vec[2] = vertInfo.Z
-				x, y, z := fastMatrixMultVec(inverted, vec)
-				vertInfo.X = x
-				vertInfo.Y = y
-				vertInfo.Z = z
+
+				vec.X = vertInfo.X
+				vec.Y = vertInfo.Y
+				vec.Z = vertInfo.Z
+
+				vec = inverted.MultVec(vec)
+
+				vertInfo.X = vec.X
+				vertInfo.Y = vec.Y
+				vertInfo.Z = vec.Z
+
 				verts = append(verts, vertInfo)
 
 			})
@@ -336,8 +334,6 @@ func (model *Model) StaticMerge(models ...*Model) {
 
 	model.BoundingSphere.SetLocalPositionVec(model.Mesh.Dimensions.Center())
 	model.BoundingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
-
-	model.skinVectorPool = NewVectorPool(len(model.Mesh.Triangles)*3*2, true)
 
 }
 
@@ -375,12 +371,10 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 
 }
 
-func (model *Model) skinVertex(vertID int) (vector.Vector, vector.Vector) {
+func (model *Model) skinVertex(vertID int) (Vector, Vector) {
 
 	// Avoid reallocating a new matrix for every vertex; that's wasteful
 	model.skinMatrix.Clear()
-
-	var normal vector.Vector
 
 	for boneIndex, bone := range model.bones[vertID] {
 
@@ -403,30 +397,30 @@ func (model *Model) skinVertex(vertID int) (vector.Vector, vector.Vector) {
 
 	}
 
-	vertOut := model.skinVectorPool.MultVecW(model.skinMatrix, model.Mesh.VertexPositions[vertID])
+	vertOut := model.skinMatrix.MultVecW(model.Mesh.VertexPositions[vertID])
 
 	model.skinMatrix[3][0] = 0
 	model.skinMatrix[3][1] = 0
 	model.skinMatrix[3][2] = 0
 	model.skinMatrix[3][3] = 1
 
-	normal = model.skinVectorPool.MultVecW(model.skinMatrix, model.Mesh.VertexNormals[vertID])
+	normal := model.skinMatrix.MultVecW(model.Mesh.VertexNormals[vertID])
 
 	return vertOut, normal
 
 }
 
-var transformedVertexPositions = [3]vector.Vector{
-	{0, 0},
-	{0, 0},
-	{0, 0},
+var transformedVertexPositions = [3]Vector{
+	{0, 0, 0, 0},
+	{0, 0, 0, 0},
+	{0, 0, 0, 0},
 }
 
 // ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
 // matrix, a camera, and the MeshPart being rendered.
 func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, scene *Scene) []sortingTriangle {
 
-	var transformFunc func(vertPos vector.Vector, index int)
+	var transformFunc func(vertPos Vector, index int) Vector
 
 	if model.VertexTransformFunction != nil {
 		transformFunc = model.VertexTransformFunction
@@ -446,34 +440,30 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	if mat != nil && mat.BillboardMode != BillboardModeNone {
 
-		lookat := NewLookAtMatrix(model.WorldPosition(), camPos, vector.Y)
+		lookat := NewLookAtMatrix(model.WorldPosition(), camPos, VecY)
 
 		if mat.BillboardMode == BillboardModeXZ {
-			lookat.SetRow(1, vector.Vector{0, 1, 0, 0})
+			lookat.SetRow(1, Vector{0, 1, 0, 0})
 			x := lookat.Row(0)
-			x[1] = 0
+			x.Y = 0
 			lookat.SetRow(0, x.Unit())
 
 			z := lookat.Row(2)
-			z[1] = 0
+			z.Y = 0
 			lookat.SetRow(2, z.Unit())
 		}
 
 		// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
 		p, s, r := base.Decompose()
-		base = r.Mult(lookat).Mult(NewMatrix4Scale(s[0], s[1], s[2]))
-		base.SetRow(3, vector.Vector{p[0], p[1], p[2], 1})
+		base = r.Mult(lookat).Mult(NewMatrix4Scale(s.X, s.Y, s.Z))
+		base.SetRow(3, Vector{p.X, p.Y, p.Z, 1})
 
 	}
 
-	mvp := fastMatrixMult(base, vpMatrix)
+	mvp := base.Mult(vpMatrix)
 
 	// Reslice to fill the capacity
 	meshPart.sortingTriangles = meshPart.sortingTriangles[:cap(meshPart.sortingTriangles)]
-
-	if model.Skinned {
-		model.skinVectorPool.Reset()
-	}
 
 	for ti := meshPart.TriangleStart; ti <= meshPart.TriangleEnd; ti++ {
 
@@ -494,18 +484,12 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 				vertPos, vertNormal := model.skinVertex(tri.VertexIndices[i])
 				if transformFunc != nil {
-					transformFunc(vertPos, tri.VertexIndices[i])
+					vertPos = transformFunc(vertPos, tri.VertexIndices[i])
 				}
-				if vertNormal != nil {
-					mesh.vertexSkinnedNormals[tri.VertexIndices[i]] = vertNormal
-					mesh.vertexSkinnedPositions[tri.VertexIndices[i]] = vertPos
-				}
-				transformed := mesh.vertexTransforms[tri.VertexIndices[i]]
-				x, y, z, w := fastMatrixMultVecW(vpMatrix, vertPos)
-				transformed[0] = x
-				transformed[1] = y
-				transformed[2] = z
-				transformed[3] = w
+				mesh.vertexSkinnedNormals[tri.VertexIndices[i]] = vertNormal
+				mesh.vertexSkinnedPositions[tri.VertexIndices[i]] = vertPos
+
+				mesh.vertexTransforms[tri.VertexIndices[i]] = vpMatrix.MultVecW(vertPos)
 
 				camera.DebugInfo.animationTime += time.Since(t)
 
@@ -514,16 +498,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				v0 := mesh.VertexPositions[tri.VertexIndices[i]]
 
 				if transformFunc != nil {
-					v0 = v0.Clone()
-					transformFunc(v0, tri.VertexIndices[i])
+					v0 = transformFunc(v0, tri.VertexIndices[i])
 				}
 
-				transformed := mesh.vertexTransforms[tri.VertexIndices[i]]
-				transformed[0], transformed[1], transformed[2], transformed[3] = fastMatrixMultVecW(mvp, v0)
+				mesh.vertexTransforms[tri.VertexIndices[i]] = mvp.MultVecW(v0)
 
 			}
 
-			w := mesh.vertexTransforms[tri.VertexIndices[i]][3]
+			w := mesh.vertexTransforms[tri.VertexIndices[i]].W
 
 			if w < depth {
 				depth = w
@@ -539,10 +521,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				w = 0.000001
 			}
 
-			transformedVertexPositions[i][0] = mesh.vertexTransforms[tri.VertexIndices[i]][0] / w
-			transformedVertexPositions[i][1] = mesh.vertexTransforms[tri.VertexIndices[i]][1] / w
+			transformedVertexPositions[i].X = mesh.vertexTransforms[tri.VertexIndices[i]].X / w
+			transformedVertexPositions[i].Y = mesh.vertexTransforms[tri.VertexIndices[i]].Y / w
 
-			if mesh.vertexTransforms[tri.VertexIndices[i]][3] >= 0 && mesh.vertexTransforms[tri.VertexIndices[i]][2] < far {
+			if mesh.vertexTransforms[tri.VertexIndices[i]].W >= 0 && mesh.vertexTransforms[tri.VertexIndices[i]].Z < far {
 				outOfBounds = false
 			}
 
@@ -560,11 +542,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			v1 := transformedVertexPositions[1]
 			v2 := transformedVertexPositions[2]
 
-			n0x := v0[0] - v1[0]
-			n0y := v0[1] - v1[1]
+			n0x := v0.X - v1.X
+			n0y := v0.Y - v1.Y
 
-			n1x := v1[0] - v2[0]
-			n1y := v1[1] - v2[1]
+			n1x := v1.X - v2.X
+			n1y := v1.Y - v2.Y
 
 			// Essentially calculating the cross product, but only for the important dimension (Z, which is "in / out" in this context)
 			nor := (n0x * n1y) - (n1x * n0y)
@@ -585,23 +567,23 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			// 	n1 := camera.backfacePool.Sub(p1, p2)
 			// 	nor := camera.backfacePool.Cross(n0, n1)
 
-			// 	if nor[2] > 0 {
+			// 	if nor.Z > 0 {
 			// 		continue
 			// 	}
 
 			// }
 			// if model.Skinned {
-			// 	v0 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices[0]]
-			// 	v1 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices[1]]
-			// 	v2 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices[2]]
+			// 	v0 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.X]
+			// 	v1 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.Y]
+			// 	v2 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.Z]
 
-			// 	backfaceTriNormal[0] = (v0[0] + v1[0] + v2[0]) / 3
-			// 	backfaceTriNormal[1] = (v0[1] + v1[1] + v2[1]) / 3
-			// 	backfaceTriNormal[2] = (v0[2] + v1[2] + v2[2]) / 3
+			// 	backfaceTriNormal.X = (v0.X + v1.X + v2.X) / 3
+			// 	backfaceTriNormal.Y = (v0.Y + v1.Y + v2.Y) / 3
+			// 	backfaceTriNormal.Z = (v0.Z + v1.Z + v2.Z) / 3
 
-			// 	interimVec[0] = camPos[0] - model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]][0]
-			// 	interimVec[1] = camPos[1] - model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]][1]
-			// 	interimVec[2] = camPos[2] - model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]][2]
+			// 	interimVec.X = camPos.X - model.Mesh.vertexSkinnedPositions[tri.VertexIndices.X].X
+			// 	interimVec.Y = camPos.Y - model.Mesh.vertexSkinnedPositions[tri.VertexIndices.X].Y
+			// 	interimVec.Z = camPos.Z - model.Mesh.vertexSkinnedPositions[tri.VertexIndices.X].Z
 
 			// 	if dot(backfaceTriNormal, interimVec) < 0 {
 			// 		continue
@@ -609,9 +591,9 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			// } else {
 
-			// 	interimVec[0] = invertedCamPos[0] - tri.Center[0]
-			// 	interimVec[1] = invertedCamPos[1] - tri.Center[1]
-			// 	interimVec[2] = invertedCamPos[2] - tri.Center[2]
+			// 	interimVec.X = invertedCamPos.X - tri.Center.X
+			// 	interimVec.Y = invertedCamPos.Y - tri.Center.Y
+			// 	interimVec.Z = invertedCamPos.Z - tri.Center.Z
 
 			// 	if dot(tri.Normal, interimVec) < 0 {
 			// 		continue
@@ -625,10 +607,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			// If all transformed vertices are wholly out of bounds to the right, left, top, or bottom of the screen, then we can assume
 			// the triangle does not need to be rendered
-			if (transformedVertexPositions[0][0] < -0.5 && transformedVertexPositions[1][0] < -0.5 && transformedVertexPositions[2][0] < -0.5) ||
-				(transformedVertexPositions[0][0] > 0.5 && transformedVertexPositions[1][0] > 0.5 && transformedVertexPositions[2][0] > 0.5) ||
-				(transformedVertexPositions[0][1] < -0.5 && transformedVertexPositions[1][1] < -0.5 && transformedVertexPositions[2][1] < -0.5) ||
-				(transformedVertexPositions[0][1] > 0.5 && transformedVertexPositions[1][1] > 0.5 && transformedVertexPositions[2][1] > 0.5) {
+			if (transformedVertexPositions[0].X < -0.5 && transformedVertexPositions[1].X < -0.5 && transformedVertexPositions[2].X < -0.5) ||
+				(transformedVertexPositions[0].X > 0.5 && transformedVertexPositions[1].X > 0.5 && transformedVertexPositions[2].X > 0.5) ||
+				(transformedVertexPositions[0].Y < -0.5 && transformedVertexPositions[1].Y < -0.5 && transformedVertexPositions[2].Y < -0.5) ||
+				(transformedVertexPositions[0].Y > 0.5 && transformedVertexPositions[1].Y > 0.5 && transformedVertexPositions[2].Y > 0.5) {
 				outOfBounds = true
 			}
 
@@ -720,7 +702,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 		for _, other := range model.Mesh.Triangles {
 
-			if tri == other || vectorsEqual(tri.Normal, other.Normal) {
+			if tri == other || tri.Normal.Equals(other.Normal) {
 				continue
 			}
 
@@ -731,7 +713,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 			span *= 0.66
 
-			if fastVectorDistanceSquared(tri.Center, other.Center) > span*span {
+			if tri.Center.DistanceSquared(other.Center) > span*span {
 				continue
 			}
 
@@ -774,7 +756,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 		if or := other.BoundingSphere.WorldRadius(); or > rad {
 			rad = or
 		}
-		if model == other || fastVectorDistanceSquared(model.WorldPosition(), other.WorldPosition()) > rad*rad {
+		if model == other || model.WorldPosition().DistanceSquared(other.WorldPosition()) > rad*rad {
 			continue
 		}
 
@@ -786,7 +768,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 			verts := tri.VertexIndices
 
-			transformedTriVerts := [3]vector.Vector{
+			transformedTriVerts := [3]Vector{
 				transform.MultVec(model.Mesh.VertexPositions[verts[0]]),
 				transform.MultVec(model.Mesh.VertexPositions[verts[1]]),
 				transform.MultVec(model.Mesh.VertexPositions[verts[2]]),
@@ -803,11 +785,11 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 				span *= 0.66
 
-				if fastVectorDistanceSquared(transform.MultVec(tri.Center), otherTransform.MultVec(otherTri.Center)) > span {
+				if transform.MultVec(tri.Center).DistanceSquared(otherTransform.MultVec(otherTri.Center)) > span {
 					continue
 				}
 
-				transformedOtherVerts := [3]vector.Vector{
+				transformedOtherVerts := [3]Vector{
 					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[0]]),
 					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[1]]),
 					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[2]]),
@@ -815,7 +797,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 				for i := 0; i < 3; i++ {
 					for j := 0; j < 3; j++ {
-						if fastVectorDistanceSquared(transformedTriVerts[i], transformedOtherVerts[j]) <= distanceSquared {
+						if transformedTriVerts[i].DistanceSquared(transformedOtherVerts[j]) <= distanceSquared {
 							ao[i] = 1
 							break
 						}

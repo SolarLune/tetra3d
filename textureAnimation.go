@@ -2,14 +2,13 @@ package tetra3d
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
 )
 
-// TextureAnimation is an animation struct. The TextureAnimation.Frames value is a []vector.Vector, with each Vector representing
+// TextureAnimation is an animation struct. The TextureAnimation.Frames value is a []Vector, with each Vector representing
 // a frame of the animation (and the offset from the original, base position for all animated vertices).
 type TextureAnimation struct {
-	FPS    float64         // The playback frame per second (or FPS) of the animation
-	Frames []vector.Vector // A slice of vectors, with each indicating the offset of the frame from the original position for the mesh.
+	FPS    float64  // The playback frame per second (or FPS) of the animation
+	Frames []Vector // A slice of vectors, with each indicating the offset of the frame from the original position for the mesh.
 }
 
 // NewTextureAnimationPixels creates a new TextureAnimation using pixel positions instead of UV values. fps is the
@@ -26,12 +25,13 @@ func NewTextureAnimationPixels(fps float64, image *ebiten.Image, framePositions 
 	textureWidth := float64(image.Bounds().Dx())
 	textureHeight := float64(image.Bounds().Dy())
 
-	frames := []vector.Vector{}
+	frames := []Vector{}
 
 	for i := 0; i < len(framePositions); i += 2 {
-		frames = append(frames, vector.Vector{
+		frames = append(frames, Vector{
 			framePositions[i] / textureWidth,
 			framePositions[i+1] / textureHeight,
+			0, 0,
 		})
 	}
 
@@ -44,8 +44,8 @@ func NewTextureAnimationPixels(fps float64, image *ebiten.Image, framePositions 
 
 // TexturePlayer is a struct that allows you to animate a collection of vertices' UV values using a TextureAnimation.
 type TexturePlayer struct {
-	OriginalOffsets map[int]vector.Vector // OriginalOffsets is a map of vertex indices to their base UV offsets. All animating happens relative to these values.
-	Animation       *TextureAnimation     // Animation is a pointer to the currently playing Animation.
+	OriginalOffsets map[int]Vector    // OriginalOffsets is a map of vertex indices to their base UV offsets. All animating happens relative to these values.
+	Animation       *TextureAnimation // Animation is a pointer to the currently playing Animation.
 	// Playhead increases as the TexturePlayer plays. The integer portion of Playhead is the frame that the TexturePlayer
 	// resides in (so a Playhead of 1.2 indicates that it is in frame 1, the second frame).
 	Playhead float64
@@ -68,9 +68,9 @@ func NewTexturePlayer(mesh *Mesh, vertexSelection *VertexSelection) *TexturePlay
 // Reset resets a TexturePlayer to be ready to run on a new selection of vertices. Note that this also resets the base UV offsets
 // to use the current values of the passed vertices in the slice.
 func (player *TexturePlayer) Reset(vertexSelection *VertexSelection) {
-	player.OriginalOffsets = map[int]vector.Vector{}
+	player.OriginalOffsets = map[int]Vector{}
 	for vert := range vertexSelection.Indices {
-		player.OriginalOffsets[vert] = player.Mesh.VertexUVs[vert].Clone()
+		player.OriginalOffsets[vert] = player.Mesh.VertexUVs[vert]
 	}
 }
 
@@ -100,7 +100,7 @@ func (player *TexturePlayer) Update(dt float64) {
 		}
 
 		frameOffset := player.Animation.Frames[playhead]
-		player.ApplyUVOffset(frameOffset[0], frameOffset[1])
+		player.ApplyUVOffset(frameOffset.X, frameOffset.Y)
 
 	}
 
@@ -110,7 +110,7 @@ func (player *TexturePlayer) Update(dt float64) {
 // set once, regardless of how many times ApplyUVOffset is called.
 func (player *TexturePlayer) ApplyUVOffset(offsetX, offsetY float64) {
 	for vertIndex, ogOffset := range player.OriginalOffsets {
-		player.Mesh.VertexUVs[vertIndex][0] = ogOffset[0] + offsetX
-		player.Mesh.VertexUVs[vertIndex][1] = ogOffset[1] + offsetY
+		player.Mesh.VertexUVs[vertIndex].X = ogOffset.X + offsetX
+		player.Mesh.VertexUVs[vertIndex].Y = ogOffset.Y + offsetY
 	}
 }

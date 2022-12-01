@@ -4,8 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"sort"
-
-	"github.com/kvartborg/vector"
 )
 
 // GridPoint represents a point on a Grid, used for pathfinding or connecting points in space.
@@ -103,7 +101,7 @@ func (point *GridPoint) Disconnect(other *GridPoint) {
 // be composed of evenly spaced points if the purpose is for shortest-distance pathfinding).
 func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
 	path := &GridPath{
-		Points: []vector.Vector{},
+		Points: []Vector{},
 	}
 
 	if !point.IsOnSameGrid(other) {
@@ -112,7 +110,7 @@ func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
 
 	if point == other {
 		return &GridPath{
-			Points: []vector.Vector{point.WorldPosition()},
+			Points: []Vector{point.WorldPosition()},
 		}
 	}
 
@@ -226,7 +224,7 @@ func (grid *Grid) Points() []*GridPoint {
 }
 
 // NearestGridPoint returns the nearest grid point to the given world position.
-func (grid *Grid) NearestGridPoint(position vector.Vector) *GridPoint {
+func (grid *Grid) NearestGridPoint(position Vector) *GridPoint {
 
 	points := grid.Points()
 
@@ -240,7 +238,7 @@ func (grid *Grid) NearestGridPoint(position vector.Vector) *GridPoint {
 
 // NearestPositionOnGrid returns the nearest world position on the Grid to the given world position. This position
 // can be directly on a GridPoint, or on a connection between GridPoints.
-func (grid *Grid) NearestPositionOnGrid(position vector.Vector) vector.Vector {
+func (grid *Grid) NearestPositionOnGrid(position Vector) Vector {
 
 	nearestPoint := grid.NearestGridPoint(position)
 
@@ -254,18 +252,18 @@ func (grid *Grid) NearestPositionOnGrid(position vector.Vector) vector.Vector {
 		end := connection.WorldPosition()
 		segment := end.Sub(start)
 		newPos := position.Sub(start)
-		t := dot(newPos, segment) / dot(segment, segment)
+		t := newPos.Dot(segment) / segment.Dot(segment)
 		if t > 1 {
 			t = 1
 		} else if t < 0 {
 			t = 0
 		}
 
-		newPos[0] = start[0] + segment[0]*t
-		newPos[1] = start[1] + segment[1]*t
-		newPos[2] = start[2] + segment[2]*t
+		newPos.X = start.X + segment.X*t
+		newPos.Y = start.Y + segment.Y*t
+		newPos.Z = start.Z + segment.Z*t
 
-		nd := fastVectorDistanceSquared(newPos, position)
+		nd := newPos.DistanceSquared(position)
 		if nd < dist {
 			dist = nd
 			endPos = newPos
@@ -278,7 +276,7 @@ func (grid *Grid) NearestPositionOnGrid(position vector.Vector) vector.Vector {
 }
 
 // FurthestGridPoint returns the furthest grid point to the given world position.
-func (grid *Grid) FurthestGridPoint(position vector.Vector) *GridPoint {
+func (grid *Grid) FurthestGridPoint(position Vector) *GridPoint {
 
 	points := grid.Points()
 
@@ -342,7 +340,7 @@ func (grid *Grid) Combine(others ...*Grid) {
 					continue
 				}
 
-				if vectorsEqual(p.WorldPosition(), p2.WorldPosition()) {
+				if p.WorldPosition().Equals(p2.WorldPosition()) {
 					for _, connect := range p2.Connections {
 						p.Connect(connect)
 						connect.Disconnect(p2)
@@ -360,22 +358,21 @@ func (grid *Grid) Combine(others ...*Grid) {
 }
 
 // Center returns the center point of the Grid, given the positions of its GridPoints.
-func (grid *Grid) Center() vector.Vector {
-	pos := vector.Vector{0, 0, 0}
+func (grid *Grid) Center() Vector {
+	pos := Vector{0, 0, 0, 0}
 	points := grid.Points()
 	for _, p := range points {
-		vector.In(pos).Add(p.WorldPosition())
+		pos = pos.Add(p.WorldPosition())
 	}
-	pos[0] /= float64(len(points))
-	pos[1] /= float64(len(points))
-	pos[2] /= float64(len(points))
+
+	pos = pos.Divide(float64(len(points)))
 	return pos
 }
 
 // Dimensions returns a Dimensions struct, indicating the overall "spread" of the GridPoints composing the Grid.
 func (grid *Grid) Dimensions() Dimensions {
 	gridPoints := grid.Points()
-	points := make([]vector.Vector, 0, len(gridPoints))
+	points := make([]Vector, 0, len(gridPoints))
 	for _, p := range gridPoints {
 		points = append(points, p.WorldPosition())
 	}
@@ -405,7 +402,7 @@ func (grid *Grid) Type() NodeType {
 
 // GridPath represents a sequence of grid points, used to traverse a path.
 type GridPath struct {
-	Points []vector.Vector
+	Points []Vector
 }
 
 func (gp *GridPath) Distance() float64 {
@@ -428,10 +425,10 @@ func (gp *GridPath) Distance() float64 {
 
 }
 
-func (gp *GridPath) points() []vector.Vector {
-	points := make([]vector.Vector, 0, len(gp.Points))
+func (gp *GridPath) points() []Vector {
+	points := make([]Vector, 0, len(gp.Points))
 	for _, p := range gp.Points {
-		points = append(points, p.Clone())
+		points = append(points, p)
 	}
 	return points
 }

@@ -2,8 +2,6 @@ package tetra3d
 
 import (
 	"math"
-
-	"github.com/kvartborg/vector"
 )
 
 // BoundingSphere represents a 3D sphere.
@@ -36,14 +34,14 @@ func (sphere *BoundingSphere) AddChildren(children ...INode) {
 
 // WorldRadius returns the radius of the BoundingSphere in world units, after taking into account its scale.
 func (sphere *BoundingSphere) WorldRadius() float64 {
-	var scale vector.Vector
+	var scale Vector
 	maxScale := 1.0
 	if sphere.Node.Parent() != nil {
 		scale = sphere.Node.WorldScale() // We don't want to have to decompose the transform if we can help it
 	} else {
 		scale = sphere.Node.scale // We don't want to have to make a memory duplicate if we don't have to
 	}
-	maxScale = math.Max(math.Max(math.Abs(scale[0]), math.Abs(scale[1])), math.Abs(scale[2]))
+	maxScale = math.Max(math.Max(math.Abs(scale.X), math.Abs(scale.Y)), math.Abs(scale.Z))
 	return sphere.Radius * maxScale
 }
 
@@ -98,15 +96,12 @@ func (sphere *BoundingSphere) CollisionTest(dx, dy, dz float64, others ...INode)
 // collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
 // object.
 // Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
-func (sphere *BoundingSphere) CollisionTestVec(moveVec vector.Vector, others ...INode) []*Collision {
-	if moveVec == nil {
-		return commonCollisionTest(sphere, 0, 0, 0, others...)
-	}
-	return commonCollisionTest(sphere, moveVec[0], moveVec[1], moveVec[2], others...)
+func (sphere *BoundingSphere) CollisionTestVec(moveVec Vector, others ...INode) []*Collision {
+	return commonCollisionTest(sphere, moveVec.X, moveVec.Y, moveVec.Z, others...)
 }
 
 // PointInside returns whether the given point is inside of the sphere or not.
-func (sphere *BoundingSphere) PointInside(point vector.Vector) bool {
+func (sphere *BoundingSphere) PointInside(point Vector) bool {
 	return sphere.Node.WorldPosition().Sub(point).Magnitude() < sphere.WorldRadius()
 }
 

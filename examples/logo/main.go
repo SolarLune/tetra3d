@@ -12,7 +12,6 @@ import (
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
@@ -33,7 +32,7 @@ type Game struct {
 
 	DrawDebugText     bool
 	DrawDebugDepth    bool
-	PrevMousePosition vector.Vector
+	PrevMousePosition tetra3d.Vector
 }
 
 //go:embed tetra3d.gltf
@@ -43,7 +42,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             398,
 		Height:            224,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: tetra3d.Vector{},
 		DrawDebugText:     true,
 	}
 	game.Offscreen = ebiten.NewImage(game.Width, game.Height)
@@ -71,7 +70,7 @@ func (g *Game) Init() {
 	// screen.Mesh.FindMeshPartByMaterialName("ScreenTexture").Material.Image = g.Offscreen
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 0, 5})
+	g.Camera.SetLocalPositionVec(tetra3d.NewVector(0, 0, 5))
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -110,10 +109,10 @@ func (g *Game) Update() error {
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
+		pos.Y += moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
+		pos.Y -= moveSpd
 	}
 
 	g.Camera.SetLocalPositionVec(pos)
@@ -127,12 +126,12 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := tetra3d.NewVector(float64(mx), float64(my), 0)
 
 	diff := mv.Sub(g.PrevMousePosition)
 
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
+	g.CameraTilt -= diff.Y * 0.005
+	g.CameraRotate -= diff.X * 0.005
 
 	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
 
@@ -147,7 +146,7 @@ func (g *Game) Update() error {
 		g.Rotate(0, 1, 0, 0.05)
 	}
 
-	g.PrevMousePosition = mv.Clone()
+	g.PrevMousePosition = mv
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")

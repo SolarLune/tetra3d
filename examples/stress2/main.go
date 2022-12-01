@@ -37,7 +37,7 @@ type Game struct {
 	Camera            *tetra3d.Camera
 	CameraTilt        float64
 	CameraRotate      float64
-	PrevMousePosition vector.Vector
+	PrevMousePosition Vector
 
 	DrawDebugText      bool
 	DrawDebugDepth     bool
@@ -54,7 +54,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             796,
 		Height:            448,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 	}
 
 	game.Init()
@@ -139,7 +139,7 @@ func (g *Game) Init() {
 		for j := 0; j < 21; j++ {
 			// Create a new Cube, position it, add it to the scene, and add it to the cubes slice.
 			cube := tetra3d.NewModel(cubeMesh, "Cube")
-			cube.SetLocalPositionVec(vector.Vector{float64(i) * 1.5, 0, float64(-j * 3)})
+			cube.SetLocalPositionVec(Vector{float64(i) * 1.5, 0, float64(-j * 3)})
 			g.Scene.Root.AddChildren(cube)
 			g.Cubes = append(g.Cubes, cube)
 		}
@@ -149,7 +149,7 @@ func (g *Game) Init() {
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Far = 120
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 0, 15})
+	g.Camera.SetLocalPositionVec(Vector{0, 0, 15})
 
 	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMaximum)
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -231,7 +231,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 

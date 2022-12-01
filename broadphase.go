@@ -1,9 +1,5 @@
 package tetra3d
 
-import (
-	"github.com/kvartborg/vector"
-)
-
 // Broadphase is a utility object specifically created to assist with quickly ruling out
 // triangles when doing Triangle-Sphere/Capsule/AABB collision detection. This works
 // largely automatically; you should generally not have to tweak this too much. The general
@@ -77,9 +73,9 @@ func (bp *Broadphase) Resize(gridSize int) {
 	cellSize := (maxDim / float64(gridSize)) + 1 // The +1 adds a little extra room
 	bp.cellSize = cellSize
 
-	bp.aabb.internalSize[0] = cellSize
-	bp.aabb.internalSize[1] = cellSize
-	bp.aabb.internalSize[2] = cellSize
+	bp.aabb.internalSize.X = cellSize
+	bp.aabb.internalSize.Y = cellSize
+	bp.aabb.internalSize.Z = cellSize
 	bp.aabb.updateSize()
 
 	bp.TriSets = make([][][][]uint16, gridSize)
@@ -94,10 +90,11 @@ func (bp *Broadphase) Resize(gridSize int) {
 
 				bp.TriSets[i][j][k] = []uint16{}
 
-				bp.aabb.SetLocalPositionVec(vector.Vector{
+				bp.aabb.SetLocalPositionVec(Vector{
 					(float64(i) - hg + 0.5) * bp.cellSize,
 					(float64(j) - hg + 0.5) * bp.cellSize,
 					(float64(k) - hg + 0.5) * bp.cellSize,
+					0,
 				})
 
 				center := bp.aabb.WorldPosition()
@@ -149,10 +146,11 @@ func (bp *Broadphase) TrianglesFromBounding(boundingObject IBoundingObject) map[
 					continue
 				}
 
-				bp.aabb.SetLocalPositionVec(vector.Vector{
+				bp.aabb.SetLocalPositionVec(Vector{
 					(float64(i) - hg + 0.5) * bp.cellSize,
 					(float64(j) - hg + 0.5) * bp.cellSize,
 					(float64(k) - hg + 0.5) * bp.cellSize,
+					0,
 				})
 
 				if bp.aabb.Colliding(boundingObject) {
@@ -179,7 +177,7 @@ func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
 
 	hg := float64(bp.GridSize) / 2
 
-	bp.aabb.SetLocalPositionVec(vector.Vector{0, 0, 0})
+	bp.aabb.SetLocalPositionVec(NewVectorZero())
 
 	for i := 0; i < bp.GridSize; i++ {
 		for j := 0; j < bp.GridSize; j++ {
@@ -187,14 +185,15 @@ func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
 
 				clone := bp.aabb.Clone().(*BoundingAABB)
 
-				clone.SetLocalPositionVec(vector.Vector{
+				clone.SetLocalPositionVec(Vector{
 					// (-float64(bp.GridSize)/2+float64(i))*bp.CellSize + (bp.CellSize / 2),
 					// (-float64(bp.GridSize)/2+float64(j))*bp.CellSize + (bp.CellSize / 2),
 					// (-float64(bp.GridSize)/2+float64(k))*bp.CellSize + (bp.CellSize / 2),
+					// 0, 0, 0,
 					(float64(i) - hg + 0.5) * bp.cellSize,
 					(float64(j) - hg + 0.5) * bp.cellSize,
 					(float64(k) - hg + 0.5) * bp.cellSize,
-					// 0, 0, 0,
+					0,
 				})
 
 				clone.SetWorldTransform(bp.aabb.Transform().Mult(clone.Transform()))
@@ -253,7 +252,7 @@ func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
 // 			for k := 0; k < gridSize; k++ {
 // 				b := NewBoundingAABB("", cellSize, cellSize, cellSize)
 // 				bp.Center.AddChildren(b)
-// 				b.SetLocalPositionVec(vector.Vector{
+// 				b.SetLocalPositionVec(Vector{
 // 					(-float64(gridSize)/2+float64(i))*cellSize + (cellSize / 2),
 // 					(-float64(gridSize)/2+float64(j))*cellSize + (cellSize / 2),
 // 					(-float64(gridSize)/2+float64(k))*cellSize + (cellSize / 2),

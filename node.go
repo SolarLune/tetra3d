@@ -3,8 +3,6 @@ package tetra3d
 import (
 	"strconv"
 	"strings"
-
-	"github.com/kvartborg/vector"
 )
 
 // NodeType represents a Node's type. Node types are categorized, and can be said to extend or "be of" more general types.
@@ -105,16 +103,16 @@ type INode interface {
 	LocalRotation() Matrix4
 	// SetLocalRotation sets the object's local rotation Matrix4 (relative to any parent).
 	SetLocalRotation(rotation Matrix4)
-	LocalPosition() vector.Vector
+	LocalPosition() Vector
 	// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 	// relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
-	SetLocalPositionVec(position vector.Vector)
+	SetLocalPositionVec(position Vector)
 	SetLocalPosition(x, y, z float64)
 	// LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
-	LocalScale() vector.Vector
+	LocalScale() Vector
 	// SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
 	// scale should be a 3D vector (i.e. X, Y, and Z components).
-	SetLocalScaleVec(scale vector.Vector)
+	SetLocalScaleVec(scale Vector)
 	SetLocalScale(w, h, d float64)
 
 	// WorldRotation returns an absolute rotation Matrix4 representing the object's rotation.
@@ -122,10 +120,10 @@ type INode interface {
 	// SetWorldRotation sets an object's global, world rotation to the provided rotation Matrix4.
 	SetWorldRotation(rotation Matrix4)
 	// WorldPosition returns the node's world position, taking into account its parenting hierarchy.
-	WorldPosition() vector.Vector
+	WorldPosition() Vector
 	// SetWorldPositionVec sets the world position of the given object using the provided position vector.
 	// Note that this isn't as performant as setting the position locally.
-	SetWorldPositionVec(position vector.Vector)
+	SetWorldPositionVec(position Vector)
 	// SetWorldPosition sets the world position of the given object using the provided position arguments.
 	// Note that this isn't as performant as setting the position locally.
 	SetWorldPosition(x, y, z float64)
@@ -136,22 +134,22 @@ type INode interface {
 	// SetWorldZ sets the z component of the Node's world position.
 	SetWorldZ(x float64)
 	// WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components).
-	WorldScale() vector.Vector
+	WorldScale() Vector
 	// SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
-	SetWorldScaleVec(scale vector.Vector)
+	SetWorldScaleVec(scale Vector)
 
 	// Move moves a Node in local space by the x, y, and z values provided.
 	Move(x, y, z float64)
 	// MoveVec moves a Node in local space using the vector provided.
-	MoveVec(moveVec vector.Vector)
+	MoveVec(moveVec Vector)
 	// Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
 	Rotate(x, y, z, angle float64)
 	// RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
-	RotateVec(vec vector.Vector, angle float64)
+	RotateVec(vec Vector, angle float64)
 	// Grow scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
 	Grow(x, y, z float64)
 	// GrowVec scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
-	GrowVec(vec vector.Vector)
+	GrowVec(vec Vector)
 
 	// Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
 	// If there's no change between the previous Transform() call and this one, Transform() will return a cached version of the
@@ -189,7 +187,7 @@ type INode interface {
 	// AnimationPlayer returns the object's animation player - every object has an AnimationPlayer by default.
 	AnimationPlayer() *AnimationPlayer
 
-	setOriginalLocalPosition(vector.Vector)
+	setOriginalLocalPosition(Vector)
 }
 
 type Property struct {
@@ -258,17 +256,17 @@ func (prop *Property) AsColor() *Color {
 
 // IsVector returns true if the value associated with the specified tag is a vector.
 func (prop *Property) IsVector() bool {
-	if _, ok := prop.Value.(vector.Vector); ok {
+	if _, ok := prop.Value.(Vector); ok {
 		return true
 	}
 	return false
 }
 
-// AsPosition returns the value associated with the specified tag (key) as a 3D position vector.Vector clone.
+// AsPosition returns the value associated with the specified tag (key) as a 3D position Vector clone.
 // The axes are corrected to account for the difference between Blender's axis order and Tetra3D's.
 // Note that this does not sanity check to ensure the tag is a vector first.
-func (prop *Property) AsVector() vector.Vector {
-	return prop.Value.(vector.Vector).Clone()
+func (prop *Property) AsVector() Vector {
+	return prop.Value.(Vector)
 }
 
 // Properties is an unordered set of string tags to values, representing a means of identifying Nodes or carrying data on Nodes.
@@ -322,10 +320,10 @@ func (props *Properties) Get(tagName string) *Property {
 // into their structs to automatically easily implement Node.
 type Node struct {
 	name                  string
-	position              vector.Vector
-	scale                 vector.Vector
+	position              Vector
+	scale                 Vector
 	rotation              Matrix4
-	originalLocalPosition vector.Vector
+	originalLocalPosition Vector
 	visible               bool
 	data                  interface{} // A place to store a pointer to something if you need it
 	children              []INode
@@ -346,17 +344,17 @@ type Node struct {
 func NewNode(name string) *Node {
 
 	nb := &Node{
-		name:             name,
-		position:         vector.Vector{0, 0, 0},
-		scale:            vector.Vector{1, 1, 1},
+		name: name,
+		// position:         NewVectorZero(),
+		scale:            Vector{1, 1, 1, 0},
 		rotation:         NewMatrix4(),
 		children:         []INode{},
 		visible:          true,
 		isTransformDirty: true,
 		props:            NewProperties(),
 		// We set this just in case we call a transform property getter before setting it and caching anything
-		cachedTransform:       NewMatrix4(),
-		originalLocalPosition: vector.Vector{0, 0, 0},
+		cachedTransform: NewMatrix4(),
+		// originalLocalPosition: NewVectorZero(),
 	}
 
 	nb.animationPlayer = NewAnimationPlayer(nb)
@@ -364,7 +362,7 @@ func NewNode(name string) *Node {
 	return nb
 }
 
-func (node *Node) setOriginalLocalPosition(position vector.Vector) {
+func (node *Node) setOriginalLocalPosition(position Vector) {
 	node.originalLocalPosition = position
 }
 
@@ -395,8 +393,8 @@ func (node *Node) setLibrary(library *Library) {
 // Clone returns a new Node.
 func (node *Node) Clone() INode {
 	newNode := NewNode(node.name)
-	newNode.position = node.position.Clone()
-	newNode.scale = node.scale.Clone()
+	newNode.position = node.position
+	newNode.scale = node.scale
 	newNode.rotation = node.rotation.Clone()
 	newNode.visible = node.visible
 	newNode.data = node.data
@@ -452,9 +450,9 @@ func (node *Node) Transform() Matrix4 {
 		return node.cachedTransform
 	}
 
-	transform := NewMatrix4Scale(node.scale[0], node.scale[1], node.scale[2])
+	transform := NewMatrix4Scale(node.scale.X, node.scale.Y, node.scale.Z)
 	transform = transform.Mult(node.rotation)
-	transform = transform.Mult(NewMatrix4Translate(node.position[0], node.position[1], node.position[2]))
+	transform = transform.Mult(NewMatrix4Translate(node.position.X, node.position.Y, node.position.Z))
 
 	if node.parent != nil {
 		transform = transform.Mult(node.parent.Transform())
@@ -548,48 +546,48 @@ func (node *Node) dirtyTransform() {
 
 // LocalPosition returns a 3D Vector consisting of the object's local position (position relative to its parent). If this object has no parent, the position will be
 // relative to world origin (0, 0, 0).
-func (node *Node) LocalPosition() vector.Vector {
-	return node.position.Clone()
+func (node *Node) LocalPosition() Vector {
+	return node.position
 }
 
 // ResetLocalTransform resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
 // by default, when you parent one Node to another, the local transform properties (position, scale, and rotation) are altered to keep the
 // object in the same absolute location, even though the origin changes.
 func (node *Node) ResetLocalTransform() {
-	node.position[0] = 0
-	node.position[1] = 0
-	node.position[2] = 0
-	node.scale[0] = 1
-	node.scale[1] = 1
-	node.scale[2] = 1
+	node.position.X = 0
+	node.position.Y = 0
+	node.position.Z = 0
+	node.scale.X = 1
+	node.scale.Y = 1
+	node.scale.Z = 1
 	node.rotation = NewMatrix4()
 	node.dirtyTransform()
 }
 
 // WorldPosition returns a 3D Vector consisting of the object's world position (position relative to the world origin point of {0, 0, 0}).
-func (node *Node) WorldPosition() vector.Vector {
-	position := node.Transform().Row(3)[:3] // We don't want to have to decompose if we don't have to
+func (node *Node) WorldPosition() Vector {
+	position := node.Transform().Row(3) // We don't want to have to decompose if we don't have to
 	return position
 }
 
 // SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 // relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
 func (node *Node) SetLocalPosition(x, y, z float64) {
-	node.position[0] = x
-	node.position[1] = y
-	node.position[2] = z
+	node.position.X = x
+	node.position.Y = y
+	node.position.Z = z
 	node.dirtyTransform()
 }
 
 // SetLocalPositionVec sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 // relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetLocalPositionVec(position vector.Vector) {
-	node.SetLocalPosition(position[0], position[1], position[2])
+func (node *Node) SetLocalPositionVec(position Vector) {
+	node.SetLocalPosition(position.X, position.Y, position.Z)
 }
 
 // SetWorldPositionVec sets the object's world position (position relative to the world origin point of {0, 0, 0}).
 // position needs to be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetWorldPositionVec(position vector.Vector) {
+func (node *Node) SetWorldPositionVec(position Vector) {
 
 	if node.parent != nil {
 
@@ -597,16 +595,16 @@ func (node *Node) SetWorldPositionVec(position vector.Vector) {
 		parentPos, parentScale, parentRot := parentTransform.Decompose()
 
 		pr := parentRot.Transposed().MultVec(position.Sub(parentPos))
-		pr[0] /= parentScale[0]
-		pr[1] /= parentScale[1]
-		pr[2] /= parentScale[2]
+		pr.X /= parentScale.X
+		pr.Y /= parentScale.Y
+		pr.Z /= parentScale.Z
 
 		node.position = pr
 
 	} else {
-		node.position[0] = position[0]
-		node.position[1] = position[1]
-		node.position[2] = position[2]
+		node.position.X = position.X
+		node.position.Y = position.Y
+		node.position.Z = position.Z
 	}
 
 	node.dirtyTransform()
@@ -615,59 +613,59 @@ func (node *Node) SetWorldPositionVec(position vector.Vector) {
 
 // SetWorldPosition sets the object's world position (position relative to the world origin point of {0, 0, 0}).
 func (node *Node) SetWorldPosition(x, y, z float64) {
-	node.SetWorldPositionVec(vector.Vector{x, y, z})
+	node.SetWorldPositionVec(Vector{x, y, z, 0})
 }
 
 // SetWorldX sets the X component of the object's world position.
 func (node *Node) SetWorldX(x float64) {
 	v := node.WorldPosition()
-	v[0] = x
+	v.X = x
 	node.SetWorldPositionVec(v)
 }
 
 // SetWorldY sets the Y component of the object's world position.
 func (node *Node) SetWorldY(y float64) {
 	v := node.WorldPosition()
-	v[1] = y
+	v.Y = y
 	node.SetWorldPositionVec(v)
 }
 
 // SetWorldZ sets the Z component of the object's world position.
 func (node *Node) SetWorldZ(z float64) {
 	v := node.WorldPosition()
-	v[0] = z
+	v.Z = z
 	node.SetWorldPositionVec(v)
 }
 
 // LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
-func (node *Node) LocalScale() vector.Vector {
-	return node.scale.Clone()
+func (node *Node) LocalScale() Vector {
+	return node.scale
 }
 
 // SetLocalScaleVec sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
 // scale should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetLocalScaleVec(scale vector.Vector) {
-	node.SetLocalScale(scale[0], scale[1], scale[2])
+func (node *Node) SetLocalScaleVec(scale Vector) {
+	node.SetLocalScale(scale.X, scale.Y, scale.Z)
 }
 
 // SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
 func (node *Node) SetLocalScale(w, h, d float64) {
-	node.scale[0] = w
-	node.scale[1] = h
-	node.scale[2] = d
+	node.scale.X = w
+	node.scale.Y = h
+	node.scale.Z = d
 	node.dirtyTransform()
 }
 
 // WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components). Note that this is a bit slow as it
 // requires decomposing the node's world transform, so you want to use node.LocalScale() if you can and performacne is a concern.
-func (node *Node) WorldScale() vector.Vector {
+func (node *Node) WorldScale() Vector {
 	_, scale, _ := node.Transform().Decompose()
 	return scale
 }
 
 // SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetWorldScaleVec(scale vector.Vector) {
-	node.SetWorldScale(scale[0], scale[1], scale[2])
+func (node *Node) SetWorldScaleVec(scale Vector) {
+	node.SetWorldScale(scale.X, scale.Y, scale.Z)
 }
 
 // SetWorldScale sets the object's absolute world scale.
@@ -678,16 +676,17 @@ func (node *Node) SetWorldScale(w, h, d float64) {
 		parentTransform := node.parent.Transform()
 		_, parentScale, _ := parentTransform.Decompose()
 
-		node.scale = vector.Vector{
-			w / parentScale[0],
-			h / parentScale[1],
-			d / parentScale[2],
+		node.scale = Vector{
+			w / parentScale.X,
+			h / parentScale.Y,
+			d / parentScale.Z,
+			0,
 		}
 
 	} else {
-		node.scale[0] = w
-		node.scale[1] = h
-		node.scale[2] = d
+		node.scale.X = w
+		node.scale.Y = h
+		node.scale.Z = d
 	}
 
 	node.dirtyTransform()
@@ -733,15 +732,15 @@ func (node *Node) Move(x, y, z float64) {
 	if x == 0 && y == 0 && z == 0 {
 		return
 	}
-	node.position[0] += x
-	node.position[1] += y
-	node.position[2] += z
+	node.position.X += x
+	node.position.Y += y
+	node.position.Z += z
 	node.dirtyTransform()
 }
 
 // MoveVec moves a Node in local space using the vector provided.
-func (node *Node) MoveVec(vec vector.Vector) {
-	node.Move(vec[0], vec[1], vec[2])
+func (node *Node) MoveVec(vec Vector) {
+	node.Move(vec.X, vec.Y, vec.Z)
 }
 
 // Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
@@ -755,8 +754,8 @@ func (node *Node) Rotate(x, y, z, angle float64) {
 }
 
 // RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
-func (node *Node) RotateVec(vec vector.Vector, angle float64) {
-	node.Rotate(vec[0], vec[1], vec[2], angle)
+func (node *Node) RotateVec(vec Vector, angle float64) {
+	node.Rotate(vec.X, vec.Y, vec.Z, angle)
 }
 
 // Grow scales the object additively using the x, y, and z arguments provided (i.e. calling
@@ -766,16 +765,16 @@ func (node *Node) Grow(x, y, z float64) {
 		return
 	}
 	scale := node.LocalScale()
-	scale[0] += x
-	scale[1] += y
-	scale[2] += z
-	node.SetLocalScale(scale[0], scale[1], scale[2])
+	scale.X += x
+	scale.Y += y
+	scale.Z += z
+	node.SetLocalScale(scale.X, scale.Y, scale.Z)
 }
 
 // GrowVec scales the object additively using the scaling vector provided (i.e. calling
-// Node.GrowVec(vector.Vector{1, 0, 0}) will scale it +1 on the X-axis).
-func (node *Node) GrowVec(vec vector.Vector) {
-	node.Grow(vec[0], vec[1], vec[2])
+// Node.GrowVec(Vector{1, 0, 0}) will scale it +1 on the X-axis).
+func (node *Node) GrowVec(vec Vector) {
+	node.Grow(vec.X, vec.Y, vec.Z)
 }
 
 // Parent returns the Node's parent. If the Node has no parent, this will return nil.
@@ -943,7 +942,7 @@ func (node *Node) HierarchyAsString() string {
 
 		wp := node.WorldPosition()
 		floatTruncation := 2
-		wpStr := "[" + strconv.FormatFloat(wp[0], 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp[1], 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp[2], 'f', floatTruncation, 64) + "]"
+		wpStr := "[" + strconv.FormatFloat(wp.X, 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp.Y, 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp.Z, 'f', floatTruncation, 64) + "]"
 
 		if level > 0 {
 			str += "\\-"

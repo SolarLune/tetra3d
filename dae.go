@@ -232,7 +232,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 		}
 
 		verts := []VertexInfo{}
-		// normals := map[*Vertex]vector.Vector{}
+		// normals := map[*Vertex]Vector{}
 
 		x, y, z := 0.0, 0.0, 0.0
 		u, v := 0.0, 0.0
@@ -307,7 +307,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 		// 		for _, tri := range part.Triangles {
 
-		// 			normal := vector.Vector{0, 0, 0}
+		// 			normal := Vector{0, 0, 0}
 		// 			for _, vert := range tri.Vertices {
 		// 				normal = normal.Add(normals[vert])
 		// 			}
@@ -337,10 +337,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 			rotate := NewMatrix4Rotate(1, 0, 0, -math.Pi/2)
 			for i := range mesh.VertexPositions {
-				x, y, z := fastMatrixMultVec(rotate, mesh.VertexPositions[i])
-				mesh.VertexPositions[i][0] = x
-				mesh.VertexPositions[i][1] = y
-				mesh.VertexPositions[i][2] = z
+				mesh.VertexPositions[i] = rotate.MultVec(mesh.VertexPositions[i])
 			}
 		}
 

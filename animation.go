@@ -4,8 +4,6 @@ import (
 	"log"
 	"math"
 	"time"
-
-	"github.com/kvartborg/vector"
 )
 
 const (
@@ -22,8 +20,8 @@ type Data struct {
 	contents interface{}
 }
 
-func (data *Data) AsVector() vector.Vector {
-	return data.contents.(vector.Vector)
+func (data *Data) AsVector() Vector {
+	return data.contents.(Vector)
 }
 
 func (data *Data) AsQuaternion() *Quaternion {
@@ -52,57 +50,51 @@ func (track *AnimationTrack) AddKeyframe(time float64, data interface{}) {
 	track.Keyframes = append(track.Keyframes, newKeyframe(time, Data{data}))
 }
 
-func (track *AnimationTrack) ValueAsVector(time float64) vector.Vector {
+func (track *AnimationTrack) ValueAsVector(time float64) (Vector, bool) {
 
 	if len(track.Keyframes) == 0 {
-		return nil
+		return Vector{}, false
 	}
 
 	if first := track.Keyframes[0]; time <= first.Time {
-		return first.Data.AsVector()
+		return first.Data.AsVector(), true
 	} else if last := track.Keyframes[len(track.Keyframes)-1]; time >= last.Time {
-		return last.Data.AsVector()
-	} else {
+		return last.Data.AsVector(), true
+	}
 
-		var first *Keyframe
-		var last *Keyframe
+	var first *Keyframe
+	var last *Keyframe
 
-		for _, k := range track.Keyframes {
+	for _, k := range track.Keyframes {
 
-			if k.Time < time {
-				first = k
-			} else {
-				last = k
-				break
-			}
-
-		}
-
-		if time == first.Time {
-			return first.Data.AsVector()
-		} else if time == last.Time {
-			return last.Data.AsVector()
+		if k.Time < time {
+			first = k
 		} else {
-
-			fd := first.Data.AsVector()
-			ld := last.Data.AsVector()
-
-			t := (time - first.Time) / (last.Time - first.Time)
-
-			if track.Interpolation == InterpolationConstant {
-				return fd
-			} else {
-				// We still need to implement InterpolationCubic
-				if track.Type == TrackTypePosition || track.Type == TrackTypeScale {
-					return fd.Add(ld.Sub(fd).Scale(t))
-				}
-			}
-
+			last = k
+			break
 		}
 
 	}
 
-	return nil
+	if time == first.Time {
+		return first.Data.AsVector(), true
+	} else if time == last.Time {
+		return last.Data.AsVector(), true
+	}
+
+	fd := first.Data.AsVector()
+	ld := last.Data.AsVector()
+
+	t := (time - first.Time) / (last.Time - first.Time)
+
+	if track.Interpolation == InterpolationConstant {
+		return fd, true
+	}
+
+	// We still need to implement InterpolationCubic
+	// if track.Type == TrackTypePosition || track.Type == TrackTypeScale {
+	return fd.Add(ld.Sub(fd).Scale(t)), true
+	// }
 
 }
 
@@ -213,8 +205,8 @@ func (animation *Animation) Library() *Library {
 
 // AnimationValues indicate the current position, scale, and rotation for a Node.
 type AnimationValues struct {
-	Position vector.Vector
-	Scale    vector.Vector
+	Position Vector
+	Scale    Vector
 	Rotation *Quaternion
 }
 
@@ -377,12 +369,16 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 					if track, exists := channel.Tracks[TrackTypePosition]; exists {
 						// node.SetLocalPositionVecVec(track.ValueAsVector(ap.Playhead))
-						ap.AnimatedProperties[node].Position = track.ValueAsVector(ap.Playhead)
+						if vec, exists := track.ValueAsVector(ap.Playhead); exists {
+							ap.AnimatedProperties[node].Position = vec
+						}
 					}
 
 					if track, exists := channel.Tracks[TrackTypeScale]; exists {
 						// node.SetLocalScaleVec(track.ValueAsVector(ap.Playhead))
-						ap.AnimatedProperties[node].Scale = track.ValueAsVector(ap.Playhead)
+						if vec, exists := track.ValueAsVector(ap.Playhead); exists {
+							ap.AnimatedProperties[node].Scale = vec
+						}
 					}
 
 					if track, exists := channel.Tracks[TrackTypeRotation]; exists {
@@ -500,32 +496,41 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 			start := ap.prevAnimatedProperties[node]
 
-			if start.Position != nil && props.Position != nil {
-				diff := props.Position.Sub(start.Position)
-				node.SetLocalPositionVec(start.Position.Add(diff.Scale(bp)))
-			} else if props.Position != nil {
-				node.SetLocalPositionVec(props.Position)
-			} else if start.Position != nil {
-				node.SetLocalPositionVec(start.Position)
-			}
+			diff := props.Position.Sub(start.Position)
+			node.SetLocalPositionVec(start.Position.Add(diff.Scale(bp)))
 
-			if start.Scale != nil && props.Scale != nil {
-				diff := props.Scale.Sub(start.Scale)
-				node.SetLocalScaleVec(start.Scale.Add(diff.Scale(bp)))
-			} else if props.Scale != nil {
-				node.SetLocalScaleVec(props.Scale)
-			} else if start.Scale != nil {
-				node.SetLocalScaleVec(start.Scale)
-			}
+			diff = props.Scale.Sub(start.Scale)
+			node.SetLocalScaleVec(start.Scale.Add(diff.Scale(bp)))
 
-			if start.Rotation != nil && props.Rotation != nil {
-				rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
-				node.SetLocalRotation(rot.ToMatrix4())
-			} else if props.Rotation != nil {
-				node.SetLocalRotation(props.Rotation.ToMatrix4())
-			} else if start.Rotation != nil {
-				node.SetLocalRotation(start.Rotation.ToMatrix4())
-			}
+			rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
+			node.SetLocalRotation(rot.ToMatrix4())
+
+			// if start.Position != nil && props.Position != nil {
+			// 	diff := props.Position.Sub(start.Position)
+			// 	node.SetLocalPositionVec(start.Position.Add(diff.Scale(bp)))
+			// } else if props.Position != nil {
+			// 	node.SetLocalPositionVec(props.Position)
+			// } else if start.Position != nil {
+			// 	node.SetLocalPositionVec(start.Position)
+			// }
+
+			// if start.Scale != nil && props.Scale != nil {
+			// 	diff := props.Scale.Sub(start.Scale)
+			// 	node.SetLocalScaleVec(start.Scale.Add(diff.Scale(bp)))
+			// } else if props.Scale != nil {
+			// 	node.SetLocalScaleVec(props.Scale)
+			// } else if start.Scale != nil {
+			// 	node.SetLocalScaleVec(start.Scale)
+			// }
+
+			// if start.Rotation != nil && props.Rotation != nil {
+			// 	rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
+			// 	node.SetLocalRotation(rot.ToMatrix4())
+			// } else if props.Rotation != nil {
+			// 	node.SetLocalRotation(props.Rotation.ToMatrix4())
+			// } else if start.Rotation != nil {
+			// 	node.SetLocalRotation(start.Rotation.ToMatrix4())
+			// }
 
 			if bp == 1 {
 				ap.blendStart = time.Time{}
@@ -534,15 +539,9 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 		} else {
 
-			if props.Position != nil {
-				node.SetLocalPositionVec(props.Position)
-			}
-			if props.Scale != nil {
-				node.SetLocalScaleVec(props.Scale)
-			}
-			if props.Rotation != nil {
-				node.SetLocalRotation(props.Rotation.ToMatrix4())
-			}
+			node.SetLocalPositionVec(props.Position)
+			node.SetLocalScaleVec(props.Scale)
+			node.SetLocalRotation(props.Rotation.ToMatrix4())
 
 		}
 

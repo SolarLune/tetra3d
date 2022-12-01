@@ -2,8 +2,6 @@ package tetra3d
 
 import (
 	"math"
-
-	"github.com/kvartborg/vector"
 )
 
 // BoundingAABB represents a 3D AABB (Axis-Aligned Bounding Box), a 3D cube of varying width, height, and depth that cannot rotate.
@@ -11,7 +9,7 @@ import (
 // BoundingObject Nodes.
 type BoundingAABB struct {
 	*Node
-	internalSize vector.Vector
+	internalSize Vector
 	Dimensions   Dimensions
 }
 
@@ -29,7 +27,7 @@ func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
 	}
 	bounds := &BoundingAABB{
 		Node:         NewNode(name),
-		internalSize: vector.Vector{width, height, depth},
+		internalSize: Vector{width, height, depth, 0},
 	}
 	bounds.Node.onTransformUpdate = bounds.updateSize
 	bounds.updateSize()
@@ -53,41 +51,39 @@ func (box *BoundingAABB) updateSize() {
 		{-1, -1, -1},
 	}
 
-	dimensions := Dimensions{
-		vector.Vector{math.MaxFloat64, math.MaxFloat64, math.MaxFloat64},
-		vector.Vector{-math.MaxFloat64, -math.MaxFloat64, -math.MaxFloat64},
-	}
+	dimensions := NewEmptyDimensions()
 
 	for _, c := range corners {
 
-		position := r.MultVec(vector.Vector{
-			box.internalSize[0] * c[0] * s[0] / 2,
-			box.internalSize[1] * c[1] * s[1] / 2,
-			box.internalSize[2] * c[2] * s[2] / 2,
+		position := r.MultVec(Vector{
+			box.internalSize.X * c[0] * s.X / 2,
+			box.internalSize.Y * c[1] * s.Y / 2,
+			box.internalSize.Z * c[2] * s.Z / 2,
+			0,
 		})
 
-		if dimensions[0][0] > position[0] {
-			dimensions[0][0] = position[0]
+		if dimensions.Min.X > position.X {
+			dimensions.Min.X = position.X
 		}
 
-		if dimensions[0][1] > position[1] {
-			dimensions[0][1] = position[1]
+		if dimensions.Min.Y > position.Y {
+			dimensions.Min.Y = position.Y
 		}
 
-		if dimensions[0][2] > position[2] {
-			dimensions[0][2] = position[2]
+		if dimensions.Min.Z > position.Z {
+			dimensions.Min.Z = position.Z
 		}
 
-		if dimensions[1][0] < position[0] {
-			dimensions[1][0] = position[0]
+		if dimensions.Max.X < position.X {
+			dimensions.Max.X = position.X
 		}
 
-		if dimensions[1][1] < position[1] {
-			dimensions[1][1] = position[1]
+		if dimensions.Max.Y < position.Y {
+			dimensions.Max.Y = position.Y
 		}
 
-		if dimensions[1][2] < position[2] {
-			dimensions[1][2] = position[2]
+		if dimensions.Max.Z < position.Z {
+			dimensions.Max.Z = position.Z
 		}
 
 	}
@@ -110,10 +106,10 @@ func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float64) {
 		newDepth = min
 	}
 
-	if box.internalSize[0] != newWidth || box.internalSize[1] != newHeight || box.internalSize[2] != newDepth {
-		box.internalSize[0] = newWidth
-		box.internalSize[1] = newHeight
-		box.internalSize[2] = newDepth
+	if box.internalSize.X != newWidth || box.internalSize.Y != newHeight || box.internalSize.Z != newDepth {
+		box.internalSize.X = newWidth
+		box.internalSize.Y = newHeight
+		box.internalSize.Z = newDepth
 		box.updateSize()
 	}
 
@@ -121,7 +117,7 @@ func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float64) {
 
 // Clone returns a new BoundingAABB.
 func (box *BoundingAABB) Clone() INode {
-	clone := NewBoundingAABB(box.name, box.internalSize[0], box.internalSize[1], box.internalSize[2])
+	clone := NewBoundingAABB(box.name, box.internalSize.X, box.internalSize.Y, box.internalSize.Z)
 	clone.Node = box.Node.Clone().(*Node)
 	clone.Node.onTransformUpdate = clone.updateSize
 	return clone
@@ -136,28 +132,28 @@ func (box *BoundingAABB) AddChildren(children ...INode) {
 
 // ClosestPoint returns the closest point, to the point given, on the inside or surface of the BoundingAABB
 // in world space.
-func (box *BoundingAABB) ClosestPoint(point vector.Vector) vector.Vector {
-	out := point.Clone()
+func (box *BoundingAABB) ClosestPoint(point Vector) Vector {
+	out := point
 	pos := box.WorldPosition()
 
 	half := box.Dimensions.Size().Scale(0.5)
 
-	if out[0] > pos[0]+half[0] {
-		out[0] = pos[0] + half[0]
-	} else if out[0] < pos[0]-half[0] {
-		out[0] = pos[0] - half[0]
+	if out.X > pos.X+half.X {
+		out.X = pos.X + half.X
+	} else if out.X < pos.X-half.X {
+		out.X = pos.X - half.X
 	}
 
-	if out[1] > pos[1]+half[1] {
-		out[1] = pos[1] + half[1]
-	} else if out[1] < pos[1]-half[1] {
-		out[1] = pos[1] - half[1]
+	if out.Y > pos.Y+half.Y {
+		out.Y = pos.Y + half.Y
+	} else if out.Y < pos.Y-half.Y {
+		out.Y = pos.Y - half.Y
 	}
 
-	if out[2] > pos[2]+half[2] {
-		out[2] = pos[2] + half[2]
-	} else if out[2] < pos[2]-half[2] {
-		out[2] = pos[2] - half[2]
+	if out.Z > pos.Z+half.Z {
+		out.Z = pos.Z + half.Z
+	} else if out.Z < pos.Z-half.Z {
+		out.Z = pos.Z - half.Z
 	}
 
 	return out
@@ -165,40 +161,40 @@ func (box *BoundingAABB) ClosestPoint(point vector.Vector) vector.Vector {
 
 // aabbNormalGuess guesses which normal to return for an AABB given an MTV vector. Basically, if you have an MTV vector indicating a sphere, for example,
 // moves up by 0.1 when colliding with an AABB, it must be colliding with the top, and so the returned normal would be [0, 1, 0].
-func aabbNormalGuess(dir vector.Vector) vector.Vector {
+func aabbNormalGuess(dir Vector) Vector {
 
-	if dir[0] == 0 && dir[1] == 0 && dir[2] == 0 {
-		return vector.Vector{0, 0, 0}
+	if dir.X == 0 && dir.Y == 0 && dir.Z == 0 {
+		return NewVectorZero()
 	}
 
-	ax := math.Abs(dir[0])
-	ay := math.Abs(dir[1])
-	az := math.Abs(dir[2])
+	ax := math.Abs(dir.X)
+	ay := math.Abs(dir.Y)
+	az := math.Abs(dir.Z)
 
 	if ax > az && ax > ay {
 		// X is greatest axis
-		if dir[0] > 0 {
-			return vector.Vector{1, 0, 0}
+		if dir.X > 0 {
+			return Vector{1, 0, 0, 0}
 		} else {
-			return vector.Vector{-1, 0, 0}
+			return Vector{-1, 0, 0, 0}
 		}
 	}
 
 	if ay > az {
 		// Y is greatest axis
 
-		if dir[1] > 0 {
-			return vector.Vector{0, 1, 0}
+		if dir.Y > 0 {
+			return Vector{0, 1, 0, 0}
 		} else {
-			return vector.Vector{0, -1, 0}
+			return Vector{0, -1, 0, 0}
 		}
 	}
 
 	// Z is greatest axis
-	if dir[2] > 0 {
-		return vector.Vector{0, 0, 1}
+	if dir.Z > 0 {
+		return Vector{0, 0, 1, 0}
 	} else {
-		return vector.Vector{0, 0, -1}
+		return Vector{0, 0, -1, 0}
 	}
 
 }
@@ -227,7 +223,7 @@ func (box *BoundingAABB) Collision(other IBoundingObject) *Collision {
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
-				vector.In(inter.Normal).Invert()
+				inter.Normal = inter.Normal.Invert()
 			}
 			intersection.BoundingObject = otherBounds
 		}
@@ -241,7 +237,7 @@ func (box *BoundingAABB) Collision(other IBoundingObject) *Collision {
 		if intersection != nil {
 			for _, inter := range intersection.Intersections {
 				inter.MTV = inter.MTV.Invert()
-				vector.In(inter.Normal).Invert()
+				inter.Normal = inter.Normal.Invert()
 			}
 			intersection.BoundingObject = otherBounds
 		}
@@ -271,11 +267,8 @@ func (box *BoundingAABB) CollisionTest(dx, dy, dz float64, others ...INode) []*C
 // collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
 // object.
 // Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
-func (box *BoundingAABB) CollisionTestVec(moveVec vector.Vector, others ...INode) []*Collision {
-	if moveVec == nil {
-		return commonCollisionTest(box, 0, 0, 0, others...)
-	}
-	return commonCollisionTest(box, moveVec[0], moveVec[1], moveVec[2], others...)
+func (box *BoundingAABB) CollisionTestVec(moveVec Vector, others ...INode) []*Collision {
+	return commonCollisionTest(box, moveVec.X, moveVec.Y, moveVec.Z, others...)
 }
 
 // Type returns the NodeType for this object.
@@ -283,16 +276,16 @@ func (box *BoundingAABB) Type() NodeType {
 	return NodeTypeBoundingAABB
 }
 
-func (box *BoundingAABB) PointInside(point vector.Vector) bool {
+func (box *BoundingAABB) PointInside(point Vector) bool {
 
 	position := box.WorldPosition()
-	min := box.Dimensions[0].Add(position)
-	max := box.Dimensions[1].Add(position)
+	min := box.Dimensions.Min.Add(position)
+	max := box.Dimensions.Max.Add(position)
 	margin := 0.01
 
-	if point[0] >= min[0]-margin && point[0] <= max[0]+margin &&
-		point[1] >= min[1]-margin && point[1] <= max[1]+margin &&
-		point[2] >= min[2]-margin && point[2] <= max[2]+margin {
+	if point.X >= min.X-margin && point.X <= max.X+margin &&
+		point.Y >= min.Y-margin && point.Y <= max.Y+margin &&
+		point.Z >= min.Z-margin && point.Z <= max.Z+margin {
 		return true
 	}
 

@@ -35,7 +35,7 @@ type Game struct {
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
 	DrawDebugCenters   bool
-	PrevMousePosition  vector.Vector
+	PrevMousePosition  Vector
 
 	AnimatedTexture *tetra3d.TexturePlayer
 
@@ -49,7 +49,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             796,
 		Height:            448,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 		DrawDebugText:     true,
 	}
 
@@ -74,7 +74,7 @@ func (g *Game) Init() {
 	g.Scene.World.LightingOn = false
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 10})
+	g.Camera.SetLocalPositionVec(Vector{0, 5, 10})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	// Firstly, we create a TexturePlayer, which animates a collection of vertices' UV values to
@@ -93,7 +93,7 @@ func (g *Game) Init() {
 
 	// bloopAnim := &tetra3d.TextureAnimation{
 	// 	FPS: 15,
-	// 	Frames: []vector.Vector{
+	// 	Frames: []Vector{
 	// 		{0, 0},     // UV offset for frame 0
 	// 		{0.5, 0},   // ... For frame 1,
 	// 		{0, 0.5},   // ... For frame 2,
@@ -178,7 +178,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 

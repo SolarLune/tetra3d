@@ -125,7 +125,7 @@ func NewGame() *Game {
 	// use for positioning and parenting) can, as well.
 
 	// We can place Models, Cameras, and other Nodes with node.SetWorldPositionVec() or 
-	// node.SetLocalPositionVec(). Both functions take a 3D vector.Vector from kvartborg's 
+	// node.SetLocalPositionVec(). Both functions take a 3D Vector from kvartborg's 
 	// vector package, and there's an additional variant that just takes the components directly,
 	// for convenience.
 
@@ -360,7 +360,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Reusing vertex indices for adjacent triangles (I believe this is possible to implement; I didn't initially because I thought that would make adjacent triangles, each with their own UV values impossible; in truth, the modeler probably automatically splits these vertices out into unique ones as necessary)
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?
-- [ ] -- Replace vector.Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)?
+- [ ] -- Replace Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)?
 - [X] -- Vector pools
 - [ ] -- Matrix pools?
 - [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?

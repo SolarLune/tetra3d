@@ -34,7 +34,7 @@ type Game struct {
 	DrawDebugText      bool
 	DrawDebugWireframe bool
 	DrawDebugDepth     bool
-	PrevMousePosition  vector.Vector
+	PrevMousePosition  Vector
 
 	Time float64
 }
@@ -43,7 +43,7 @@ func NewGame() *Game {
 	game := &Game{
 		Width:             1920,
 		Height:            1080,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 		DrawDebugText:     true,
 	}
 
@@ -68,7 +68,7 @@ func (g *Game) Init() {
 
 	g.Camera = tetra3d.NewCamera(1920, 1080)
 	g.Camera.Far = 30
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 5, 15})
+	g.Camera.SetLocalPositionVec(Vector{0, 5, 15})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ambientLight := tetra3d.NewAmbientLight("ambient", 0.8, 0.9, 1, 0.5)
@@ -80,7 +80,7 @@ func (g *Game) Init() {
 
 	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
 
-	water.VertexTransformFunction = func(v vector.Vector, vertID int) vector.Vector {
+	water.VertexTransformFunction = func(v Vector, vertID int) Vector {
 		v[1] += math.Sin((g.Time*math.Pi)+(v[0]*1.2)+(v[2]*0.739)) * 0.1
 		return v
 	}
@@ -153,7 +153,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 

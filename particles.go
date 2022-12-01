@@ -2,8 +2,6 @@ package tetra3d
 
 import (
 	"math/rand"
-
-	"github.com/kvartborg/vector"
 )
 
 const (
@@ -16,12 +14,12 @@ const (
 // Particle represents a particle, rendered in a ParticleSystem.
 type Particle struct {
 	ParticleSystem *ParticleSystem
-	ModelBank      []*Model      // Bank of models the particle could possibly use
-	Model          *Model        // The currently active Model
-	Velocity       vector.Vector // The velocity of the Particle in world-space
-	Acceleration   vector.Vector // The acceleration of the Particle in world-space; these values are added to the particle's velocity each frame.
-	Growth         vector.Vector // The growth of the Particle in world-space
-	Rotation       vector.Vector // The additive rotation of the Particle in local-space
+	ModelBank      []*Model // Bank of models the particle could possibly use
+	Model          *Model   // The currently active Model
+	Velocity       Vector   // The velocity of the Particle in world-space
+	Acceleration   Vector   // The acceleration of the Particle in world-space; these values are added to the particle's velocity each frame.
+	Growth         Vector   // The growth of the Particle in world-space
+	Rotation       Vector   // The additive rotation of the Particle in local-space
 	Life           float64
 	Lifetime       float64
 	Data           map[string]interface{}
@@ -68,28 +66,28 @@ func (part *Particle) Update(dt float64) {
 
 	if friction := part.ParticleSystem.Settings.Friction; friction > 0 {
 
-		if vel[0] > friction {
-			vel[0] -= friction
-		} else if vel[0] < -friction {
-			vel[0] += friction
+		if vel.X > friction {
+			vel.X -= friction
+		} else if vel.X < -friction {
+			vel.X += friction
 		} else {
-			vel[0] = 0
+			vel.X = 0
 		}
 
-		if vel[1] > friction {
-			vel[1] -= friction
-		} else if vel[1] < -friction {
-			vel[1] += friction
+		if vel.Y > friction {
+			vel.Y -= friction
+		} else if vel.Y < -friction {
+			vel.Y += friction
 		} else {
-			vel[1] = 0
+			vel.Y = 0
 		}
 
-		if vel[2] > friction {
-			vel[2] -= friction
-		} else if vel[2] < -friction {
-			vel[2] += friction
+		if vel.Z > friction {
+			vel.Z -= friction
+		} else if vel.Z < -friction {
+			vel.Z += friction
 		} else {
-			vel[2] = 0
+			vel.Z = 0
 		}
 
 	}
@@ -107,14 +105,14 @@ func (part *Particle) Update(dt float64) {
 	}
 
 	if part.Rotation.Magnitude() != 0 {
-		part.Model.RotateVec(vector.X, part.Rotation[0])
-		part.Model.RotateVec(vector.Y, part.Rotation[1])
-		part.Model.RotateVec(vector.Z, part.Rotation[2])
+		part.Model.RotateVec(VecX, part.Rotation.X)
+		part.Model.RotateVec(VecY, part.Rotation.Y)
+		part.Model.RotateVec(VecZ, part.Rotation.Z)
 	}
 
 	scale := part.Model.LocalScale()
 
-	if !part.ParticleSystem.Settings.AllowNegativeScale && (scale[0] < 0 || scale[1] < 0 || scale[2] < 0) {
+	if !part.ParticleSystem.Settings.AllowNegativeScale && (scale.X < 0 || scale.Y < 0 || scale.Z < 0) {
 		part.Life = part.Lifetime // Die because the particle got too small
 	}
 
@@ -321,7 +319,7 @@ func (ps *ParticleSystem) Spawn() {
 	part.Growth = ps.Settings.Growth.Value()
 	part.Rotation = ps.Settings.Rotation.Value()
 
-	var pos vector.Vector
+	var pos Vector
 
 	if ps.Settings.VertexSpawnMode != ParticleVertexSpawnModeOff {
 
@@ -394,16 +392,16 @@ func (ran *NumberRange) Value() float64 {
 // VectorRange represents a range of possible values, and allows Tetra3D to get a random value from within
 // that number range.
 type VectorRange struct {
-	Uniform bool          // If the random value returned by the NumberRange should be consistent across all axes or not
-	Min     vector.Vector // Min is the set of minimum numbers allowed in the NumberRange
-	Max     vector.Vector // Max is the set of maximum numbers allowed in the NumberRange
+	Uniform bool   // If the random value returned by the NumberRange should be consistent across all axes or not
+	Min     Vector // Min is the set of minimum numbers allowed in the NumberRange
+	Max     Vector // Max is the set of maximum numbers allowed in the NumberRange
 }
 
 // NewVectorRange returns a new instance of a 3D NumberRange struct.
 func NewVectorRange() *VectorRange {
 	return &VectorRange{
-		Min: vector.Vector{0, 0, 0},
-		Max: vector.Vector{0, 0, 0},
+		Min: Vector{0, 0, 0, 0},
+		Max: Vector{0, 0, 0, 0},
 	}
 }
 
@@ -411,83 +409,85 @@ func NewVectorRange() *VectorRange {
 func (ran *VectorRange) Clone() *VectorRange {
 	new := NewVectorRange()
 	new.Uniform = ran.Uniform
-	new.Min = ran.Min.Clone()
-	new.Max = ran.Max.Clone()
+	new.Min = ran.Min
+	new.Max = ran.Max
 	return new
 }
 
 // SetAll sets the minimum and maximum values of all components of the number range at the same time to the value
 // passed.
 func (ran *VectorRange) SetAll(value float64) {
-	ran.Min[0] = value
-	ran.Max[0] = value
-	ran.Min[1] = value
-	ran.Max[1] = value
-	ran.Min[2] = value
-	ran.Max[2] = value
+	ran.Min.X = value
+	ran.Max.X = value
+	ran.Min.Y = value
+	ran.Max.Y = value
+	ran.Min.Z = value
+	ran.Max.Z = value
 }
 
 // SetAxes sets the minimum and maximum values of all components of the number range at the same time. Both
 // minimum and maximum boundaries of the NumberRange will be the same.
 func (ran *VectorRange) SetAxes(x, y, z float64) {
-	ran.Min[0] = x
-	ran.Max[0] = x
+	ran.Min.X = x
+	ran.Max.X = x
 
-	ran.Min[1] = y
-	ran.Max[1] = y
+	ran.Min.Y = y
+	ran.Max.Y = y
 
-	ran.Min[2] = z
-	ran.Max[2] = z
+	ran.Min.Z = z
+	ran.Max.Z = z
 }
 
 // SetRanges sets the minimum and maximum values of all components (axes) of the number range.
 func (ran *VectorRange) SetRanges(min, max float64) {
 
-	ran.Min[0] = min
-	ran.Min[1] = min
-	ran.Min[2] = min
+	ran.Min.X = min
+	ran.Min.Y = min
+	ran.Min.Z = min
 
-	ran.Max[0] = max
-	ran.Max[1] = max
-	ran.Max[2] = max
+	ran.Max.X = max
+	ran.Max.Y = max
+	ran.Max.Z = max
 
 }
 
 // SetRangeX sets the minimum and maximum values of the X component of the number range.
 func (ran *VectorRange) SetRangeX(min, max float64) {
-	ran.Min[0] = min
-	ran.Max[0] = max
+	ran.Min.X = min
+	ran.Max.X = max
 }
 
 // SetRangeY sets the minimum and maximum values of the Y component of the number range.
 func (ran *VectorRange) SetRangeY(min, max float64) {
-	ran.Min[1] = min
-	ran.Max[1] = max
+	ran.Min.Y = min
+	ran.Max.Y = max
 }
 
 // SetRangeZ sets the minimum and maximum values of the Z component of the number range.
 func (ran *VectorRange) SetRangeZ(min, max float64) {
-	ran.Min[2] = min
-	ran.Max[2] = max
+	ran.Min.Z = min
+	ran.Max.Z = max
 }
 
 // Value returns a random value from within the bounds of the NumberRange.
-func (ran *VectorRange) Value() vector.Vector {
+func (ran *VectorRange) Value() Vector {
 
-	var vec vector.Vector
+	var vec Vector
 
 	if ran.Uniform {
 		random := rand.Float64()
-		vec = vector.Vector{
-			ran.Min[0] + ((ran.Max[0] - ran.Min[0]) * random),
-			ran.Min[1] + ((ran.Max[1] - ran.Min[1]) * random),
-			ran.Min[2] + ((ran.Max[2] - ran.Min[2]) * random),
+		vec = Vector{
+			ran.Min.X + ((ran.Max.X - ran.Min.X) * random),
+			ran.Min.Y + ((ran.Max.Y - ran.Min.Y) * random),
+			ran.Min.Z + ((ran.Max.Z - ran.Min.Z) * random),
+			0,
 		}
 	} else {
-		vec = vector.Vector{
-			ran.Min[0] + ((ran.Max[0] - ran.Min[0]) * rand.Float64()),
-			ran.Min[1] + ((ran.Max[1] - ran.Min[1]) * rand.Float64()),
-			ran.Min[2] + ((ran.Max[2] - ran.Min[2]) * rand.Float64()),
+		vec = Vector{
+			ran.Min.X + ((ran.Max.X - ran.Min.X) * rand.Float64()),
+			ran.Min.Y + ((ran.Max.Y - ran.Min.Y) * rand.Float64()),
+			ran.Min.Z + ((ran.Max.Z - ran.Min.Z) * rand.Float64()),
+			0,
 		}
 	}
 

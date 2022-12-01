@@ -33,7 +33,7 @@ type Game struct {
 
 	DrawDebugText     bool
 	DrawDebugDepth    bool
-	PrevMousePosition vector.Vector
+	PrevMousePosition Vector
 
 	Time float64
 }
@@ -43,7 +43,7 @@ func NewGame() *Game {
 		Width:             796,
 		Height:            448,
 		DrawDebugText:     true,
-		PrevMousePosition: vector.Vector{},
+		PrevMousePosition: Vector{},
 	}
 
 	game.Init()
@@ -72,7 +72,7 @@ func (g *Game) Init() {
 	g.Scene = library.Scenes[0]
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(vector.Vector{0, 2, 15})
+	g.Camera.SetLocalPositionVec(Vector{0, 2, 15})
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -213,7 +213,7 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := vector.Vector{float64(mx), float64(my)}
+	mv := Vector{float64(mx), float64(my)}
 
 	diff := mv.Sub(g.PrevMousePosition)
 
