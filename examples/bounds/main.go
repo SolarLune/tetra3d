@@ -12,7 +12,6 @@ import (
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
@@ -138,7 +137,7 @@ func (g *Game) Update() error {
 		move[2] = moveSpd
 	}
 
-	// Let's do gravity first
+	// Collision checking:
 
 	move[1] -= 0.3
 
@@ -148,14 +147,14 @@ func (g *Game) Update() error {
 		break
 	}
 
+	// Now try moving horizontally:
+
 	g.Controlling.MoveVec(move)
 
 	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
 	for _, col := range bounds.CollisionTest(0, 0, 0, solids...) {
-		g.Controlling.MoveVec(col.AverageMTV())
-		move = col.SlideAgainstAverageNormal(move)
-		move[1] = 0 // We don't want to move up
-		// break
+		mtv := col.AverageMTV()
+		g.Controlling.Move(mtv[0], 0, mtv[2])
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {

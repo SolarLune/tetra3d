@@ -503,6 +503,7 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
     bl_context = "render"
     
     def draw(self, context):
+
         row = self.layout.row()
         row.operator(EXPORT_OT_tetra3d.bl_idname)
         row = self.layout.row()
@@ -518,6 +519,14 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box.prop(context.scene, "t3dPackTextures__")
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
+
+        row = self.layout.row()
+        row.prop(context.scene.render, "resolution_x")
+        row.prop(context.scene.render, "resolution_y")
+        row = self.layout.row()
+        row.label(text="Animation Playback Framerate (in Blender):")
+        row = self.layout.row()
+        row.prop(context.scene.render, "fps")
 
 
 def export():

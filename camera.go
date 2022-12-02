@@ -67,6 +67,7 @@ type Camera struct {
 	clipAlphaCompositeShader *ebiten.Shader
 	clipAlphaRenderShader    *ebiten.Shader
 	colorShader              *ebiten.Shader
+	sprite3DShader           *ebiten.Shader
 
 	// Visibility check variables
 	cameraForward          Vector
@@ -138,7 +139,7 @@ func NewCamera(w, h int) *Camera {
 		}
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
-			tex := imageSrc0At(texCoord)
+			tex := imageSrc0UnsafeAt(texCoord)
 			if (tex.a == 0) {
 				discard()
 			} else {
@@ -167,8 +168,8 @@ func NewCamera(w, h int) *Camera {
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
-			depthValue := imageSrc0At(texCoord)
-			texture := imageSrc1At(texCoord)
+			depthValue := imageSrc0UnsafeAt(texCoord)
+			texture := imageSrc1UnsafeAt(texCoord)
 
 			if depthValue.a == 0 || decodeDepth(depthValue) > texture.r {
 				return texture
@@ -187,7 +188,7 @@ func NewCamera(w, h int) *Camera {
 		panic(err)
 	}
 
-	colorShaderText := []byte(
+	cam.colorShader, err = ebiten.NewShader([]byte(
 		`package main
 
 		var Fog vec4
@@ -202,10 +203,10 @@ func NewCamera(w, h int) *Camera {
 		
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 
-			depth := imageSrc1At(texCoord)
+			depth := imageSrc1UnsafeAt(texCoord)
 			
 			if depth.a > 0 {
-				colorTex := imageSrc0At(texCoord)
+				colorTex := imageSrc0UnsafeAt(texCoord)
 				
 				d := smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
 
@@ -234,9 +235,37 @@ func NewCamera(w, h int) *Camera {
 		}
 
 		`,
+	))
+
+	if err != nil {
+		panic(err)
+	}
+
+	sprite3DShaderText := []byte(
+		`package main
+
+		var SpriteDepth float
+
+		func decodeDepth(rgba vec4) float {
+			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+		}
+
+		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+
+			resultDepth := imageSrc1UnsafeAt(texCoord)
+
+			if resultDepth.a == 0 || decodeDepth(resultDepth) > SpriteDepth {
+				return imageSrc0UnsafeAt(texCoord)
+			}
+
+			discard()
+
+		}
+
+		`,
 	)
 
-	cam.colorShader, err = ebiten.NewShader(colorShaderText)
+	cam.sprite3DShader, err = ebiten.NewShader(sprite3DShaderText)
 
 	if err != nil {
 		panic(err)
@@ -302,6 +331,12 @@ func (camera *Camera) Resize(w, h int) {
 	camera.clipAlphaIntermediate = ebiten.NewImage(w, h)
 	camera.sphereFactorCalculated = false
 
+}
+
+// Size returns the width and height of the camera's backing color texture. All of the Camera's textures are the same size, so these
+// same size values can also be used for the depth texture, the accumulation buffer, etc.
+func (camera *Camera) Size() (w, h int) {
+	return camera.resultColorTexture.Size()
 }
 
 // ViewMatrix returns the Camera's view matrix.
@@ -1223,6 +1258,88 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 	camera.DebugInfo.frameTime += time.Since(frametimeStart)
 
 	camera.DebugInfo.frameCount++
+
+}
+
+func encodeDepth(depth float64) *Color {
+
+	r := math.Floor(depth*255) / 255
+	_, f := math.Modf(depth * 255)
+	g := math.Floor(f*255) / 255
+	_, f = math.Modf(depth * 255 * 255)
+	b := f
+
+	if r < 0 {
+		r = 0
+	} else if r > 1 {
+		r = 1
+	}
+	if g < 0 {
+		g = 0
+	} else if g > 1 {
+		g = 1
+	}
+	if b < 0 {
+		b = 0
+	} else if b > 1 {
+		b = 1
+	}
+
+	return NewColor(float32(r), float32(g), float32(b), 1)
+
+}
+
+type SpriteRender3d struct {
+	Image         *ebiten.Image
+	Options       *ebiten.DrawImageOptions
+	WorldPosition Vector
+}
+
+// DrawImageIn3D draws an image on the screen in 2D, but at the screen position of the 3D world position provided
+// and with depth intersection.
+// This allows you to render 2D elements "at" a 3D position, and can be very useful in situations where you want
+// a sprite to render at 100% size and no perspective or skewing, but still look like it's in the 3D space (like in
+// a game with a fixed camera viewpoint).
+func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...SpriteRender3d) {
+
+	// TODO: Replace this with a more performant alternative, where we minimize shader / texture switches.
+
+	for _, rs := range renderSettings {
+
+		camera.colorIntermediate.Clear()
+
+		px := camera.WorldToScreen(rs.WorldPosition)
+
+		out := camera.ViewMatrix().Mult(camera.Projection()).MultVec(rs.WorldPosition)
+
+		depth := float32(out.Z / camera.Far)
+
+		if depth < 0 {
+			depth = 0
+		}
+		if depth > 1 {
+			depth = 1
+		}
+
+		opt := rs.Options
+
+		if opt == nil {
+			opt = &ebiten.DrawImageOptions{}
+		}
+		opt.GeoM.Translate(px.X, px.Y)
+
+		camera.colorIntermediate.DrawImage(rs.Image, opt)
+
+		colorTextureW, colorTextureH := camera.resultColorTexture.Size()
+		rectShaderOptions := &ebiten.DrawRectShaderOptions{}
+		rectShaderOptions.Images[0] = camera.colorIntermediate
+		rectShaderOptions.Images[1] = camera.resultDepthTexture
+		rectShaderOptions.Uniforms = map[string]interface{}{
+			"SpriteDepth": depth,
+		}
+		screen.DrawRectShader(colorTextureW, colorTextureH, camera.sprite3DShader, rectShaderOptions)
+
+	}
 
 }
 

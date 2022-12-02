@@ -485,7 +485,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			if channel.Target.Path == gltf.TRSTranslation {
 
-				id, err := modeler.ReadAccessor(doc, doc.Accessors[*sampler.Input], nil)
+				id, err := modeler.ReadAccessor(doc, doc.Accessors[sampler.Input], nil)
 
 				if err != nil {
 					return nil, err
@@ -493,7 +493,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				inputData := id.([]float32)
 
-				od, err := modeler.ReadAccessor(doc, doc.Accessors[*sampler.Output], nil)
+				od, err := modeler.ReadAccessor(doc, doc.Accessors[sampler.Output], nil)
 
 				if err != nil {
 					return nil, err
@@ -514,7 +514,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			} else if channel.Target.Path == gltf.TRSScale {
 
-				id, err := modeler.ReadAccessor(doc, doc.Accessors[*sampler.Input], nil)
+				id, err := modeler.ReadAccessor(doc, doc.Accessors[sampler.Input], nil)
 
 				if err != nil {
 					return nil, err
@@ -522,7 +522,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				inputData := id.([]float32)
 
-				od, err := modeler.ReadAccessor(doc, doc.Accessors[*sampler.Output], nil)
+				od, err := modeler.ReadAccessor(doc, doc.Accessors[sampler.Output], nil)
 
 				if err != nil {
 					return nil, err
@@ -543,7 +543,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			} else if channel.Target.Path == gltf.TRSRotation {
 
-				id, err := modeler.ReadAccessor(doc, doc.Accessors[*sampler.Input], nil)
+				id, err := modeler.ReadAccessor(doc, doc.Accessors[sampler.Input], nil)
 
 				if err != nil {
 					return nil, err
@@ -551,7 +551,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				inputData := id.([]float32)
 
-				od, err := modeler.ReadAccessor(doc, doc.Accessors[*sampler.Output], nil)
+				od, err := modeler.ReadAccessor(doc, doc.Accessors[sampler.Output], nil)
 
 				if err != nil {
 					return nil, err
