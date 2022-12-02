@@ -1,19 +1,11 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"image/png"
-	"math"
-	"os"
-	"runtime/pprof"
-	"time"
-
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -23,27 +15,15 @@ import (
 var gltfData []byte
 
 type Game struct {
-	Width, Height int
-	Library       *tetra3d.Library
-	Scene         *tetra3d.Scene
+	Library *tetra3d.Library
+	Scene   *tetra3d.Scene
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	PrevMousePosition Vector
-
-	Time float64
+	Camera examples.BasicFreeCam
+	System examples.BasicSystemHandler
 }
 
 func NewGame() *Game {
-	game := &Game{
-		Width:             796,
-		Height:            448,
-		PrevMousePosition: Vector{},
-	}
+	game := &Game{}
 
 	game.Init()
 
@@ -52,10 +32,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	opt := tetra3d.DefaultGLTFLoadOptions()
-	opt.CameraWidth = g.Width
-	opt.CameraHeight = g.Height
-	library, err := tetra3d.LoadGLTFData(gltfData, opt)
+	library, err := tetra3d.LoadGLTFData(gltfData, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -63,32 +40,18 @@ func (g *Game) Init() {
 	g.Library = library
 	g.Scene = library.Scenes[0]
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(Vector{0, 2, 15})
-	g.Scene.Root.AddChildren(g.Camera)
+	g.Camera = examples.NewBasicFreeCam()
+	g.System = examples.NewBasicSystemHandler(g)
+
 	light := tetra3d.NewPointLight("camera light", 1, 1, 1, 2)
 	light.Distance = 10
 	light.Move(0, 1, -2)
 	light.On = false
-	g.Camera.AddChildren(light)
-
-	// g.Scene.FogMode = tetra3d.FogMultiply
-
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+	g.Camera.Node.AddChildren(light)
 
 }
 
 func (g *Game) Update() error {
-
-	g.Time += 1.0 / 60.0
-
-	var err error
-
-	moveSpd := 0.05
-
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
 
 	spin := g.Scene.Root.Get("Spin").(*tetra3d.Model)
 	spin.Rotate(0, 1, 0, 0.025)
@@ -102,42 +65,7 @@ func (g *Game) Update() error {
 	// light := g.Scene.Root.Get("third point light")
 	// light.Move(math.Sin(g.Time*math.Pi)*0.1, 0, math.Cos(g.Time*math.Pi*0.19)*0.03)
 
-	// Moving the Camera
-
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
 	// g.Scene.Root.Get("point light").(*tetra3d.PointLight).Distance = 10 + (math.Sin(g.Time*math.Pi) * 5)
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
-	}
-
-	g.Camera.SetLocalPositionVec(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
 
 	armature := g.Scene.Root.Get("Armature")
 
@@ -151,53 +79,6 @@ func (g *Game) Update() error {
 	player.Play(g.Library.Animations["ArmatureAction"])
 	player.Update(1.0 / 60.0)
 
-	// Rotating the camera with the mouse
-
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
-
-	mv := Vector{float64(mx), float64(my)}
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	g.PrevMousePosition = mv.Clone()
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
-		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture())
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		g.StartProfiling()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		g.Scene.World.LightingOn = !g.Scene.World.LightingOn
 	}
@@ -207,7 +88,7 @@ func (g *Game) Update() error {
 		pointLight.On = !pointLight.On
 	}
 
-	return err
+	return g.System.Update()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -239,24 +120,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	}
 }
 
-func (g *Game) StartProfiling() {
-	outFile, err := os.Create("./cpu.pprof")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(2 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
-}
-
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	nw, nh := g.Camera.ColorTexture().Size()
+	return nw, nh
 }
 
 func main() {

@@ -15,7 +15,7 @@ type Intersection struct {
 
 // Slope returns the slope of the intersection's normal, in radians. This ranges from 0 (straight up) to pi (straight down).
 func (intersection *Intersection) Slope() float64 {
-	return VecY.Angle(intersection.Normal)
+	return Up.Angle(intersection.Normal)
 }
 
 // SlideAgainstNormal takes an input vector and alters it to slide against the intersection's returned normal.
@@ -398,21 +398,21 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 		axes := []Vector{
 
-			VecX,
-			VecY,
-			VecZ,
+			Right,
+			Up,
+			Back,
 
-			VecX.Cross(ab),
-			VecX.Cross(bc),
-			VecX.Cross(ca),
+			Right.Cross(ab),
+			Right.Cross(bc),
+			Right.Cross(ca),
 
-			VecY.Cross(ab),
-			VecY.Cross(bc),
-			VecY.Cross(ca),
+			Up.Cross(ab),
+			Up.Cross(bc),
+			Up.Cross(ca),
 
-			VecZ.Cross(ab),
-			VecZ.Cross(bc),
-			VecZ.Cross(ca),
+			Back.Cross(ab),
+			Back.Cross(bc),
+			Back.Cross(ca),
 
 			transformNoLoc.MultVec(tri.Normal),
 		}
@@ -430,9 +430,9 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 			p1 := project(axis, v0, v1, v2)
 
-			r := boxSize.X*math.Abs(VecX.Dot(axis)) +
-				boxSize.Y*math.Abs(VecY.Dot(axis)) +
-				boxSize.Z*math.Abs(VecZ.Dot(axis))
+			r := boxSize.X*math.Abs(Right.Dot(axis)) +
+				boxSize.Y*math.Abs(Up.Dot(axis)) +
+				boxSize.Z*math.Abs(Back.Dot(axis))
 
 			p2 := projection{
 				Max: r,

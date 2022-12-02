@@ -205,9 +205,12 @@ func (animation *Animation) Library() *Library {
 
 // AnimationValues indicate the current position, scale, and rotation for a Node.
 type AnimationValues struct {
-	Position Vector
-	Scale    Vector
-	Rotation *Quaternion
+	Position       Vector
+	PositionExists bool
+	Scale          Vector
+	ScaleExists    bool
+	Rotation       *Quaternion
+	RotationExists bool
 }
 
 // AnimationPlayer is an object that allows you to play back an animation on a Node.
@@ -371,6 +374,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 						// node.SetLocalPositionVecVec(track.ValueAsVector(ap.Playhead))
 						if vec, exists := track.ValueAsVector(ap.Playhead); exists {
 							ap.AnimatedProperties[node].Position = vec
+							ap.AnimatedProperties[node].PositionExists = true
 						}
 					}
 
@@ -378,6 +382,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 						// node.SetLocalScaleVec(track.ValueAsVector(ap.Playhead))
 						if vec, exists := track.ValueAsVector(ap.Playhead); exists {
 							ap.AnimatedProperties[node].Scale = vec
+							ap.AnimatedProperties[node].ScaleExists = true
 						}
 					}
 
@@ -385,6 +390,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 						quat := track.ValueAsQuaternion(ap.Playhead)
 						// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
 						ap.AnimatedProperties[node].Rotation = quat
+						ap.AnimatedProperties[node].RotationExists = true
 					}
 
 				}
@@ -496,41 +502,32 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 			start := ap.prevAnimatedProperties[node]
 
-			diff := props.Position.Sub(start.Position)
-			node.SetLocalPositionVec(start.Position.Add(diff.Scale(bp)))
+			if start.PositionExists && props.PositionExists {
+				diff := props.Position.Sub(start.Position)
+				node.SetLocalPositionVec(start.Position.Add(diff.Scale(bp)))
+			} else if props.PositionExists {
+				node.SetLocalPositionVec(props.Position)
+			} else if start.PositionExists {
+				node.SetLocalPositionVec(start.Position)
+			}
 
-			diff = props.Scale.Sub(start.Scale)
-			node.SetLocalScaleVec(start.Scale.Add(diff.Scale(bp)))
+			if start.ScaleExists && props.ScaleExists {
+				diff := props.Scale.Sub(start.Scale)
+				node.SetLocalScaleVec(start.Scale.Add(diff.Scale(bp)))
+			} else if props.ScaleExists {
+				node.SetLocalScaleVec(props.Scale)
+			} else if start.ScaleExists {
+				node.SetLocalScaleVec(start.Scale)
+			}
 
-			rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
-			node.SetLocalRotation(rot.ToMatrix4())
-
-			// if start.Position != nil && props.Position != nil {
-			// 	diff := props.Position.Sub(start.Position)
-			// 	node.SetLocalPositionVec(start.Position.Add(diff.Scale(bp)))
-			// } else if props.Position != nil {
-			// 	node.SetLocalPositionVec(props.Position)
-			// } else if start.Position != nil {
-			// 	node.SetLocalPositionVec(start.Position)
-			// }
-
-			// if start.Scale != nil && props.Scale != nil {
-			// 	diff := props.Scale.Sub(start.Scale)
-			// 	node.SetLocalScaleVec(start.Scale.Add(diff.Scale(bp)))
-			// } else if props.Scale != nil {
-			// 	node.SetLocalScaleVec(props.Scale)
-			// } else if start.Scale != nil {
-			// 	node.SetLocalScaleVec(start.Scale)
-			// }
-
-			// if start.Rotation != nil && props.Rotation != nil {
-			// 	rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
-			// 	node.SetLocalRotation(rot.ToMatrix4())
-			// } else if props.Rotation != nil {
-			// 	node.SetLocalRotation(props.Rotation.ToMatrix4())
-			// } else if start.Rotation != nil {
-			// 	node.SetLocalRotation(start.Rotation.ToMatrix4())
-			// }
+			if start.RotationExists && props.RotationExists {
+				rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
+				node.SetLocalRotation(rot.ToMatrix4())
+			} else if props.RotationExists {
+				node.SetLocalRotation(props.Rotation.ToMatrix4())
+			} else if start.RotationExists {
+				node.SetLocalRotation(start.Rotation.ToMatrix4())
+			}
 
 			if bp == 1 {
 				ap.blendStart = time.Time{}
@@ -539,9 +536,15 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 		} else {
 
-			node.SetLocalPositionVec(props.Position)
-			node.SetLocalScaleVec(props.Scale)
-			node.SetLocalRotation(props.Rotation.ToMatrix4())
+			if props.PositionExists {
+				node.SetLocalPositionVec(props.Position)
+			}
+			if props.ScaleExists {
+				node.SetLocalScaleVec(props.Scale)
+			}
+			if props.RotationExists {
+				node.SetLocalRotation(props.Rotation.ToMatrix4())
+			}
 
 		}
 

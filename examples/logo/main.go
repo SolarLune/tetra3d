@@ -1,234 +1,109 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"image/color"
-	"image/png"
-	"math"
-	"os"
-	"runtime/pprof"
-	"time"
 
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
-	"github.com/solarlune/tetra3d/colors"
-	"golang.org/x/image/font/basicfont"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
+
+	examples "github.com/solarlune/tetra3d/examples"
 )
 
 type Game struct {
-	Width, Height int
-	Scene         *tetra3d.Scene
+	Scene     *tetra3d.Scene
+	Offscreen *ebiten.Image
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-	Offscreen    *ebiten.Image
-
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	PrevMousePosition tetra3d.Vector
+	SystemHandler examples.BasicSystemHandler
+	Camera        examples.BasicFreeCam
 }
 
 //go:embed tetra3d.gltf
 var logoModel []byte
 
 func NewGame() *Game {
-	game := &Game{
-		Width:             398,
-		Height:            224,
-		PrevMousePosition: tetra3d.Vector{},
-		DrawDebugText:     true,
-	}
-	game.Offscreen = ebiten.NewImage(game.Width, game.Height)
+
+	game := &Game{}
 
 	game.Init()
 
 	return game
+
 }
 
 func (g *Game) Init() {
+
+	g.Camera = examples.NewBasicFreeCam()
+	g.SystemHandler = examples.NewBasicSystemHandler(g)
+
 	data, err := tetra3d.LoadGLTFData(logoModel, nil)
+
 	if err != nil {
 		panic(err)
 	}
 
 	g.Scene = data.Scenes[0]
 
-	// And set its image to the offscreen buffer
+	g.Offscreen = ebiten.NewImage(g.Camera.Width, g.Camera.Height)
+
+	// Set the screen objects' screen texture to the offscreen buffer we just created above:
 	data.Materials["ScreenTexture"].Texture = g.Offscreen
 
-	g.Scene.World.LightingOn = false
+	// This is another way to do it:
 
-	// This is another way to do it
 	// screen := g.Scene.Root.Get("Screen").(*tetra3d.Model)
-	// screen.Mesh.FindMeshPartByMaterialName("ScreenTexture").Material.Image = g.Offscreen
+	// screen.Mesh.FindMeshPart("ScreenTexture").Material.Texture = g.Offscreen
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(tetra3d.NewVector(0, 0, 5))
-	g.Scene.Root.AddChildren(g.Camera)
-
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+	g.Scene.World.LightingOn = false
 
 }
 
 func (g *Game) Update() error {
-	var err error
 
-	moveSpd := 0.05
+	// Let the camera move around, handle locking and unlocking, etc.
+	g.Camera.Update()
 
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
-
-	// Moving the Camera
-
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos.Y += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos.Y -= moveSpd
-	}
-
-	g.Camera.SetLocalPositionVec(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	// Rotating the camera with the mouse
-
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
-
-	mv := tetra3d.NewVector(float64(mx), float64(my), 0)
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff.Y * 0.005
-	g.CameraRotate -= diff.X * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	// Spinning the tetrahedron in the logo around its local orientation
+	// Spin the tetrahedrons in the logos around their local orientation:
 	for _, g := range g.Scene.Root.ChildrenRecursive().ByTags("spin") {
 		g.Rotate(0, 1, 0, 0.05)
 	}
 
-	g.PrevMousePosition = mv
+	// Let the system handler handle quitting, fullscreening, restarting, etc.
+	return g.SystemHandler.Update()
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
-		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture())
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		g.StartProfiling()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
-	return err
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	// Clear, but with a color
+
+	// Clear with a color:
 	screen.Fill(g.Scene.World.ClearColor.ToRGBA64())
 
-	// Clear the Camera
+	// Clear the Camera:
 	g.Camera.Clear()
 
-	// Render the logo first
+	// Render the logos first:
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("LogoGroup"))
 
-	// Clear the Offscreen, then draw the camera's color texture output to it as well.
+	// Clear the Offscreen, then draw the camera's color texture output to it as well:
 	g.Offscreen.Fill(color.Black)
 	g.Offscreen.DrawImage(g.Camera.ColorTexture(), nil)
 
-	// Render the screen objects after drawing the others; this way, we can ensure the TV doesn't show up onscreen.
+	// Render the screen objects individually after drawing the others; this way, we can ensure the TVs don't show up onscreen:
 	g.Camera.Render(g.Scene, g.Scene.Root.ChildrenRecursive().ByName("screen", false, false).Models()...)
 
-	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
-	// we could just draw the images straight.
-	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture().Size()
-	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), opt)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), opt)
-	}
+	// And then just draw the color texture output:
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThe screen object shows what the\ncamera is looking at.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{200, 200, 200, 255})
-	}
-}
+	// Finally, do any debug rendering that might be necessary. Because BasicFreeCam embeds *tetra3d.Camera, we pass
+	// its embedded Camera instance.
+	g.SystemHandler.Draw(screen, g.Camera.Camera)
 
-func (g *Game) StartProfiling() {
-	outFile, err := os.Create("./cpu.pprof")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(2 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	return g.Camera.Width, g.Camera.Height
 }
 
 func main() {

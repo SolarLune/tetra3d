@@ -11,7 +11,6 @@ import (
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 
@@ -33,17 +32,16 @@ type Game struct {
 
 	DrawDebugText     bool
 	DrawDebugDepth    bool
-	PrevMousePosition Vector
+	PrevMousePosition tetra3d.Vector
 
 	Time float64
 }
 
 func NewGame() *Game {
 	game := &Game{
-		Width:             796,
-		Height:            448,
-		DrawDebugText:     true,
-		PrevMousePosition: Vector{},
+		Width:         796,
+		Height:        448,
+		DrawDebugText: true,
 	}
 
 	game.Init()
@@ -72,7 +70,7 @@ func (g *Game) Init() {
 	g.Scene = library.Scenes[0]
 
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(Vector{0, 2, 15})
+	g.Camera.SetLocalPositionVec(tetra3d.NewVector(0, 2, 15))
 	g.Scene.Root.AddChildren(g.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
@@ -196,10 +194,10 @@ func (g *Game) Update() error {
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
+		pos.Y += moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
+		pos.Y -= moveSpd
 	}
 
 	g.Camera.SetLocalPositionVec(pos)
@@ -213,12 +211,12 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := Vector{float64(mx), float64(my)}
+	mv := tetra3d.Vector{float64(mx), float64(my), 0, 0}
 
 	diff := mv.Sub(g.PrevMousePosition)
 
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
+	g.CameraTilt -= diff.Y * 0.005
+	g.CameraRotate -= diff.X * 0.005
 
 	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
 
@@ -228,7 +226,7 @@ func (g *Game) Update() error {
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
 	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
-	g.PrevMousePosition = mv.Clone()
+	g.PrevMousePosition = mv
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")

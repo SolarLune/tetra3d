@@ -105,9 +105,9 @@ func (part *Particle) Update(dt float64) {
 	}
 
 	if part.Rotation.Magnitude() != 0 {
-		part.Model.RotateVec(VecX, part.Rotation.X)
-		part.Model.RotateVec(VecY, part.Rotation.Y)
-		part.Model.RotateVec(VecZ, part.Rotation.Z)
+		part.Model.RotateVec(Right, part.Rotation.X)
+		part.Model.RotateVec(Up, part.Rotation.Y)
+		part.Model.RotateVec(Back, part.Rotation.Z)
 	}
 
 	scale := part.Model.LocalScale()

@@ -1,20 +1,30 @@
 package tetra3d
 
 import (
+	"fmt"
 	"math"
 	"strings"
 )
 
 // Much of the harder code taken with HEAVY appreciation from quartercastle: https://github.com/quartercastle/vector
 
-// VecX represents a unit vector in the global direction of VecX on the right-handed OpenGL / Tetra3D's coordinate system (right).
-var VecX = NewVector(1, 0, 0)
+// Right represents a unit vector in the global direction of Right on the right-handed OpenGL / Tetra3D's coordinate system (+X).
+var Right = NewVector(1, 0, 0)
 
-// VecY represents a unit vector in the global direction of VecY on the right-handed OpenGL / Tetra3D's coordinate system (upwards).
-var VecY = NewVector(0, 1, 0)
+// Left represents a unit vector in the global direction of Left on the right-handed OpenGL / Tetra3D's coordinate system (-X).
+var Left = Right.Invert()
 
-// VecZ represents a unit vector in the global direction of VecZ on the right-handed OpenGL / Tetra3D's coordinate system (backwards, towards you).
-var VecZ = NewVector(0, 0, 1)
+// Up represents a unit vector in the global direction of Up on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
+var Up = NewVector(0, 1, 0)
+
+// Down represents a unit vector in the global direction of Down on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
+var Down = Up.Invert()
+
+// Back represents a unit vector in the global direction of Back on the right-handed OpenGL / Tetra3D's coordinate system (+Z).
+var Back = NewVector(0, 0, 1)
+
+// Forward represents a unit vector in the global direction of Forward on the right-handed OpenGL / Tetra3D's coordinate system (-Z).
+var Forward = Back.Invert()
 
 // Vector represents a 3D Vector, which can be used for usual 3D applications (position, direction, velocity, etc).
 // The fourth component, W, can be ignored and is used for internal Tetra3D usage.
@@ -28,7 +38,7 @@ type Vector struct {
 	W float64 // The w (4th) component of the Vector; not used for most Vector functions
 }
 
-// NewVector creates a new Vector with the specified x, y, z, and w components. The W component is generally ignored for most purposes.
+// NewVector creates a new Vector with the specified x, y, and z components. The W component is generally ignored for most purposes.
 func NewVector(x, y, z float64) Vector {
 	return Vector{X: x, Y: y, Z: z, W: 0}
 }
@@ -43,7 +53,12 @@ func NewVectorZero() Vector {
 // 	return vec
 // }
 
-// Add returns a copy of the calling vector, added together with the other Vector provided (ignoring the W component).
+// String returns a string representation of the Vector, excluding its W component (which is primarily used for internal purposes).
+func (vs Vector) String() string {
+	return fmt.Sprintf("{%.f, %.f, %.f}", vs.X, vs.Y, vs.Z)
+}
+
+// Plus returns a copy of the calling vector, added together with the other Vector provided (ignoring the W component).
 func (vs Vector) Add(other Vector) Vector {
 	vs.X += other.X
 	vs.Y += other.Y
@@ -244,21 +259,21 @@ func (vec Vector) Rotate(axis Vector, angle float64) Vector {
 
 	cos, sin := math.Cos(float64(angle)), math.Sin(float64(angle))
 
-	if axis.Equals(VecX) {
+	if axis.Equals(Right) {
 		ay, az := float64(vec.Y), float64(vec.Z)
 		vec.Y = float64(ay*cos - az*sin)
 		vec.Z = float64(ay*sin + az*cos)
 		return vec
 	}
 
-	if axis.Equals(VecY) {
+	if axis.Equals(Up) {
 		ax, az := float64(vec.X), float64(vec.Z)
 		vec.X = float64(ax*cos + az*sin)
 		vec.Z = float64(-ax*sin + az*cos)
 		return vec
 	}
 
-	if axis.Equals(VecZ) {
+	if axis.Equals(Back) {
 		ax, ay := float64(vec.X), float64(vec.Y)
 		vec.X = float64(ax*cos - ay*sin)
 		vec.Y = float64(ax*sin + ay*cos)

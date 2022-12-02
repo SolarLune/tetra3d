@@ -85,6 +85,13 @@ func BenchmarkMathInternalVector(b *testing.B) {
 		}
 	}
 
+	// // Main point of benchmarking
+	// for z := 0; z < b.N; z++ {
+	// 	for i := 0; i < maxSize-1; i++ {
+	// 		vecs[i].Add(vecs[i+1]).CCross(vecs[i+1])
+	// 	}
+	// }
+
 }
 
 // Benchmark function for previous iteration of vectors, which were type definitions that just pointed to [4]float32.

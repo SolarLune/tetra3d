@@ -12,7 +12,6 @@ import (
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"golang.org/x/image/font/basicfont"
@@ -30,7 +29,7 @@ type Game struct {
 	Camera            *tetra3d.Camera
 	CameraTilt        float64
 	CameraRotate      float64
-	PrevMousePosition Vector
+	PrevMousePosition tetra3d.Vector
 
 	DrawDebugText      bool
 	DrawDebugDepth     bool
@@ -45,10 +44,9 @@ var gltf []byte
 func NewGame() *Game {
 
 	game := &Game{
-		Width:             796,
-		Height:            448,
-		PrevMousePosition: Vector{},
-		DrawDebugText:     true,
+		Width:         796,
+		Height:        448,
+		DrawDebugText: true,
 	}
 
 	game.Init()
@@ -98,24 +96,24 @@ func (g *Game) Update() error {
 	pos := g.Camera.LocalPosition()
 
 	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
+		pos.Add(forward.Scale(moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
+		pos.Add(right.Scale(moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
+		pos.Add(forward.Scale(-moveSpd))
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
+		pos.Add(right.Scale(-moveSpd))
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
+		pos.Y += moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
+		pos.Y -= moveSpd
 	}
 
 	g.Camera.SetLocalPositionVec(pos)
@@ -129,12 +127,12 @@ func (g *Game) Update() error {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := Vector{float64(mx), float64(my)}
+	mv := tetra3d.NewVector(float64(mx), float64(my), 0)
 
 	diff := mv.Sub(g.PrevMousePosition)
 
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
+	g.CameraTilt -= diff.Y * 0.005
+	g.CameraRotate -= diff.X * 0.005
 
 	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
 
@@ -144,7 +142,7 @@ func (g *Game) Update() error {
 	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
 	g.Camera.SetLocalRotation(tilt.Mult(rotate))
 
-	g.PrevMousePosition = mv.Clone()
+	g.PrevMousePosition = mv
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
 		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
