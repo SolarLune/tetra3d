@@ -20,15 +20,20 @@ type GameI interface {
 }
 
 type BasicSystemHandler struct {
-	DrawDebugText  bool
-	DrawDebugDepth bool
-	Game           GameI
+	DrawDebugText      bool
+	DrawDebugDepth     bool
+	DrawDebugWireframe bool
+	DrawDebugCenters   bool
+
+	Game              GameI
+	UsingBasicFreeCam bool
 }
 
 func NewBasicSystemHandler(game GameI) BasicSystemHandler {
 	return BasicSystemHandler{
-		DrawDebugText: true,
-		Game:          game,
+		DrawDebugText:     true,
+		Game:              game,
+		UsingBasicFreeCam: true,
 	}
 }
 
@@ -52,8 +57,16 @@ func (system *BasicSystemHandler) Update() error {
 		system.DrawDebugText = !system.DrawDebugText
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
 		system.DrawDebugDepth = !system.DrawDebugDepth
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
+		system.DrawDebugWireframe = !system.DrawDebugWireframe
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		system.DrawDebugCenters = !system.DrawDebugCenters
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
@@ -79,9 +92,28 @@ func (system *BasicSystemHandler) Draw(screen *ebiten.Image, camera *tetra3d.Cam
 		screen.DrawImage(camera.DepthTexture(), nil)
 	}
 
+	if system.DrawDebugWireframe {
+		camera.DrawDebugWireframe(screen, camera.Scene().Root, colors.White())
+	}
+
+	if system.DrawDebugCenters {
+		camera.DrawDebugCenters(screen, camera.Scene().Root, colors.SkyBlue())
+	}
+
 	if system.DrawDebugText {
 		camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
+		var txt string
+		if system.UsingBasicFreeCam {
+			txt = `WASD: Move, Mouse: Look
+Left Click to Lock / Unlock Mouse Cursor
+F1: Toggle help text - F2: Toggle depth debug,
+F3: Wireframe debug - F4: fullscreen - F5: node center debug
+ESC: Quit`
+		} else {
+			txt = `F1: Toggle help text - F2: Toggle depth debug,
+F3: Wireframe debug - F4: fullscreen - F5: node center debug
+ESC: Quit`
+		}
 		camera.DebugDrawText(screen, txt, 0, 120, 1, colors.LightGray())
 	}
 
@@ -90,6 +122,7 @@ func (system *BasicSystemHandler) Draw(screen *ebiten.Image, camera *tetra3d.Cam
 // BasicFreeCam represents a basic freely moving camera, which allows you to easily explore a scene.
 type BasicFreeCam struct {
 	*tetra3d.Camera
+	Scene             *tetra3d.Scene
 	CameraTilt        float64
 	CameraRotate      float64
 	PrevMousePosition tetra3d.Vector
@@ -97,17 +130,19 @@ type BasicFreeCam struct {
 }
 
 // NewBasicFreeCam creates a new BasicFreeCam struct.
-func NewBasicFreeCam() BasicFreeCam {
+func NewBasicFreeCam(scene *tetra3d.Scene) BasicFreeCam {
 
 	freecam := BasicFreeCam{
 		Locked: true,
+		Scene:  scene,
 	}
 
-	freecam.Camera = tetra3d.NewCamera(480, 270)
+	freecam.Camera = tetra3d.NewCamera(640, 360)
+	freecam.Camera.SetLocalPosition(0, 0, 5)
+
+	scene.Root.AddChildren(freecam.Camera)
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	freecam.Node.SetLocalPosition(0, 0, 5)
 
 	return freecam
 

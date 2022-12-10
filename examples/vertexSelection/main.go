@@ -1,40 +1,23 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"image/color"
-	"image/png"
-	"math"
-	"os"
-	"runtime/pprof"
-	"time"
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
-	"golang.org/x/image/font/basicfont"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 type Game struct {
-	Width, Height int
-	Library       *tetra3d.Library
-	Scene         *tetra3d.Scene
+	Library *tetra3d.Library
+	Scene   *tetra3d.Scene
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-
-	DrawDebugText      bool
-	DrawDebugDepth     bool
-	DrawDebugWireframe bool
-	PrevMousePosition  Vector
+	Camera examples.BasicFreeCam
+	System examples.BasicSystemHandler
 
 	FlashingVertices *tetra3d.VertexSelection
 
@@ -47,12 +30,7 @@ type Game struct {
 var libraryData []byte
 
 func NewGame() *Game {
-	game := &Game{
-		Width:             796,
-		Height:            448,
-		PrevMousePosition: Vector{},
-		DrawDebugText:     true,
-	}
+	game := &Game{}
 
 	game.Init()
 
@@ -73,40 +51,36 @@ func (g *Game) Init() {
 
 	g.Cube = g.Scene.Root.Get("Cube").(*tetra3d.Model)
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(Vector{0, 5, 10})
-	g.Scene.Root.AddChildren(g.Camera)
+	g.Camera = examples.NewBasicFreeCam(g.Scene)
+	g.Camera.SetLocalPosition(0, 5, 10)
 
-	// So, the easiest way to select vertices is to just use Mesh.SelectVertices() - it allows us to select vertices that fulfill a set of
-	// criteria, returning a *VertexSelection instance that is our vertex capture.
+	g.System = examples.NewBasicSystemHandler(g)
+
+	// OK, so this demo is about selecting vertices.
+
+	// The easiest way to select vertices is to just use Mesh.SelectVertices() - it allows us to create a VertexSelection object, which is our
+	// current vertex capture. We can use it to select vertices that fulfill a set of criteria (and yes, it's method-chainable as well)
 
 	// Internally, the vertices are simply index numbers, with their properties (position, UV, normals, etc.) stored on the Mesh as a series of
 	// slices (i.e. Mesh.VertexPositions[], Mesh.VertexNormals[], Mesh.VertexUVs[], etc).
 
 	// Oh, and by default, when we export a mesh with vertex colors, the first channel is active.
 
-	// Select our vertices.
+	// Here, we'll select our vertices and store it in the Game struct.
 	mesh := g.Cube.Mesh
+
+	// VertexSelection.SelectInChannel selects all vertices that have a non-black color in a specified color channel.
 	g.FlashingVertices = mesh.SelectVertices().SelectInChannel(mesh.VertexColorChannelNames["Flash"])
 
 	// Once we know which vertices are not black in the "Flash" channel in Blender, we're good to go.
-
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
 
 func (g *Game) Update() error {
 
-	var err error
-
-	moveSpd := 0.05
-
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
-
 	g.Time += 1.0 / 60.0
 
+	// Here we'll create a new glowing color.
 	glow := tetra3d.NewColorFromHSV(g.Time/10, 1, 1)
 
 	// Once we've gotten our indices, we can use the helper SetColor() function to set the color of all vertices at the same time.
@@ -114,146 +88,43 @@ func (g *Game) Update() error {
 	// instance and modifying the mesh's vertex properties.
 	g.FlashingVertices.SetColor(0, glow)
 
-	// Moving the Camera
+	g.Camera.Update()
 
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
-	}
-
-	g.Camera.SetLocalPositionVec(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	// Rotating the camera with the mouse
-
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
-
-	mv := Vector{float64(mx), float64(my)}
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	g.PrevMousePosition = mv.Clone()
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
-		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture())
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		g.StartProfiling()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.DrawDebugWireframe = !g.DrawDebugWireframe
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
-	return err
+	return g.System.Update()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+
 	// Clear, but with a color
 	screen.Fill(color.RGBA{60, 70, 80, 255})
 
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the logo first
+	// Render the scene
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
-	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
-	// we could just draw the images straight.
-	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture().Size()
-	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), opt)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), opt)
+	// Now draw the result to the screen
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
+
+	g.System.Draw(screen, g.Camera.Camera)
+
+	if g.System.DrawDebugText {
+		txt := `This demo shows how to easily select specific
+vertices using vertex color in Tetra3D.
+In this example, the glowing triangles are colored in the 'Flash'
+vertex color channel in Blender (which
+becomes channel 1 in Tetra3D as it's in the second slot).
+The vertices that have a non-black color
+in the "Flash" channel are then assigned
+a flashing color here in Tetra3D.`
+		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis demo shows how to easily select specific\nvertices using vertex color in Tetra3D.\nIn this example, the glowing faces are colored in the 'Flash'\nvertex color channel in Blender (which\nbecomes channel 1 in Tetra3D as it's in the second slot).\nThe vertices that have a non-black color\nin the \"Flash\" channel are then assigned\na flashing color here in Tetra3D.\n\nF2:Toggle wireframe\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 120, color.RGBA{255, 0, 0, 255})
-	}
-
-	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Gray())
-	}
-
-}
-
-func (g *Game) StartProfiling() {
-	outFile, err := os.Create("./cpu.pprof")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(2 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	return g.Camera.Size()
 }
 
 func main() {

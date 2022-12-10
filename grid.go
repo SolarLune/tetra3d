@@ -124,14 +124,14 @@ func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
 
 	for {
 
+		if next == point {
+			break
+		}
+
 		next = toCheck[0]
 
 		toCheck = toCheck[1:]
 		checked[next] = true
-
-		if next == point {
-			break
-		}
 
 		for _, c := range next.Connections {
 			if _, exists := checked[c]; !exists {
@@ -229,15 +229,15 @@ func (grid *Grid) NearestGridPoint(position Vector) *GridPoint {
 	points := grid.Points()
 
 	sort.Slice(points, func(i, j int) bool {
-		return points[i].WorldPosition().Sub(position).Magnitude() < points[j].WorldPosition().Sub(position).Magnitude()
+		return points[i].WorldPosition().Sub(position).MagnitudeSquared() < points[j].WorldPosition().Sub(position).MagnitudeSquared()
 	})
 
 	return points[0]
 
 }
 
-// NearestPositionOnGrid returns the nearest world position on the Grid to the given world position. This position
-// can be directly on a GridPoint, or on a connection between GridPoints.
+// NearestPositionOnGrid returns the nearest world position on the Grid to the given world position.
+// This position can be directly on a GridPoint, or on a connection between GridPoints.
 func (grid *Grid) NearestPositionOnGrid(position Vector) Vector {
 
 	nearestPoint := grid.NearestGridPoint(position)
@@ -281,7 +281,7 @@ func (grid *Grid) FurthestGridPoint(position Vector) *GridPoint {
 	points := grid.Points()
 
 	sort.Slice(points, func(i, j int) bool {
-		return points[i].WorldPosition().Sub(position).Magnitude() < points[j].WorldPosition().Sub(position).Magnitude()
+		return points[i].WorldPosition().Sub(position).MagnitudeSquared() < points[j].WorldPosition().Sub(position).MagnitudeSquared()
 	})
 
 	return points[len(points)-1]

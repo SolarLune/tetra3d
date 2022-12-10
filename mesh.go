@@ -158,7 +158,6 @@ type Mesh struct {
 
 	MeshParts []*MeshPart // The various mesh parts (collections of triangles, rendered with a single material).
 	Triangles []*Triangle // The various triangles composing the Mesh.
-	Indices   []int       // The indices of each triangle
 	triIndex  int
 
 	// Vertices are stored as a struct-of-arrays for simplified and faster rendering.
@@ -226,54 +225,56 @@ func (mesh *Mesh) Clone() *Mesh {
 	newMesh.allocateVertexBuffers(len(mesh.VertexPositions))
 
 	for i := range mesh.VertexPositions {
-		newMesh.VertexPositions[i] = mesh.VertexPositions[i]
+		newMesh.VertexPositions = append(newMesh.VertexPositions, mesh.VertexPositions[i])
 	}
 
 	for i := range mesh.VertexNormals {
-		newMesh.VertexNormals[i] = mesh.VertexNormals[i]
+		newMesh.VertexNormals = append(newMesh.VertexNormals, mesh.VertexNormals[i])
 	}
 
 	for i := range mesh.vertexLights {
-		newMesh.vertexLights[i] = mesh.vertexLights[i].Clone()
+		newMesh.vertexLights = append(newMesh.vertexLights, mesh.vertexLights[i].Clone())
 	}
 
 	for i := range mesh.VertexUVs {
-		newMesh.VertexUVs[i] = mesh.VertexUVs[i]
+		newMesh.VertexUVs = append(newMesh.VertexUVs, mesh.VertexUVs[i])
 	}
 
 	for i := range mesh.VertexColors {
-		newMesh.VertexColors[i] = make([]*Color, len(mesh.VertexColors[i]))
+		newMesh.VertexColors = append(newMesh.VertexColors, make([]*Color, len(mesh.VertexColors[i])))
 		for channelIndex := range mesh.VertexColors[i] {
 			newMesh.VertexColors[i][channelIndex] = mesh.VertexColors[i][channelIndex].Clone()
 		}
 	}
 
 	for c := range mesh.VertexActiveColorChannel {
-		newMesh.VertexActiveColorChannel[c] = mesh.VertexActiveColorChannel[c]
+		newMesh.VertexActiveColorChannel = append(newMesh.VertexActiveColorChannel, mesh.VertexActiveColorChannel[c])
 	}
 
 	for c := range mesh.VertexBones {
+		newMesh.VertexBones = append(newMesh.VertexBones, []uint16{})
 		for v := range mesh.VertexBones[c] {
-			newMesh.VertexBones[c][v] = mesh.VertexBones[c][v]
+			newMesh.VertexBones[c] = append(newMesh.VertexBones[c], mesh.VertexBones[c][v])
 		}
 	}
 
 	for c := range mesh.VertexWeights {
+		newMesh.VertexWeights = append(newMesh.VertexWeights, []float32{})
 		for v := range mesh.VertexWeights[c] {
-			newMesh.VertexWeights[c][v] = mesh.VertexWeights[c][v]
+			newMesh.VertexWeights[c] = append(newMesh.VertexWeights[c], mesh.VertexWeights[c][v])
 		}
 	}
 
 	for v := range mesh.vertexTransforms {
-		newMesh.vertexTransforms[v] = mesh.vertexTransforms[v]
+		newMesh.vertexTransforms = append(newMesh.vertexTransforms, mesh.vertexTransforms[v])
 	}
 
 	for v := range mesh.vertexSkinnedNormals {
-		newMesh.vertexSkinnedNormals[v] = mesh.vertexSkinnedNormals[v]
+		newMesh.vertexSkinnedNormals = append(newMesh.vertexSkinnedNormals, mesh.vertexSkinnedNormals[v])
 	}
 
 	for v := range mesh.vertexSkinnedPositions {
-		newMesh.vertexSkinnedPositions[v] = mesh.vertexSkinnedPositions[v]
+		newMesh.vertexSkinnedPositions = append(newMesh.vertexSkinnedPositions, mesh.vertexSkinnedPositions[v])
 	}
 
 	newMesh.Triangles = make([]*Triangle, 0, len(mesh.Triangles))
@@ -281,7 +282,7 @@ func (mesh *Mesh) Clone() *Mesh {
 	for _, part := range mesh.MeshParts {
 		newPart := part.Clone()
 
-		part.ForEachTri(
+		newPart.ForEachTri(
 			func(tri *Triangle) {
 				newTri := tri.Clone()
 				newTri.MeshPart = newPart
@@ -289,9 +290,11 @@ func (mesh *Mesh) Clone() *Mesh {
 			},
 		)
 
-		newMesh.MeshParts = append(newMesh.MeshParts, newPart)
 		newPart.AssignToMesh(newMesh)
 	}
+
+	newMesh.vertsAddEnd = mesh.vertsAddEnd
+	newMesh.vertsAddStart = mesh.vertsAddStart
 
 	for channelName, index := range mesh.VertexColorChannelNames {
 		newMesh.VertexColorChannelNames[channelName] = index
@@ -1130,6 +1133,8 @@ func (part *MeshPart) AssignToMesh(mesh *Mesh) {
 	part.sortingTriangles = newSorts
 
 	mesh.MeshParts = append(mesh.MeshParts, part)
+
+	part.Mesh = mesh
 
 }
 

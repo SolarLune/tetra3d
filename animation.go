@@ -24,10 +24,11 @@ func (data *Data) AsVector() Vector {
 	return data.contents.(Vector)
 }
 
-func (data *Data) AsQuaternion() *Quaternion {
-	return data.contents.(*Quaternion)
+func (data *Data) AsQuaternion() Quaternion {
+	return data.contents.(Quaternion)
 }
 
+// Keyframe represents a single keyframe in an animation for an AnimationTrack.
 type Keyframe struct {
 	Time float64
 	Data Data
@@ -40,16 +41,21 @@ func newKeyframe(time float64, data Data) *Keyframe {
 	}
 }
 
+// AnimationTrack represents a collection of keyframes that drive an animation type (position, scale or rotation) for a node in an animation.
 type AnimationTrack struct {
 	Type          string
 	Keyframes     []*Keyframe
 	Interpolation int
 }
 
+// AddKeyframe adds a keyframe of the necessary data type to the AnimationTrack.
 func (track *AnimationTrack) AddKeyframe(time float64, data interface{}) {
 	track.Keyframes = append(track.Keyframes, newKeyframe(time, Data{data}))
 }
 
+// ValueAsVector returns a Vector associated with the current time in seconds, as well as a boolean indicating if
+// the Vector exists (i.e. if the AnimationTrack has location or scale data in the animation). The Vector will be
+// interpolated according to time between keyframes.
 func (track *AnimationTrack) ValueAsVector(time float64) (Vector, bool) {
 
 	if len(track.Keyframes) == 0 {
@@ -85,6 +91,7 @@ func (track *AnimationTrack) ValueAsVector(time float64) (Vector, bool) {
 	fd := first.Data.AsVector()
 	ld := last.Data.AsVector()
 
+	// Linear interpolation
 	t := (time - first.Time) / (last.Time - first.Time)
 
 	if track.Interpolation == InterpolationConstant {
@@ -98,16 +105,18 @@ func (track *AnimationTrack) ValueAsVector(time float64) (Vector, bool) {
 
 }
 
-func (track *AnimationTrack) ValueAsQuaternion(time float64) *Quaternion {
+// ValueAsQuaternion returns the Quaternion associated with this AnimationTrack using the given time in seconds,
+// and a boolean indicating if the Quaternion exists (i.e. if this is track has rotation animation data).
+func (track *AnimationTrack) ValueAsQuaternion(time float64) (Quaternion, bool) {
 
 	if len(track.Keyframes) == 0 {
-		return nil
+		return Quaternion{}, false
 	}
 
 	if first := track.Keyframes[0]; time <= first.Time {
-		return first.Data.AsQuaternion()
+		return first.Data.AsQuaternion(), true
 	} else if last := track.Keyframes[len(track.Keyframes)-1]; time >= last.Time {
-		return last.Data.AsQuaternion()
+		return last.Data.AsQuaternion(), true
 	} else {
 
 		var first *Keyframe
@@ -125,17 +134,18 @@ func (track *AnimationTrack) ValueAsQuaternion(time float64) *Quaternion {
 		}
 
 		if time == first.Time {
-			return first.Data.AsQuaternion()
+			return first.Data.AsQuaternion(), true
 		} else if time == last.Time {
-			return last.Data.AsQuaternion()
+			return last.Data.AsQuaternion(), true
 		} else {
 
 			fd := first.Data.AsQuaternion()
 			ld := last.Data.AsQuaternion()
 
+			// Linear interpolation
 			t := (time - first.Time) / (last.Time - first.Time)
 
-			return fd.Lerp(ld, t)
+			return fd.Lerp(ld, t), true
 
 		}
 
@@ -209,7 +219,7 @@ type AnimationValues struct {
 	PositionExists bool
 	Scale          Vector
 	ScaleExists    bool
-	Rotation       *Quaternion
+	Rotation       Quaternion
 	RotationExists bool
 }
 
@@ -280,6 +290,11 @@ func (ap *AnimationPlayer) SetRoot(node INode) {
 // playing. If the animation is already playing, Play() does nothing.
 func (ap *AnimationPlayer) Play(animation *Animation) {
 
+	restartAnim := false
+	if ap.Animation != animation {
+		restartAnim = true
+	}
+
 	if ap.Animation != animation || !ap.Playing {
 		ap.Animation = animation
 		ap.Playing = true
@@ -287,11 +302,16 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 		return
 	}
 
-	if ap.PlaySpeed > 0 {
-		ap.Playhead = 0.0
-	} else {
-		ap.Playhead = animation.Length
+	if restartAnim {
+
+		if ap.PlaySpeed > 0 {
+			ap.Playhead = 0.0
+		} else {
+			ap.Playhead = animation.Length
+		}
+
 	}
+
 	ap.ChannelsUpdated = false
 
 	if ap.BlendTime > 0 {
@@ -302,6 +322,12 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 		ap.blendStart = time.Now()
 	}
 
+}
+
+// Stop stops playing the currently playing animation (if any is playing), pausing it in its
+// current pose. To restart the animation from the beginning, set ap.Playhead to 0.
+func (ap *AnimationPlayer) Stop() {
+	ap.Playing = false
 }
 
 // assignChannels assigns the player's root node's children to channels in the player. This is called when the channels need to be
@@ -387,10 +413,11 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 					}
 
 					if track, exists := channel.Tracks[TrackTypeRotation]; exists {
-						quat := track.ValueAsQuaternion(ap.Playhead)
-						// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
-						ap.AnimatedProperties[node].Rotation = quat
-						ap.AnimatedProperties[node].RotationExists = true
+						if quat, exists := track.ValueAsQuaternion(ap.Playhead); exists {
+							// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
+							ap.AnimatedProperties[node].Rotation = quat
+							ap.AnimatedProperties[node].RotationExists = true
+						}
 					}
 
 				}
@@ -552,6 +579,7 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 }
 
+// Finished returns whether the AnimationPlayer is finished playing its current animation.
 func (ap *AnimationPlayer) Finished() bool {
 	return ap.finished
 }
@@ -571,7 +599,7 @@ func (ap *AnimationPlayer) TouchedMarker(markerName string) bool {
 	return false
 }
 
-// AfterMarker returns if the AnimationPlayer's playhead is after a marker with the specified name while the AnimationPlayer is not finished playing.
+// AfterMarker returns if the AnimationPlayer's playhead is after a marker with the specified name.
 func (ap *AnimationPlayer) AfterMarker(markerName string) bool {
 
 	if ap.Animation == nil {
@@ -586,7 +614,7 @@ func (ap *AnimationPlayer) AfterMarker(markerName string) bool {
 	return false
 }
 
-// BeforeMarker returns if the AnimationPlayer's playhead is before a marker with the specified name while the AnimationPlayer is not finished playing.
+// BeforeMarker returns if the AnimationPlayer's playhead is before a marker with the specified name.
 func (ap *AnimationPlayer) BeforeMarker(markerName string) bool {
 
 	if ap.Animation == nil {

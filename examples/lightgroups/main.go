@@ -1,19 +1,11 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"image/png"
-	"math"
-	"os"
-	"runtime/pprof"
-	"time"
-
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -23,32 +15,17 @@ import (
 var gltfData []byte
 
 type Game struct {
-	Width, Height int
-	Library       *tetra3d.Library
-	Scene         *tetra3d.Scene
+	Library *tetra3d.Library
+	Scene   *tetra3d.Scene
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	PrevMousePosition Vector
-
-	CamLocked bool
+	Camera examples.BasicFreeCam
+	System examples.BasicSystemHandler
 
 	Time float64
 }
 
 func NewGame() *Game {
-	game := &Game{
-		Width:             796,
-		Height:            448,
-		PrevMousePosition: Vector{},
-		CamLocked:         true,
-	}
-
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+	game := &Game{}
 
 	game.Init()
 
@@ -57,10 +34,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	opt := tetra3d.DefaultGLTFLoadOptions()
-	opt.CameraWidth = g.Width
-	opt.CameraHeight = g.Height
-	library, err := tetra3d.LoadGLTFData(gltfData, opt)
+	library, err := tetra3d.LoadGLTFData(gltfData, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -68,9 +42,9 @@ func (g *Game) Init() {
 	g.Library = library
 	g.Scene = library.Scenes[0]
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(Vector{0, 2, 15})
-	g.Scene.Root.AddChildren(g.Camera)
+	g.Camera = examples.NewBasicFreeCam(g.Scene)
+	g.Camera.SetLocalPosition(0, 2, 15)
+	g.System = examples.NewBasicSystemHandler(g)
 
 	gt := g.Scene.Root.Get("OnlyGreen").(*tetra3d.Model)
 	gt.LightGroup = tetra3d.NewLightGroup(g.Scene.Root.Get("GreenLight").(*tetra3d.PointLight))
@@ -82,115 +56,12 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	g.Time += 1.0 / 60.0
-
-	var err error
-
-	moveSpd := 0.05
-
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
-
-	// Moving the Camera
-
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.CamLocked = !g.CamLocked
-
-		if g.CamLocked {
-			ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-		} else {
-			ebiten.SetCursorMode(ebiten.CursorModeVisible)
-		}
-
-	}
-
-	g.Camera.SetLocalPositionVec(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
 	armature := g.Scene.Root.Get("Armature")
 
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
 		armature.Move(-0.1, 0, 0)
 	} else if ebiten.IsKeyPressed(ebiten.KeyRight) {
 		armature.Move(0.1, 0, 0)
-	}
-
-	// Rotating the camera with the mouse
-
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
-
-	mv := Vector{float64(mx), float64(my)}
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	g.PrevMousePosition = mv.Clone()
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
-		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture())
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		g.StartProfiling()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
@@ -205,7 +76,9 @@ func (g *Game) Update() error {
 		g.Scene.World.LightingOn = !g.Scene.World.LightingOn
 	}
 
-	return err
+	g.Camera.Update()
+
+	return g.System.Update()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -221,37 +94,27 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), nil)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), nil)
-	}
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\n\nThis example shows light groups.\nLight groups allow you to control\nwhich lights influence Models\nwhile having them remain available for others.\n\nThere's two point lights in this scene - a red one\nand a green one. The left cube is only\nlit by the green light, while the right\nis only lit by the red one.\n\n1 Key: Toggle light groups being active\n2 Key: Toggle all lighting\nF2: Lock / Unlock Mouse\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		g.Camera.DebugDrawText(screen, txt, 0, 150, 1, colors.LightGray())
-	}
-}
+	g.System.Draw(screen, g.Camera.Camera)
 
-func (g *Game) StartProfiling() {
-	outFile, err := os.Create("./cpu.pprof")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
+	if g.System.DrawDebugText {
+		txt := `This example shows light groups, which
+allow you to control how lights color specific Models.
 
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(2 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
+There's two point lights in this scene - a red one
+and a green one. By using LightGroups, the left cube 
+is only lit by the green light, while the right
+is only lit by the red one. The center cube is lit by both.
+
+1 Key: Toggle light groups being active
+2 Key: Toggle all lighting`
+		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+	}
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	return g.Camera.Size()
 }
 
 func main() {

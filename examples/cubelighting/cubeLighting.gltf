@@ -1,7 +1,29 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.2.43",
+        "generator" : "Khronos glTF Blender I/O v3.3.32",
         "version" : "2.0"
+    },
+    "extensionsUsed" : [
+        "KHR_lights_punctual"
+    ],
+    "extensionsRequired" : [
+        "KHR_lights_punctual"
+    ],
+    "extensions" : {
+        "KHR_lights_punctual" : {
+            "lights" : [
+                {
+                    "color" : [
+                        1,
+                        1,
+                        1
+                    ],
+                    "intensity" : 8,
+                    "type" : "directional",
+                    "name" : "SunLight"
+                }
+            ]
+        }
     },
     "scene" : 0,
     "scenes" : [
@@ -10,6 +32,10 @@
                 "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
                 "t3dPackTextures__" : 1,
+                "t3dCameraResolution__" : [
+                    1920,
+                    1080
+                ],
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
@@ -33,7 +59,8 @@
                             "Cube.014",
                             "Cube.015",
                             "Cube.016",
-                            "Cube.017"
+                            "Cube.017",
+                            "SunLight"
                         ],
                         "offset" : [
                             0.0,
@@ -45,9 +72,9 @@
                 "t3dWorlds__" : {
                     "World" : {
                         "ambient color" : [
-                            0.2265842854976654,
-                            0.2265842854976654,
-                            0.2265842854976654,
+                            0.0,
+                            0.0,
+                            0.0,
                             1.0
                         ],
                         "ambient energy" : 1.0
@@ -77,7 +104,8 @@
                 17,
                 18,
                 19,
-                20
+                20,
+                21
             ]
         }
     ],
@@ -419,6 +447,32 @@
                 8,
                 -14
             ]
+        },
+        {
+            "extensions" : {
+                "KHR_lights_punctual" : {
+                    "light" : 0
+                }
+            },
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    3.0,
+                    0.0,
+                    26.0
+                ]
+            },
+            "name" : "SunLight",
+            "rotation" : [
+                -0.6982700228691101,
+                0.11144089698791504,
+                -0.11144089698791504,
+                0.6982699632644653
+            ],
+            "translation" : [
+                3,
+                26,
+                0
+            ]
         }
     ],
     "materials" : [
@@ -438,6 +492,19 @@
                 "baseColorTexture" : {
                     "index" : 1
                 },
+                "metallicFactor" : 0,
+                "roughnessFactor" : 0.5
+            }
+        },
+        {
+            "name" : "Material",
+            "pbrMetallicRoughness" : {
+                "baseColorFactor" : [
+                    0.800000011920929,
+                    0.800000011920929,
+                    0.800000011920929,
+                    1
+                ],
                 "metallicFactor" : 0,
                 "roughnessFactor" : 0.5
             }
@@ -506,7 +573,8 @@
                         "NORMAL" : 13,
                         "TEXCOORD_0" : 14
                     },
-                    "indices" : 15
+                    "indices" : 15,
+                    "material" : 2
                 }
             ]
         },
@@ -726,22 +794,26 @@
         {
             "buffer" : 0,
             "byteLength" : 3888,
-            "byteOffset" : 0
+            "byteOffset" : 0,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 3888,
-            "byteOffset" : 3888
+            "byteOffset" : 3888,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 2592,
-            "byteOffset" : 7776
+            "byteOffset" : 7776,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 3072,
-            "byteOffset" : 10368
+            "byteOffset" : 10368,
+            "target" : 34963
         },
         {
             "buffer" : 0,
@@ -751,22 +823,26 @@
         {
             "buffer" : 0,
             "byteLength" : 672,
-            "byteOffset" : 13900
+            "byteOffset" : 13900,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 672,
-            "byteOffset" : 14572
+            "byteOffset" : 14572,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 448,
-            "byteOffset" : 15244
+            "byteOffset" : 15244,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 264,
-            "byteOffset" : 15692
+            "byteOffset" : 15692,
+            "target" : 34963
         },
         {
             "buffer" : 0,
@@ -776,62 +852,74 @@
         {
             "buffer" : 0,
             "byteLength" : 288,
-            "byteOffset" : 16308
+            "byteOffset" : 16308,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 288,
-            "byteOffset" : 16596
+            "byteOffset" : 16596,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 192,
-            "byteOffset" : 16884
+            "byteOffset" : 16884,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 72,
-            "byteOffset" : 17076
+            "byteOffset" : 17076,
+            "target" : 34963
         },
         {
             "buffer" : 0,
             "byteLength" : 648,
-            "byteOffset" : 17148
+            "byteOffset" : 17148,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 648,
-            "byteOffset" : 17796
+            "byteOffset" : 17796,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 432,
-            "byteOffset" : 18444
+            "byteOffset" : 18444,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 288,
-            "byteOffset" : 18876
+            "byteOffset" : 18876,
+            "target" : 34963
         },
         {
             "buffer" : 0,
             "byteLength" : 2880,
-            "byteOffset" : 19164
+            "byteOffset" : 19164,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 2880,
-            "byteOffset" : 22044
+            "byteOffset" : 22044,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 1920,
-            "byteOffset" : 24924
+            "byteOffset" : 24924,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 480,
-            "byteOffset" : 26844
+            "byteOffset" : 26844,
+            "target" : 34963
         }
     ],
     "samplers" : [

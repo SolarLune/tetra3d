@@ -1,54 +1,34 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"image/color"
-	"image/png"
-	"math"
-	"os"
-	"runtime/pprof"
-	"time"
 
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
-	"golang.org/x/image/font/basicfont"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 //go:embed bounds.gltf
 var gltfData []byte
 
 type Game struct {
-	Width, Height int
-	Scene         *tetra3d.Scene
+	Scene *tetra3d.Scene
 
-	Controlling *tetra3d.Model
+	Controlling   *tetra3d.Model
+	Movement      tetra3d.Vector
+	VerticalSpeed float64
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-
-	DrawDebugText      bool
-	DrawDebugDepth     bool
-	DrawDebugBounds    bool
-	DrawDebugWireframe bool
-	DrawDebugNormals   bool
-	PrevMousePosition  Vector
+	Camera examples.BasicFreeCam
+	System examples.BasicSystemHandler
 }
 
 func NewGame() *Game {
-	game := &Game{
-		Width:             796,
-		Height:            448,
-		PrevMousePosition: Vector{},
-		DrawDebugText:     true,
-	}
+	game := &Game{}
 
 	game.Init()
 
@@ -66,96 +46,89 @@ func (g *Game) Init() {
 
 	g.Controlling = g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(Vector{0, 6, 15})
+	g.Camera = examples.NewBasicFreeCam(g.Scene)
+	g.Camera.SetLocalPosition(0, 6, 15)
 	g.Camera.Far = 40
 
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-
-	// g.Scene.Root.Get("Ground").SetVisible(false, false)
+	g.System = examples.NewBasicSystemHandler(g)
 
 }
 
 func (g *Game) Update() error {
 
-	var err error
+	friction := 0.05
+	maxSpd := 0.25
+	accel := 0.05 + friction
+	gravity := 0.05
 
-	moveSpd := 0.1
-
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
-
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
-	}
-
-	g.Camera.SetLocalPositionVec(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	move := Vector{0, 0, 0}
 	bounds := g.Controlling.Children()[0].(tetra3d.IBoundingObject)
 	solids := g.Scene.Root.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingObject)
 
+	movement := g.Movement.Modify() // Modification Vector
+
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		move[0] = moveSpd
+		movement.X += accel
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		move[0] = -moveSpd
+		movement.X -= accel
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		move[2] = -moveSpd
+		movement.Z -= accel
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		move[2] = moveSpd
+		movement.Z += accel
 	}
 
-	// Collision checking:
-
-	move[1] -= 0.3
-
-	// OK, so the general idea here is we're doing collision testing by moving the object into the position we want
-	for _, col := range bounds.CollisionTest(0, 0, -0.3, solids...) {
-		move[1] = col.AverageMTV()[1]
-		break
+	if movement.Magnitude() > friction {
+		fr := movement.Clone().Unit().Scale(friction).ToVector()
+		movement.Sub(fr)
+	} else {
+		movement.SetZero()
 	}
 
-	// Now try moving horizontally:
+	movement.ClampMagnitude(maxSpd)
 
-	g.Controlling.MoveVec(move)
-
-	// Above, we move the objects into place as necessary, so we don't need to use the dx, dy, and dz arguments to test for movement when doing the CollisionTest.
-	for _, col := range bounds.CollisionTest(0, 0, 0, solids...) {
-		mtv := col.AverageMTV()
-		g.Controlling.Move(mtv[0], 0, mtv[2])
+	if g.VerticalSpeed < -0.3 {
+		g.VerticalSpeed = -0.3
 	}
+
+	g.VerticalSpeed -= gravity
+
+	// Now, check for collisions.
+
+	// Horizontal check (walls):
+
+	g.Controlling.MoveVec(g.Movement)
+
+	margin := 0.01
+
+	bounds.CollisionTest(tetra3d.CollisionTestSettings{
+
+		HandleCollision: func(col *tetra3d.Collision) bool {
+			mtv := col.AverageMTV()
+			mtv.Y = 0                                       // We don't want to move up to avoid collision
+			g.Controlling.MoveVec(mtv.Expand(margin, 0.01)) // Move out of the collision, but add a little margin
+			return true
+		},
+
+		Others: solids,
+	})
+
+	// Vertical check (floors):
+
+	g.Controlling.Move(0, g.VerticalSpeed, 0)
+
+	bounds.CollisionTest(tetra3d.CollisionTestSettings{
+
+		HandleCollision: func(col *tetra3d.Collision) bool {
+			g.Controlling.Move(0, col.AverageMTV().Y+margin, 0) // Move the object up, so that it's on the ground, plus a little margin
+			g.VerticalSpeed = 0
+			return true
+		},
+
+		Others: solids,
+	})
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)
@@ -167,125 +140,38 @@ func (g *Game) Update() error {
 		}
 	}
 
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
+	g.Camera.Update()
+	return g.System.Update()
 
-	mv := Vector{float64(mx), float64(my)}
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	g.PrevMousePosition = mv.Clone()
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
-		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture())
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		g.StartProfiling()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.DrawDebugWireframe = !g.DrawDebugWireframe
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
-		g.DrawDebugNormals = !g.DrawDebugNormals
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugBounds = !g.DrawDebugBounds
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
-	return err
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+
 	// Clear, but with a color
-	// screen.Fill(color.RGBA{20, 25, 30, 255})
-	screen.Fill(color.Black)
+	screen.Fill(g.Scene.World.ClearColor.ToRGBA64())
 
 	g.Camera.Clear()
 
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
-	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture().Size()
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
-	// We rescale the depth or color textures just in case we render at a different resolution than the window's.
-	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), opt)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), opt)
+	g.System.Draw(screen, g.Camera.Camera)
+
+	if g.System.DrawDebugText {
+		txt := fmt.Sprintf(`This demo shows some basic movement 
+and collision detection. The red and white cubes
+have BoundingAABB nodes, while the capsule and sphere are,
+naturally, capsule and sphere BoundingObjects.
+Arrow keys: Move %s
+F: switch between capsule and sphere`, g.Controlling.Name())
+		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 
-	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.White())
-	}
-
-	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, colors.SkyBlue())
-	}
-
-	if g.DrawDebugBounds {
-		g.Camera.DrawDebugBounds(screen, g.Scene.Root, false, false)
-	}
-
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		shapeName := g.Controlling.Name()
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nArrow keys: Move " + shapeName + "\nF: switch between capsule and sphere\nF1, F2, F3: Debug views\nF5: Display bounds shapes\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{192, 192, 192, 255})
-	}
-
-}
-
-func (g *Game) StartProfiling() {
-	outFile, err := os.Create("./cpu.pprof")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(2 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	return g.Camera.Size()
 }
 
 func main() {

@@ -440,7 +440,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	if mat != nil && mat.BillboardMode != BillboardModeNone {
 
-		lookat := NewLookAtMatrix(model.WorldPosition(), camPos, Up)
+		lookat := NewLookAtMatrix(model.WorldPosition(), camPos, WorldUp)
 
 		if mat.BillboardMode == BillboardModeXZ {
 			lookat.SetRow(1, Vector{0, 1, 0, 0})

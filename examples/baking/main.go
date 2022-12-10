@@ -1,18 +1,11 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"image/png"
-	"math"
-	"os"
-	"runtime/pprof"
-	"time"
-
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -22,27 +15,15 @@ import (
 var gltfData []byte
 
 type Game struct {
-	Width, Height int
-	Library       *tetra3d.Library
-	Scene         *tetra3d.Scene
+	Library *tetra3d.Library
+	Scene   *tetra3d.Scene
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	PrevMousePosition tetra3d.Vector
-
-	Time float64
+	Camera examples.BasicFreeCam
+	System examples.BasicSystemHandler
 }
 
 func NewGame() *Game {
-	game := &Game{
-		Width:         796,
-		Height:        448,
-		DrawDebugText: true,
-	}
+	game := &Game{}
 
 	game.Init()
 
@@ -58,10 +39,7 @@ const (
 
 func (g *Game) Init() {
 
-	opt := tetra3d.DefaultGLTFLoadOptions()
-	opt.CameraWidth = g.Width
-	opt.CameraHeight = g.Height
-	library, err := tetra3d.LoadGLTFData(gltfData, opt)
+	library, err := tetra3d.LoadGLTFData(gltfData, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -69,11 +47,9 @@ func (g *Game) Init() {
 	g.Library = library
 	g.Scene = library.Scenes[0]
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(tetra3d.NewVector(0, 2, 15))
-	g.Scene.Root.AddChildren(g.Camera)
-
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+	g.Camera = examples.NewBasicFreeCam(g.Scene)
+	g.Camera.Move(0, 10, 0)
+	g.System = examples.NewBasicSystemHandler(g)
 
 	// OK, so in this example we're going to bake lighting and AO.
 	// We will combine them into different vertex color channels to
@@ -132,9 +108,7 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	// lights := g.Scene.Root.ChildrenRecursive().AsLights()
-
-	// Bake the lighting real quick
+	// Change the active vertex color channels
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
 			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelNone) // Switch to unlit
@@ -159,101 +133,9 @@ func (g *Game) Update() error {
 		}
 	}
 
-	g.Time += 1.0 / 60.0
+	g.Camera.Update()
 
-	var err error
-
-	moveSpd := 0.05
-
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
-
-	// Moving the Camera
-
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
-	// g.Scene.Root.Get("point light").(*tetra3d.PointLight).Distance = 10 + (math.Sin(g.Time*math.Pi) * 5)
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos.Y += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos.Y -= moveSpd
-	}
-
-	g.Camera.SetLocalPositionVec(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	// Rotating the camera with the mouse
-
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
-
-	mv := tetra3d.Vector{float64(mx), float64(my), 0, 0}
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff.Y * 0.005
-	g.CameraRotate -= diff.X * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	g.PrevMousePosition = mv
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
-		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture())
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		g.StartProfiling()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
-	return err
+	return g.System.Update()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -269,40 +151,20 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
-	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture().Size()
-	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), opt)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), opt)
+
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
+
+	g.System.Draw(screen, g.Camera.Camera)
+
+	if g.System.DrawDebugText {
+		txt := "This example shows how lighting and primitive\nambient occlusion can be baked into vertex colors.\n1 Key: Switch to unlit channel\n2 Key: Switch to only AO\n3 key: Switch to only lighting\n4 Key: Switch to lighting+AO"
+		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example shows how lighting and primitive\nambient occlusion can be baked into vertex colors.\n1 Key: Switch to unlit channel\n2 Key: Switch to only AO\n3 key: Switch to only lighting\n4 Key: Switch to lighting+AO\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		g.Camera.DebugDrawText(screen, txt, 0, 150, 1, colors.LightGray())
-	}
-}
-
-func (g *Game) StartProfiling() {
-	outFile, err := os.Create("./cpu.pprof")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(2 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	return g.Camera.Size()
 }
 
 func main() {

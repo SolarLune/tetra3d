@@ -77,6 +77,8 @@ type Camera struct {
 	sphereFactorX          float64
 	sphereFactorTang       float64
 	sphereFactorCalculated bool
+
+	debugTextTexture *ebiten.Image
 }
 
 // NewCamera creates a new Camera with the specified width and height.
@@ -142,9 +144,9 @@ func NewCamera(w, h int) *Camera {
 			tex := imageSrc0UnsafeAt(texCoord)
 			if (tex.a == 0) {
 				discard()
-			} else {
-				return vec4(encodeDepth(color.r).rgb, tex.a)
 			}
+			return vec4(encodeDepth(color.r).rgb, tex.a)
+			
 			// TODO: This shader needs to discard if tex.a is transparent. We can't sample the texture to return 
 			// what's underneath here, so discard is basically necessary. We need to implement it once the dicard
 			// keyword / function is implemented (if it ever is; hopefully it will be).
@@ -671,6 +673,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		if scene.World != nil && scene.World.AmbientLight != nil && scene.World.AmbientLight.IsOn() {
 			sceneLights = append(sceneLights, scene.World.AmbientLight)
 			scene.World.AmbientLight.beginRender()
+			camera.DebugInfo.LightCount++
+			camera.DebugInfo.ActiveLightCount++
 		}
 
 	}
@@ -873,6 +877,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		}
 
 		mesh := model.Mesh
+
 		maxSpan := model.Mesh.Dimensions.MaxSpan()
 		modelPos := model.WorldPosition()
 
@@ -1604,6 +1609,20 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, posY, textScale float64, color *Color) {
 
+	size := text.BoundString(basicfont.Face7x13, txtStr).Size()
+
+	if camera.debugTextTexture == nil || size.X > camera.debugTextTexture.Bounds().Dx() || size.Y > camera.debugTextTexture.Bounds().Dy() {
+		camera.debugTextTexture = ebiten.NewImage(size.X, size.Y+13)
+	}
+
+	camera.debugTextTexture.Clear()
+
+	opt := &ebiten.DrawImageOptions{}
+	opt.GeoM.Translate(0, 13)
+	text.DrawWithOptions(camera.debugTextTexture, txtStr, basicfont.Face7x13, opt)
+
+	// TODO: This is slow, this could be way faster by drawing once to an image and then drawing that result
+
 	dr := &ebiten.DrawImageOptions{}
 	dr.ColorM.Scale(0, 0, 0, 1)
 
@@ -1617,7 +1636,7 @@ func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, p
 			dr.GeoM.Translate(posX+4+float64(x), posY+4+float64(y)+periodOffset)
 			dr.GeoM.Scale(textScale, textScale)
 
-			text.DrawWithOptions(screen, txtStr, basicfont.Face7x13, dr)
+			screen.DrawImage(camera.debugTextTexture, dr)
 		}
 
 	}
@@ -1629,7 +1648,7 @@ func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, p
 	dr.GeoM.Translate(posX+4, posY+4+periodOffset)
 	dr.GeoM.Scale(textScale, textScale)
 
-	text.DrawWithOptions(screen, txtStr, basicfont.Face7x13, dr)
+	screen.DrawImage(camera.debugTextTexture, dr)
 
 }
 

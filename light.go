@@ -518,11 +518,8 @@ func (cube *CubeLight) beginModel(model *Model) {
 		cube.workingDimensions.Min = r.MultVec(cube.workingDimensions.Min)
 		cube.workingDimensions.Max = r.MultVec(cube.workingDimensions.Max)
 
-		cube.workingDimensions.Min.Add(s)
-		cube.workingDimensions.Min.Add(p)
-
-		cube.workingDimensions.Max.Add(s)
-		cube.workingDimensions.Max.Add(p)
+		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(s).Add(p)
+		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(s).Add(p)
 
 	}
 

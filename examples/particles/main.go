@@ -1,56 +1,35 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"image/color"
-	"image/png"
 	"math"
-	"os"
-	"runtime/pprof"
-	"time"
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type Game struct {
-	Width, Height int
-	Scene         *tetra3d.Scene
+	Scene *tetra3d.Scene
 
-	Camera       *tetra3d.Camera
-	CameraTilt   float64
-	CameraRotate float64
-	CamLocked    bool
-
-	DrawDebugText     bool
-	DrawDebugDepth    bool
-	PrevMousePosition Vector
-
-	Time float64
+	Camera examples.BasicFreeCam
+	System examples.BasicSystemHandler
 
 	FireParticleSystem  *tetra3d.ParticleSystem
 	FieldParticleSystem *tetra3d.ParticleSystem
 	RingParticleSystem  *tetra3d.ParticleSystem
+
+	Time float64
 }
 
 func NewGame() *Game {
-	game := &Game{
-		Width:             786,
-		Height:            448,
-		PrevMousePosition: Vector{},
-		DrawDebugText:     true,
-		CamLocked:         true,
-	}
+	game := &Game{}
 
 	game.Init()
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 	return game
 }
@@ -125,9 +104,8 @@ func (g *Game) Init() {
 	// how the particles move. In the below function, we move them out from the center of the particle system after they spawn.
 	settings.MovementFunction = func(particle *tetra3d.Particle) {
 		diff := particle.Model.WorldPosition().Sub(particle.ParticleSystem.Root.WorldPosition())
-		diff[1] = 0
-		vector.In(diff).Unit().Scale(0.01)
-		particle.Model.MoveVec(diff)
+		diff.Y = 0
+		particle.Model.MoveVec(diff.Unit().Scale(0.01))
 	}
 
 	particleColor := tetra3d.NewColor(0.25, 0.75, 1, 1)
@@ -145,12 +123,12 @@ func (g *Game) Init() {
 	// Similarly to the field system, the ring system spawns particles in a different manner - we want them to spawn in a ring that spins.
 	// To do this, we'll make use of a vector that controls how far out the particles spawn, and then rotate that ring after each spawn.
 
-	ring := Vector{4, 0, 0}
+	ring := tetra3d.NewVector(4, 0, 0)
 
 	settings.SpawnOffsetFunction = func(particle *tetra3d.Particle) {
 		particle.Model.MoveVec(ring)
 		// 181 degrees here because 1: we're slowly spinning the ring by 1 degree, and 2: we're spawning two rings (so we spin the ring by 180 degrees)
-		ring = ring.Rotate(tetra3d.ToRadians(181), Vector{0, 1, 0})
+		ring = ring.RotateVec(tetra3d.WorldUp, tetra3d.ToRadians(181))
 	}
 
 	settings.SpawnOffset.SetRanges(-0.1, 0.1)
@@ -172,22 +150,15 @@ func (g *Game) Init() {
 
 	// And that's about it!
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
-	g.Camera.SetLocalPositionVec(Vector{0, 2, 5})
-	g.Scene.Root.AddChildren(g.Camera)
+	g.Camera = examples.NewBasicFreeCam(g.Scene)
+	g.Camera.Move(0, 5, 5)
+	g.System = examples.NewBasicSystemHandler(g)
 
 }
 
 func (g *Game) Update() error {
-	var err error
-
-	moveSpd := 0.05
 
 	g.Time += 1.0 / 60.0
-
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
 
 	// Update all of our particle systems, and we're done~
 	g.FireParticleSystem.Update(1.0 / 60.0)
@@ -196,107 +167,10 @@ func (g *Game) Update() error {
 
 	g.FireParticleSystem.Root.Move(math.Sin(g.Time)*0.05, 0, 0)
 
-	// Moving the Camera
+	g.Camera.Update()
 
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
+	return g.System.Update()
 
-	pos := g.Camera.LocalPosition()
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
-	}
-
-	g.Camera.SetLocalPositionVec(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	// Rotating the camera with the mouse
-
-	mx, my := ebiten.CursorPosition()
-
-	mv := Vector{float64(mx), float64(my)}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.CamLocked = !g.CamLocked
-
-		if g.CamLocked {
-			ebiten.SetCursorMode(ebiten.CursorModeCaptured)
-		} else {
-			ebiten.SetCursorMode(ebiten.CursorModeVisible)
-		}
-
-		g.PrevMousePosition = mv.Clone()
-
-	}
-
-	if g.CamLocked {
-
-		// Rotate and tilt the camera according to mouse movements
-
-		diff := mv.Sub(g.PrevMousePosition)
-
-		g.CameraTilt -= diff[1] * 0.005
-		g.CameraRotate -= diff[0] * 0.005
-
-		g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-		tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-		rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-		// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-		g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	}
-
-	g.PrevMousePosition = mv.Clone()
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
-		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture())
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		g.StartProfiling()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
-	return err
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -311,37 +185,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), nil)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), nil)
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
+
+	g.System.Draw(screen, g.Camera.Camera)
+
+	if g.System.DrawDebugText {
+		txt := `This example shows how various particle systems work.`
+		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nThis example shows how particle systems work.\nF2: Lock / Unlock mouse\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		g.Camera.DebugDrawText(screen, txt, 0, 120, 1, colors.LightGray())
-	}
-}
-
-func (g *Game) StartProfiling() {
-	outFile, err := os.Create("./cpu.pprof")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(2 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	return g.Camera.Size()
 }
 
 func main() {

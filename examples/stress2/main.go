@@ -2,26 +2,18 @@ package main
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"image"
 	"image/color"
-	"image/png"
 	"math"
-	"os"
-	"runtime/pprof"
-	"time"
 
 	_ "embed"
 
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
-	"golang.org/x/image/font/basicfont"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 //go:embed testimage.png
@@ -31,18 +23,10 @@ var testImage []byte
 var character []byte
 
 type Game struct {
-	Width, Height int
-	Scene         *tetra3d.Scene
+	Scene *tetra3d.Scene
 
-	Camera            *tetra3d.Camera
-	CameraTilt        float64
-	CameraRotate      float64
-	PrevMousePosition Vector
-
-	DrawDebugText      bool
-	DrawDebugDepth     bool
-	DrawDebugWireframe bool
-	DrawDebugNormals   bool
+	Camera examples.BasicFreeCam
+	System examples.BasicSystemHandler
 
 	Cubes []*tetra3d.Model
 
@@ -51,11 +35,7 @@ type Game struct {
 
 func NewGame() *Game {
 
-	game := &Game{
-		Width:             796,
-		Height:            448,
-		PrevMousePosition: Vector{},
-	}
+	game := &Game{}
 
 	game.Init()
 
@@ -139,7 +119,7 @@ func (g *Game) Init() {
 		for j := 0; j < 21; j++ {
 			// Create a new Cube, position it, add it to the scene, and add it to the cubes slice.
 			cube := tetra3d.NewModel(cubeMesh, "Cube")
-			cube.SetLocalPositionVec(Vector{float64(i) * 1.5, 0, float64(-j * 3)})
+			cube.SetLocalPosition(float64(i)*1.5, 0, float64(-j*3))
 			g.Scene.Root.AddChildren(cube)
 			g.Cubes = append(g.Cubes, cube)
 		}
@@ -147,20 +127,17 @@ func (g *Game) Init() {
 
 	g.Scene.Root.AddChildren(batched)
 
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
+	g.Camera = examples.NewBasicFreeCam(g.Scene)
 	g.Camera.Far = 120
-	g.Camera.SetLocalPositionVec(Vector{0, 0, 15})
+	g.Camera.SetLocalPosition(0, 0, 15)
+
+	g.System = examples.NewBasicSystemHandler(g)
 
 	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMaximum)
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 }
 
 func (g *Game) Update() error {
-
-	var err error
-
-	moveSpd := 0.1
 
 	tps := 1.0 / 60.0 // 60 ticks per second, regardless of display FPS
 
@@ -169,7 +146,7 @@ func (g *Game) Update() error {
 	for cubeIndex, cube := range g.Cubes {
 		wp := cube.WorldPosition()
 
-		wp[1] = math.Sin(g.Time*math.Pi + float64(cubeIndex))
+		wp.Y = math.Sin(g.Time*math.Pi + float64(cubeIndex))
 
 		cube.SetWorldPositionVec(wp)
 		cube.Color.R = float32(cubeIndex) / 100
@@ -187,120 +164,9 @@ func (g *Game) Update() error {
 
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
+	g.Camera.Update()
 
-	// Moving the Camera
-
-	// We use Camera.Rotation.Forward().Invert() because the camera looks down -Z (so its forward vector is inverted)
-	forward := g.Camera.LocalRotation().Forward().Invert()
-	right := g.Camera.LocalRotation().Right()
-
-	pos := g.Camera.LocalPosition()
-
-	if ebiten.IsKeyPressed(ebiten.KeyW) {
-		pos = pos.Add(forward.Scale(moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		pos = pos.Add(right.Scale(moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		pos = pos.Add(forward.Scale(-moveSpd))
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		pos = pos.Add(right.Scale(-moveSpd))
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
-		pos[1] += moveSpd
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyControl) {
-		pos[1] -= moveSpd
-	}
-
-	g.Camera.SetLocalPositionVec(pos)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	// Rotating the camera with the mouse
-
-	// Rotate and tilt the camera according to mouse movements
-	mx, my := ebiten.CursorPosition()
-
-	mv := Vector{float64(mx), float64(my)}
-
-	diff := mv.Sub(g.PrevMousePosition)
-
-	g.CameraTilt -= diff[1] * 0.005
-	g.CameraRotate -= diff[0] * 0.005
-
-	g.CameraTilt = math.Max(math.Min(g.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
-
-	tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, g.CameraTilt)
-	rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, g.CameraRotate)
-
-	// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-	g.Camera.SetLocalRotation(tilt.Mult(rotate))
-
-	g.PrevMousePosition = mv.Clone()
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF12) {
-		f, err := os.Create("screenshot" + time.Now().Format("2006-01-02 15:04:05") + ".png")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer f.Close()
-		png.Encode(f, g.Camera.ColorTexture())
-	}
-
-	if ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		g.StartProfiling()
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
-		g.DrawDebugWireframe = !g.DrawDebugWireframe
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
-		g.DrawDebugNormals = !g.DrawDebugNormals
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
-	return err
-
-}
-
-func (g *Game) StartProfiling() {
-
-	outFile, err := os.Create("./cpu.pprof")
-
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-
-	fmt.Println("Beginning CPU profiling...")
-	pprof.StartCPUProfile(outFile)
-	go func() {
-		time.Sleep(10 * time.Second)
-		pprof.StopCPUProfile()
-		fmt.Println("CPU profiling finished.")
-	}()
+	return g.System.Update()
 
 }
 
@@ -312,40 +178,32 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear the Camera
 	g.Camera.Clear()
 
-	// Render the non-screen Models
-	// g.Camera.Render(g.Scene, g.Scene.Models...)
-
+	// Render the scene
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
-	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
-	// we could just draw the images straight.
-	opt := &ebiten.DrawImageOptions{}
-	w, h := g.Camera.ColorTexture().Size()
-	opt.GeoM.Scale(float64(g.Width)/float64(w), float64(g.Height)/float64(h))
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), opt)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), opt)
-	}
+	// Render the result
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
-	if g.DrawDebugWireframe {
-		g.Camera.DrawDebugWireframe(screen, g.Scene.Root, colors.Red())
-	}
+	g.System.Draw(screen, g.Camera.Camera)
 
-	if g.DrawDebugNormals {
-		g.Camera.DrawDebugNormals(screen, g.Scene.Root, 0.25, colors.Blue())
-	}
+	if g.System.DrawDebugText {
+		txt := `Stress Test 2 - Here, cubes are moving. We can render them
+efficiently by dynamically batching them, though they
+will mimic the batching object (the character plane) visually - 
+they no longer have their own texture,
+blend mode, or texture filtering (as they all
+take these properties from the floating character plane).
+They also can no longer intersect; rather, they
+will just draw in front of or behind each other.
 
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nWASD: Move, Mouse: Look\nStress Test 2 - Here, cubes are moving. We can render them\nefficiently by dynamically batching them, though they\nwill mimic the batching object (the character plane) visually - \nthey no longer have their own texture,\nblend mode, or texture filtering (as they all\ntake these properties from the floating character plane).\nThey also can no longer intersect; rather, they\nwill just draw in front of or behind each other.\n1 Key: Toggle batching cubes together\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 140, color.RGBA{200, 200, 200, 255})
+1 Key: Toggle batching cubes together`
+		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Width, g.Height
+	return g.Camera.Size()
 }
 
 func main() {

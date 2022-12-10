@@ -658,17 +658,17 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			lightData := lights[lighting.(lightspuntual.LightIndex)]
 
 			if lightData.Type == lightspuntual.TypeDirectional {
-				directionalLight := NewDirectionalLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity)
+				directionalLight := NewDirectionalLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity) // Sun is in "energy"
 				obj = directionalLight
 			} else if lightData.Type == lightspuntual.TypePoint {
-				pointLight := NewPointLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/1000)
+				pointLight := NewPointLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/80) // Point lights have wattage energy
 				if !math.IsInf(float64(*lightData.Range), 0) {
 					pointLight.Distance = float64(*lightData.Range)
 				}
 				obj = pointLight
 			} else {
 				// Any unsupported light type just gets turned into an ambient light
-				pointLight := NewAmbientLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/1000)
+				pointLight := NewAmbientLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/80)
 				obj = pointLight
 			}
 
@@ -863,8 +863,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							dim := model.Mesh.Dimensions
 							scale := model.WorldScale()
 
-							dim.Min = dim.Min.MultComp(scale)
-							dim.Max = dim.Max.MultComp(scale)
+							dim.Min = dim.Min.HadamardMult(scale)
+							dim.Max = dim.Max.HadamardMult(scale)
 
 							sphere = NewBoundingSphere("BoundingSphere", dim.MaxDimension()/2)
 						}

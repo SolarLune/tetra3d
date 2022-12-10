@@ -120,7 +120,7 @@ func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
 }
 
 // ToQuaternion returns a Quaternion representative of the Matrix4's rotation (assuming it is just a purely rotational Matrix4).
-func (matrix Matrix4) ToQuaternion() *Quaternion {
+func (matrix Matrix4) ToQuaternion() Quaternion {
 
 	sqrt := math.Sqrt(1 + matrix[0][0] + matrix[1][1] + matrix[2][2])
 

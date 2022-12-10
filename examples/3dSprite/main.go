@@ -2,13 +2,12 @@ package main
 
 import (
 	"bytes"
-	"errors"
-	"image/color"
 
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -22,20 +21,16 @@ var heartImg []byte
 var scene []byte
 
 type Game struct {
-	Width, Height  int
-	Scene          *tetra3d.Scene
-	Camera         *tetra3d.Camera
-	DrawDebugText  bool
-	DrawDebugDepth bool
-
+	Scene              *tetra3d.Scene
+	Camera             *tetra3d.Camera
 	WireframeDrawHeart bool
 	HeartSprite        *ebiten.Image
+
+	System examples.BasicSystemHandler
 }
 
 func NewGame() *Game {
-	game := &Game{
-		DrawDebugText: true,
-	}
+	game := &Game{}
 
 	game.Init()
 
@@ -59,13 +54,14 @@ func (g *Game) Init() {
 	if err != nil {
 		panic(err)
 	}
+
+	g.System = examples.NewBasicSystemHandler(g)
+	g.System.UsingBasicFreeCam = false
 	g.HeartSprite = newImg
 
 }
 
 func (g *Game) Update() error {
-
-	var err error
 
 	moveSpd := 0.05
 	dx := 0.0
@@ -93,37 +89,13 @@ func (g *Game) Update() error {
 		g.WireframeDrawHeart = !g.WireframeDrawHeart
 	}
 
-	// Quit if we press Escape.
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
-
-	// Fullscreen toggling.
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
-		g.Init()
-	}
-
-	// Debug views
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
-	return err
+	return g.System.Update()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Clear the screen with a color.
-	screen.Fill(color.RGBA{60, 70, 80, 255})
+	screen.Fill(g.Scene.World.ClearColor.ToRGBA64())
 
 	// Clear the Camera.
 	g.Camera.Clear()
@@ -143,20 +115,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	)
 
 	// Draw depth texture if the debug option is enabled; draw color texture otherwise.
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), nil)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), nil)
-	}
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		g.Camera.DebugDrawText(screen, "F1 to toggle this text.\n\nThis is an example showing\nhow you can render a sprite in 2D, while\nmaintaining its ability to render over or under\nother 3D objects by simply moving\nit through 3D space.\n\nA: Toggle wireframe view of heart position\nR: Restart\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit", 0, 130, 1, colors.LightGray())
+	if g.System.DrawDebugText {
+		g.Camera.DebugDrawText(screen, "This is an example showing\nhow you can render a sprite in 2D, while\nmaintaining its ability to render over or under\nother 3D objects by simply moving\nit through 3D space.\n\nA: Toggle wireframe view of heart position", 0, 200, 1, colors.LightGray())
 	}
 
 	if g.WireframeDrawHeart {
 		g.Camera.DrawDebugWireframe(screen, g.Scene.Root.Get("Heart"), colors.White())
 	}
+
+	g.System.Draw(screen, g.Camera)
 
 }
 

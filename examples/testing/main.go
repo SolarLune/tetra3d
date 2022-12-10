@@ -1,33 +1,29 @@
 package main
 
 import (
-	"errors"
 	"image/color"
 
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
-	"golang.org/x/image/font/basicfont"
+	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 type Game struct {
-	Width, Height  int
-	Scene          *tetra3d.Scene
-	Camera         *tetra3d.Camera
-	DrawDebugText  bool
-	DrawDebugDepth bool
+	Width, Height int
+	Scene         *tetra3d.Scene
+	Camera        *tetra3d.Camera
+
+	System examples.BasicSystemHandler
 }
 
 func NewGame() *Game {
 	game := &Game{
-		Width:         796,
-		Height:        448,
-		DrawDebugText: true,
+		Width:  640,
+		Height: 360,
 	}
 
 	game.Init()
@@ -47,66 +43,27 @@ func (g *Game) Init() {
 	// Turn off lighting.
 	g.Scene.World.LightingOn = false
 
-	// Create a plane, set the color, add it to the scene.
-	plane := tetra3d.NewModel(tetra3d.NewCube(), "Plane")
-	plane.Color.RandomizeRGB(0.5, 1, false)
-	g.Scene.Root.AddChildren(plane)
+	// Create a cube, set the color, add it to the scene.
+	cube := tetra3d.NewModel(tetra3d.NewCube(), "Cube")
+	cube.Color.RandomizeRGB(0.5, 1, false)
+	g.Scene.Root.AddChildren(cube)
 
-	// clones := []tetra3d.INode{}
-
-	// for x := 0; x < 10; x++ {
-	// 	for y := 0; y < 4; y++ {
-	// 		for z := 0; z < 10; z++ {
-	// 			clone := plane.Clone().(*tetra3d.Model)
-	// 			clone.Color.RandomizeRGB(0.5, 1, false)
-	// 			clone.Move(float64(x)*2+2, float64(y)*2, -float64(z)*2)
-	// 			clones = append(clones, clone)
-	// 			// g.Scene.Root.AddChildren(clone)
-	// 		}
-	// 	}
-	// }
-	// plane.AddChildren(clones...)
+	g.System = examples.NewBasicSystemHandler(g)
+	g.System.UsingBasicFreeCam = false
 
 	// Create a camera, move it back.
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Move(0, 2, 15)
 
-	// Again, we don't need to actually add the camera to the scenegraph, but we'll do it anyway because why not.
+	// We don't need to actually add the camera to the scenegraph, but we'll do it anyway because why not.
 	g.Scene.Root.AddChildren(g.Camera)
 
-	plane.Rotate(0, 1, 0, 1)
+	cube.Rotate(0, 1, 0, 1)
 
 }
 
 func (g *Game) Update() error {
-
-	var err error
-
-	// Quit if we press Escape.
-	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
-	}
-
-	// Fullscreen toggling.
-	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
-	}
-
-	// Spinning the plane.
-	// plane := g.Scene.Root.Get("Plane")
-	// plane.SetLocalRotation(plane.LocalRotation().Rotated(0, 1, 0, 0.01))
-
-	// Debug views
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
-		g.DrawDebugText = !g.DrawDebugText
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
-		g.DrawDebugDepth = !g.DrawDebugDepth
-	}
-
-	return err
+	return g.System.Update()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -121,17 +78,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
 
 	// Draw depth texture if the debug option is enabled; draw color texture otherwise.
-	if g.DrawDebugDepth {
-		screen.DrawImage(g.Camera.DepthTexture(), nil)
-	} else {
-		screen.DrawImage(g.Camera.ColorTexture(), nil)
+	screen.DrawImage(g.Camera.ColorTexture(), nil)
+
+	g.System.Draw(screen, g.Camera)
+
+	if g.System.DrawDebugText {
+		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
+		txt := `This is a very simple example showing
+a simple 3D cube,
+created through code.`
+		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 
-	if g.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := "F1 to toggle this text\nThis is a very simple example showing\na simple 3D cube,\ncreated through code.\nF5: Toggle depth debug view\nF4: Toggle fullscreen\nESC: Quit"
-		text.Draw(screen, txt, basicfont.Face7x13, 0, 130, color.RGBA{200, 200, 200, 255})
-	}
 }
 
 func (g *Game) Layout(w, h int) (int, int) {

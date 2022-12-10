@@ -142,26 +142,11 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 
 }
 
-// CollisionTest performs an collision test if the bounding object were to move in the given direction in world space.
-// It returns all valid Collisions across all recursive children of the INodes slice passed in as others, testing against BoundingObjects in those trees.
-// To exemplify this, if you had a Model that had a BoundingObject child, and then tested the Model for collision,
-// the Model's children would be tested for collision (which means the BoundingObject), and the Model would be the
-// collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
-// object.
-// Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
-func (bt *BoundingTriangles) CollisionTest(dx, dy, dz float64, others ...INode) []*Collision {
-	return commonCollisionTest(bt, dx, dy, dz, others...)
-}
-
-// CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space using a vector.
-// It returns all valid Collisions across all recursive children of the INodes slice passed in as others, testing against BoundingObjects in those trees.
-// To exemplify this, if you had a Model that had a BoundingObject child, and then tested the Model for collision,
-// the Model's children would be tested for collision (which means the BoundingObject), and the Model would be the
-// collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
-// object.
-// Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
-func (bt *BoundingTriangles) CollisionTestVec(moveVec Vector, others ...INode) []*Collision {
-	return commonCollisionTest(bt, moveVec.X, moveVec.Y, moveVec.Z, others...)
+// CollisionTest performs a collision test using the provided collision test settings structure.
+// As a nicety, CollisionTest also returns a distance-sorted slice of all of the Collisions (but you should rather
+// handle collisions with intent using the OnCollision function of the CollisionTestSettings struct).
+func (bt *BoundingTriangles) CollisionTest(settings CollisionTestSettings) []*Collision {
+	return CommonCollisionTest(bt, settings)
 }
 
 // Type returns the NodeType for this object.

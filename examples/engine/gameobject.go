@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/kvartborg/vector"
 	"github.com/solarlune/tetra3d"
 )
 
@@ -30,39 +29,43 @@ func NewPlayer(node tetra3d.INode) *Player {
 
 func (player *Player) Update() {
 
-	move := Vector{0, 0, 0}
+	move := tetra3d.NewVectorZero()
 	moveSpd := 0.1
 
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		move[0] -= moveSpd
+		move.X -= moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		move[0] += moveSpd
+		move.X += moveSpd
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		move[2] -= moveSpd
+		move.Z -= moveSpd
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		move[2] += moveSpd
+		move.Z += moveSpd
 	}
-
-	collisions := player.Bounds.CollisionTestVec(
-		move,
-		player.node.Root().ChildrenRecursive().ByTags("solid")...,
-	)
 
 	player.node.MoveVec(move)
 
-	for _, col := range collisions {
+	player.Bounds.CollisionTest(
 
-		if col.BoundingObject.Parent().Properties().Has("death") {
-			player.node.Unparent() // Unparenting is the equivalent of destroying the node
-		}
+		tetra3d.CollisionTestSettings{
 
-		player.node.MoveVec(col.AverageMTV())
+			Others: player.node.Root().ChildrenRecursive().ByTags("solid"),
 
-	}
+			HandleCollision: func(col *tetra3d.Collision) bool {
+
+				if col.BoundingObject.Parent().Properties().Has("death") {
+					player.node.Unparent() // Unparenting is the equivalent of destroying the node
+				}
+
+				player.node.MoveVec(col.AverageMTV())
+
+				return true
+			},
+		},
+	)
 
 }
 

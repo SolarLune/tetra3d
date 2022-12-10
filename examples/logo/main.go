@@ -35,9 +35,6 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	g.Camera = examples.NewBasicFreeCam()
-	g.SystemHandler = examples.NewBasicSystemHandler(g)
-
 	data, err := tetra3d.LoadGLTFData(logoModel, nil)
 
 	if err != nil {
@@ -46,7 +43,10 @@ func (g *Game) Init() {
 
 	g.Scene = data.Scenes[0]
 
-	g.Offscreen = ebiten.NewImage(g.Camera.Width, g.Camera.Height)
+	g.Camera = examples.NewBasicFreeCam(g.Scene)
+	g.SystemHandler = examples.NewBasicSystemHandler(g)
+
+	g.Offscreen = ebiten.NewImage(g.Camera.Size())
 
 	// Set the screen objects' screen texture to the offscreen buffer we just created above:
 	data.Materials["ScreenTexture"].Texture = g.Offscreen
@@ -103,7 +103,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	return g.Camera.Width, g.Camera.Height
+	return g.Camera.Size()
 }
 
 func main() {

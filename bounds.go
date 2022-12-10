@@ -15,7 +15,7 @@ type Intersection struct {
 
 // Slope returns the slope of the intersection's normal, in radians. This ranges from 0 (straight up) to pi (straight down).
 func (intersection *Intersection) Slope() float64 {
-	return Up.Angle(intersection.Normal)
+	return WorldUp.Angle(intersection.Normal)
 }
 
 // SlideAgainstNormal takes an input vector and alters it to slide against the intersection's returned normal.
@@ -141,6 +141,32 @@ func (result *Collision) AverageContactPoint() Vector {
 	return contactPoint
 }
 
+// CollisionTestSettings controls how a CollisionTest() call evaluates.
+type CollisionTestSettings struct {
+	// HandleCollision is a callback function that is called when a valid collision test happens between the
+	// calling object and one of the valid INodes contained within the Others slice. The callback should return a boolean
+	// indicating if the test should continue after evaluating this collision (true) or not (false).
+	//
+	// Because this function is called whenever a Collision is found, anything done in this function will influence
+	// following possible Collisions. To illustrate this, let's say that you had object A that is colliding with objects B and C.
+	// If the collision with B is detected first, and you move A away so that it is no longer colliding with B or C, then the collision
+	// with C would not be detected (and HandleCollision would not be called in this case).
+	//
+	// This being the case, HandleCollision is not guaranteed to be called in any fixed order (so in the above example,
+	// it could detect a collision with B first, OR C first). If you need collisions to be checked in order of distance,
+	// step through them manually with the results of CollisionTest(), rather than handling them individually with HandleCollision.
+	HandleCollision func(col *Collision) bool
+
+	// Others is a slice of INodes to check for collision against.
+	// A Collision test tests against all recursive children of the Others slice, testing against specifically the
+	// BoundingObjects in those trees.
+	// To exemplify this, if you had a Model that had a BoundingObject child, and then added the Model to the Others slice,
+	// the Model's children would be tested for collision (which means the BoundingObject), and the Model would be the
+	// collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
+	// object in the Collision object returned.
+	Others []INode
+}
+
 // IBoundingObject represents a Node type that can be tested for collision. The exposed functions are essentially just
 // concerning whether an object that implements IBoundingObject is colliding with another IBoundingObject, and
 // if so, by how much.
@@ -150,22 +176,12 @@ type IBoundingObject interface {
 	// Collision returns a Collision if the BoundingObject is intersecting another BoundingObject. If
 	// no intersection is reported, Collision returns nil.
 	Collision(other IBoundingObject) *Collision
-	// CollisionTest performs an collision test if the bounding object were to move in the given direction in world space.
-	// It returns all valid Collisions across all recursive children of the INodes slice passed in as others, testing against BoundingObjects in those trees.
-	// To exemplify this, if you had a Model that had a BoundingObject child, and then tested the Model for collision,
-	// the Model's children would be tested for collision (which means the BoundingObject), and the Model would be the
-	// collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
-	// object.
-	// Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
-	CollisionTest(dx, dy, dz float64, others ...INode) []*Collision
-	// CollisionTestVec performs an collision test if the bounding object were to move in the given direction in world space using a vector.
-	// It returns all valid Collisions across all recursive children of the INodes slice passed in as others, testing against BoundingObjects in those trees.
-	// To exemplify this, if you had a Model that had a BoundingObject child, and then tested the Model for collision,
-	// the Model's children would be tested for collision (which means the BoundingObject), and the Model would be the
-	// collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
-	// object.
-	// Collisions will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
-	CollisionTestVec(moveVec Vector, others ...INode) []*Collision
+
+	// CollisionTest performs a collision test using the provided collision test settings structure.
+	// As a nicety, CollisionTest also returns a distance-sorted slice of all of the Collisions (but you should rather
+	// handle collisions with intent using the OnCollision function of the CollisionTestSettings struct).
+	// The returned Collisions slice will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
+	CollisionTest(settings CollisionTestSettings) []*Collision
 }
 
 // The below set of bt functions are used to test for intersection between BoundingObject pairs.
@@ -398,21 +414,21 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 		axes := []Vector{
 
-			Right,
-			Up,
-			Back,
+			WorldRight,
+			WorldUp,
+			WorldBack,
 
-			Right.Cross(ab),
-			Right.Cross(bc),
-			Right.Cross(ca),
+			WorldRight.Cross(ab),
+			WorldRight.Cross(bc),
+			WorldRight.Cross(ca),
 
-			Up.Cross(ab),
-			Up.Cross(bc),
-			Up.Cross(ca),
+			WorldUp.Cross(ab),
+			WorldUp.Cross(bc),
+			WorldUp.Cross(ca),
 
-			Back.Cross(ab),
-			Back.Cross(bc),
-			Back.Cross(ca),
+			WorldBack.Cross(ab),
+			WorldBack.Cross(bc),
+			WorldBack.Cross(ca),
 
 			transformNoLoc.MultVec(tri.Normal),
 		}
@@ -430,9 +446,9 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 			p1 := project(axis, v0, v1, v2)
 
-			r := boxSize.X*math.Abs(Right.Dot(axis)) +
-				boxSize.Y*math.Abs(Up.Dot(axis)) +
-				boxSize.Z*math.Abs(Back.Dot(axis))
+			r := boxSize.X*math.Abs(WorldRight.Dot(axis)) +
+				boxSize.Y*math.Abs(WorldUp.Dot(axis)) +
+				boxSize.Z*math.Abs(WorldBack.Dot(axis))
 
 			p2 := projection{
 				Max: r,
@@ -794,41 +810,38 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 }
 
-func commonCollisionTest(node INode, dx, dy, dz float64, others ...INode) []*Collision {
-
-	var ogPos Vector
-
-	moving := false
-
-	// If dx, dy, and dz are 0, we don't need to reposition the node for the collision test.
-	if dx != 0 || dy != 0 || dz != 0 {
-		ogPos = node.LocalPosition()
-		moving = true
-		node.Move(dx, dy, dz)
-	}
+func CommonCollisionTest(node INode, settings CollisionTestSettings) []*Collision {
 
 	collisions := []*Collision{}
 
 	var test func(checking, parent INode)
 
+	continueChecking := true
+
 	test = func(checking, parent INode) {
 
-		if c, ok := checking.(IBoundingObject); ok {
+		if continueChecking {
 
-			if collision := node.(IBoundingObject).Collision(c); collision != nil {
-				collision.Root = parent
-				collisions = append(collisions, collision)
+			if c, ok := checking.(IBoundingObject); ok {
+
+				if collision := node.(IBoundingObject).Collision(c); collision != nil {
+					collision.Root = parent
+					if settings.HandleCollision != nil && !settings.HandleCollision(collision) {
+						continueChecking = false
+					}
+					collisions = append(collisions, collision)
+				}
+
 			}
 
-		}
-
-		for _, child := range checking.Children() {
-			test(child, parent)
+			for _, child := range checking.Children() {
+				test(child, parent)
+			}
 		}
 
 	}
 
-	for _, o := range others {
+	for _, o := range settings.Others {
 		test(o, o)
 	}
 
@@ -837,10 +850,6 @@ func commonCollisionTest(node INode, dx, dy, dz float64, others ...INode) []*Col
 		return collisions[i].AverageContactPoint().DistanceSquared(collisions[i].Intersections[0].StartingPoint) >
 			collisions[j].AverageContactPoint().DistanceSquared(collisions[j].Intersections[0].StartingPoint)
 	})
-
-	if moving {
-		node.SetLocalPositionVec(ogPos)
-	}
 
 	return collisions
 
@@ -894,16 +903,14 @@ var sphereCheck = NewBoundingSphere("sphere check", 1)
 
 // SphereCheck performs a quick bounding sphere check at the specified X, Y, and Z position with the radius given,
 // against the bounding objects provided in "others".
-func SphereCheck(x, y, z, radius float64, others ...INode) []*Collision {
+func SphereCheck(x, y, z, radius float64, settings CollisionTestSettings) []*Collision {
 	sphereCheck.SetLocalPosition(x, y, z)
 	sphereCheck.Radius = radius
-	return commonCollisionTest(sphereCheck, 0, 0, 0, others...)
+	return CommonCollisionTest(sphereCheck, settings)
 }
 
 // SphereCheck performs a quick bounding sphere check at the specified position with the radius given, against the
 // bounding objects provided in "others".
-func SphereCheckVec(position Vector, radius float64, others ...INode) []*Collision {
-	sphereCheck.SetLocalPositionVec(position)
-	sphereCheck.Radius = radius
-	return commonCollisionTest(sphereCheck, 0, 0, 0, others...)
+func SphereCheckVec(position Vector, radius float64, settings CollisionTestSettings) []*Collision {
+	return SphereCheck(position.X, position.Y, position.Z, radius, settings)
 }

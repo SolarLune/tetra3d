@@ -8,23 +8,23 @@ import (
 
 // Much of the harder code taken with HEAVY appreciation from quartercastle: https://github.com/quartercastle/vector
 
-// Right represents a unit vector in the global direction of Right on the right-handed OpenGL / Tetra3D's coordinate system (+X).
-var Right = NewVector(1, 0, 0)
+// WorldRight represents a unit vector in the global direction of WorldRight on the right-handed OpenGL / Tetra3D's coordinate system (+X).
+var WorldRight = NewVector(1, 0, 0)
 
-// Left represents a unit vector in the global direction of Left on the right-handed OpenGL / Tetra3D's coordinate system (-X).
-var Left = Right.Invert()
+// WorldLeft represents a unit vector in the global direction of WorldLeft on the right-handed OpenGL / Tetra3D's coordinate system (-X).
+var WorldLeft = WorldRight.Invert()
 
-// Up represents a unit vector in the global direction of Up on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
-var Up = NewVector(0, 1, 0)
+// WorldUp represents a unit vector in the global direction of WorldUp on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
+var WorldUp = NewVector(0, 1, 0)
 
-// Down represents a unit vector in the global direction of Down on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
-var Down = Up.Invert()
+// WorldDown represents a unit vector in the global direction of WorldDown on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
+var WorldDown = WorldUp.Invert()
 
-// Back represents a unit vector in the global direction of Back on the right-handed OpenGL / Tetra3D's coordinate system (+Z).
-var Back = NewVector(0, 0, 1)
+// WorldBack represents a unit vector in the global direction of WorldBack on the right-handed OpenGL / Tetra3D's coordinate system (+Z).
+var WorldBack = NewVector(0, 0, 1)
 
-// Forward represents a unit vector in the global direction of Forward on the right-handed OpenGL / Tetra3D's coordinate system (-Z).
-var Forward = Back.Invert()
+// WorldForward represents a unit vector in the global direction of WorldForward on the right-handed OpenGL / Tetra3D's coordinate system (-Z).
+var WorldForward = WorldBack.Invert()
 
 // Vector represents a 3D Vector, which can be used for usual 3D applications (position, direction, velocity, etc).
 // The fourth component, W, can be ignored and is used for internal Tetra3D usage.
@@ -43,9 +43,20 @@ func NewVector(x, y, z float64) Vector {
 	return Vector{X: x, Y: y, Z: z, W: 0}
 }
 
+// NewVector creates a new Vector with the specified x and y components. The W and Z components are set to 0.
+func NewVector2d(x, y float64) Vector {
+	return Vector{X: x, Y: y, Z: 0, W: 0}
+}
+
 // NewVectorZero creates a new "zero-ed out" Vector, with the values of 0, 0, 0, and 0 (for W).
 func NewVectorZero() Vector {
 	return Vector{}
+}
+
+// Modify returns a ModVector object (a pointer to the original vector).
+func (vec *Vector) Modify() ModVector {
+	ip := ModVector{Vector: vec}
+	return ip
 }
 
 // Clone clones the provided Vector, returning a new copy of it. This isn't necessary for a value-based struct like this.
@@ -54,16 +65,16 @@ func NewVectorZero() Vector {
 // }
 
 // String returns a string representation of the Vector, excluding its W component (which is primarily used for internal purposes).
-func (vs Vector) String() string {
-	return fmt.Sprintf("{%.f, %.f, %.f}", vs.X, vs.Y, vs.Z)
+func (vec Vector) String() string {
+	return fmt.Sprintf("{%.2f, %.2f, %.2f}", vec.X, vec.Y, vec.Z)
 }
 
 // Plus returns a copy of the calling vector, added together with the other Vector provided (ignoring the W component).
-func (vs Vector) Add(other Vector) Vector {
-	vs.X += other.X
-	vs.Y += other.Y
-	vs.Z += other.Z
-	return vs
+func (vec Vector) Add(other Vector) Vector {
+	vec.X += other.X
+	vec.Y += other.Y
+	vec.Z += other.Z
+	return vec
 }
 
 // Sub returns a copy of the calling Vector, with the other Vector subtracted from it (ignoring the W component).
@@ -71,6 +82,22 @@ func (vec Vector) Sub(other Vector) Vector {
 	vec.X -= other.X
 	vec.Y -= other.Y
 	vec.Z -= other.Z
+	return vec
+}
+
+// Expand expands the Vector by the margin specified, in absolute units, if each component is over the minimum argument.
+// To illustrate: Given a Vector of {1, 0.1, -0.3}, Vector.Expand(0.5, 0.2) would give you a Vector of {1.5, 0.1, -0.8}.
+// This function returns a copy of the Vector with the result.
+func (vec Vector) Expand(margin, min float64) Vector {
+	if vec.X > min || vec.X < -min {
+		vec.X += math.Copysign(margin, vec.X)
+	}
+	if vec.Y > min || vec.Y < -min {
+		vec.Y += math.Copysign(margin, vec.Y)
+	}
+	if vec.Z > min || vec.Z < -min {
+		vec.Z += math.Copysign(margin, vec.Z)
+	}
 	return vec
 }
 
@@ -94,11 +121,11 @@ func (vec Vector) Cross(other Vector) Vector {
 
 }
 
+// Invert returns a copy of the Vector with all components inverted (ignoring the Vector's W component).
 func (vec Vector) Invert() Vector {
 	vec.X = -vec.X
 	vec.Y = -vec.Y
 	vec.Z = -vec.Z
-	vec.W = -vec.W
 	return vec
 }
 
@@ -112,15 +139,26 @@ func (vec Vector) MagnitudeSquared() float64 {
 	return vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z
 }
 
+// ClampMagnitude clamps the overall magnitude of the Vector to the maximum magnitude specified, returning a copy with the result.
+func (vec Vector) ClampMagnitude(maxMag float64) Vector {
+	if vec.Magnitude() > maxMag {
+		vec = vec.Unit().Scale(maxMag)
+	}
+	return vec
+}
+
+// Distance returns the distance from the calling Vector to the other Vector provided.
 func (vec Vector) Distance(other Vector) float64 {
 	return vec.Sub(other).Magnitude()
 }
 
+// Distance returns the squared distance from the calling Vector to the other Vector provided. This is faster than Distance(), as it avoids using math.Sqrt().
 func (vec Vector) DistanceSquared(other Vector) float64 {
 	return vec.Sub(other).MagnitudeSquared()
 }
 
-func (vec Vector) MultComp(other Vector) Vector {
+// HadamardMult performs Hadamard (component-wise) multiplication on the calling Vector with the other Vector provided, returning a copy with the result (and ignoring the Vector's W component).
+func (vec Vector) HadamardMult(other Vector) Vector {
 	vec.X *= other.X
 	vec.Y *= other.Y
 	vec.Z *= other.Z
@@ -131,7 +169,7 @@ func (vec Vector) MultComp(other Vector) Vector {
 // It does not alter the W component of the Vector.
 func (vec Vector) Unit() Vector {
 	l := vec.Magnitude()
-	if l < 1e-8 {
+	if l < 1e-8 || l == 1 {
 		// If it's 0, then don't modify the vector
 		return vec
 	}
@@ -221,7 +259,7 @@ func (vec Vector) Floats() [4]float64 {
 // Equals returns true if the two Vectors are close enough in all values (excluding W).
 func (vec Vector) Equals(other Vector) bool {
 
-	eps := 1e-8
+	eps := 1e-6
 
 	if math.Abs(float64(vec.X-other.X)) > eps || math.Abs(float64(vec.Y-other.Y)) > eps || math.Abs(float64(vec.Z-other.Z)) > eps {
 		return false
@@ -255,61 +293,26 @@ func (vec Vector) IsZero() bool {
 // Rotate returns a copy of the Vector, rotated around the Vector axis provided by the angle provided (in radians).
 // The function is most efficient if passed an orthogonal, normalized axis (i.e. the X, Y, or Z constants).
 // Note that this function ignores the W component of both Vectors.
-func (vec Vector) Rotate(axis Vector, angle float64) Vector {
+func (vec Vector) RotateVec(axis Vector, angle float64) Vector {
+	return NewQuaternionFromAxisAngle(axis, angle).RotateVec(vec)
+}
 
-	cos, sin := math.Cos(float64(angle)), math.Sin(float64(angle))
-
-	if axis.Equals(Right) {
-		ay, az := float64(vec.Y), float64(vec.Z)
-		vec.Y = float64(ay*cos - az*sin)
-		vec.Z = float64(ay*sin + az*cos)
-		return vec
-	}
-
-	if axis.Equals(Up) {
-		ax, az := float64(vec.X), float64(vec.Z)
-		vec.X = float64(ax*cos + az*sin)
-		vec.Z = float64(-ax*sin + az*cos)
-		return vec
-	}
-
-	if axis.Equals(Back) {
-		ax, ay := float64(vec.X), float64(vec.Y)
-		vec.X = float64(ax*cos - ay*sin)
-		vec.Y = float64(ax*sin + ay*cos)
-		return vec
-	}
-
-	u := axis.Unit()
-
-	x := u.Cross(vec)
-
-	d := u.Dot(vec)
-
-	vec = vec.Add(vec.Scale(float64(cos)))
-	vec = vec.Add(x.Scale(float64(sin)))
-	vec = vec.Add(u.Scale(d).Scale(float64(1 - cos)))
-
-	// u := unit(clone(axis))
-
-	// x, _ := cross(u, a)
-	// d := dot(u, a)
-
-	// add(a, scale(a, cos))
-	// add(a, scale(x, sin))
-	// add(a, scale(scale(u, d), 1-cos))
-
-	return vec
-
+// Rotate returns a copy of the Vector, rotated around an axis Vector with the x, y, and z components provided, by the angle
+// provided (in radians).
+// The function is most efficient if passed an orthogonal, normalized axis (i.e. the X, Y, or Z constants).
+// Note that this function ignores the W component of both Vectors.
+func (vec Vector) Rotate(x, y, z, angle float64) Vector {
+	return NewQuaternionFromAxisAngle(Vector{X: x, Y: y, Z: z}, angle).RotateVec(vec)
 }
 
 // Angle returns the angle between the calling Vector and the provided other Vector (ignoring the W component).
 func (vec Vector) Angle(other Vector) float64 {
-	angle := math.Acos(float64(vec.Unit().Dot(other.Unit())))
-	return float64(angle)
+	d := vec.Unit().Dot(other.Unit())
+	d = clamp(d, -1, 1) // Acos returns NaN if value < -1 or > 1
+	return math.Acos(float64(d))
 }
 
-// Scale scales a Vector by the given scalar (ignoring the W component).
+// Scale scales a Vector by the given scalar (ignoring the W component), returning a copy with the result.
 func (vec Vector) Scale(scalar float64) Vector {
 	vec.X *= scalar
 	vec.Y *= scalar
@@ -317,7 +320,7 @@ func (vec Vector) Scale(scalar float64) Vector {
 	return vec
 }
 
-// Divide dividese a Vector by the given scalar (ignoring the W component).
+// Divide divides a Vector by the given scalar (ignoring the W component), returning a copy with the result.
 func (vec Vector) Divide(scalar float64) Vector {
 	vec.X /= scalar
 	vec.Y /= scalar
@@ -330,8 +333,171 @@ func (vec Vector) Dot(other Vector) float64 {
 	return vec.X*other.X + vec.Y*other.Y + vec.Z*other.Z
 }
 
-// The previous iteration of a Vector implementation was this VectorFloat, which was more performant than the previously used quartercastle Vector,
-// but more awkward, since we have to pass pointers into functions to modify them, but avoid actually storing these pointers to keep vectors from being allocated to heap.
+// ModVector represents a reference to a Vector, made to facilitate easy method-chaining and modifications on that Vector (as you
+// don't need to re-assign the results of a chain of operations to the original variable to "save" the results).
+// Note that a ModVector is not meant to be used to chain methods on a vector to pass directly into a function; you can just
+// use the normal vector functions for that purpose. ModVectors are pointers, which are allocated to the heap. This being the case,
+// they should be slower relative to normal Vectors, so use them only in non-performance-critical parts of your application.
+type ModVector struct {
+	*Vector
+}
+
+// Add adds the other Vector provided to the ModVector.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Add(other Vector) ModVector {
+	ip.X += other.X
+	ip.Y += other.Y
+	ip.Z += other.Z
+	return ip
+}
+
+// Sub subtracts the other Vector from the calling ModVector.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Sub(other Vector) ModVector {
+	ip.X -= other.X
+	ip.Y -= other.Y
+	ip.Z -= other.Z
+	return ip
+}
+
+func (ip ModVector) SetZero() ModVector {
+	ip.X = 0
+	ip.Y = 0
+	ip.Z = 0
+	return ip
+}
+
+// Scale scales the Vector by the scalar provided.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Scale(scalar float64) ModVector {
+	ip.X *= scalar
+	ip.Y *= scalar
+	ip.Z *= scalar
+	return ip
+}
+
+// Divide divides a Vector by the given scalar (ignoring the W component).
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Divide(scalar float64) ModVector {
+	ip.X /= scalar
+	ip.Y /= scalar
+	ip.Z /= scalar
+	return ip
+}
+
+// Expand expands the ModVector by the margin specified, in absolute units, if each component is over the minimum argument.
+// To illustrate: Given a ModVector of {1, 0.1, -0.3}, ModVector.Expand(0.5, 0.2) would give you a ModVector of {1.5, 0.1, -0.8}.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Expand(margin, min float64) ModVector {
+	exp := ip.Vector.Expand(margin, min)
+	ip.X = exp.X
+	ip.Y = exp.Y
+	ip.Z = exp.Z
+	return ip
+}
+
+// HadamardMult performs Hadamard (component-wise) multiplication with the Vector on the other Vector provided.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) HadamardMult(other Vector) ModVector {
+	ip.X *= other.X
+	ip.Y *= other.Y
+	ip.Z *= other.Z
+	return ip
+}
+
+// Unit normalizes the ModVector (sets it to be of unit length).
+// It does not alter the W component of the Vector.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Unit() ModVector {
+	l := ip.Magnitude()
+	if l < 1e-8 || l == 1 {
+		// If it's 0, then don't modify the vector
+		return ip
+	}
+	ip.X, ip.Y, ip.Z = ip.X/l, ip.Y/l, ip.Z/l
+	return ip
+}
+
+// Swizzle swizzles the ModVector using the string provided.
+// The string can be of length 3 ("xyz") or 4 ("xyzw").
+// The string should be composed of the axes of a vector, i.e. 'x', 'y', 'z', or 'w'.
+// Example: `vec := Vector{1, 2, 3}.Swizzle("zxy") // Returns a Vector of {3, 1, 2}.`
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Swizzle(swizzleString string) ModVector {
+	vec := ip.Vector.Swizzle(swizzleString)
+	ip.X = vec.X
+	ip.Y = vec.Y
+	ip.Z = vec.Z
+	return ip
+}
+
+// Cross performs a cross-product multiplication on the ModVector.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Cross(other Vector) ModVector {
+	cross := (*ip.Vector).Cross(other)
+	ip.X = cross.X
+	ip.Y = cross.Y
+	ip.Z = cross.Z
+	return ip
+}
+
+// RotateVec rotates the calling Vector by the axis Vector and angle provided (in radians).
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) RotateVec(axis Vector, angle float64) ModVector {
+	rot := (*ip.Vector).RotateVec(axis, angle)
+	ip.X = rot.X
+	ip.Y = rot.Y
+	ip.Z = rot.Z
+	return ip
+}
+
+// RotateVec rotates the calling Vector by an axis Vector composed of the x, y, and z components provided,
+// by the angle provided (in radians).
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Rotate(x, y, z, angle float64) ModVector {
+	rot := (*ip.Vector).Rotate(x, y, z, angle)
+	ip.X = rot.X
+	ip.Y = rot.Y
+	ip.Z = rot.Z
+	return ip
+}
+
+// Invert returns a copy of the Vector with all components inverted (ignoring the Vector's W component).
+func (ip ModVector) Invert() ModVector {
+	ip.X = -ip.X
+	ip.Y = -ip.Y
+	ip.Z = -ip.Z
+	return ip
+}
+
+// ClampMagnitude clamps the overall magnitude of the Vector to the maximum magnitude specified.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) ClampMagnitude(maxMag float64) ModVector {
+	clamped := (*ip.Vector).ClampMagnitude(maxMag)
+	ip.X = clamped.X
+	ip.Y = clamped.Y
+	ip.Z = clamped.Z
+	return ip
+}
+
+// String converts the ModVector to a string. Because it's a ModVector, it's represented with a *.
+func (ip ModVector) String() string {
+	return fmt.Sprintf("*{%.2f, %.2f, %.2f}", ip.X, ip.Y, ip.Z)
+}
+
+// Clone returns a ModVector of a clone of its backing Vector.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Clone() ModVector {
+	v := *ip.Vector
+	return v.Modify()
+}
+
+func (ip ModVector) ToVector() Vector {
+	return *ip.Vector
+}
+
+// The previous iteration of a Vector implementation was this VectorFloat, which was more performant than the previously used quartercastle's Vector package,
+// but also more awkward, since we have to pass pointers into functions to modify them, but avoid actually storing these pointers to keep vectors from being allocated to heap.
 // It also meant you couldn't effectively method chain (as this allocated to heap as well).
 // That created an awkward system like so:
 

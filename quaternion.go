@@ -11,12 +11,8 @@ type Quaternion struct {
 	X, Y, Z, W float64
 }
 
-func NewQuaternion(x, y, z, w float64) *Quaternion {
-	return &Quaternion{x, y, z, w}
-}
-
-func (quat *Quaternion) Clone() *Quaternion {
-	return NewQuaternion(quat.X, quat.Y, quat.Z, quat.W)
+func NewQuaternion(x, y, z, w float64) Quaternion {
+	return Quaternion{x, y, z, w}
 }
 
 // func (quat *Quaternion) Slerp(other *Quaternion, percent float64) *Quaternion {
@@ -61,12 +57,12 @@ func (quat *Quaternion) Clone() *Quaternion {
 
 // }
 
-func (quat *Quaternion) Lerp(end *Quaternion, percent float64) *Quaternion {
+func (quat Quaternion) Lerp(end Quaternion, percent float64) Quaternion {
 
 	if percent <= 0 {
-		return quat.Clone()
+		return quat
 	} else if percent >= 1 {
-		return end.Clone()
+		return end
 	}
 
 	if quat.Dot(end) < 0 {
@@ -82,11 +78,11 @@ func (quat *Quaternion) Lerp(end *Quaternion, percent float64) *Quaternion {
 
 }
 
-func (quat *Quaternion) Dot(other *Quaternion) float64 {
+func (quat Quaternion) Dot(other Quaternion) float64 {
 	return quat.X*other.X + quat.Y*other.Y + quat.Z*other.Z + quat.W*other.W
 }
 
-func (quat *Quaternion) Magnitude() float64 {
+func (quat Quaternion) Magnitude() float64 {
 	return math.Sqrt(
 		(quat.X * quat.X) +
 			(quat.Y * quat.Y) +
@@ -95,21 +91,20 @@ func (quat *Quaternion) Magnitude() float64 {
 	)
 }
 
-func (quat *Quaternion) Normalized() *Quaternion {
-	newQuat := quat.Clone()
-	m := newQuat.Magnitude()
-	newQuat.X /= m
-	newQuat.Y /= m
-	newQuat.Z /= m
-	newQuat.W /= m
-	return newQuat
+func (quat Quaternion) Normalized() Quaternion {
+	m := quat.Magnitude()
+	quat.X /= m
+	quat.Y /= m
+	quat.Z /= m
+	quat.W /= m
+	return quat
 }
 
-func (quat *Quaternion) Negated() *Quaternion {
+func (quat Quaternion) Negated() Quaternion {
 	return NewQuaternion(-quat.X, -quat.Y, -quat.Z, -quat.W)
 }
 
-func (q1 *Quaternion) Mult(q2 *Quaternion) *Quaternion {
+func (q1 Quaternion) Mult(q2 Quaternion) Quaternion {
 	// Cribbed from euclidean space: http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/code/index.htm#mul
 	return NewQuaternion(
 		q1.X*q2.W+q1.Y*q2.Z-q1.Z*q2.Y+q1.W*q2.X,
@@ -120,7 +115,7 @@ func (q1 *Quaternion) Mult(q2 *Quaternion) *Quaternion {
 }
 
 // ToMatrix4 generates a rotation Matrx4 from the given Quaternion.
-func (quat *Quaternion) ToMatrix4() Matrix4 {
+func (quat Quaternion) ToMatrix4() Matrix4 {
 
 	// See this page for where this formula comes from: https://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToMatrix/jay.htm
 
@@ -170,6 +165,23 @@ func (quat *Quaternion) ToMatrix4() Matrix4 {
 	return m1.Mult(m2)
 }
 
+func (quat Quaternion) RotateVec(v Vector) Vector {
+
+	// xyz := NewVector(quat.X, quat.Y, quat.Z)
+	// t := xyz.Cross(v).Scale(2)
+	// out := xyz.Cross(t).Add(t.Scale(quat.W).Add(v))
+
+	// Cribbed from StackOverflow, yet again~: https://gamedev.stackexchange.com/questions/28395/rotating-vector3-by-a-quaternion
+
+	u := NewVector(quat.X, quat.Y, quat.Z)
+	s := quat.W
+	out := u.Scale(u.Dot(v)).Scale(2)
+	out = out.Add(v.Scale(2*s*s - 1))
+	out = out.Add(u.Cross(v).Scale(s).Scale(2))
+	return out
+
+}
+
 // func NewLookAtQuaternion(from, to, up Vector) *Quaternion {
 // 	// Cribbed from StackOverflow: https://stackoverflow.com/questions/12435671/quaternion-lookat-function
 
@@ -192,17 +204,18 @@ func (quat *Quaternion) ToMatrix4() Matrix4 {
 // 	return NewQuaternionFromAxisAngle(rotAxis, rotAngle)
 // }
 
-// func NewQuaternionFromAxisAngle(axis Vector, angle float64) *Quaternion {
-// 	// Also cribbed from StackOverflow whoops
-// 	halfAngle := angle * .5
-// 	s := math.Sin(halfAngle)
-// 	return NewQuaternion(
-// 		axis[0]*s,
-// 		axis[1]*s,
-// 		axis[2]*s,
-// 		math.Cos(halfAngle),
-// 	)
-// }
+func NewQuaternionFromAxisAngle(axis Vector, angle float64) Quaternion {
+	// Also cribbed from StackOverflow whoops
+	axis = axis.Unit()
+	halfAngle := angle * .5
+	s := math.Sin(halfAngle)
+	return NewQuaternion(
+		axis.X*s,
+		axis.Y*s,
+		axis.Z*s,
+		math.Cos(halfAngle),
+	)
+}
 
 // func (quat *Quaternion) Add(other *Quaternion) *Quaternion {
 
