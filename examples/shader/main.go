@@ -34,7 +34,7 @@ func (g *Game) Init() {
 
 	g.Scene = tetra3d.NewScene("shader test scene")
 
-	mesh := tetra3d.NewCube()
+	mesh := tetra3d.NewCubeMesh()
 
 	// Here we specify a fragment shader
 	_, err := mesh.MeshParts[0].Material.SetShader([]byte(`
@@ -53,7 +53,7 @@ func (g *Game) Init() {
 	model.Move(-2, 0, 0)
 	g.Scene.Root.AddChildren(model)
 
-	vertCube := tetra3d.NewCube()
+	vertCube := tetra3d.NewCubeMesh()
 	mat := vertCube.MeshParts[0].Material
 	mat.Shadeless = true
 
@@ -92,7 +92,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the scene.
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderScene(g.Scene)
 
 	// Draw the result.
 	screen.DrawImage(g.Camera.ColorTexture(), nil)

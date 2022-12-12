@@ -12,6 +12,9 @@ type Scene struct {
 	Root  INode
 	World *World
 	props *Properties
+
+	autobatchDynamicMap map[*Material]*Model
+	autobatchStaticMap  map[*Material]*Model
 }
 
 // NewScene creates a new Scene by the name given.
@@ -53,4 +56,36 @@ func (scene *Scene) Library() *Library {
 
 func (scene *Scene) Properties() *Properties {
 	return scene.props
+}
+
+func (scene *Scene) autobatchDynamic(model *Model) {
+
+	if scene.autobatchDynamicMap == nil {
+		scene.autobatchDynamicMap = map[*Material]*Model{}
+	}
+
+	mat := model.Mesh.Materials()[0]
+	if _, exists := scene.autobatchDynamicMap[mat]; !exists {
+		mp := NewMesh("auto dynamic batch")
+		mp.AddMeshPart(mat)
+		scene.autobatchDynamicMap[mat] = NewModel(mp, "auto dynamic batch")
+		scene.Root.AddChildren(scene.autobatchDynamicMap[mat])
+	}
+	scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].Mesh.MeshParts[0], model)
+
+}
+
+func (scene *Scene) autobatchStatic(model *Model) {
+
+	if scene.autobatchStaticMap == nil {
+		scene.autobatchStaticMap = map[*Material]*Model{}
+	}
+
+	mat := model.Mesh.Materials()[0]
+	if _, exists := scene.autobatchStaticMap[mat]; !exists {
+		scene.autobatchStaticMap[mat] = NewModel(NewMesh("auto static merge"), "auto static merge")
+		scene.Root.AddChildren(scene.autobatchStaticMap[mat])
+	}
+	scene.autobatchStaticMap[mat].StaticMerge(model)
+
 }

@@ -36,31 +36,29 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
+	// The general idea of this example is to do a simple stress test to measure rendering efficiency.
+
+	// In this example, we'll create our scene in code.
 	g.Scene = tetra3d.NewScene("Test Scene")
 
-	img, _, err := image.Decode(bytes.NewReader(testImage))
-	if err != nil {
-		panic(err)
-	}
-
-	// When creating a new mesh, it has no MeshParts.
+	// When creating a new mesh with NewMesh, it has no MeshParts (which is what renders).
 	merged := tetra3d.NewModel(tetra3d.NewMesh("merged cubes"), "merged cubes")
 
 	// Here, we'll store all of the cubes we'll merge together.
 	cubes := []*tetra3d.Model{}
 
 	// We can reuse the mesh for all of the models.
-	cubeMesh := tetra3d.NewCube()
+	cubeMesh := tetra3d.NewCubeMesh()
 
-	// Create a new Model, position it, and add it to the cubes slice.
-	// for x := 0; x < 100; x++ {
-	// 	for j := 0; j < 100; j++ {
+	// Create a new Model and add it to the Cubes slice. Note that we're not moving
+	// the cubes, so this for loop block creates 10x10x10 (or 1000) cubes overlaid exactly on top
+	// of each other.
+
+	// We also could just create one cube and call merged.StaticMerge() 1000 times.
 	for x := 0; x < 10; x++ {
 		for z := 0; z < 10; z++ {
 			for y := 0; y < 10; y++ {
-				cube := tetra3d.NewModel(cubeMesh, "Cube")
-				// cube.SetLocalPosition(3*float64(x), 3*float64(y), -3*float64(z))
-				cubes = append(cubes, cube)
+				cubes = append(cubes, tetra3d.NewModel(cubeMesh, "Cube"))
 			}
 		}
 	}
@@ -71,16 +69,16 @@ func (g *Game) Init() {
 	// in a single draw call is 21845.
 	merged.StaticMerge(cubes...)
 
-	// for i := 0; i < 6; i++ {
-	// 	c := merged.Clone()
-	// 	c.Move(0, float64(i)*4, 0)
-	// 	g.Scene.Root.AddChildren(c)
-	// }
-
 	// After merging the cubes, the merged mesh has multiple MeshParts, but because the cube Models
 	// shared a single Mesh (which has a single Material (aptly named "Cube")), the MeshParts also
 	// share the same Material. This being the case, we don't need to set the image on all MeshParts'
 	// Materials; just the first one is fine.
+
+	// Load the image for the texture.
+	img, _, err := image.Decode(bytes.NewReader(testImage))
+	if err != nil {
+		panic(err)
+	}
 
 	mat := merged.Mesh.MeshParts[0].Material
 	mat.Shadeless = true
@@ -89,6 +87,8 @@ func (g *Game) Init() {
 	// Add the merged result model, and we're done, basically.
 	g.Scene.Root.AddChildren(merged)
 
+	// We can clone the merged result and move it to create 8 individual distinct
+	// "sections" of cubes.
 	for x := 0; x < 8; x++ {
 		m2 := merged.Clone()
 		m2.Move(4*float64(x+1), 0, 0)
@@ -128,7 +128,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Render the non-screen Models
 	// g.Camera.Render(g.Scene, g.Scene.Models...)
 
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderScene(g.Scene)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.

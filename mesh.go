@@ -647,8 +647,8 @@ func (vs *VertexSelection) MoveVec(vec Vector) {
 
 }
 
-// NewCube creates a new Cube Mesh and gives it a new material (suitably named "Cube").
-func NewCube() *Mesh {
+// NewCubeMesh creates a new Cube Mesh and gives it a new material (suitably named "Cube").
+func NewCubeMesh() *Mesh {
 
 	mesh := NewMesh("Cube",
 
@@ -735,141 +735,130 @@ func NewCube() *Mesh {
 
 }
 
-// NewIcosphere creates a new icosphere Mesh of the specified detail level. Note that the UVs are left at {0,0} because I'm lazy.
-func NewIcosphere(detailLevel int) *Mesh {
+// NewIcosphereMesh creates a new icosphere Mesh of the specified detail level. Note that the UVs are left at {0,0} because I'm lazy.
+func NewIcosphereMesh(detailLevel int) *Mesh {
 
 	// Code cribbed from http://blog.andreaskahler.com/2009/06/creating-icosphere-mesh-in-code.html, thank you very much Andreas!
 
 	mesh := NewMesh("Icosphere")
-	// part := mesh.AddMeshPart(NewMaterial("Icosphere"))
 
-	// t := (1.0 + math.Sqrt(5)) / 2
+	t := (1.0 + math.Sqrt(5)) / 2
 
-	// v0 := NewVertex(-1, t, 0, 0, 0)
-	// v1 := NewVertex(1, t, 0, 0, 0)
-	// v2 := NewVertex(-1, -t, 0, 0, 0)
-	// v3 := NewVertex(1, -t, 0, 0, 0)
+	v0 := NewVertex(-1, t, 0, 0, 0)
+	v1 := NewVertex(1, t, 0, 0, 0)
+	v2 := NewVertex(-1, -t, 0, 0, 0)
+	v3 := NewVertex(1, -t, 0, 0, 0)
 
-	// v4 := NewVertex(0, -1, t, 0, 0)
-	// v5 := NewVertex(0, 1, t, 0, 0)
-	// v6 := NewVertex(0, -1, -t, 0, 0)
-	// v7 := NewVertex(0, 1, -t, 0, 0)
+	v4 := NewVertex(0, -1, t, 0, 0)
+	v5 := NewVertex(0, 1, t, 0, 0)
+	v6 := NewVertex(0, -1, -t, 0, 0)
+	v7 := NewVertex(0, 1, -t, 0, 0)
 
-	// v8 := NewVertex(t, 0, -1, 0, 0)
-	// v9 := NewVertex(t, 0, 1, 0, 0)
-	// v10 := NewVertex(-t, 0, -1, 0, 0)
-	// v11 := NewVertex(-t, 0, 1, 0, 0)
+	v8 := NewVertex(t, 0, -1, 0, 0)
+	v9 := NewVertex(t, 0, 1, 0, 0)
+	v10 := NewVertex(-t, 0, -1, 0, 0)
+	v11 := NewVertex(-t, 0, 1, 0, 0)
 
-	// indices := []uint32{
-	// 	0, 11, 5,
-	// 	0, 5, 1,
-	// 	0, 1, 7,
-	// 	0, 7, 10,
-	// 	0, 10, 11,
+	indices := []int{
+		0, 11, 5,
+		0, 5, 1,
+		0, 1, 7,
+		0, 7, 10,
+		0, 10, 11,
 
-	// 	1, 5, 9,
-	// 	5, 11, 4,
-	// 	11, 10, 2,
-	// 	10, 7, 6,
-	// 	7, 1, 8,
+		1, 5, 9,
+		5, 11, 4,
+		11, 10, 2,
+		10, 7, 6,
+		7, 1, 8,
 
-	// 	3, 9, 4,
-	// 	3, 4, 2,
-	// 	3, 2, 6,
-	// 	3, 6, 8,
-	// 	3, 8, 9,
+		3, 9, 4,
+		3, 4, 2,
+		3, 2, 6,
+		3, 6, 8,
+		3, 8, 9,
 
-	// 	4, 9, 5,
-	// 	2, 4, 11,
-	// 	6, 2, 10,
-	// 	8, 6, 7,
-	// 	9, 8, 1,
-	// }
+		4, 9, 5,
+		2, 4, 11,
+		6, 2, 10,
+		8, 6, 7,
+		9, 8, 1,
+	}
 
-	// vertices := []VertexInfo{
-	// 	v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11,
-	// }
+	vertices := []VertexInfo{
+		v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11,
+	}
 
-	// type cacheStorage struct {
-	// 	v0, v1 int
-	// }
+	type cacheStorage struct {
+		v0, v1 int
+	}
 
-	// cache := map[cacheStorage]int{}
+	cache := map[cacheStorage]int{}
 
-	// getMiddlePoint := func(index0, index1 int) int {
+	getMiddlePoint := func(index0, index1 int) int {
 
-	// 	if v, exists := cache[cacheStorage{index0, index1}]; exists {
-	// 		return v
-	// 	}
+		if v, exists := cache[cacheStorage{index0, index1}]; exists {
+			return v
+		}
 
-	// 	a := Vector{vertices[index0].X, vertices[index0].Y, vertices[index0].Z}
-	// 	b := Vector{vertices[index1].X, vertices[index1].Y, vertices[index1].Z}
-	// 	midA := a.Add(b.Sub(a).Scale(0.5))
-	// 	midAVert := NewVertex(midA[0], midA[1], midA[2], 0, 0)
-	// 	vertices = append(vertices, midAVert)
+		a := Vector{vertices[index0].X, vertices[index0].Y, vertices[index0].Z, 0}
+		b := Vector{vertices[index1].X, vertices[index1].Y, vertices[index1].Z, 0}
+		midA := a.Add(b).Divide(2)
+		// midA := a.Add(b.Sub(a).Scale(0.5))
+		vertices = append(vertices, NewVertex(midA.X, midA.Y, midA.Z, 0, 0))
 
-	// 	cache[cacheStorage{index0, index1}] = len(vertices)
-	// 	return len(vertices)
+		cache[cacheStorage{index0, index1}] = len(vertices) - 1
 
-	// }
+		return len(vertices) - 1
 
-	// if detailLevel > 0 {
+	}
 
-	// 	for i := 0; i < detailLevel+1; i++ {
+	if detailLevel > 0 {
 
-	// 		newFaces := make([]VertexInfo, 0, len(vertices)*4)
-	// 		newIndices := make([]int, 0, len(indices)*4)
+		for i := 0; i < detailLevel+1; i++ {
 
-	// 		for triIndex := 0; triIndex < len(vertices); triIndex += 3 {
+			newIndices := make([]int, 0, len(indices)*4)
 
-	// 			a := Vector{vertices[triIndex].X, vertices[triIndex].Y, vertices[triIndex].Z}
-	// 			b := Vector{vertices[triIndex+1].X, vertices[triIndex+1].Y, vertices[triIndex+1].Z}
-	// 			c := Vector{vertices[triIndex+2].X, vertices[triIndex+2].Y, vertices[triIndex+2].Z}
+			for i := 0; i < len(indices); i += 3 {
 
-	// 			midA := a.Add(b.Sub(a).Scale(0.5))
-	// 			midB := b.Add(c.Sub(b).Scale(0.5))
-	// 			midC := c.Add(a.Sub(c).Scale(0.5))
+				midAB := getMiddlePoint(indices[i], indices[i+1])
+				midBC := getMiddlePoint(indices[i+1], indices[i+2])
+				midCA := getMiddlePoint(indices[i+2], indices[i])
 
-	// 			midAVert := NewVertex(midA[0], midA[1], midA[2], 0, 0)
-	// 			midBVert := NewVertex(midB[0], midB[1], midB[2], 0, 0)
-	// 			midCVert := NewVertex(midC[0], midC[1], midC[2], 0, 0)
+				newIndices = append(newIndices, indices[i], midAB, midCA)
+				newIndices = append(newIndices, indices[i+1], midBC, midAB)
+				newIndices = append(newIndices, indices[i+2], midCA, midBC)
+				newIndices = append(newIndices, midAB, midBC, midCA)
+				// newIndices = append(newIndices, indices[i], indices[i+1], indices[i+2])
 
-	// 			newFaces = append(newFaces,
-	// 				vertices[triIndex], midAVert, midCVert,
-	// 				vertices[triIndex+1], midBVert, midAVert,
-	// 				vertices[triIndex+2], midCVert, midBVert,
-	// 				midAVert, midBVert, midCVert,
-	// 			)
-	// 			newIndices = append(newIndices)
+			}
 
-	// 		}
+			indices = newIndices
 
-	// 		vertices = newFaces
+		}
 
-	// 	}
+	}
 
-	// }
+	for i := range vertices {
 
-	// for i := range vertices {
+		v := Vector{vertices[i].X, vertices[i].Y, vertices[i].Z, 0}.Unit() // Make it spherical
+		vertices[i].X = v.X
+		vertices[i].Y = v.Y
+		vertices[i].Z = v.Z
 
-	// 	v := Vector{vertices[i].X, vertices[i].Y, vertices[i].Z}.Unit() // Make it spherical
-	// 	vertices[i].X = v[0]
-	// 	vertices[i].Y = v[1]
-	// 	vertices[i].Z = v[2]
+		vertices[i].U = 0
+		vertices[i].V = 0
+		if i%3 == 1 {
+			vertices[i].U = 1
+		} else if i%3 == 2 {
+			vertices[i].V = 1
+		}
 
-	// 	vertices[i].U = 0
-	// 	vertices[i].V = 0
-	// 	if i%3 == 1 {
-	// 		vertices[i].U = 1
-	// 	} else if i%3 == 2 {
-	// 		vertices[i].V = 1
-	// 	}
+	}
 
-	// }
+	mesh.AddVertices(vertices...)
 
-	// part.AddTriangles(
-	// 	indices,
-	// 	vertices...)
+	mesh.AddMeshPart(NewMaterial("Icosphere"), indices...)
 
 	mesh.AutoNormal()
 
@@ -878,8 +867,8 @@ func NewIcosphere(detailLevel int) *Mesh {
 	return mesh
 }
 
-// NewPlane creates a new plane Mesh and gives it a new material (suitably named "Plane").
-func NewPlane() *Mesh {
+// NewPlaneMesh creates a new plane Mesh and gives it a new material (suitably named "Plane").
+func NewPlaneMesh() *Mesh {
 
 	mesh := NewMesh("Plane",
 		NewVertex(1, 0, -1, 1, 0),

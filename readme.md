@@ -78,15 +78,11 @@ func NewGame() *Game {
 	g := &Game{}
 
 	// First, we load a scene from a .gltf or .glb file. LoadGLTFFile takes a filepath and
-	// any loading options (nil is taken as a default), and returns a *Library 
+	// any loading options (nil is taken as a default), and returns a tetra3d.*Library 
 	// and an error if it was unsuccessful. We can also use tetra3d.LoadGLTFData() if we don't
 	// have access to the host OS's filesystem (like on web, or if the assets are embedded).
 
-	options := tetra3d.DefaultGLTFLoadOptions()
-	options.CameraWidth = ScreenWidth
-	options.CameraHeight = ScreenHeight
-
-	library, err := tetra3d.LoadGLTFFile("example.gltf", options) 
+	library, err := tetra3d.LoadGLTFFile("example.gltf", nil) 
 
 	if err != nil {
 		panic(err)
@@ -169,7 +165,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// individual Models.
 	g.Camera.RenderNodes(g.GameScene, g.GameScene.Root) 
 
-	// Before drawing the result, clear the screen first; in this case, with a color.
+	// Before drawing the result, clear the screen first; in this case, with a color, though we
+	// can also go with screen.Clear().
 	screen.Fill(color.RGBA{20, 30, 40, 255})
 
 	// Draw the resulting texture to the screen, and you're done! You can 

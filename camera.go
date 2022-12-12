@@ -611,9 +611,16 @@ func (camera *Camera) Clear() {
 
 }
 
+// RenderScene renders the provided Scene.
+// Note that if Camera.RenderDepth is false, scenes rendered one after another in multiple RenderScene() calls will be rendered on top of
+// each other in the Camera's texture buffers. Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
+func (camera *Camera) RenderScene(scene *Scene) {
+	camera.RenderNodes(scene, scene.Root)
+}
+
 // RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example). Note that if Camera.RenderDepth
-// is false, scenes rendered one after another in multiple RenderNodes() calls will be rendered on top of each other in the Camera's texture buffers.
-// Note that for Models, each MeshPart of a Model has a maximum renderable triangle count of 21845.
+// is false, scenes rendered one after another in multiple RenderScene() calls will be rendered on top of each other in the Camera's texture buffers.
+// Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
 func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	meshes := []*Model{}
@@ -649,7 +656,7 @@ var bayerMatrix = []float32{
 
 // Render renders all of the models passed using the provided Scene's properties (fog, for example). Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
-// Note that for Models, each MeshPart of a Model has a maximum renderable triangle count of 21845.
+// Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
 func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	frametimeStart := time.Now()
@@ -1192,7 +1199,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	for _, pair := range solids {
 
-		if !pair.Model.visible {
+		// Automatically statically batched models can't render
+		if !pair.Model.visible || pair.Model.AutoBatchMode == AutoBatchStatic {
 			continue
 		}
 
@@ -1893,7 +1901,7 @@ func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, co
 
 }
 
-var debugIcosphereMesh = NewIcosphere(1)
+var debugIcosphereMesh = NewIcosphereMesh(1)
 var debugIcosphere = NewModel(debugIcosphereMesh, "debug icosphere")
 
 func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color *Color) {

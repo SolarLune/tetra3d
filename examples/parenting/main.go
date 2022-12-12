@@ -51,7 +51,7 @@ func (g *Game) Init() {
 	// In this example, we'll construct the scene ourselves by hand.
 	g.Scene = tetra3d.NewScene("Test Scene")
 
-	cubeMesh := tetra3d.NewCube()
+	cubeMesh := tetra3d.NewCubeMesh()
 	mat := cubeMesh.MeshParts[0].Material
 	mat.Shadeless = true
 	mat.Texture = loadImage(testImageData)
@@ -138,7 +138,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear the Camera
 	g.Camera.Clear()
 
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderScene(g.Scene)
 
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
 

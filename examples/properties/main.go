@@ -98,7 +98,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the scene.
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderScene(g.Scene)
 
 	// Draw the result.
 	screen.DrawImage(g.Camera.ColorTexture(), nil)

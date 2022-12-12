@@ -619,6 +619,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
+	// Node / Object creation
 	for _, node := range doc.Nodes {
 
 		var obj INode
@@ -631,6 +632,12 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		if mesh != nil {
 			obj = NewModel(mesh, node.Name)
+
+			if node.Extras != nil && nodeHasProp(node, "t3dAutoBatch__") {
+				s := node.Extras.(map[string]interface{})["t3dAutoBatch__"].(float64)
+				obj.(*Model).AutoBatchMode = int(s)
+			}
+
 		} else if node.Camera != nil {
 
 			gltfCam := doc.Cameras[*node.Camera]

@@ -98,7 +98,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the logo first
-	g.Camera.RenderNodes(scene, scene.Root)
+	g.Camera.RenderScene(scene)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.

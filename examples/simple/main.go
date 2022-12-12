@@ -46,7 +46,7 @@ func (g *Game) Init() {
 	g.Scene.World.LightingOn = false
 
 	// Create a cube, set the color, add it to the scene.
-	cube := tetra3d.NewModel(tetra3d.NewCube(), "Cube")
+	cube := tetra3d.NewModel(tetra3d.NewCubeMesh(), "Cube")
 	cube.Color.Set(0, 0.5, 1, 1)
 	g.Scene.Root.AddChildren(cube)
 
@@ -99,7 +99,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the scene.
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderScene(g.Scene)
 
 	// Draw depth texture if the debug option is enabled; draw color texture otherwise.
 	if g.DrawDebugDepth {

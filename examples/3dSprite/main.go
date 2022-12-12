@@ -101,7 +101,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the scene.
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderScene(g.Scene)
 
 	opt := &ebiten.DrawImageOptions{}
 	opt.GeoM.Translate(-float64(g.HeartSprite.Bounds().Dx())/2, -float64(g.HeartSprite.Bounds().Dy())/2)

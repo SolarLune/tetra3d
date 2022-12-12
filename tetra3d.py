@@ -65,6 +65,12 @@ gamePropTypes = [
     ("vector3d", "3D Vector", "3D vector data type", 0, 6),
 ]
 
+batchModes = [ 
+    ("OFF", "Off", "No automatic batching", 0, 0), 
+    ("DYNAMIC", "Dynamic Batching", "Dynamic batching based off of one material (the first one)", 0, 1), 
+    ("STATIC", "Static Merging", "Static merging; merged objects cannot move or deviate in any way. After automatic static merging, the merged models will be automatically set to invisible", 0, 2),
+]
+
 class t3dGamePropertyItem__(bpy.types.PropertyGroup):
 
     name: bpy.props.StringProperty(name="Name", default="New Property")
@@ -272,17 +278,20 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.enabled = context.object.t3dObjectType__ == 'MESH'
         row.prop(context.object, "t3dVisible__")
-        row = self.layout.row()
-        row.prop(context.object, "t3dBoundsType__")
-        
+
         if context.object.type == "MESH":
             box = self.layout.box()
+            row = box.row()
+            row.enabled = context.object.t3dObjectType__ == 'MESH'
+            row.prop(context.object, "t3dAutoBatch__")
             row = box.row()
             row.label(text="Object Type: ")
             row.prop(context.object, "t3dObjectType__", expand=True)
 
         row = self.layout.row()
-
+        row.prop(context.object, "t3dBoundsType__")
+        
+        row = self.layout.row()
         
         if context.object.t3dBoundsType__ == 'AABB':
             row.prop(context.object, "t3dAABBCustomEnabled__")
@@ -775,8 +784,10 @@ objectProps = {
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
     "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
     "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
-    "t3dShareProperties__" : bpy.props.BoolProperty(name="Copy Game Properties to Top-Level Instanced Nodes", description="If enabled, properties set on the collection instance are cloned to its instanced top-level nodes", default=False)
+    "t3dShareProperties__" : bpy.props.BoolProperty(name="Copy Game Properties to Top-Level Instanced Nodes", description="If enabled, properties set on the collection instance are cloned to its instanced top-level nodes", default=False),
+    "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),
 }
+
 
 def getExportOnSave(self):
     s = globalGet("t3dExportOnSave__")

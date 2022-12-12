@@ -14,7 +14,7 @@ import (
 )
 
 // Shared cube mesh
-var cubeMesh = tetra3d.NewCube()
+var cubeMesh = tetra3d.NewCubeMesh()
 
 type CubeElement struct {
 	Model     *tetra3d.Model
@@ -123,7 +123,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the logo first
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderScene(g.Scene)
 
 	// We rescale the depth or color textures here just in case we render at a different resolution than the window's; this isn't necessary,
 	// we could just draw the images straight.

@@ -9,6 +9,12 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+const (
+	AutoBatchNone    = iota // No automatic batching
+	AutoBatchDynamic        // Dynamically batch
+	AutoBatchStatic         // Statically merge
+)
+
 // Model represents a singular visual instantiation of a Mesh. A Mesh contains the vertex information (what to draw); a Model references the Mesh to draw it with a specific
 // Position, Rotation, and/or Scale (where and how to draw).
 type Model struct {
@@ -44,6 +50,10 @@ type Model struct {
 	// This program runs after the vertex position is clipped to screen coordinates.
 	// Note that the VertexClipFunction must return the vector passed.
 	VertexClipFunction func(vertexPosition Vector, vertexIndex int) Vector
+
+	// Automatic batching mode; when set and a Model changes parenting, it will be automatically batched as necessary according to
+	// the AutoBatchMode set.
+	AutoBatchMode int
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -58,7 +68,9 @@ func NewModel(mesh *Mesh, name string) *Model {
 		DynamicBatchModels: map[*MeshPart][]*Model{},
 	}
 
-	model.Node.onTransformUpdate = model.TransformUpdate
+	model.Node.onParentChange = model.onParentChange
+
+	model.Node.onTransformUpdate = model.onTransformUpdate
 
 	radius := 0.0
 	if mesh != nil {
@@ -77,6 +89,7 @@ func (model *Model) Clone() INode {
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.visible = model.visible
 	newModel.Color = model.Color.Clone()
+	newModel.AutoBatchMode = model.AutoBatchMode
 
 	for k := range model.DynamicBatchModels {
 		newModel.DynamicBatchModels[k] = append([]*Model{}, model.DynamicBatchModels[k]...)
@@ -91,7 +104,8 @@ func (model *Model) Clone() INode {
 	}
 
 	newModel.Node = model.Node.Clone().(*Node)
-	newModel.Node.onTransformUpdate = newModel.TransformUpdate
+	newModel.Node.onTransformUpdate = newModel.onTransformUpdate
+	newModel.Node.onParentChange = newModel.onParentChange
 	for _, child := range newModel.children {
 		child.setParent(newModel)
 	}
@@ -109,9 +123,8 @@ func (model *Model) Clone() INode {
 
 }
 
-// Transform returns the global transform of the Model, taking into account any transforms its parents or grandparents have that
-// would impact the Model.
-func (model *Model) TransformUpdate() {
+// When updating a Model's transform, we have to also update its bounding sphere for frustum culling.
+func (model *Model) onTransformUpdate() {
 
 	transform := model.cachedTransform
 
@@ -152,6 +165,21 @@ func (model *Model) TransformUpdate() {
 
 }
 
+// When changing a Model's hierarchy, we have to handle auto batching.
+func (model *Model) onParentChange() {
+
+	if model.Scene() != nil {
+
+		if model.AutoBatchMode == AutoBatchDynamic {
+			model.Scene().autobatchDynamic(model)
+		} else if model.AutoBatchMode == AutoBatchStatic {
+			model.Scene().autobatchStatic(model)
+		}
+
+	}
+
+}
+
 func (model *Model) modelAlreadyDynamicallyBatched(batchedModel *Model) bool {
 
 	for _, modelSlice := range model.DynamicBatchModels {
@@ -180,6 +208,11 @@ func (model *Model) DynamicBatchAdd(meshPart *MeshPart, batchedModels ...*Model)
 
 		if model == other || model.modelAlreadyDynamicallyBatched(other) {
 			continue
+		}
+
+		// It must be owned by another batch
+		if other.DynamicBatchOwner != nil {
+			other.DynamicBatchOwner.DynamicBatchRemove(other)
 		}
 
 		triCount := model.DynamicBatchTriangleCount()
@@ -258,7 +291,7 @@ func (model *Model) StaticMerge(models ...*Model) {
 		model.Mesh.allocateVertexBuffers(len(model.Mesh.VertexPositions) + totalSize)
 	}
 
-	vec := Vector{0, 0, 0, 0}
+	vec := NewVectorZero()
 
 	for _, other := range models {
 
@@ -320,7 +353,7 @@ func (model *Model) StaticMerge(models ...*Model) {
 
 			otherPart.ForEachTri(func(tri *Triangle) {
 				for _, i := range tri.VertexIndices {
-					indices = append(indices, i-otherPart.VertexIndexStart)
+					indices = append(indices, i-otherPart.VertexIndexStart+model.Mesh.vertsAddStart)
 				}
 			})
 

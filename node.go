@@ -338,6 +338,7 @@ type Node struct {
 	library               *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 	scene                 *Scene
 	onTransformUpdate     func()
+	onParentChange        func()
 }
 
 // NewNode returns a new Node.
@@ -785,6 +786,9 @@ func (node *Node) Parent() INode {
 // setParent sets the Node's parent.
 func (node *Node) setParent(parent INode) {
 	node.parent = parent
+	if node.onParentChange != nil {
+		node.onParentChange()
+	}
 }
 
 // Scene looks for the Node's parents recursively to return what scene it exists in.

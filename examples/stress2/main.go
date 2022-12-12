@@ -81,7 +81,7 @@ func (g *Game) Init() {
 	}
 
 	// We can reuse the same mesh for all of the models.
-	cubeMesh := tetra3d.NewCube()
+	cubeMesh := tetra3d.NewCubeMesh()
 
 	// Set up how the cube should appear.
 	mat := cubeMesh.MeshParts[0].Material
@@ -96,7 +96,7 @@ func (g *Game) Init() {
 
 	// In this example, you will see it as a plane, floating above all the other Cubes before batching.
 
-	planeMesh := tetra3d.NewPlane()
+	planeMesh := tetra3d.NewPlaneMesh()
 
 	// Load the character texture.
 	img, _, err = image.Decode(bytes.NewReader(character))
@@ -179,7 +179,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the scene
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root)
+	g.Camera.RenderScene(g.Scene)
 
 	// Render the result
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
