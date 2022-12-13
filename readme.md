@@ -2,7 +2,9 @@
 
 [Ebitengine Discord](https://discord.gg/fXM7VYASTu)
 
-![Tetra3D Logo](https://thumbs.gfycat.com/DifferentZealousFowl-size_restricted.gif)
+[SolarLune's Discord](https://discord.gg/cepcpfV)
+
+![Tetra3D Logo](https://user-images.githubusercontent.com/4733521/207243838-b3ece6c4-965a-4cb5-aa81-b6b61f34d4d4.gif)
 
 ![It Breeds Fear - Construction Worker](https://thumbs.gfycat.com/ThoughtfulChubbyBunny-size_restricted.gif)
 
@@ -22,8 +24,6 @@ Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [E
 
 Tetra3D's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a largely-software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebitengine game, or a relatively simple fully 3D game (i.e. something on the level of a PS1, or N64 game). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
-In general, Tetra3D's just a renderer, so you can target higher resolutions (like 1080p or 4K) _or_ lower resolutions. Anything's fine as long as the target GPU can handle generating the color and depth textures at your desired resolution (assuming you have depth texture rendering on).
-
 Tetra3D also gives you a Blender add-on to make the Blender > Tetra3D development process flow a bit smoother. See the Releases section for the add-on, and [this wiki page](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon) for more information.
 
 ## Why did I make it?
@@ -42,7 +42,7 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 `go get github.com/solarlune/tetra3d`
 
-Tetra depends on kvartborg's [vector](https://github.com/kvartborg/vector) package, and [Ebitengine](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
+Tetra depends on [Ebitengine](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
 
 There is an optional Blender add-on as well (`tetra3d.py`) that can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). The add-on provides some useful helper functionality that makes using Tetra3D simpler - for more information, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
 
@@ -64,9 +64,6 @@ import (
 	"github.com/solarlune/tetra3d"
 	"github.com/hajimehoshi/ebiten/v2"
 )
-
-const ScreenWidth = 786
-const ScreenHeight = 448
 
 type Game struct {
 	GameScene    *tetra3d.Scene
@@ -108,10 +105,8 @@ func NewGame() *Game {
 	// g.Camera = tetra3d.NewCamera(ScreenWidth, ScreenHeight)
 
 	// However, we can also just grab an existing camera from the scene if it 
-	// were exported from the GLTF file. The loading options struct speciies the camera's
-	// backing texture size (defaulting to 1920x1080 if either
-	// no loading options are passed, or the default loading options struct is used
-	// unaltered).
+	// were exported from the GLTF file - if exported through Blender's Tetra3D add-on,
+	// then the camera size can be set from within Blender.
 
 	g.Camera = g.GameScene.Root.Get("Camera").(*tetra3d.Camera)
 
@@ -120,22 +115,21 @@ func NewGame() *Game {
 	// Models, Lights, and Nodes (which are essentially "empties" one can
 	// use for positioning and parenting) can, as well.
 
-	// We can place Models, Cameras, and other Nodes with node.SetWorldPositionVec() or 
-	// node.SetLocalPositionVec(). Both functions take a 3D Vector from kvartborg's 
-	// vector package, and there's an additional variant that just takes the components directly,
-	// for convenience.
+	// We can place Models, Cameras, and other Nodes with node.SetWorldPosition() or 
+	// node.SetLocalPosition(). There are also variants that take a 3D Vector.
 
-	// The *World variants position Nodes in absolute space; the Local variants
-	// position Nodes relative to their parents' positioning and transforms (and is
-	// more performant.)
+	// The *World variants of positioning functions takes into account absolute space; 
+	// the Local variants position Nodes relative to their parents' positioning and 
+	// transforms (and is more performant.)
 	// You can also move Nodes using Node.Move(x, y, z) / Node.MoveVec(vector).
 
 	// Each Scene has a tree that starts with the Root Node. To add Nodes to the Scene, 
 	// parent them to the Scene's base, like so:
 
-	// g.GameScene.Root.AddChildren(object)
+	// scene.Root.AddChildren(object)
 
-	// To remove them, either use Node.RemoveChildren() or Node.Unparent().
+	// To remove them, either use Node.RemoveChildren() (in this case, scene.Root.RemoveChildren()) 
+	// or Node.Unparent() (in this case, object.Unparent() ).
 
 	// For Cameras, we don't actually need to have them in the scene to view it, since
 	// the presence of the Camera in the Scene node tree doesn't impact what it would see.
@@ -160,10 +154,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Below, we'll pass both the Scene and the scene root because 1) the Scene influences
 	// how Models draw (fog, for example), and 2) we may not want to render all Models. 
 
-	// Camera.RenderNodes() renders all Nodes in a tree, starting with the 
-	// Node specified. You can also use Camera.Render() to simply render a selection of
-	// individual Models.
-	g.Camera.RenderNodes(g.GameScene, g.GameScene.Root) 
+	// Camera.RenderScene() renders all Nodes in a scene, starting with the 
+	// scene's root. You can also use Camera.Render() to simply render a selection of
+	// individual Models, or Camera.RenderNodes() to render a subset of a scene tree.
+	g.Camera.RenderScene(g.GameScene) 
 
 	// Before drawing the result, clear the screen first; in this case, with a color, though we
 	// can also go with screen.Clear().
@@ -176,11 +170,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	// This is the size of the window; note that we set it
-	// to be the same as the size of the backing camera texture. However,
-	// you could use a much larger backing texture size, thereby reducing 
-	// certain visual glitches from triangles not drawing tightly enough.
-	return ScreenWidth, ScreenHeight
+	// Here, by simply returning the camera's size, we are essentially
+	// scaling the output to the window size and letterboxing as necessary. 
+	// If you wanted to extend the camera view according to window size, you would 
+	// have to resize the camera using the new width and height.
+	return g.Camera.Size()
 }
 
 func main() {
@@ -211,10 +205,10 @@ func NewGame() *Game {
 
 	g := &Game{}
 
-	// Create a new BoundingCapsule, 1 unit tall with a 0.25 unit radius for the caps at the ends.
+	// Create a new BoundingCapsule named "player", 1 unit tall with a 0.25 unit radius for the caps at the ends.
 	g.Capsule = tetra3d.NewBoundingCapsule("player", 1, 0.25)
 
-	// Create a new BoundingAABB, of 0.5 width, height, and depth (in that order).
+	// Create a new BoundingAABB named "block", of 0.5 width, height, and depth (in that order).
 	g.Cube = tetra3d.NewBoundingAABB("block", 0.5, 0.5, 0.5)
 
 	// Move it over on the X axis by 4 units.
@@ -236,9 +230,9 @@ func (g *Game) Update() {
 
 ```
 
-That's basically it.
+If you wanted a deeper collision test with multiple objects, you can do so using `IBoundingObject.CollisionTest()`. Take a look at the [Wiki](https://github.com/SolarLune/tetra3d/wiki/Collision-Testing) and the `bounds` example for more info.
 
-Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine the examples folder for some examples showing how Tetra3D works. Calling `go run .` from within their directories should work.
+That's basically it. Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine all of the examples in the `examples` folder. Calling `go run .` from within their directories will run them - the mouse usually controls the view, and clicking locks and unlocks the view.
 
 There's a quick start project repo available [here](https://github.com/SolarLune/tetra3d-quickstart), as well to help with getting started.
 
@@ -308,13 +302,13 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Collection / group substitution
 - [X] -- -- Overwriting properties through collection instance
 - [ ] -- -- (Not done as well as I would like currently; ideally, you can view and manually override each individual property of top-level objects in the collection?)
-- [ ] -- Optional camera size export
+- [x] -- Optional camera size export
 - [X] -- Linking collections from external files
 - [X] -- Material data export
 - [X] -- Option to pack textures or leave them as a path
 - [X] -- Path / 3D Curve support
 - [X] -- Grid support (for pathfinding / linking 3D points together)
-- [ ] -- Toggleable option for drawing property status to screen for each object using the gpu and blf modules
+- [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
 - [X] **DAE model loading**
 - [X] -- Vertex colors loading
 - [X] -- UV map loading
@@ -354,11 +348,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
 - [ ] **Optimization**
-- [ ] -- Reusing vertex indices for adjacent triangles (I believe this is possible to implement; I didn't initially because I thought that would make adjacent triangles, each with their own UV values impossible; in truth, the modeler probably automatically splits these vertices out into unique ones as necessary)
+- [x] -- Reusing vertex indices for adjacent triangles
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?
 - [ ] -- Replace Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)?
-- [X] -- Vector pools
+- [X] -- Custom Vectors
 - [ ] -- Matrix pools?
 - [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
 - [ ] -- Lighting speed improvements
@@ -370,7 +364,8 @@ Again, it's incomplete and jank. However, it's also pretty cool!
 
 Huge shout-out to the open-source community:
 
-- StackOverflow, in general
+- StackOverflow, in general, _FOR REAL_
+- [quartercastle's vector package](https://github.com/quartercastle/vector)
 - [fauxgl](https://github.com/fogleman/fauxgl)
 - [tinyrenderer](https://github.com/ssloy/tinyrenderer)
 - [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems)
