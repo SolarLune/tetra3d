@@ -194,6 +194,7 @@ type Property struct {
 	Value interface{}
 }
 
+// Set sets the property's value to the given value.
 func (prop *Property) Set(value interface{}) {
 	prop.Value = value
 }
@@ -262,8 +263,9 @@ func (prop *Property) IsVector() bool {
 	return false
 }
 
-// AsPosition returns the value associated with the specified tag (key) as a 3D position Vector clone.
-// The axes are corrected to account for the difference between Blender's axis order and Tetra3D's.
+// AsVector returns the value associated with the specified tag (key) as a 3D position Vector clone.
+// The axes are corrected to account for the difference between Blender's axis order and Tetra3D's (i.e.
+// Blender's +X, +Y, +Z becomes Tetra3D's +X, +Z, +Y).
 // Note that this does not sanity check to ensure the tag is a vector first.
 func (prop *Property) AsVector() Vector {
 	return prop.Value.(Vector)
@@ -338,7 +340,6 @@ type Node struct {
 	library               *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 	scene                 *Scene
 	onTransformUpdate     func()
-	onParentChange        func()
 }
 
 // NewNode returns a new Node.
@@ -786,9 +787,6 @@ func (node *Node) Parent() INode {
 // setParent sets the Node's parent.
 func (node *Node) setParent(parent INode) {
 	node.parent = parent
-	if node.onParentChange != nil {
-		node.onParentChange()
-	}
 }
 
 // Scene looks for the Node's parents recursively to return what scene it exists in.

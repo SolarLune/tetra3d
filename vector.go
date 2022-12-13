@@ -259,7 +259,7 @@ func (vec Vector) Floats() [4]float64 {
 // Equals returns true if the two Vectors are close enough in all values (excluding W).
 func (vec Vector) Equals(other Vector) bool {
 
-	eps := 1e-6
+	eps := 1e-4
 
 	if math.Abs(float64(vec.X-other.X)) > eps || math.Abs(float64(vec.Y-other.Y)) > eps || math.Abs(float64(vec.Z-other.Z)) > eps {
 		return false
@@ -276,7 +276,7 @@ func (vec Vector) Equals(other Vector) bool {
 // IsZero returns true if the values in the Vector are extremely close to 0 (excluding W).
 func (vec Vector) IsZero() bool {
 
-	eps := 1e-8
+	eps := 1e-4
 
 	if math.Abs(float64(vec.X)) > eps || math.Abs(float64(vec.Y)) > eps || math.Abs(float64(vec.Z)) > eps {
 		return false

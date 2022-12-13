@@ -659,6 +659,8 @@ var bayerMatrix = []float32{
 // Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
 func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
+	scene.HandleAutobatch()
+
 	frametimeStart := time.Now()
 
 	sceneLights := []ILight{}

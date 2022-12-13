@@ -13,6 +13,7 @@ type Scene struct {
 	World *World
 	props *Properties
 
+	updateAutobatch     bool
 	autobatchDynamicMap map[*Material]*Model
 	autobatchStaticMap  map[*Material]*Model
 }
@@ -21,10 +22,12 @@ type Scene struct {
 func NewScene(name string) *Scene {
 
 	scene := &Scene{
-		Name:  name,
-		Root:  NewNode("Root"),
-		World: NewWorld("World"),
-		props: NewProperties(),
+		Name:                name,
+		Root:                NewNode("Root"),
+		World:               NewWorld("World"),
+		props:               NewProperties(),
+		autobatchDynamicMap: map[*Material]*Model{},
+		autobatchStaticMap:  map[*Material]*Model{},
 	}
 
 	scene.Root.(*Node).scene = scene
@@ -45,6 +48,8 @@ func (scene *Scene) Clone() *Scene {
 	newScene.World = scene.World // Here, we simply reference the same world; we don't clone it, since a single world can be shared across multiple Scenes
 	newScene.props = scene.props.Clone()
 
+	newScene.updateAutobatch = true
+
 	return newScene
 
 }
@@ -58,34 +63,50 @@ func (scene *Scene) Properties() *Properties {
 	return scene.props
 }
 
-func (scene *Scene) autobatchDynamic(model *Model) {
+var autobatchBlankMat = NewMaterial("autobatch null material")
 
-	if scene.autobatchDynamicMap == nil {
-		scene.autobatchDynamicMap = map[*Material]*Model{}
+func (scene *Scene) HandleAutobatch() {
+
+	if scene.updateAutobatch {
+
+		for _, node := range scene.Root.ChildrenRecursive() {
+
+			if model, ok := node.(*Model); ok && !model.autoBatched {
+
+				mat := autobatchBlankMat
+
+				if mats := model.Mesh.Materials(); len(mats) > 0 {
+					mat = mats[0]
+				}
+
+				if model.AutoBatchMode == AutoBatchDynamic {
+
+					if _, exists := scene.autobatchDynamicMap[mat]; !exists {
+						mesh := NewMesh("auto dynamic batch")
+						mesh.AddMeshPart(mat)
+						scene.autobatchDynamicMap[mat] = NewModel(mesh, "auto dynamic batch")
+						scene.Root.AddChildren(scene.autobatchDynamicMap[mat])
+					}
+					scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].Mesh.MeshParts[0], model)
+
+				} else if model.AutoBatchMode == AutoBatchStatic {
+
+					if _, exists := scene.autobatchStaticMap[mat]; !exists {
+						scene.autobatchStaticMap[mat] = NewModel(NewMesh("auto static merge"), "auto static merge")
+						scene.Root.AddChildren(scene.autobatchStaticMap[mat])
+					}
+					scene.autobatchStaticMap[mat].StaticMerge(model)
+
+				}
+
+				model.autoBatched = true
+
+			}
+
+		}
+
+		scene.updateAutobatch = false
+
 	}
-
-	mat := model.Mesh.Materials()[0]
-	if _, exists := scene.autobatchDynamicMap[mat]; !exists {
-		mp := NewMesh("auto dynamic batch")
-		mp.AddMeshPart(mat)
-		scene.autobatchDynamicMap[mat] = NewModel(mp, "auto dynamic batch")
-		scene.Root.AddChildren(scene.autobatchDynamicMap[mat])
-	}
-	scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].Mesh.MeshParts[0], model)
-
-}
-
-func (scene *Scene) autobatchStatic(model *Model) {
-
-	if scene.autobatchStaticMap == nil {
-		scene.autobatchStaticMap = map[*Material]*Model{}
-	}
-
-	mat := model.Mesh.Materials()[0]
-	if _, exists := scene.autobatchStaticMap[mat]; !exists {
-		scene.autobatchStaticMap[mat] = NewModel(NewMesh("auto static merge"), "auto static merge")
-		scene.Root.AddChildren(scene.autobatchStaticMap[mat])
-	}
-	scene.autobatchStaticMap[mat].StaticMerge(model)
 
 }

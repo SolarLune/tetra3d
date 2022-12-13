@@ -1101,16 +1101,22 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							clone = findNode(cloneName).Clone()
 						} else {
 							path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
-
 							if gltfLoadOptions.DependentLibraryResolver == nil {
-								panic("Error in instantiating linked element " + cloneName + " as the Dependent Library Resolver function is nil.")
+								log.Printf("Warning: No dependent library resolver defined to resolve dependent library %s for object %s.\n", path, cloneName)
+							} else {
+
+								if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
+									if foundNode := library.FindNode(cloneName); foundNode != nil {
+										clone = foundNode.Clone()
+									} else {
+										panic("Error in instantiating linked element: " + cloneName + " as there is no such object in the returned library.")
+									}
+								} else {
+									log.Printf("Warning: No library returned in resolving dependent library %s for object %s.\n", path, cloneName)
+								}
+
 							}
 
-							if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
-								if foundNode := library.FindNode(cloneName); foundNode != nil {
-									clone = foundNode.Clone()
-								}
-							}
 						}
 
 						if clone != nil {

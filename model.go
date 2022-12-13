@@ -54,6 +54,7 @@ type Model struct {
 	// Automatic batching mode; when set and a Model changes parenting, it will be automatically batched as necessary according to
 	// the AutoBatchMode set.
 	AutoBatchMode int
+	autoBatched   bool
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -67,8 +68,6 @@ func NewModel(mesh *Mesh, name string) *Model {
 		skinMatrix:         NewMatrix4(),
 		DynamicBatchModels: map[*MeshPart][]*Model{},
 	}
-
-	model.Node.onParentChange = model.onParentChange
 
 	model.Node.onTransformUpdate = model.onTransformUpdate
 
@@ -105,7 +104,6 @@ func (model *Model) Clone() INode {
 
 	newModel.Node = model.Node.Clone().(*Node)
 	newModel.Node.onTransformUpdate = newModel.onTransformUpdate
-	newModel.Node.onParentChange = newModel.onParentChange
 	for _, child := range newModel.children {
 		child.setParent(newModel)
 	}
@@ -162,21 +160,6 @@ func (model *Model) onTransformUpdate() {
 	dim.Max.Z *= scale.Z
 
 	model.BoundingSphere.Radius = dim.MaxSpan() / 2
-
-}
-
-// When changing a Model's hierarchy, we have to handle auto batching.
-func (model *Model) onParentChange() {
-
-	if model.Scene() != nil {
-
-		if model.AutoBatchMode == AutoBatchDynamic {
-			model.Scene().autobatchDynamic(model)
-		} else if model.AutoBatchMode == AutoBatchStatic {
-			model.Scene().autobatchStatic(model)
-		}
-
-	}
 
 }
 
@@ -918,11 +901,19 @@ func (model *Model) AddChildren(children ...INode) {
 	model.addChildren(model, children...)
 }
 
+func (model *Model) setParent(parent INode) {
+	model.Node.setParent(parent)
+	if model.AutoBatchMode != AutoBatchNone && model.Scene() != nil {
+		model.Scene().updateAutobatch = true
+	}
+}
+
 // Unparent unparents the Model from its parent, removing it from the scenegraph.
 func (model *Model) Unparent() {
 	if model.parent != nil {
 		model.parent.RemoveChildren(model)
 	}
+	model.autoBatched = false
 }
 
 // Type returns the NodeType for this object.
