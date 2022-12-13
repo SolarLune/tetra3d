@@ -17,8 +17,6 @@ type Game struct {
 
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
-
-	AnimatingCube bool
 }
 
 //go:embed animations.gltf
@@ -58,13 +56,11 @@ func (g *Game) Update() error {
 	ap := armature.AnimationPlayer()
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-		g.AnimatingCube = !g.AnimatingCube
-		if g.AnimatingCube {
-			ap.Play(g.Library.Animations["ArmatureAction"])
+		if ap.Animation != nil && ap.Animation.Name == "ArmatureAction" {
+			ap.Playing = !ap.Playing
 		} else {
-			ap.Stop()
+			ap.Play("ArmatureAction")
 		}
-
 	}
 
 	ap.Update(1.0 / 60)
@@ -74,10 +70,10 @@ func (g *Game) Update() error {
 	ap = table.AnimationPlayer()
 	ap.BlendTime = 0.1
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		ap.Play(g.Library.Animations["SmoothRoll"])
+		ap.Play("SmoothRoll")
 	}
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		ap.Play(g.Library.Animations["StepRoll"])
+		ap.Play("StepRoll")
 	}
 
 	ap.Update(1.0 / 60)

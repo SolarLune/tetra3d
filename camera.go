@@ -742,7 +742,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 						continue
 					}
 
-					dynamicDepths[child] = camera.WorldToScreen(child.WorldPosition()).Z
+					dynamicDepths[child] = camera.WorldPosition().DistanceSquared(child.WorldPosition())
 
 					if !transparent {
 

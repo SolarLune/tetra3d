@@ -286,30 +286,21 @@ func (ap *AnimationPlayer) SetRoot(node INode) {
 	ap.ChannelsUpdated = false
 }
 
-// Play plays the specified animation back, resetting the playhead if the specified animation is not currently
-// playing. If the animation is already playing, Play() does nothing.
-func (ap *AnimationPlayer) Play(animation *Animation) {
+// PlayAnim plays the specified animation back, resetting the playhead if the specified animation is not currently
+// playing, or if the animation is paused. If the animation is already playing, Play() does nothing.
+func (ap *AnimationPlayer) PlayAnim(animation *Animation) {
 
-	restartAnim := false
-	if ap.Animation != animation {
-		restartAnim = true
-	}
-
-	if ap.Animation != animation || !ap.Playing {
-		ap.Animation = animation
-		ap.Playing = true
-	} else {
+	if ap.Animation == animation && ap.Playing {
 		return
 	}
 
-	if restartAnim {
+	ap.Animation = animation
+	ap.Playing = true
 
-		if ap.PlaySpeed > 0 {
-			ap.Playhead = 0.0
-		} else {
-			ap.Playhead = animation.Length
-		}
-
+	if ap.PlaySpeed > 0 {
+		ap.Playhead = 0.0
+	} else {
+		ap.Playhead = animation.Length
 	}
 
 	ap.ChannelsUpdated = false
@@ -324,10 +315,9 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 
 }
 
-// Stop stops playing the currently playing animation (if any is playing), pausing it in its
-// current pose. To restart the animation from the beginning, set ap.Playhead to 0.
-func (ap *AnimationPlayer) Stop() {
-	ap.Playing = false
+// Play plays back an animation by name, accessing it through the AnimationPlayer's root node's library.
+func (ap *AnimationPlayer) Play(animationName string) {
+	ap.PlayAnim(ap.RootNode.Library().Animations[animationName])
 }
 
 // assignChannels assigns the player's root node's children to channels in the player. This is called when the channels need to be

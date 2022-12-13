@@ -112,7 +112,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `This demo shows how to easily select specific
 vertices using vertex color in Tetra3D.
-In this example, the glowing triangles are colored in the 'Flash'
+In this example, the glowing faces are colored in the 'Flash'
 vertex color channel in Blender (which
 becomes channel 1 in Tetra3D as it's in the second slot).
 The vertices that have a non-black color
