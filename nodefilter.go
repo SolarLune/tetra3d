@@ -1,7 +1,7 @@
 package tetra3d
 
 import (
-	"strings"
+	"regexp"
 )
 
 // NodeFilter represents a filterable selection of INodes. For example,
@@ -50,30 +50,27 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 	return out
 }
 
-// ByName allows you to filter a given selection of nodes by the given name.
-// If caseSensitive is not true, then names are compared as if they were all toLower()'d.
-// If exactMatch is true, the nodes' names can contain the name provided; otherwise, they have to match exactly.
+// ByName allows you to filter a given selection of nodes if their names are wholly equal
+// to the provided name string.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByName(name string, caseSensitive bool, exactMatch bool) NodeFilter {
+func (nf NodeFilter) ByName(name string) NodeFilter {
 	out := make([]INode, 0, len(nf))
 	for _, node := range nf {
-
-		var nameExists bool
-
-		nodeName := node.Name()
-
-		if !caseSensitive {
-			nodeName = strings.ToLower(nodeName)
-			name = strings.ToLower(name)
+		if node.Name() == name {
+			out = append(out, node)
 		}
+	}
+	return out
+}
 
-		if exactMatch {
-			nameExists = nodeName == name
-		} else {
-			nameExists = strings.Contains(nodeName, name)
-		}
-
-		if nameExists {
+// ByRegex allows you to filter a given selection of nodes by the given regex string.
+// If the regexp string is invalid or no matching Nodes are found, an empty NodeFilter is returned.
+// See https://regexr.com/ for regex help / reference.
+func (nf NodeFilter) ByRegex(regexString string) NodeFilter {
+	out := make([]INode, 0, len(nf))
+	for _, node := range nf {
+		match, _ := regexp.MatchString(regexString, node.Name())
+		if match {
 			out = append(out, node)
 		}
 	}

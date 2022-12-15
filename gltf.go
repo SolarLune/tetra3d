@@ -1087,6 +1087,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				}
 
 				if c, exists := dataMap["t3dInstanceCollection__"]; exists {
+					obj.(*Node).isCollectionInstance = true
 					collection := collections[c.(string)]
 
 					offset := Vector{-collection.Offset[0], -collection.Offset[2], collection.Offset[1], 0}

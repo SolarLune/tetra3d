@@ -50,7 +50,7 @@ func (g *Game) Update() error {
 
 	scene := g.Library.Scenes[0]
 
-	armature := scene.Root.ChildrenRecursive().ByName("Armature", true, true)[0].(*tetra3d.Node)
+	armature := scene.Root.ChildrenRecursive().ByName("Armature")[0].(*tetra3d.Node)
 	armature.Rotate(0, 1, 0, 0.01)
 
 	ap := armature.AnimationPlayer()

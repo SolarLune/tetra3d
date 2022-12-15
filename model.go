@@ -2,7 +2,6 @@ package tetra3d
 
 import (
 	"errors"
-	"math"
 	"sort"
 	"time"
 
@@ -138,7 +137,7 @@ func (model *Model) onTransformUpdate() {
 	// now from origin relative to the base of the armature on scene export.
 	if model.SkinRoot != nil && model.Skinned && model.parent == model.SkinRoot {
 		parent := model.parent.(*Node)
-		center = model.Mesh.Dimensions.Center().Sub(parent.originalLocalPosition)
+		center = model.Mesh.Dimensions.Center().Sub(parent.originalLocalPosition).Sub(model.originalLocalPosition)
 	} else {
 		center = model.Mesh.Dimensions.Center()
 	}
@@ -486,7 +485,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		tri := mesh.Triangles[ti]
 
 		meshPart.sortingTriangles[sortingTriIndex].Triangle = mesh.Triangles[ti]
-		depth := math.MaxFloat64
+		depth := 0.0
 
 		outOfBounds := true
 
@@ -523,9 +522,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			w := mesh.vertexTransforms[tri.VertexIndices[i]].W
 
-			if w < depth {
-				depth = w
-			}
+			depth += w
 
 			if !camera.Perspective {
 				w = 1.0
@@ -545,6 +542,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			}
 
 		}
+
+		depth /= 3
 
 		if outOfBounds {
 			continue
