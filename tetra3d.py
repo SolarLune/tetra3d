@@ -977,7 +977,7 @@ def unregister():
     del bpy.types.World.t3dFogMode__
     del bpy.types.World.t3dFogRangeStart__
     del bpy.types.World.t3dFogRangeEnd__
-    del bpy.types.World.t3dTransparentFogDithered
+    del bpy.types.World.t3dTransparentFogDithered__
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)
