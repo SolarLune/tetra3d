@@ -451,7 +451,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	mesh := meshPart.Mesh
 	base := modelTransform
 
+	sortMode := TriangleSortModeBackToFront
+
+	if meshPart.Material != nil {
+		sortMode = meshPart.Material.TriangleSortMode
+	}
+
 	camPos := camera.WorldPosition()
+	invertedCamPos := modelTransform.Inverted().MultVec(camPos)
 
 	if mat != nil && mat.BillboardMode != BillboardModeNone {
 
@@ -485,7 +492,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		tri := mesh.Triangles[ti]
 
 		meshPart.sortingTriangles[sortingTriIndex].Triangle = mesh.Triangles[ti]
-		depth := 0.0
 
 		outOfBounds := true
 
@@ -522,12 +528,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			w := mesh.vertexTransforms[tri.VertexIndices[i]].W
 
-			depth += w
-
-			if !camera.Perspective {
-				w = 1.0
-			}
-
 			// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
 			// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
 			if w < 0 {
@@ -542,8 +542,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			}
 
 		}
-
-		depth /= 3
 
 		if outOfBounds {
 			continue
@@ -635,19 +633,20 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			continue
 		}
 
-		meshPart.sortingTriangles[sortingTriIndex].depth = float32(depth)
+		// Previously, depth was compared using the lowest W value of all vertices in the triangle; after that, I tried
+		// averaging them out. Neither of these was completely satisfactory, and in addition, there was no depth sorting
+		// for orthographic triangles that overlapped using this method.
+
+		// I could substitute Z for W, but sorting by distance to the triangle center directly gives a better result overall, it seems.
+		if sortMode != TriangleSortModeNone {
+			meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamPos.DistanceSquared(tri.Center))
+		}
 
 		sortingTriIndex++
 
 	}
 
 	meshPart.sortingTriangles = meshPart.sortingTriangles[:sortingTriIndex]
-
-	sortMode := TriangleSortModeBackToFront
-
-	if meshPart.Material != nil {
-		sortMode = meshPart.Material.TriangleSortMode
-	}
 
 	// Preliminary tests indicate sort.SliceStable is faster than sort.Slice for our purposes
 
