@@ -15,7 +15,7 @@ import (
 
 // DebugInfo is a struct that holds debugging information for a Camera's render pass. These values are reset when Camera.Clear() is called.
 type DebugInfo struct {
-	AvgFrameTime     time.Duration // Amount of CPU frame time spent transforming vertices. Doesn't necessarily include CPU time spent sending data to the GPU.
+	AvgFrameTime     time.Duration // Amount of CPU frame time spent transforming vertices and calling Image.DrawTriangles. Doesn't include time ebitengine spends flushing the command queue.
 	AvgAnimationTime time.Duration // Amount of CPU frame time spent animating vertices.
 	AvgLightTime     time.Duration // Amount of CPU frame time spent lighting vertices.
 	animationTime    time.Duration
@@ -1233,39 +1233,35 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	}
 
-	if len(transparents) > 0 {
+	sort.SliceStable(transparents, func(i, j int) bool {
+		return depths[transparents[i].Model] > depths[transparents[j].Model]
+	})
 
-		sort.SliceStable(transparents, func(i, j int) bool {
-			return depths[transparents[i].Model] > depths[transparents[j].Model]
-		})
+	for _, pair := range transparents {
 
-		for _, pair := range transparents {
+		if !pair.Model.visible {
+			continue
+		}
 
-			if !pair.Model.visible {
-				continue
-			}
+		if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
 
-			if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
+			modelSlice := dyn[pair.MeshPart]
 
-				modelSlice := dyn[pair.MeshPart]
+			for _, merged := range modelSlice {
 
-				for _, merged := range modelSlice {
-
-					if !merged.visible {
-						continue
-					}
-
-					for _, part := range merged.Mesh.MeshParts {
-						render(renderPair{Model: merged, MeshPart: part})
-					}
+				if !merged.visible {
+					continue
 				}
 
-				flush(pair)
-			} else {
-				render(pair)
-				flush(pair)
+				for _, part := range merged.Mesh.MeshParts {
+					render(renderPair{Model: merged, MeshPart: part})
+				}
 			}
 
+			flush(pair)
+		} else {
+			render(pair)
+			flush(pair)
 		}
 
 	}
@@ -1379,6 +1375,9 @@ func (camera *Camera) drawCircle(screen *ebiten.Image, position Vector, radius f
 
 // DrawDebugRenderInfo draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
 // at the top-left of the provided screen *ebiten.Image, using the textScale and color provided.
+// Note that the frame-time mentioned here is purely the time that Tetra3D spends sending render commands to the command queue.
+// Any additional time that Ebitengine takes to flush that queue is not included in this average frame-time value, and is not
+// visible outside of debugging and profiling, like with pprof.
 func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float64, color *Color) {
 
 	m := camera.DebugInfo.AvgFrameTime.Round(time.Microsecond).Microseconds()

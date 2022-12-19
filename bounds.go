@@ -165,6 +165,10 @@ type CollisionTestSettings struct {
 	// collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
 	// object in the Collision object returned.
 	Others []INode
+
+	// Skip is a slice of INodes to skip checking (i.e. you can use this to skip
+	// checking certain colliders in an object's tree).
+	Skip []INode
 }
 
 // IBoundingObject represents a Node type that can be tested for collision. The exposed functions are essentially just
@@ -822,10 +826,19 @@ func CommonCollisionTest(node INode, settings CollisionTestSettings) []*Collisio
 
 		if continueChecking {
 
+			if settings.Skip != nil {
+				for _, node := range settings.Skip {
+					if node == checking {
+						return
+					}
+				}
+			}
+
 			if c, ok := checking.(IBoundingObject); ok {
 
 				if collision := node.(IBoundingObject).Collision(c); collision != nil {
 					collision.Root = parent
+
 					if settings.HandleCollision != nil && !settings.HandleCollision(collision) {
 						continueChecking = false
 					}
@@ -837,6 +850,7 @@ func CommonCollisionTest(node INode, settings CollisionTestSettings) []*Collisio
 			for _, child := range checking.Children() {
 				test(child, parent)
 			}
+
 		}
 
 	}
