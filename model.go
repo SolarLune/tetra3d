@@ -52,8 +52,9 @@ type Model struct {
 
 	// Automatic batching mode; when set and a Model changes parenting, it will be automatically batched as necessary according to
 	// the AutoBatchMode set.
-	AutoBatchMode int
-	autoBatched   bool
+	AutoBatchMode  int
+	autoBatched    bool
+	dynamicBatcher bool
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -115,6 +116,7 @@ func (model *Model) Clone() INode {
 
 	newModel.VertexClipFunction = model.VertexClipFunction
 	newModel.VertexTransformFunction = model.VertexTransformFunction
+	newModel.dynamicBatcher = model.dynamicBatcher
 
 	return newModel
 
@@ -179,12 +181,17 @@ func (model *Model) modelAlreadyDynamicallyBatched(batchedModel *Model) bool {
 	return false
 }
 
-// DynamicBatchAdd adds the provided models to the calling Model's dynamic batch, rendering with the specified meshpart (which should be part of the calling Model,
-// of course). Note that unlike StaticMerge(), DynamicBatchAdd works by simply rendering the batched models using the calling Model's first MeshPart's material. By
-// dynamically batching models together, this allows us to not flush between rendering multiple Models, saving a lot of render time, particularly if rendering many
-// low-poly, individual models that have very little variance (i.e. if they all share a single texture).
-// For more information, see this Wiki page on batching / merging: https://github.com/SolarLune/Tetra3d/wiki/Merging-and-Batching-Draw-Calls
+/*
+DynamicBatchAdd adds the provided models to the calling Model's dynamic batch, rendering with the specified meshpart (which should be part of the calling Model,
+of course). Note that unlike StaticMerge(), DynamicBatchAdd works by simply rendering the batched models using the calling Model's first MeshPart's material. By
+dynamically batching models together, this allows us to not flush between rendering multiple Models, saving a lot of render time, particularly if rendering many
+low-poly, individual models that have very little variance (i.e. if they all share a single texture).
+Calling this turns the model into a dynamic batching owner, meaning that it will no longer render its own mesh (for simplicity).
+For more information, see this Wiki page on batching / merging: https://github.com/SolarLune/Tetra3d/wiki/Merging-and-Batching-Draw-Calls
+*/
 func (model *Model) DynamicBatchAdd(meshPart *MeshPart, batchedModels ...*Model) error {
+
+	model.dynamicBatcher = true
 
 	for _, other := range batchedModels {
 
@@ -493,6 +500,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		meshPart.sortingTriangles[sortingTriIndex].Triangle = mesh.Triangles[ti]
 
+		// if invertedCamPos.DistanceSquared(tri.Center) > pow(camera.Far+tri.MaxSpan, 2) {
+		// 	continue
+		// }
+
 		outOfBounds := true
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
@@ -568,7 +579,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			// there's fewer graphical glitches when looking from very near a surface outwards; this
 			// doesn't help if a surface does not have backface culling, of course...
 			if nor < 0 {
-				outOfBounds = true
+				continue
 			}
 
 			// Old methods of backface culling; performant, but causes graphical glitches.
@@ -616,20 +627,12 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		}
 
-		if !outOfBounds {
-
-			// If all transformed vertices are wholly out of bounds to the right, left, top, or bottom of the screen, then we can assume
-			// the triangle does not need to be rendered
-			if (transformedVertexPositions[0].X < -0.5 && transformedVertexPositions[1].X < -0.5 && transformedVertexPositions[2].X < -0.5) ||
-				(transformedVertexPositions[0].X > 0.5 && transformedVertexPositions[1].X > 0.5 && transformedVertexPositions[2].X > 0.5) ||
-				(transformedVertexPositions[0].Y < -0.5 && transformedVertexPositions[1].Y < -0.5 && transformedVertexPositions[2].Y < -0.5) ||
-				(transformedVertexPositions[0].Y > 0.5 && transformedVertexPositions[1].Y > 0.5 && transformedVertexPositions[2].Y > 0.5) {
-				outOfBounds = true
-			}
-
-		}
-
-		if outOfBounds {
+		// If all transformed vertices are wholly out of bounds to the right, left, top, or bottom of the screen, then we can assume
+		// the triangle does not need to be rendered
+		if (transformedVertexPositions[0].X < -0.5 && transformedVertexPositions[1].X < -0.5 && transformedVertexPositions[2].X < -0.5) ||
+			(transformedVertexPositions[0].X > 0.5 && transformedVertexPositions[1].X > 0.5 && transformedVertexPositions[2].X > 0.5) ||
+			(transformedVertexPositions[0].Y < -0.5 && transformedVertexPositions[1].Y < -0.5 && transformedVertexPositions[2].Y < -0.5) ||
+			(transformedVertexPositions[0].Y > 0.5 && transformedVertexPositions[1].Y > 0.5 && transformedVertexPositions[2].Y > 0.5) {
 			continue
 		}
 
@@ -900,10 +903,40 @@ func (model *Model) AddChildren(children ...INode) {
 }
 
 func (model *Model) setParent(parent INode) {
+
+	prevScene := model.Scene()
+
 	model.Node.setParent(parent)
-	if model.AutoBatchMode != AutoBatchNone && model.Scene() != nil {
-		model.Scene().updateAutobatch = true
+
+	batched := model.AutoBatchMode != AutoBatchNone
+
+	if !batched {
+
+		for _, child := range model.ChildrenRecursive() {
+
+			if child, ok := child.(*Model); ok && child.AutoBatchMode != AutoBatchNone {
+
+				batched = true
+				break
+
+			}
+
+		}
+
 	}
+
+	if batched {
+
+		if prevScene != nil {
+			prevScene.updateAutobatch = true
+		}
+
+		if newScene := model.Scene(); newScene != nil {
+			newScene.updateAutobatch = true
+		}
+
+	}
+
 }
 
 // Unparent unparents the Model from its parent, removing it from the scenegraph.

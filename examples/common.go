@@ -104,7 +104,7 @@ func (system *BasicSystemHandler) Draw(screen *ebiten.Image, camera *tetra3d.Cam
 		camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		var txt string
 		if system.UsingBasicFreeCam {
-			txt = `WASD: Move, Mouse: Look
+			txt = `WASD: Move, Mouse: Look, Shift: move fast
 Left Click to Lock / Unlock Mouse Cursor
 F1: Toggle help text - F2: Toggle depth debug,
 F3: Wireframe debug - F4: fullscreen - F5: node center debug
@@ -154,7 +154,7 @@ func (cc *BasicFreeCam) Update() {
 
 	// Moving the Camera
 
-	moveSpd := 0.05
+	moveSpd := 0.075
 
 	if ebiten.IsKeyPressed(ebiten.KeyShift) {
 		moveSpd *= 3

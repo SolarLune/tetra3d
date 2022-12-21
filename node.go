@@ -184,9 +184,6 @@ type INode interface {
 	IsBone() bool
 	// IsRootBone() bool
 
-	// IsCollectionInstance returns if the Node is a collection instance object.
-	IsCollectionInstance() bool
-
 	// AnimationPlayer returns the object's animation player - every object has an AnimationPlayer by default.
 	AnimationPlayer() *AnimationPlayer
 
@@ -211,7 +208,7 @@ type Node struct {
 	animationPlayer       *AnimationPlayer
 	inverseBindMatrix     Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 	isBone                bool
-	isCollectionInstance  bool // Returns if the node is a collection instance
+	collectionObjects     []INode // Returns if the node is a collection instance
 	boneInfluence         Matrix4
 	library               *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 	scene                 *Scene
@@ -303,7 +300,6 @@ func (node *Node) Clone() INode {
 	if newNode.isBone {
 		newNode.inverseBindMatrix = node.inverseBindMatrix.Clone()
 	}
-	newNode.isCollectionInstance = node.isCollectionInstance
 
 	return newNode
 }
@@ -776,7 +772,7 @@ func (node *Node) HierarchyAsString() string {
 		// "more specific type". To avoid doing this, I'm just going to have the first level node
 		// look like : [-] .
 		if level == 0 {
-			prefix = "-"
+			prefix = "ROOT"
 		} else {
 
 			nodeType := node.Type()
@@ -815,8 +811,15 @@ func (node *Node) HierarchyAsString() string {
 
 		str := ""
 
+		if node.Parent() != nil {
+			for i := 0; i < level; i++ {
+				str += "    |"
+			}
+			str += "\n"
+		}
+
 		for i := 0; i < level; i++ {
-			str += "    "
+			str += "    |"
 		}
 
 		wp := node.WorldPosition()
@@ -824,9 +827,9 @@ func (node *Node) HierarchyAsString() string {
 		wpStr := "[" + strconv.FormatFloat(wp.X, 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp.Y, 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp.Z, 'f', floatTruncation, 64) + "]"
 
 		if level > 0 {
-			str += "\\-"
+			str += "-"
 		}
-		str += "[" + prefix + "] " + node.Name() + " : " + wpStr + "\n"
+		str += " [" + prefix + "] " + node.Name() + " : " + wpStr + "\n"
 
 		for _, child := range node.Children() {
 			str += printNode(child, level+1)
@@ -934,11 +937,6 @@ func (node *Node) Root() INode {
 // IsBone returns if the Node is a "bone" (a node that was a part of an armature and so can play animations back to influence a skinned mesh).
 func (node *Node) IsBone() bool {
 	return node.isBone
-}
-
-// IsCollectionInstance returns if the Node is a collection instance in Blender, to which its collection objects are instantiated in and parented to.
-func (node *Node) IsCollectionInstance() bool {
-	return node.isCollectionInstance
 }
 
 // // IsRootBone returns if the Node SHOULD be the root of an Armature (a Node that was the base of an armature).

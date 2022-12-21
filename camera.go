@@ -1210,22 +1210,27 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		// end - this saves a lot of time if we're rendering singular low-poly objects, at the cost of each
 		// object sharing the same material / object-level properties (color / material blending mode, for
 		// example).
-		if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
+		if pair.Model.dynamicBatcher {
 
-			modelSlice := dyn[pair.MeshPart]
+			if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
 
-			for _, merged := range modelSlice {
+				modelSlice := dyn[pair.MeshPart]
 
-				if !merged.visible {
-					continue
+				for _, merged := range modelSlice {
+
+					if !merged.visible {
+						continue
+					}
+
+					for _, part := range merged.Mesh.MeshParts {
+						render(renderPair{Model: merged, MeshPart: part})
+					}
 				}
 
-				for _, part := range merged.Mesh.MeshParts {
-					render(renderPair{Model: merged, MeshPart: part})
-				}
+				flush(pair)
+
 			}
 
-			flush(pair)
 		} else {
 			render(pair)
 			flush(pair)
@@ -1243,23 +1248,29 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			continue
 		}
 
-		if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
+		if pair.Model.dynamicBatcher {
 
-			modelSlice := dyn[pair.MeshPart]
+			if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
 
-			for _, merged := range modelSlice {
+				modelSlice := dyn[pair.MeshPart]
 
-				if !merged.visible {
-					continue
+				for _, merged := range modelSlice {
+
+					if !merged.visible {
+						continue
+					}
+
+					for _, part := range merged.Mesh.MeshParts {
+						render(renderPair{Model: merged, MeshPart: part})
+					}
 				}
 
-				for _, part := range merged.Mesh.MeshParts {
-					render(renderPair{Model: merged, MeshPart: part})
-				}
+				flush(pair)
+
 			}
 
-			flush(pair)
 		} else {
+			// Autobatch models don't need to render if they don't have anything
 			render(pair)
 			flush(pair)
 		}

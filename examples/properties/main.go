@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/solarlune/tetra3d/examples"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type Game struct {
@@ -42,15 +44,17 @@ func (g *Game) Init() {
 	g.Scene = data.ExportedScene
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
-	g.Camera.SetLocalPosition(0, 5, 5)
+	g.Camera.SetLocalPosition(0, 5, 15)
 
 	g.System = examples.NewBasicSystemHandler(g)
 
 	for _, o := range g.Scene.Root.Children() {
 
+		// In this example, we use a property named "parented to" to dynamically parent an object to another at run-time.
 		if o.Properties().Has("parented to") {
 
-			// Object reference properties are composed of [Scene Name]:[Object Name]. If the scene to search is not set in Blender, that portion will be blank.
+			// Object reference properties are composed of strings, formatted as: [Scene Name]:[Object Name].
+			// If the scene to search is not set in Blender, that portion will be blank.
 			link := strings.Split(o.Properties().Get("parented to").AsString(), ":")
 
 			// Store the object's original transform
@@ -65,22 +69,31 @@ func (g *Game) Init() {
 
 	}
 
+	fmt.Println(g.Scene.Root.HierarchyAsString())
+
 }
 
 func (g *Game) Update() error {
 
 	g.Time += 1.0 / 60.0
 
+	// Here we loop through objects as usual, but notice from the blend file that collection instance
+	// objects are replaced in the scene tree by their children.
 	for _, o := range g.Scene.Root.Children() {
 
 		if o.Properties().Has("turn") {
 			o.Rotate(0, 1, 0, 0.02*o.Properties().Get("turn").AsFloat64())
 		}
 
-		if o.Properties().Has("wave") {
-			o.Move(0, math.Sin(g.Time*math.Pi)*0.02, 0)
+		if o.Properties().Has("wave") && o.Properties().Get("wave").AsBool() {
+			o.Move(0, math.Sin(g.Time*math.Pi)*0.08, 0)
 		}
 
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
+		fmt.Println(g.Scene.Root.HierarchyAsString())
+		g.Scene.Root.Get("Cube.008").Unparent()
 	}
 
 	g.Camera.Update()
@@ -110,9 +123,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 the Tetra3D Blender add-on.
 Game properties are set in the blend file, and
 exported from there to a GLTF file.
-They become tags here in Tetra3D,
-influencing whether the cubes rotate or float,
-and at what speed in this demo.`
+
+Collection instances can be used as prefabs,
+and properties set on a collection
+instance object get propagated to top-level objects
+in that collection.`
 		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 

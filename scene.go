@@ -71,35 +71,60 @@ func (scene *Scene) HandleAutobatch() {
 
 		for _, node := range scene.Root.ChildrenRecursive() {
 
-			if model, ok := node.(*Model); ok && !model.autoBatched {
+			if model, ok := node.(*Model); ok {
 
-				mat := autobatchBlankMat
+				if !model.autoBatched {
 
-				if mats := model.Mesh.Materials(); len(mats) > 0 {
-					mat = mats[0]
+					mat := autobatchBlankMat
+
+					if mats := model.Mesh.Materials(); len(mats) > 0 {
+						mat = mats[0]
+					}
+
+					if model.AutoBatchMode == AutoBatchDynamic {
+
+						if _, exists := scene.autobatchDynamicMap[mat]; !exists {
+							mesh := NewMesh("auto dynamic batch")
+							mesh.AddMeshPart(mat)
+							m := NewModel(mesh, "auto dynamic batch")
+							m.dynamicBatcher = true
+							scene.autobatchDynamicMap[mat] = m
+							scene.Root.AddChildren(m)
+						}
+						scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].Mesh.MeshParts[0], model)
+
+					} else if model.AutoBatchMode == AutoBatchStatic {
+
+						if _, exists := scene.autobatchStaticMap[mat]; !exists {
+							m := NewModel(NewMesh("auto static merge"), "auto static merge")
+							scene.autobatchStaticMap[mat] = m
+							scene.Root.AddChildren(scene.autobatchStaticMap[mat])
+						}
+						scene.autobatchStaticMap[mat].StaticMerge(model)
+
+					}
+
+					model.autoBatched = true
+
 				}
 
-				if model.AutoBatchMode == AutoBatchDynamic {
+			}
 
-					if _, exists := scene.autobatchDynamicMap[mat]; !exists {
-						mesh := NewMesh("auto dynamic batch")
-						mesh.AddMeshPart(mat)
-						scene.autobatchDynamicMap[mat] = NewModel(mesh, "auto dynamic batch")
-						scene.Root.AddChildren(scene.autobatchDynamicMap[mat])
+		}
+
+		for _, dyn := range scene.autobatchDynamicMap {
+
+			for _, models := range dyn.DynamicBatchModels {
+
+				modelList := append(make([]*Model, 0, len(models)), models...)
+
+				for _, model := range modelList {
+
+					if model.Root() == nil {
+						dyn.DynamicBatchRemove(model)
 					}
-					scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].Mesh.MeshParts[0], model)
-
-				} else if model.AutoBatchMode == AutoBatchStatic {
-
-					if _, exists := scene.autobatchStaticMap[mat]; !exists {
-						scene.autobatchStaticMap[mat] = NewModel(NewMesh("auto static merge"), "auto static merge")
-						scene.Root.AddChildren(scene.autobatchStaticMap[mat])
-					}
-					scene.autobatchStaticMap[mat].StaticMerge(model)
 
 				}
-
-				model.autoBatched = true
 
 			}
 

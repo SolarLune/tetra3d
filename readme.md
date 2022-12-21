@@ -275,7 +275,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] **Animations**
 - [X] -- Armature-based animations
 - [X] -- Object transform-based animations
-- [X] -- Blending between animations
+- [ ] -- Blending between animations (this works, but can be a bit buggy and needs to be looked at)
 - [X] -- Linear keyframe interpolation
 - [X] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
@@ -283,7 +283,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] **Scenes**
 - [X] -- Fog
 - [X] -- A node or scenegraph for parenting and simple visibility culling
-- [ ] -- Ambient vertex coloring?
+- [X] -- Ambient vertex coloring
 - [ ] -- Multiple vertex color channels
 - [X] **GLTF / GLB model loading**
 - [X] -- Vertex colors loading
@@ -300,8 +300,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Bounds node creation
 - [X] -- Game property export (less clunky version of Blender's vanilla custom properties)
 - [X] -- Collection / group substitution
-- [X] -- -- Overwriting properties through collection instance
-- [ ] -- -- (Not done as well as I would like currently; ideally, you can view and manually override each individual property of top-level objects in the collection?)
+- [X] -- -- Overwriting properties through collection instance objects
+- [X] -- -- Collection instances instantiate their objects in the same location in the tree
 - [x] -- Optional camera size export
 - [X] -- Linking collections from external files
 - [X] -- Material data export
@@ -323,6 +323,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Lighting Groups
 - [X] -- Ability to bake lighting to vertex colors
 - [X] -- Ability to bake ambient occlusion to vertex colors
+- [ ] -- Specular lighting (shininess)
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
 - [X] **Shaders**

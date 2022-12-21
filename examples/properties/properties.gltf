@@ -1,23 +1,26 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v1.7.33",
+        "generator" : "Khronos glTF Blender I/O v3.4.49",
         "version" : "2.0"
     },
     "extensionsUsed" : [
         "KHR_materials_unlit"
     ],
-    "scene" : 0,
+    "scene" : 1,
     "scenes" : [
         {
             "extras" : {
-                "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
-                "t3dExportLights__" : 0,
+                "t3dExportOnSave__" : 1,
+                "t3dCameraResolution__" : [
+                    1920,
+                    1080
+                ],
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
-                            "Cube",
-                            "Cube.001",
+                            "Cube.009",
+                            "Parent",
                             "Cube.002",
                             "Cube.003",
                             "Cube.004",
@@ -25,8 +28,18 @@
                             "Cube.006",
                             "Cube.007",
                             "Cube.008",
-                            "Cube.009",
-                            "Parent"
+                            "Cube.010",
+                            "Cube.011"
+                        ],
+                        "offset" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "Cube" : {
+                        "objects" : [
+                            "Cube"
                         ],
                         "offset" : [
                             0.0,
@@ -34,12 +47,36 @@
                             0.0
                         ]
                     }
-                }
+                },
+                "t3dWorlds__" : {
+                    "World" : {
+                        "ambient color" : [
+                            0.04445478320121765,
+                            0.04445478320121765,
+                            0.04445478320121765,
+                            1.0
+                        ],
+                        "ambient energy" : 1.0
+                    }
+                },
+                "t3dCurrentWorld__" : "World"
+            },
+            "name" : "Group",
+            "nodes" : [
+                1
+            ]
+        },
+        {
+            "extras" : {
+                "t3dExportOnSave__" : 1,
+                "t3dExportFormat__" : 2,
+                "t3dExportLights__" : 0,
+                "t3dExpandOverrideProps__" : 1,
+                "t3dExpandGameProps__" : 1,
+                "t3dCurrentWorld__" : "World"
             },
             "name" : "Scene",
             "nodes" : [
-                0,
-                1,
                 2,
                 3,
                 4,
@@ -48,7 +85,9 @@
                 7,
                 8,
                 9,
-                10
+                10,
+                11,
+                12
             ]
         }
     ],
@@ -57,200 +96,54 @@
             "extras" : {
                 "t3dGameProperties__" : [
                     {
-                        "name" : "turn",
-                        "valueBool" : 1,
-                        "valueReference" : {},
-                        "valueType" : 2,
-                        "valueInt" : 2,
-                        "valueFloat" : 2.0
-                    },
-                    {
-                        "name" : "wave",
-                        "valueType" : 0,
-                        "valueBool" : 1,
-                        "valueInt" : 0,
-                        "valueFloat" : 0.0,
-                        "valueString" : "",
-                        "valueReference" : null,
-                        "valueReferenceScene" : null
+                        "name" : "Test"
                     }
+                ],
+                "t3dOriginalLocalPosition__" : [
+                    0.0,
+                    0.0,
+                    4.0
                 ]
-            },
-            "mesh" : 0,
-            "name" : "Cube"
-        },
-        {
-            "extras" : {
-                "t3dGameProperties__" : []
             },
             "mesh" : 0,
             "name" : "Cube.001",
             "translation" : [
                 0,
-                0,
-                -10
-            ]
-        },
-        {
-            "extras" : {
-                "t3dGameProperties__" : [
-                    {
-                        "name" : "turn",
-                        "valueType" : 2,
-                        "valueBool" : 1,
-                        "valueInt" : 2,
-                        "valueFloat" : 1.0,
-                        "valueString" : "",
-                        "valueReference" : null
-                    }
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.002",
-            "translation" : [
-                -10,
-                0,
-                -10
-            ]
-        },
-        {
-            "extras" : {
-                "t3dGameProperties__" : [
-                    {
-                        "name" : "wave",
-                        "valueType" : 0,
-                        "valueBool" : 1,
-                        "valueInt" : 0,
-                        "valueFloat" : 0.0,
-                        "valueString" : "",
-                        "valueReference" : null
-                    }
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.003",
-            "translation" : [
-                -10,
-                0,
+                4,
                 0
             ]
         },
         {
+            "children" : [
+                0
+            ],
             "extras" : {
                 "t3dGameProperties__" : [
                     {
                         "name" : "wave",
                         "valueType" : 0,
+                        "valueFloat" : 1.0,
                         "valueBool" : 1,
-                        "valueInt" : 0,
-                        "valueFloat" : 0.0,
-                        "valueString" : "",
-                        "valueReference" : null,
+                        "valueReference" : {},
                         "valueReferenceScene" : {}
-                    }
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.004",
-            "translation" : [
-                10,
-                0,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dGameProperties__" : [
-                    {
-                        "name" : "turn",
-                        "valueType" : 2,
-                        "valueBool" : 1,
-                        "valueInt" : 2,
-                        "valueFloat" : 1.0,
-                        "valueString" : "",
-                        "valueReference" : null
                     },
                     {
-                        "name" : "wave",
-                        "valueType" : 0,
-                        "valueBool" : 1,
-                        "valueInt" : 0,
-                        "valueFloat" : 0.0,
-                        "valueString" : "",
-                        "valueReference" : null,
-                        "valueReferenceScene" : null
-                    }
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.005",
-            "translation" : [
-                10,
-                0,
-                -10
-            ]
-        },
-        {
-            "extras" : {
-                "t3dGameProperties__" : [
-                    {
-                        "name" : "wave",
-                        "valueBool" : 1,
-                        "valueReference" : {}
-                    }
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.006",
-            "translation" : [
-                10,
-                0,
-                -20
-            ]
-        },
-        {
-            "extras" : {
-                "t3dGameProperties__" : [
-                    {
                         "name" : "turn",
+                        "valueBool" : 1,
                         "valueType" : 2,
-                        "valueBool" : 1,
-                        "valueInt" : 2,
-                        "valueFloat" : 4.0,
-                        "valueString" : "",
-                        "valueReference" : null
+                        "valueFloat" : 1.0,
+                        "valueReference" : {},
+                        "valueReferenceScene" : {}
                     }
+                ],
+                "t3dOriginalLocalPosition__" : [
+                    0.0,
+                    0.0,
+                    0.0
                 ]
             },
-            "mesh" : 0,
-            "name" : "Cube.007",
-            "translation" : [
-                0,
-                0,
-                -20
-            ]
-        },
-        {
-            "extras" : {
-                "t3dGameProperties__" : [
-                    {
-                        "name" : "wave",
-                        "valueType" : 0,
-                        "valueBool" : 1,
-                        "valueInt" : 0,
-                        "valueFloat" : 0.0,
-                        "valueString" : "",
-                        "valueReference" : null
-                    }
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.008",
-            "translation" : [
-                -10,
-                0,
-                -20
-            ]
+            "mesh" : 1,
+            "name" : "Cube"
         },
         {
             "extras" : {
@@ -264,9 +157,14 @@
                         },
                         "name" : "parented to"
                     }
+                ],
+                "t3dOriginalLocalPosition__" : [
+                    30.0,
+                    10.0,
+                    0.0
                 ]
             },
-            "mesh" : 0,
+            "mesh" : 2,
             "name" : "Cube.009",
             "translation" : [
                 30,
@@ -296,14 +194,249 @@
                         "valueReference" : null,
                         "valueReferenceScene" : null
                     }
+                ],
+                "t3dOriginalLocalPosition__" : [
+                    25.0,
+                    10.0,
+                    0.0
                 ]
             },
-            "mesh" : 0,
+            "mesh" : 2,
             "name" : "Parent",
             "translation" : [
                 25,
                 0,
                 -10
+            ]
+        },
+        {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.002",
+            "rotation" : [
+                -0.02722805179655552,
+                0.2111053168773651,
+                0.4056556522846222,
+                0.8888963460922241
+            ]
+        },
+        {
+            "extras" : {
+                "t3dGameProperties__" : [
+                    {
+                        "name" : "turn",
+                        "valueType" : 2,
+                        "valueBool" : 1,
+                        "valueInt" : 0,
+                        "valueFloat" : 8.0,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null,
+                        "valueColor" : [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "valueVector3D" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                ],
+                "t3dOriginalLocalPosition__" : [
+                    10.0,
+                    0.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.003",
+            "translation" : [
+                10,
+                0,
+                0
+            ]
+        },
+        {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    10.0,
+                    10.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.004",
+            "translation" : [
+                10,
+                0,
+                -10
+            ]
+        },
+        {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    0.0,
+                    10.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.005",
+            "rotation" : [
+                0.021459734067320824,
+                -0.16638220846652985,
+                -0.3197166919708252,
+                0.9325436949729919
+            ],
+            "translation" : [
+                0,
+                0,
+                -10
+            ]
+        },
+        {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -10.0,
+                    10.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.006",
+            "translation" : [
+                -10,
+                0,
+                -10
+            ]
+        },
+        {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -10.0,
+                    0.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.007",
+            "rotation" : [
+                0.018247919157147408,
+                -0.1414802521467209,
+                -0.27186551690101624,
+                0.9517034888267517
+            ],
+            "translation" : [
+                -10,
+                0,
+                0
+            ]
+        },
+        {
+            "extras" : {
+                "t3dGameProperties__" : [
+                    {
+                        "name" : "wave",
+                        "valueType" : 0,
+                        "valueBool" : 0,
+                        "valueInt" : 0,
+                        "valueFloat" : 1.0,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null,
+                        "valueColor" : [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "valueVector3D" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    {
+                        "name" : "turn",
+                        "valueType" : 2,
+                        "valueBool" : 1,
+                        "valueInt" : 0,
+                        "valueFloat" : 0.10000000149011612,
+                        "valueString" : "",
+                        "valueReference" : null,
+                        "valueReferenceScene" : null,
+                        "valueColor" : [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ],
+                        "valueVector3D" : [
+                            0.0,
+                            0.0,
+                            0.0
+                        ]
+                    }
+                ],
+                "t3dOriginalLocalPosition__" : [
+                    10.0,
+                    -10.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.008",
+            "translation" : [
+                10,
+                0,
+                10
+            ]
+        },
+        {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    0.0,
+                    -10.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.010",
+            "rotation" : [
+                0.015566161833703518,
+                -0.12068801373243332,
+                -0.23191164433956146,
+                0.9650954008102417
+            ],
+            "translation" : [
+                0,
+                0,
+                10
+            ]
+        },
+        {
+            "extras" : {
+                "t3dOriginalLocalPosition__" : [
+                    -10.0,
+                    -10.0,
+                    0.0
+                ],
+                "t3dInstanceCollection__" : "Cube"
+            },
+            "name" : "Cube.011",
+            "translation" : [
+                -10,
+                0,
+                10
             ]
         }
     ],
@@ -329,16 +462,56 @@
                     "Col"
                 ]
             },
+            "name" : "Cube.001",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "COLOR_0" : 0,
+                        "POSITION" : 1,
+                        "TEXCOORD_0" : 2,
+                        "NORMAL" : 3
+                    },
+                    "indices" : 4,
+                    "material" : 0
+                }
+            ]
+        },
+        {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
             "name" : "Cube",
             "primitives" : [
                 {
                     "attributes" : {
-                        "POSITION" : 0,
-                        "NORMAL" : 1,
-                        "TEXCOORD_0" : 2,
-                        "COLOR_0" : 3
+                        "COLOR_0" : 5,
+                        "POSITION" : 6,
+                        "TEXCOORD_0" : 7,
+                        "NORMAL" : 8
                     },
                     "indices" : 4,
+                    "material" : 0
+                }
+            ]
+        },
+        {
+            "extras" : {
+                "t3dVertexColorNames__" : [
+                    "Col"
+                ]
+            },
+            "name" : "Diamond",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "COLOR_0" : 9,
+                        "POSITION" : 10,
+                        "TEXCOORD_0" : 11,
+                        "NORMAL" : 12
+                    },
+                    "indices" : 13,
                     "material" : 0
                 }
             ]
@@ -347,6 +520,54 @@
     "accessors" : [
         {
             "bufferView" : 0,
+            "componentType" : 5123,
+            "count" : 24,
+            "normalized" : true,
+            "type" : "VEC4"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 24,
+            "max" : [
+                0.5,
+                0.5,
+                0.5
+            ],
+            "min" : [
+                -0.5,
+                -0.5,
+                -0.5
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 24,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5126,
+            "count" : 24,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 4,
+            "componentType" : 5123,
+            "count" : 36,
+            "type" : "SCALAR"
+        },
+        {
+            "bufferView" : 5,
+            "componentType" : 5123,
+            "count" : 24,
+            "normalized" : true,
+            "type" : "VEC4"
+        },
+        {
+            "bufferView" : 6,
             "componentType" : 5126,
             "count" : 24,
             "max" : [
@@ -362,62 +583,149 @@
             "type" : "VEC3"
         },
         {
-            "bufferView" : 1,
-            "componentType" : 5126,
-            "count" : 24,
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 2,
+            "bufferView" : 7,
             "componentType" : 5126,
             "count" : 24,
             "type" : "VEC2"
         },
         {
-            "bufferView" : 3,
+            "bufferView" : 8,
+            "componentType" : 5126,
+            "count" : 24,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 9,
             "componentType" : 5123,
             "count" : 24,
             "normalized" : true,
             "type" : "VEC4"
         },
         {
-            "bufferView" : 4,
+            "bufferView" : 10,
+            "componentType" : 5126,
+            "count" : 24,
+            "max" : [
+                1,
+                1,
+                1
+            ],
+            "min" : [
+                -1,
+                -1,
+                -1
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 11,
+            "componentType" : 5126,
+            "count" : 24,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 12,
+            "componentType" : 5126,
+            "count" : 24,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 13,
             "componentType" : 5123,
-            "count" : 36,
+            "count" : 24,
             "type" : "SCALAR"
         }
     ],
     "bufferViews" : [
         {
             "buffer" : 0,
-            "byteLength" : 288,
-            "byteOffset" : 0
+            "byteLength" : 192,
+            "byteOffset" : 0,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 288,
-            "byteOffset" : 288
+            "byteOffset" : 192,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 192,
-            "byteOffset" : 576
+            "byteOffset" : 480,
+            "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 192,
-            "byteOffset" : 768
+            "byteLength" : 288,
+            "byteOffset" : 672,
+            "target" : 34962
         },
         {
             "buffer" : 0,
             "byteLength" : 72,
-            "byteOffset" : 960
+            "byteOffset" : 960,
+            "target" : 34963
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 192,
+            "byteOffset" : 1032,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 288,
+            "byteOffset" : 1224,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 192,
+            "byteOffset" : 1512,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 288,
+            "byteOffset" : 1704,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 192,
+            "byteOffset" : 1992,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 288,
+            "byteOffset" : 2184,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 192,
+            "byteOffset" : 2472,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 288,
+            "byteOffset" : 2664,
+            "target" : 34962
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 48,
+            "byteOffset" : 2952,
+            "target" : 34963
         }
     ],
     "buffers" : [
         {
-            "byteLength" : 1032,
-            "uri" : "data:application/octet-stream;base64,AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AAAAAAAAAAAAAIC/AAAAAAAAgD8AAAAAAACAPwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAAAAAACAPwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAAAAAACAvwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAvwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAAAAAACAvwAAAAAAAAAAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AAAgPwAAAD8AACA/AAAAPwAAID8AAAA/AADAPgAAAD8AAMA+AAAAPwAAwD4AAAA/AAAgPwAAgD4AACA/AACAPgAAID8AAIA+AADAPgAAgD4AAMA+AACAPgAAwD4AAIA+AAAgPwAAQD8AACA/AABAPwAAYD8AAAA/AADAPgAAQD8AAAA+AAAAPwAAwD4AAEA/AAAgPwAAgD8AACA/AAAAAAAAYD8AAIA+AADAPgAAgD8AAAA+AACAPgAAwD4AAAAA//////////+nHL2A//////////////////////////////////////////////////////////+nHL2A/////////////////////////////////////////////////////////////////////6ccvYD//////////////////////////////////////////////////////////6ccvYD/////////////////////////////////////AQAOABQAAQAUAAcACgAGABMACgATABcAFQASAAwAFQAMAA8AEAADAAkAEAAJABYABQACAAgABQAIAAsAEQANAAAAEQAAAAQA"
+            "byteLength" : 3000,
+            "uri" : "data:application/octet-stream;base64,pxy9gP//////////////////////////////////////////////////////////pxy9gP//////////////////////////////////////////////////////////pxy9gP//////////////////////////////////////////////////////////pxy9gP//////////////////////////////////////////////////////////AAAAPwAAAD8AAAC/AAAAPwAAAD8AAAC/AAAAPwAAAD8AAAC/AAAAPwAAAL8AAAC/AAAAPwAAAL8AAAC/AAAAPwAAAL8AAAC/AAAAPwAAAD8AAAA/AAAAPwAAAD8AAAA/AAAAPwAAAD8AAAA/AAAAPwAAAL8AAAA/AAAAPwAAAL8AAAA/AAAAPwAAAL8AAAA/AAAAvwAAAD8AAAC/AAAAvwAAAD8AAAC/AAAAvwAAAD8AAAC/AAAAvwAAAL8AAAC/AAAAvwAAAL8AAAC/AAAAvwAAAL8AAAC/AAAAvwAAAD8AAAA/AAAAvwAAAD8AAAA/AAAAvwAAAD8AAAA/AAAAvwAAAL8AAAA/AAAAvwAAAL8AAAA/AAAAvwAAAL8AAAA/AAAgPwAAAD8AACA/AAAAPwAAID8AAAA/AADAPgAAAD8AAMA+AAAAPwAAwD4AAAA/AAAgPwAAgD4AACA/AACAPgAAID8AAIA+AADAPgAAgD4AAMA+AACAPgAAwD4AAIA+AABgPwAAAD8AACA/AABAPwAAID8AAEA/AAAAPgAAAD8AAMA+AABAPwAAwD4AAEA/AABgPwAAgD4AACA/AAAAAAAAID8AAIA/AAAAPgAAgD4AAMA+AAAAAAAAwD4AAIA/AAAAAAAAgD8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAAAAAAAAgD8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAAAAAAAAgD8AAACAAACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgL8AAACAAACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAACAAAAAAAAAAAAAAIA/AACAvwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAvwAAAAAAAACAAAAMABIAAAASAAYACgAHABMACgATABYAFwAUAA0AFwANABAADwADAAkADwAJABUABQACAAgABQAIAAsAEQAOAAEAEQABAAQApxy9gP//////////////////////////////////////////////////////////pxy9gP//////////////////////////////////////////////////////////pxy9gP//////////////////////////////////////////////////////////pxy9gP//////////////////////////////////////////////////////////AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AAAgPwAAAD8AACA/AAAAPwAAID8AAAA/AADAPgAAAD8AAMA+AAAAPwAAwD4AAAA/AAAgPwAAgD4AACA/AACAPgAAID8AAIA+AADAPgAAgD4AAMA+AACAPgAAwD4AAIA+AABgPwAAAD8AACA/AABAPwAAID8AAEA/AAAAPgAAAD8AAMA+AABAPwAAwD4AAEA/AABgPwAAgD4AACA/AAAAAAAAID8AAIA/AAAAPgAAgD4AAMA+AAAAAAAAwD4AAIA/AAAAAAAAgD8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAAAAAAAAgD8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAAAAAAAAgD8AAACAAACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgL8AAACAAACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAACAAAAAAAAAAAAAAIA/AACAvwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAvwAAAAAAAACAyggaOv/////KCBo6/////8oIGjr/////yggaOv///////////////////////////////////////////////8oIGjr/////yggaOv//////////////////////////yggaOv/////KCBo6///////////////////////////KCBo6/////8oIGjr//////////////////////////8oIGjr/////yggaOv//////////////////////////AAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgD8AAACAAAAAAAAAgL8AAACAAAAAAAAAgL8AAACAAAAAAAAAgL8AAACAAAAAAAAAgL8AAACAAACAPwAAAAAAAIC/AACAPwAAAAAAAIC/AACAPwAAAAAAAIC/AACAPwAAAAAAAIC/AACAvwAAAAAAAIA/AACAvwAAAAAAAIA/AACAvwAAAAAAAIA/AACAvwAAAAAAAIA/AACAPwAAAAAAAIA/AACAPwAAAAAAAIA/AACAPwAAAAAAAIA/AACAPwAAAAAAAIA/AACAvwAAAAAAAIC/AACAvwAAAAAAAIC/AACAvwAAAAAAAIC/AACAvwAAAAAAAIC/AAAgPwAAAAAAACA/AACAPgAAID8AAAA/AAAgPwAAQD8AAMA+AACAPgAAwD4AAAA/AADAPgAAQD8AAMA+AACAPwAAAD8AAAA/AAAAPwAAAD8AAAA/AAAAPwAAAD8AAAA/AAAAPwAAAAAAAAA/AACAPwAAAD8AAAAAAAAAPwAAgD8AAAA/AACAPgAAAD8AAIA+AAAAPwAAgD4AAAA/AACAPgAAAD8AAEA/AAAAPwAAQD8AAAA/AABAPwAAAD8AAEA/AAAAAPMENT/zBDU/8wQ1P/MENT8AAACAAAAAAPMENT/zBDW/8wQ1v/MENT8AAACAAAAAAPMENb/zBDU/8wQ1P/MENb8AAACAAAAAAPMENb/zBDW/8wQ1v/MENb8AAACAAAAAAPMENT/zBDW/8wQ1P/MENT8AAACAAAAAAPMENb/zBDW/8wQ1P/MENb8AAACAAAAAAPMENT/zBDU/8wQ1v/MENT8AAACAAAAAAPMENb/zBDU/8wQ1v/MENb8AAACAAAAAAPMENT/zBDU/8wQ1P/MENT8AAACAAAAAAPMENb/zBDU/8wQ1P/MENb8AAACA8wQ1v/MENT8AAACAAAAAAPMENT/zBDW/8wQ1v/MENb8AAACAAAAAAPMENb/zBDW/EAAAAAwADQADABQACQABABEAFQACAAgABgAXAAoABQALABMABwAPABYABAASAA4A"
         }
     ]
 }

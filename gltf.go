@@ -33,6 +33,9 @@ type GLTFLoadOptions struct {
 	// You could then simply load the assets library first and then code the DependentLibraryResolver function to take the assets library, or code the
 	// function to use the path to load the library on demand. You could then store the loaded result as necessary if multiple levels use this assets Library.
 	DependentLibraryResolver func(blendPath string) *Library
+
+	//If top-level objects in collections should be renamed according to their instance objects.
+	RenameCollectionObjects bool
 }
 
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
@@ -42,6 +45,7 @@ func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 		CameraHeight:              -1,
 		CameraDepth:               true,
 		DefaultToAutoTransparency: true,
+		RenameCollectionObjects:   true,
 	}
 }
 
@@ -101,7 +105,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	camHeight := gltfLoadOptions.CameraHeight
 	camSetSize := false
 
-	if gltfLoadOptions.CameraWidth < 0 && gltfLoadOptions.CameraHeight < 0 {
+	if gltfLoadOptions.CameraWidth <= 0 && gltfLoadOptions.CameraHeight <= 0 {
 		camWidth = 1920
 		camHeight = 1080
 	} else {
@@ -1081,13 +1085,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		if node.Extras != nil {
 			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
 
-				shareProperties := false
-				if c, exists := dataMap["t3dShareProperties__"]; exists && c.(float64) > 0 {
-					shareProperties = true
-				}
-
 				if c, exists := dataMap["t3dInstanceCollection__"]; exists {
-					obj.(*Node).isCollectionInstance = true
+
+					n := obj.(*Node)
+					n.collectionObjects = []INode{}
+
 					collection := collections[c.(string)]
 
 					offset := Vector{-collection.Offset[0], -collection.Offset[2], collection.Offset[1], 0}
@@ -1125,14 +1127,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							clone.MoveVec(offset)
 							obj.AddChildren(clone)
 
-						} else {
-							log.Println("Error in instantiating linked element:", cloneName, "from:", path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
-						}
+							n.collectionObjects = append(n.collectionObjects, clone)
 
-						if shareProperties {
+							// Share properties to top-level clones
 							for k, v := range obj.Properties().props {
 								clone.Properties().Get(k).Set(v.Value)
 							}
+
+						} else {
+							log.Println("Error in instantiating linked element:", cloneName, "from:", path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
 						}
 
 					}
@@ -1226,6 +1229,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		scene.library = library
 
+		// Parent all parentless objects to the scene root to be visible.
 		for _, n := range s.Nodes {
 			scene.Root.AddChildren(objects[n])
 		}
@@ -1252,6 +1256,50 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
 					scene.Properties().Get(tagName).Set(data)
 				}
+			}
+
+		}
+
+		/*
+			Below, we handle collection instances specially, as objects in the collection should be instantiated
+			instead in the same relative locations, rather than parenting them to their collection instance objects.
+			Otherwise, there would be nodes in the middle - the collection instance. For example, a collection composed
+			of a chair mesh parented to a collision box would become a hierarchy like this:
+
+			* Root
+				|- * Chair (Collection Instance, named "Chair.001")
+					|- * Chair Collision Box (named "ChairCol")
+						|- * Chair Mesh
+
+			Instead, we can substitute the chair collision box in the collection instance's location:
+
+			* Root
+				|- * Chair Collision Box (now optionally named "Chair.001")
+					|- * Chair Mesh
+
+		*/
+
+		for _, n := range scene.Root.ChildrenRecursive() {
+
+			if node, ok := n.(*Node); ok && len(node.collectionObjects) > 0 {
+
+				for _, child := range node.collectionObjects {
+					transform := child.Transform()
+					node.parent.AddChildren(child)
+					if gltfLoadOptions.RenameCollectionObjects {
+						child.SetName(node.name)
+					}
+					child.SetWorldTransform(transform)
+				}
+
+				// TODO: For now, this code doesn't do anything because objects parented to instance collections
+				// in Blender aren't exported (for whatever reason).
+				for _, child := range node.children {
+					node.collectionObjects[0].AddChildren(child)
+				}
+
+				node.Unparent()
+
 			}
 
 		}
