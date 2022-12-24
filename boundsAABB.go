@@ -123,13 +123,6 @@ func (box *BoundingAABB) Clone() INode {
 	return clone
 }
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (box *BoundingAABB) AddChildren(children ...INode) {
-	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
-	box.addChildren(box, children...)
-}
-
 // ClosestPoint returns the closest point, to the point given, on the inside or surface of the BoundingAABB
 // in world space.
 func (box *BoundingAABB) ClosestPoint(point Vector) Vector {
@@ -256,11 +249,6 @@ func (box *BoundingAABB) CollisionTest(settings CollisionTestSettings) []*Collis
 	return CommonCollisionTest(box, settings)
 }
 
-// Type returns the NodeType for this object.
-func (box *BoundingAABB) Type() NodeType {
-	return NodeTypeBoundingAABB
-}
-
 func (box *BoundingAABB) PointInside(point Vector) bool {
 
 	position := box.WorldPosition()
@@ -275,4 +263,31 @@ func (box *BoundingAABB) PointInside(point Vector) bool {
 	}
 
 	return false
+}
+
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (box *BoundingAABB) AddChildren(children ...INode) {
+	box.addChildren(box, children...)
+}
+
+// Unparent unparents the Camera from its parent, removing it from the scenegraph.
+func (box *BoundingAABB) Unparent() {
+	if box.parent != nil {
+		box.parent.RemoveChildren(box)
+	}
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (box *BoundingAABB) Index() int {
+	if box.parent != nil {
+		return box.parent.Children().Index(box)
+	}
+	return -1
+}
+
+// Type returns the NodeType for this object.
+func (box *BoundingAABB) Type() NodeType {
+	return NodeTypeBoundingAABB
 }

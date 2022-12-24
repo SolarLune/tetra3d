@@ -2,7 +2,6 @@ package tetra3d
 
 import (
 	"fmt"
-	"image/color"
 	"math"
 	"sort"
 	"time"
@@ -1365,25 +1364,6 @@ func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...Spri
 
 }
 
-func (camera *Camera) drawCircle(screen *ebiten.Image, position Vector, radius float64, drawColor color.Color) {
-
-	transformedCenter := camera.WorldToScreen(position)
-
-	stepCount := float64(32)
-
-	for i := 0; i < int(stepCount); i++ {
-
-		x := (math.Sin(math.Pi*2*float64(i)/stepCount) * radius)
-		y := (math.Cos(math.Pi*2*float64(i)/stepCount) * radius)
-
-		x2 := (math.Sin(math.Pi*2*float64(i+1)/stepCount) * radius)
-		y2 := (math.Cos(math.Pi*2*float64(i+1)/stepCount) * radius)
-
-		ebitenutil.DrawLine(screen, transformedCenter.X+x, transformedCenter.Y+y, transformedCenter.X+x2, transformedCenter.Y+y2, drawColor)
-	}
-
-}
-
 // DrawDebugRenderInfo draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
 // at the top-left of the provided screen *ebiten.Image, using the textScale and color provided.
 // Note that the frame-time mentioned here is purely the time that Tetra3D spends sending render commands to the command queue.
@@ -1614,7 +1594,8 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 			continue
 		}
 
-		camera.drawCircle(screen, node.WorldPosition(), 8, c)
+		px := camera.WorldToScreen(node.WorldPosition())
+		ebitenutil.DrawCircle(screen, px.X, px.Y, 6, c)
 
 		// If the node's parent is something, and its parent's parent is something (i.e. it's not the root)
 		if node.Parent() != nil && node.Parent() != node.Root() {
@@ -1939,6 +1920,15 @@ func (camera *Camera) Unparent() {
 	if camera.parent != nil {
 		camera.parent.RemoveChildren(camera)
 	}
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (camera *Camera) Index() int {
+	if camera.parent != nil {
+		return camera.parent.Children().Index(camera)
+	}
+	return -1
 }
 
 // Type returns the NodeType for this object.

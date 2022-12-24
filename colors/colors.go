@@ -29,6 +29,11 @@ func DarkGray() *tetra3d.Color {
 	return tetra3d.NewColor(0.2, 0.2, 0.2, 1)
 }
 
+// DarkGray generates a tetra3d.Color instance of the provided name.
+func DarkestGray() *tetra3d.Color {
+	return tetra3d.NewColor(0.05, 0.05, 0.05, 1)
+}
+
 // Red generates a tetra3d.Color instance of the provided name.
 func Red() *tetra3d.Color {
 	return tetra3d.NewColor(1, 0, 0, 1)

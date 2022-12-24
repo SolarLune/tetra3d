@@ -735,6 +735,51 @@ func NewCubeMesh() *Mesh {
 
 }
 
+// NewPrismMesh creates a new prism Mesh and gives it a new material (suitably named "Prism").
+func NewPrismMesh() *Mesh {
+
+	mesh := NewMesh("Prism",
+
+		// Top
+
+		NewVertex(0, 1, 0, 0, 0),
+
+		// Middle
+
+		NewVertex(-1, 0, 1, 0, 0),
+		NewVertex(1, 0, 1, 1, 1),
+		NewVertex(1, 0, -1, 1, 0),
+		NewVertex(-1, 0, -1, 0, 1),
+
+		// Bottom
+
+		NewVertex(0, -1, 0, 1, 0),
+	)
+
+	mesh.AddMeshPart(
+
+		NewMaterial("Prism"),
+
+		// Upper half
+		0, 1, 2,
+		0, 2, 3,
+		0, 3, 4,
+		0, 4, 1,
+
+		// // Bottom half
+		1, 5, 2,
+		2, 5, 3,
+		3, 5, 4,
+		4, 5, 1,
+	)
+
+	mesh.UpdateBounds()
+	mesh.AutoNormal()
+
+	return mesh
+
+}
+
 // NewIcosphereMesh creates a new icosphere Mesh of the specified detail level. Note that the UVs are left at {0,0} because I'm lazy.
 func NewIcosphereMesh(detailLevel int) *Mesh {
 

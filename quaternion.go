@@ -204,10 +204,37 @@ func (quat Quaternion) RotateVec(v Vector) Vector {
 // 	return NewQuaternionFromAxisAngle(rotAxis, rotAngle)
 // }
 
+// ToAxisAngle returns tha axis Vector and angle (in radians) for a quaternion's rotation.
+func (quat Quaternion) ToAxisAngle() (Vector, float64) {
+
+	if quat.W > 1 {
+		quat = quat.Normalized()
+	}
+
+	angle := 2 * math.Acos(quat.W)
+
+	s := math.Sqrt(1 - quat.W*quat.W)
+
+	vec := NewVectorZero()
+	if s < 0.001 {
+		vec.X = quat.X
+		vec.Y = quat.Y
+		vec.Z = quat.Z
+
+	} else {
+		vec.X = quat.X / s
+		vec.Y = quat.Y / s
+		vec.Z = quat.Z / s
+	}
+
+	return vec, angle
+
+}
+
+// NewQuaternionFromAxisAngle returns a new Quaternion
 func NewQuaternionFromAxisAngle(axis Vector, angle float64) Quaternion {
-	// Also cribbed from StackOverflow whoops
 	axis = axis.Unit()
-	halfAngle := angle * .5
+	halfAngle := angle / 2
 	s := math.Sin(halfAngle)
 	return NewQuaternion(
 		axis.X*s,
@@ -216,6 +243,14 @@ func NewQuaternionFromAxisAngle(axis Vector, angle float64) Quaternion {
 		math.Cos(halfAngle),
 	)
 }
+
+// type AxisAngle struct {
+// 	X, Y, Z, Angle float64
+// }
+
+// func NewAxisAngle(x, y, z, angle float64) *AxisAngle {
+// 	return &AxisAngle{X: x, Y: y, Z: z, Angle: angle}
+// }
 
 // func (quat *Quaternion) Add(other *Quaternion) *Quaternion {
 
