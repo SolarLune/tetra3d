@@ -93,6 +93,15 @@ func (amb *AmbientLight) Type() NodeType {
 	return NodeTypeAmbientLight
 }
 
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (amb *AmbientLight) Index() int {
+	if amb.parent != nil {
+		return amb.parent.Children().Index(amb)
+	}
+	return -1
+}
+
 //---------------//
 
 // PointLight represents a point light (naturally).
@@ -261,6 +270,15 @@ func (point *PointLight) SetOn(on bool) {
 	point.On = on
 }
 
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (point *PointLight) Index() int {
+	if point.parent != nil {
+		return point.parent.Children().Index(point)
+	}
+	return -1
+}
+
 // Type returns the NodeType for this object.
 func (point *PointLight) Type() NodeType {
 	return NodeTypePointLight
@@ -366,6 +384,15 @@ func (sun *DirectionalLight) IsOn() bool {
 
 func (sun *DirectionalLight) SetOn(on bool) {
 	sun.On = on
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (sun *DirectionalLight) Index() int {
+	if sun.parent != nil {
+		return sun.parent.Children().Index(sun)
+	}
+	return -1
 }
 
 // Type returns the NodeType for this object.
@@ -641,6 +668,15 @@ func (cube *CubeLight) Unparent() {
 	if cube.parent != nil {
 		cube.parent.RemoveChildren(cube)
 	}
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (cube *CubeLight) Index() int {
+	if cube.parent != nil {
+		return cube.parent.Children().Index(cube)
+	}
+	return -1
 }
 
 // Type returns the type of INode this is (NodeTypeCubeLight).

@@ -25,13 +25,6 @@ func (sphere *BoundingSphere) Clone() INode {
 	return clone
 }
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (sphere *BoundingSphere) AddChildren(children ...INode) {
-	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
-	sphere.addChildren(sphere, children...)
-}
-
 // WorldRadius returns the radius of the BoundingSphere in world units, after taking into account its scale.
 func (sphere *BoundingSphere) WorldRadius() float64 {
 	var scale Vector
@@ -88,6 +81,30 @@ func (sphere *BoundingSphere) CollisionTest(settings CollisionTestSettings) []*C
 // PointInside returns whether the given point is inside of the sphere or not.
 func (sphere *BoundingSphere) PointInside(point Vector) bool {
 	return sphere.Node.WorldPosition().Sub(point).Magnitude() < sphere.WorldRadius()
+}
+
+/////
+
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (sphere *BoundingSphere) AddChildren(children ...INode) {
+	sphere.addChildren(sphere, children...)
+}
+
+// Unparent unparents the Camera from its parent, removing it from the scenegraph.
+func (sphere *BoundingSphere) Unparent() {
+	if sphere.parent != nil {
+		sphere.parent.RemoveChildren(sphere)
+	}
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (sphere *BoundingSphere) Index() int {
+	if sphere.parent != nil {
+		return sphere.parent.Children().Index(sphere)
+	}
+	return -1
 }
 
 // Type returns the NodeType for this object.

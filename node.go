@@ -50,6 +50,8 @@ func (nt NodeType) Is(other NodeType) bool {
 type INode interface {
 	// Name returns the object's name.
 	Name() string
+	// ID returns the object's unique ID.
+	ID() uint64
 	// SetName sets the object's name.
 	SetName(name string)
 	// Clone returns a clone of the specified INode implementer.
@@ -76,6 +78,15 @@ type INode interface {
 	// Root returns the root node in this tree by recursively traversing this node's hierarchy of
 	// parents upwards.
 	Root() INode
+
+	// ReindexChild moves the child in the calling Node's children slice to the specified newPosition.
+	// The function returns the old index where the child Node was, or -1 if it wasn't a child of the calling Node.
+	// The newPosition is clamped to the size of the node's children slice.
+	ReindexChild(child INode, newPosition int) int
+
+	// Index returns the index of the Node in its parent's children list.
+	// If the node doesn't have a parent, its index will be -1.
+	Index() int
 
 	// Children() returns the Node's children as a NodeFilter.
 	Children() NodeFilter
@@ -190,9 +201,13 @@ type INode interface {
 	setOriginalLocalPosition(Vector)
 }
 
+var nodeID uint64 = 0
+
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
 // into their structs to automatically easily implement Node.
+
 type Node struct {
+	id                    uint64 // Unique ID for this node
 	name                  string
 	position              Vector
 	scale                 Vector
@@ -219,6 +234,7 @@ type Node struct {
 func NewNode(name string) *Node {
 
 	nb := &Node{
+		id:   nodeID,
 		name: name,
 		// position:         NewVectorZero(),
 		scale:            Vector{1, 1, 1, 0},
@@ -232,9 +248,16 @@ func NewNode(name string) *Node {
 		// originalLocalPosition: NewVectorZero(),
 	}
 
+	nodeID++
+
 	nb.animationPlayer = NewAnimationPlayer(nb)
 
 	return nb
+}
+
+// ID returns the object's unique ID.
+func (node *Node) ID() uint64 {
+	return node.id
 }
 
 func (node *Node) setOriginalLocalPosition(position Vector) {
@@ -716,6 +739,41 @@ func (node *Node) Unparent() {
 	if node.parent != nil {
 		node.parent.RemoveChildren(node)
 	}
+}
+
+// ReindexChild moves the child in the calling Node's children slice to the specified newPosition.
+// The function returns the old index where the child Node was, or -1 if it wasn't a child of the calling Node.
+// The newPosition is clamped to the size of the node's children slice.
+func (node *Node) ReindexChild(child INode, newPosition int) int {
+
+	if oldIndex := child.Index(); oldIndex >= 0 {
+
+		if newPosition < 0 {
+			newPosition = 0
+		} else if newPosition > len(node.children)-1 {
+			newPosition = len(node.children) - 1
+		}
+
+		node.children = append(node.children[:oldIndex], node.children[oldIndex+1:]...)
+
+		node.children = append(node.children, nil)
+		copy(node.children[newPosition+1:], node.children[newPosition:])
+		node.children[newPosition] = child
+
+		return oldIndex
+	}
+
+	return -1
+
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (node *Node) Index() int {
+	if node.parent != nil {
+		return node.parent.Children().Index(node)
+	}
+	return -1
 }
 
 // Children() returns the Node's children.

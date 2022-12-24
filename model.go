@@ -898,7 +898,7 @@ func (model *Model) isTransparent(meshPart *MeshPart) bool {
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 // hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
 func (model *Model) AddChildren(children ...INode) {
-	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
+	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.Node.
 	model.addChildren(model, children...)
 }
 
@@ -950,4 +950,13 @@ func (model *Model) Unparent() {
 // Type returns the NodeType for this object.
 func (model *Model) Type() NodeType {
 	return NodeTypeModel
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (model *Model) Index() int {
+	if model.parent != nil {
+		return model.parent.Children().Index(model)
+	}
+	return -1
 }

@@ -30,13 +30,6 @@ func (capsule *BoundingCapsule) Clone() INode {
 	return clone
 }
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (capsule *BoundingCapsule) AddChildren(children ...INode) {
-	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
-	capsule.addChildren(capsule, children...)
-}
-
 // WorldRadius is the radius of the Capsule in world units, after taking into account its scale.
 func (capsule *BoundingCapsule) WorldRadius() float64 {
 	maxScale := 1.0
@@ -159,6 +152,30 @@ func (capsule *BoundingCapsule) lineBottom() Vector {
 func (capsule *BoundingCapsule) Bottom() Vector {
 	up := capsule.Node.WorldRotation().Up()
 	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height / 2))
+}
+
+/////
+
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (capsule *BoundingCapsule) AddChildren(children ...INode) {
+	capsule.addChildren(capsule, children...)
+}
+
+// Unparent unparents the Camera from its parent, removing it from the scenegraph.
+func (capsule *BoundingCapsule) Unparent() {
+	if capsule.parent != nil {
+		capsule.parent.RemoveChildren(capsule)
+	}
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (capsule *BoundingCapsule) Index() int {
+	if capsule.parent != nil {
+		return capsule.parent.Children().Index(capsule)
+	}
+	return -1
 }
 
 // Type returns the NodeType for this object.

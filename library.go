@@ -34,6 +34,7 @@ func (lib *Library) FindScene(name string) *Scene {
 
 func (lib *Library) AddScene(sceneName string) *Scene {
 	newScene := NewScene(sceneName)
+	newScene.library = lib
 	lib.Scenes = append(lib.Scenes, newScene)
 	return newScene
 }

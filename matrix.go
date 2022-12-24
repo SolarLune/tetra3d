@@ -623,6 +623,58 @@ func (matrix Matrix4) String() string {
 	return s
 }
 
+// ToEuler converts the rotation portion of the Matrix to a euler values,
+// returned in the form of a Vector.
+// func (matrix Matrix4) ToEuler() Vector {
+// 	// This function doesn't work properly yet.
+// 	eps := 0.998
+// 	vec := NewVectorZero()
+
+// 	if matrix[1][0] > eps {
+// 		vec.Y = math.Atan2(matrix[0][2], matrix[2][2])
+// 		vec.Z = math.Pi / 2
+// 		vec.X = 0
+// 	} else if matrix[1][0] < -eps {
+// 		vec.Y = math.Atan2(matrix[0][2], matrix[2][2])
+// 		vec.Z = -math.Pi / 2
+// 		vec.X = 0
+// 	} else {
+// 		vec.Y = math.Atan2(-matrix[2][0], matrix[0][0])
+// 		vec.X = math.Atan2(-matrix[1][2], matrix[1][1])
+// 		vec.Z = math.Asin(matrix[1][0])
+// 	}
+// 	return vec
+// }
+
+// NewMatrix4RotateFromEuler creates a rotation Matrix4 from the euler values contained within the
+// Vector.
+func NewMatrix4RotateFromEuler(euler Vector) Matrix4 {
+	mat := NewMatrix4()
+
+	ch := math.Cos(euler.Y)
+	sh := math.Sin(euler.Y)
+
+	ca := math.Cos(euler.Z)
+	sb := math.Sin(euler.Z)
+
+	caa := math.Cos(euler.X)
+	saa := math.Sin(euler.X)
+
+	mat[0][0] = ch * ca
+	mat[0][1] = sh*saa - ch*sb*caa
+	mat[0][2] = ch*sb*saa + sh*caa
+
+	mat[1][0] = sb
+	mat[1][1] = ca * caa
+	mat[1][2] = -ca * saa
+
+	mat[2][0] = -sh * ca
+	mat[2][1] = sh*sb*caa + ch*saa
+	mat[2][2] = -sh*sb*saa + ch*caa
+
+	return mat
+}
+
 // NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. to is the target's world position,
 // from is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
 func NewLookAtMatrix(from, to, up Vector) Matrix4 {

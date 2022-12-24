@@ -126,6 +126,22 @@ func (nf NodeFilter) ChildrenRecursive() NodeFilter {
 	return out
 }
 
+// Contains returns if the provided Node is contained in the NodeFilter.
+func (nf NodeFilter) Contains(node INode) bool {
+	return nf.Index(node) >= 0
+}
+
+// Index returns the index of the given INode in the NodeFilter; if it doesn't exist in the filter,
+// then this function returns -1.
+func (nf NodeFilter) Index(node INode) int {
+	for index, child := range nf {
+		if child == node {
+			return index
+		}
+	}
+	return -1
+}
+
 // Empty returns true if the NodeFilter contains no Nodes.
 func (nf NodeFilter) Empty() bool {
 	return len(nf) == 0

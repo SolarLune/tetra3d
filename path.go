@@ -272,3 +272,12 @@ func (path *Path) Unparent() {
 func (path *Path) Type() NodeType {
 	return NodeTypePath
 }
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (path *Path) Index() int {
+	if path.parent != nil {
+		return path.parent.Children().Index(path)
+	}
+	return -1
+}

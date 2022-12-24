@@ -1227,8 +1227,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		scene := library.AddScene(s.Name)
 
-		scene.library = library
-
 		// Parent all parentless objects to the scene root to be visible.
 		for _, n := range s.Nodes {
 			scene.Root.AddChildren(objects[n])

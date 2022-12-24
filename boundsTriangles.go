@@ -78,13 +78,6 @@ func (bt *BoundingTriangles) Clone() INode {
 	return clone
 }
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (bt *BoundingTriangles) AddChildren(children ...INode) {
-	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
-	bt.addChildren(bt, children...)
-}
-
 // Colliding returns true if the BoundingTriangles object is intersecting the other specified BoundingObject.
 func (bt *BoundingTriangles) Colliding(other IBoundingObject) bool {
 	return bt.Collision(other) != nil
@@ -147,11 +140,6 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 // handle collisions with intent using the OnCollision function of the CollisionTestSettings struct).
 func (bt *BoundingTriangles) CollisionTest(settings CollisionTestSettings) []*Collision {
 	return CommonCollisionTest(bt, settings)
-}
-
-// Type returns the NodeType for this object.
-func (bt *BoundingTriangles) Type() NodeType {
-	return NodeTypeBoundingTriangles
 }
 
 type collisionPlane struct {
@@ -249,4 +237,33 @@ func (plane *collisionPlane) closestPointOnLine(point, start, end Vector) Vector
 
 	return start.Add(diff.Scale(d))
 
+}
+
+/////
+
+// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
+// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
+func (bt *BoundingTriangles) AddChildren(children ...INode) {
+	bt.addChildren(bt, children...)
+}
+
+// Unparent unparents the Camera from its parent, removing it from the scenegraph.
+func (bt *BoundingTriangles) Unparent() {
+	if bt.parent != nil {
+		bt.parent.RemoveChildren(bt)
+	}
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (bt *BoundingTriangles) Index() int {
+	if bt.parent != nil {
+		return bt.parent.Children().Index(bt)
+	}
+	return -1
+}
+
+// Type returns the NodeType for this object.
+func (bt *BoundingTriangles) Type() NodeType {
+	return NodeTypeBoundingTriangles
 }

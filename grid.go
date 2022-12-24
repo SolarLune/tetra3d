@@ -169,6 +169,15 @@ func (point *GridPoint) Unparent() {
 	}
 }
 
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (point *GridPoint) Index() int {
+	if point.parent != nil {
+		return point.parent.Children().Index(point)
+	}
+	return -1
+}
+
 // Type returns the NodeType for this object.
 func (point *GridPoint) Type() NodeType {
 	return NodeTypeGridPoint
@@ -393,6 +402,15 @@ func (grid *Grid) Unparent() {
 	if grid.parent != nil {
 		grid.parent.RemoveChildren(grid)
 	}
+}
+
+// Index returns the index of the Node in its parent's children list.
+// If the node doesn't have a parent, its index will be -1.
+func (grid *Grid) Index() int {
+	if grid.parent != nil {
+		return grid.parent.Children().Index(grid)
+	}
+	return -1
 }
 
 // Type returns the NodeType for this object.
