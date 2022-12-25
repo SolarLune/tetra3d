@@ -4,6 +4,8 @@
 
 [SolarLune's Discord](https://discord.gg/cepcpfV)
 
+[TetraTerm, an easy-to-use tool to visualize your game scene](https://github.com/SolarLune/tetraterm)
+
 ![Tetra3D Logo](https://user-images.githubusercontent.com/4733521/207243838-b3ece6c4-965a-4cb5-aa81-b6b61f34d4d4.gif)
 
 ![It Breeds Fear - Construction Worker](https://thumbs.gfycat.com/ThoughtfulChubbyBunny-size_restricted.gif)
