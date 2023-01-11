@@ -77,9 +77,10 @@ func NewGame() *Game {
 	g := &Game{}
 
 	// First, we load a scene from a .gltf or .glb file. LoadGLTFFile takes a filepath and
-	// any loading options (nil is taken as a default), and returns a tetra3d.*Library 
-	// and an error if it was unsuccessful. We can also use tetra3d.LoadGLTFData() if we don't
-	// have access to the host OS's filesystem (like on web, or if the assets are embedded).
+	// any loading options (nil can be taken as a valid default set of loading options), and 
+	// returns a tetra3d.*Library and an error if it was unsuccessful. We can also use 
+	// tetra3d.LoadGLTFData() if we don't have access to the host OS's filesystem (if the 
+	// assets are embedded, for example).
 
 	library, err := tetra3d.LoadGLTFFile("example.gltf", nil) 
 
@@ -88,12 +89,12 @@ func NewGame() *Game {
 	}
 
 	// A Library is essentially everything that got exported from your 3D modeler - 
-	// all of the scenes, meshes, materials, and animations.
-
-	// The ExportedScene of a Library is the scene that was active when the file was exported.
+	// all of the scenes, meshes, materials, and animations. The ExportedScene of a Library
+	// is the scene that was active when the file was exported.
 
 	// We'll clone the ExportedScene so we don't change it irreversibly; making a clone
-	// of a Tetra3D resource makes a deep copy of it.
+	// of a Tetra3D resource (Scene, Node, Material, Mesh, Camera, whatever) makes a deep 
+	// copy of it.
 	g.GameScene = library.ExportedScene.Clone()
 
 	// Tetra3D uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Forward), 
@@ -139,6 +140,9 @@ func NewGame() *Game {
 	// We can see the tree "visually" by printing out the hierarchy:
 	fmt.Println(g.GameScene.Root.HierarchyAsString())
 
+	// You can also visualize the scene hierarchy using TetraTerm:
+	// https://github.com/SolarLune/tetraterm
+
 	return g
 }
 
@@ -146,22 +150,20 @@ func (g *Game) Update() error { return nil }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
-	// Call Camera.Clear() to clear its internal backing texture. This
+	// Here, we'll call Camera.Clear() to clear its internal backing texture. This
 	// should be called once per frame before drawing your Scene.
 	g.Camera.Clear()
 
 	// Now we'll render the Scene from the camera. The Camera's ColorTexture will then 
 	// hold the result. 
 
-	// Below, we'll pass both the Scene and the scene root because 1) the Scene influences
-	// how Models draw (fog, for example), and 2) we may not want to render all Models. 
-
 	// Camera.RenderScene() renders all Nodes in a scene, starting with the 
 	// scene's root. You can also use Camera.Render() to simply render a selection of
 	// individual Models, or Camera.RenderNodes() to render a subset of a scene tree.
 	g.Camera.RenderScene(g.GameScene) 
 
-	// Before drawing the result, clear the screen first; in this case, with a color, though we
+	// To see the result, we draw the Camera's ColorTexture to the screen. Before doing so, we'll clear the screen first; 
+	// in this case, with a color, though we
 	// can also go with screen.Clear().
 	screen.Fill(color.RGBA{20, 30, 40, 255})
 
@@ -169,14 +171,20 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// also visualize the depth texture with g.Camera.DepthTexture.
 	screen.DrawImage(g.Camera.ColorTexture, nil) 
 
+	// Note that the resulting texture is indeed just an ordinary *ebiten.Image, so 
+	// you can also use this as a texture for a mesh, as an example.
+
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
+	
 	// Here, by simply returning the camera's size, we are essentially
-	// scaling the output to the window size and letterboxing as necessary. 
-	// If you wanted to extend the camera view according to window size, you would 
+	// scaling the camera's output to the window size and letterboxing as necessary. 
+
+	// If you wanted to extend the camera according to window size, you would 
 	// have to resize the camera using the new width and height.
 	return g.Camera.Size()
+
 }
 
 func main() {
@@ -357,8 +365,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Replace Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)?
 - [X] -- Custom Vectors
 - [ ] -- Matrix pools?
-- [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
+- [ ] -- Instead of doing cosllision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
 - [ ] -- Lighting speed improvements
+- [ ] -- Occlusion culling - this should be possible using octrees to determine if an object is visible before rendering it; see: https://www.gamedeveloper.com/programming/occlusion-culling-algorithms
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!
@@ -367,7 +376,7 @@ Again, it's incomplete and jank. However, it's also pretty cool!
 
 Huge shout-out to the open-source community:
 
-- StackOverflow, in general, _FOR REAL_
+- StackOverflow, in general, _FOR REAL_ - this would've been impossible otherwiseaop[]
 - [quartercastle's vector package](https://github.com/quartercastle/vector)
 - [fauxgl](https://github.com/fogleman/fauxgl)
 - [tinyrenderer](https://github.com/ssloy/tinyrenderer)
