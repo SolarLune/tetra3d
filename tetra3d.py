@@ -698,8 +698,12 @@ def export():
                     obj["t3dOriginalLocalPosition__"] = obj.location
 
                     if obj.type == "MESH":
-                        vertexColors = [layer.name for layer in obj.data.vertex_colors]
-                        obj.data["t3dVertexColorNames__"] = vertexColors
+                        
+                        if len(obj.data.color_attributes) > 0:
+                            vertexColors = [layer.name for layer in obj.data.color_attributes]
+                            obj.data["t3dVertexColorNames__"] = vertexColors
+                            obj.data["t3dActiveVertexColorIndex__"] = obj.data.color_attributes.render_color_index
+
                         if obj.t3dObjectType__ == 'GRID':
                             gridConnections = {}
                             gridEntries = []
@@ -765,6 +769,7 @@ def export():
         export_cameras=scene.t3dExportCameras__, 
         export_lights=scene.t3dExportLights__, 
         export_keep_originals=not scene.t3dPackTextures__,
+        export_attributes=True,
 
         export_extras=True,
         export_yup=True,
@@ -799,6 +804,8 @@ def export():
                     if obj.type == "MESH":
                         if "t3dVertexColorNames__" in obj.data:
                             del(obj.data["t3dVertexColorNames__"])
+                        if "t3dActiveVertexColorIndex__" in obj.data:
+                            del(obj.data["t3dActiveVertexColorIndex__"])
                         if obj.t3dObjectType__ == 'GRID':
                             del(obj.data["t3dGrid__"])
                             del(obj["t3dGridConnections__"])

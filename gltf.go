@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"image"
 	"log"
 	"math"
@@ -292,6 +293,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		library.Meshes[mesh.Name] = newMesh
 		newMesh.library = library
 
+		colorChannelNames := []string{}
+
 		if mesh.Extras != nil {
 
 			if dataMap, isMap := mesh.Extras.(map[string]interface{}); isMap {
@@ -299,6 +302,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				if vcNames, exists := dataMap["t3dVertexColorNames__"]; exists {
 					for index, name := range vcNames.([]interface{}) {
 						newMesh.VertexColorChannelNames[name.(string)] = index
+						colorChannelNames = append(colorChannelNames, name.(string))
 					}
 				}
 
@@ -370,39 +374,55 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
-			// Blender max is 8 vertex color channels
-			for colorChannelIndex := 0; colorChannelIndex < 8; colorChannelIndex++ {
+			// Blender's GLTF exporter changed - now the active vertex color channel
+			// is turned to "COLOR_0", while the other channels are turned into attributes
+			// accessible by their names like so: "_CHANNELNAMEINALLCAPS".
 
-				colorChannelName := "COLOR_" + strconv.Itoa(colorChannelIndex)
+			if len(colorChannelNames) > 0 {
 
-				if vertexColorAccessor, vcExists := v.Attributes[colorChannelName]; vcExists {
+				dataMap, _ := mesh.Extras.(map[string]interface{})
+				activeChannelIndex := int(dataMap["t3dActiveVertexColorIndex__"].(float64))
 
-					vcBuffer := [][4]uint16{}
+				for _, name := range colorChannelNames {
 
-					colors, err := modeler.ReadColor64(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
+					name = "_" + strings.ToUpper(name)
 
-					if err != nil {
-						return nil, err
+					vertexColorAccessor, colorChannelExists := v.Attributes[name]
+
+					if !colorChannelExists {
+						vertexColorAccessor, colorChannelExists = v.Attributes["COLOR_0"]
 					}
 
-					for i, colorData := range colors {
+					if colorChannelExists {
 
-						// colors are exported from Blender as linear, but display as sRGB so we'll convert them here
-						color := NewColor(
-							float32(colorData[0])/math.MaxUint16,
-							float32(colorData[1])/math.MaxUint16,
-							float32(colorData[2])/math.MaxUint16,
-							float32(colorData[3])/math.MaxUint16,
-						)
-						color.ConvertTosRGB()
-						vertexData[i].Colors = append(vertexData[i].Colors, color)
-						vertexData[i].ActiveColorChannel = 0
+						vcBuffer := [][4]uint16{}
+
+						colors, err := modeler.ReadColor64(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
+
+						if err != nil {
+							return nil, err
+						}
+
+						for i, colorData := range colors {
+
+							// colors are exported from Blender as linear, but display as sRGB so we'll convert them here
+							color := NewColor(
+								float32(colorData[0])/math.MaxUint16,
+								float32(colorData[1])/math.MaxUint16,
+								float32(colorData[2])/math.MaxUint16,
+								float32(colorData[3])/math.MaxUint16,
+							)
+							color.ConvertTosRGB()
+							vertexData[i].Colors = append(vertexData[i].Colors, color)
+							vertexData[i].ActiveColorChannel = activeChannelIndex
+
+						}
 
 					}
 
-				} else {
-					break
 				}
+
+				fmt.Println("active channel index:", activeChannelIndex)
 
 			}
 
