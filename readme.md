@@ -131,10 +131,10 @@ func NewGame() *Game {
 
 	// scene.Root.AddChildren(object)
 
-	// To remove them, either use Node.RemoveChildren() (in this case, scene.Root.RemoveChildren()) 
+	// To remove them, either use Node.RemoveChildren() (so something like, scene.Root.RemoveChildren(object)) 
 	// or Node.Unparent() (in this case, object.Unparent() ).
 
-	// For Cameras, we don't actually need to have them in the scene to view it, since
+	// For Cameras, we don't actually need to place them in the scene to view it, since
 	// the presence of the Camera in the Scene node tree doesn't impact what it would see.
 
 	// We can see the tree "visually" by printing out the hierarchy:
@@ -163,8 +163,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.RenderScene(g.GameScene) 
 
 	// To see the result, we draw the Camera's ColorTexture to the screen. Before doing so, we'll clear the screen first; 
-	// in this case, with a color, though we
-	// can also go with screen.Clear().
+	// in this case, with a color, though we can also go with screen.Clear().
 	screen.Fill(color.RGBA{20, 30, 40, 255})
 
 	// Draw the resulting texture to the screen, and you're done! You can 
@@ -282,6 +281,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Basic Texturing
 - [X] -- Multitexturing / Per-triangle Materials
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
+- [ ] -- Screen-coordinate instead of UV texturing (useful for repeating patterns)
 - [X] **Animations**
 - [X] -- Armature-based animations
 - [X] -- Object transform-based animations
