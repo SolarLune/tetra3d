@@ -59,11 +59,6 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	// for _, cube := range g.Scene.Root.ChildrenRecursive().ByTags("cube") {
-	// 	// cube.Move(0, math.Sin(g.Time*math.Pi)*0.1, 0)
-	// 	cube.Move(0, 0, -0.1)
-	// }
-
 	cubeLight := g.Scene.Root.Get("cube light").(*tetra3d.CubeLight)
 
 	angle := cubeLight.LightingAngle.Modify()

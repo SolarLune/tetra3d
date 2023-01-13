@@ -62,7 +62,7 @@ func (g *Game) Init() {
 	lights = append(lights, g.Scene.World.AmbientLight)
 
 	// Let's get all the solid, occluding models here.
-	models := g.Scene.Root.ChildrenRecursive().ByTags("ao").Models()
+	models := g.Scene.Root.ChildrenRecursive().ByProperties("ao").Models()
 
 	// The idea is that we'll bake the lighting and AO of each ao-applicable Model.
 

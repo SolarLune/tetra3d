@@ -89,7 +89,7 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
 class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
     bl_idname = "object.tetra3daddprop"
     bl_label = "Add Game Property"
-    bl_description= "Adds a game property to the currently selected object. A game property gets added to an Object's Tags object in Tetra3D"
+    bl_description= "Adds a game property to the currently selected object. A game property gets added to an Object's Properties object in Tetra3D"
     bl_options = {'REGISTER', 'UNDO'}
 
     mode : bpy.props.StringProperty()

@@ -219,7 +219,7 @@ type Node struct {
 	parent                INode
 	cachedTransform       Matrix4
 	isTransformDirty      bool
-	props                 *Properties // Tags is an unordered set of string tags, representing a means of identifying Nodes.
+	props                 *Properties // Properties is an unordered set of properties, representing a means of identifying and setting game properties on Nodes.
 	animationPlayer       *AnimationPlayer
 	inverseBindMatrix     Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 	isBone                bool
@@ -807,7 +807,7 @@ func (node *Node) SetVisible(visible bool, recursive bool) {
 	node.visible = visible
 }
 
-// Tags represents an unordered set of string tags that can be used to identify this object.
+// Properties represents an unordered set of game properties that can be used to identify this object.
 func (node *Node) Properties() *Properties {
 	return node.props
 }

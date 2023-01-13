@@ -1382,8 +1382,8 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 
 	debugText := fmt.Sprintf(
 		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d",
-		ebiten.CurrentTPS(),
-		ebiten.CurrentFPS(),
+		ebiten.ActualTPS(),
+		ebiten.ActualFPS(),
 		ft,
 		at,
 		lt,

@@ -319,6 +319,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Path / 3D Curve support
 - [X] -- Grid support (for pathfinding / linking 3D points together)
 - [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
+- [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values.
 - [X] **DAE model loading**
 - [X] -- Vertex colors loading
 - [X] -- UV map loading

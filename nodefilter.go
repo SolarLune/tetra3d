@@ -95,12 +95,12 @@ func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 
 }
 
-// ByTags allows you to filter a given selection of nodes by the provided set of tag names.
+// ByProperties allows you to filter a given selection of nodes by the provided set of property names.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByTags(tagNames ...string) NodeFilter {
+func (nf NodeFilter) ByProperties(propNames ...string) NodeFilter {
 	out := make([]INode, 0, len(nf))
 	for _, node := range nf {
-		if node.Properties().Has(tagNames...) {
+		if node.Properties().Has(propNames...) {
 			out = append(out, node)
 		}
 	}
