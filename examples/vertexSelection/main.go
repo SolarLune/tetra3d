@@ -56,20 +56,23 @@ func (g *Game) Init() {
 
 	g.System = examples.NewBasicSystemHandler(g)
 
+	// ------
+
 	// OK, so this demo is about selecting vertices.
 
 	// The easiest way to select vertices is to just use Mesh.SelectVertices() - it allows us to create a VertexSelection object, which is our
-	// current vertex capture. We can use it to select vertices that fulfill a set of criteria (and yes, it's method-chainable as well)
+	// current vertex capture. We can use it to select vertices that fulfill a set of criteria (and yes, it's method-chainable as well).
 
-	// Internally, the vertices are simply index numbers, with their properties (position, UV, normals, etc.) stored on the Mesh as a series of
-	// slices (i.e. Mesh.VertexPositions[], Mesh.VertexNormals[], Mesh.VertexUVs[], etc).
+	// Internally for the VertexSelection object, the vertices are simply index numbers, with their properties (position, UV, normals, etc.)
+	// stored on the Mesh as a series of slices (i.e. Mesh.VertexPositions[], Mesh.VertexNormals[], Mesh.VertexUVs[], etc).
 
-	// Oh, and by default, when we export a mesh with vertex colors, the first channel is active.
+	// Oh, and by default, when we export a mesh with vertex colors, the first vertex color channel is active.
 
 	// Here, we'll select our vertices and store it in the Game struct.
 	mesh := g.Cube.Mesh
 
 	// VertexSelection.SelectInChannel selects all vertices that have a non-black color in a specified color channel.
+	// mesh.VertexColorChannelNames stores the various vertex color channel names with their related channel indices.
 	g.FlashingVertices = mesh.SelectVertices().SelectInChannel(mesh.VertexColorChannelNames["Flash"])
 
 	// Once we know which vertices are not black in the "Flash" channel in Blender, we're good to go.
@@ -84,8 +87,9 @@ func (g *Game) Update() error {
 	glow := tetra3d.NewColorFromHSV(g.Time/10, 1, 1)
 
 	// Once we've gotten our indices, we can use the helper SetColor() function to set the color of all vertices at the same time.
-	// If we wanted to do something else a bit more special, we could do so manually by looping through the indices in the *VertexSelection
-	// instance and modifying the mesh's vertex properties.
+	// There are other functions to, for example, move or set the normal of the vertices, but if we wanted to do something else a
+	// bit more special, we could do so manually by looping through the indices in the *VertexSelection instance and modifying the
+	// mesh's vertex properties.
 	g.FlashingVertices.SetColor(0, glow)
 
 	g.Camera.Update()

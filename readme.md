@@ -259,7 +259,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
 - [X] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
 - [X] -- A more advanced / accurate depth buffer
-- [ ] -- Writing depth through some other means than vertex colors for precision
+- [x] -- ~~Writing depth through some other means than vertex colors for precision~~ _This is fine for now, I think._
 - [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
 - [X] -- Offscreen Rendering
 - [X] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
@@ -360,6 +360,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
 - [ ] **Optimization**
+- [ ] -- It might be possible to not have to write depth manually
 - [x] -- Reusing vertex indices for adjacent triangles
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?
@@ -377,7 +378,7 @@ Again, it's incomplete and jank. However, it's also pretty cool!
 
 Huge shout-out to the open-source community:
 
-- StackOverflow, in general, _FOR REAL_ - this would've been impossible otherwiseaop[]
+- StackOverflow, in general, _FOR REAL_ - this would've been impossible otherwise
 - [quartercastle's vector package](https://github.com/quartercastle/vector)
 - [fauxgl](https://github.com/fogleman/fauxgl)
 - [tinyrenderer](https://github.com/ssloy/tinyrenderer)

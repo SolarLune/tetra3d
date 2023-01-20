@@ -536,15 +536,9 @@ func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
 
 	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
-	for i, c := range vs.Mesh.VertexColors {
-		fmt.Println(c)
-		fmt.Println(i, c[0], c[1])
-	}
 	for vertexIndex := range vs.Mesh.VertexColors {
 
 		color := vs.Mesh.VertexColors[vertexIndex][channelIndex]
-
-		fmt.Println(vertexIndex, channelIndex, color)
 
 		if color.R > 0.01 || color.G > 0.01 || color.B > 0.01 {
 			vs.Indices[vertexIndex] = true

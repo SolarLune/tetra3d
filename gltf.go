@@ -3,7 +3,6 @@ package tetra3d
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"image"
 	"log"
 	"math"
@@ -421,8 +420,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					}
 
 				}
-
-				fmt.Println("active channel index:", activeChannelIndex)
 
 			}
 
