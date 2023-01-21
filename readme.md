@@ -306,11 +306,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Separate .bin loading
 - [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
 - [X] **Blender Add-on**
+- [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices
 - [X] -- Export GLTF on save / on command via button
 - [X] -- Bounds node creation
 - [X] -- Game property export (less clunky version of Blender's vanilla custom properties)
 - [X] -- Collection / group substitution
-- [X] -- -- Overwriting properties through collection instance objects
+- [X] -- -- Overwriting properties through collection instance objects (it would be nice to do this cleanly with a nice UI, but just hamfisting it is fine for now)
 - [X] -- -- Collection instances instantiate their objects in the same location in the tree
 - [x] -- Optional camera size export
 - [X] -- Linking collections from external files
