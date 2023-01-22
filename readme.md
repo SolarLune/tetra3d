@@ -362,6 +362,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
 - [ ] **Optimization**
 - [ ] -- It might be possible to not have to write depth manually
+- [ ] -- Make NodeFilters work lazily, rather than gathering all nodes in the filter at once
 - [x] -- Reusing vertex indices for adjacent triangles
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?

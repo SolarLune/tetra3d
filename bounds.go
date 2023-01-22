@@ -24,7 +24,7 @@ func (intersection *Intersection) SlideAgainstNormal(movementVec Vector) Vector 
 	temp := intersection.Normal.Cross(movementVec)
 
 	if temp.Magnitude() == 0 {
-		return movementVec.Invert()
+		return NewVectorZero()
 	}
 
 	out := temp.Cross(intersection.Normal)
@@ -103,7 +103,7 @@ func (col *Collision) SlideAgainstAverageNormal(movementVec Vector) Vector {
 	temp := averageNormal.Cross(movementVec)
 
 	if temp.Magnitude() == 0 {
-		return movementVec.Invert()
+		return NewVectorZero()
 	}
 
 	out := temp.Cross(averageNormal)

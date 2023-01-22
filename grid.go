@@ -101,7 +101,7 @@ func (point *GridPoint) Disconnect(other *GridPoint) {
 // be composed of evenly spaced points if the purpose is for shortest-distance pathfinding).
 func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
 	path := &GridPath{
-		Points: []Vector{},
+		GridPoints: []Vector{},
 	}
 
 	if !point.IsOnSameGrid(other) {
@@ -110,7 +110,7 @@ func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
 
 	if point == other {
 		return &GridPath{
-			Points: []Vector{point.WorldPosition()},
+			GridPoints: []Vector{point.WorldPosition()},
 		}
 	}
 
@@ -143,11 +143,11 @@ func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
 	}
 
 	for next.prevLink != nil {
-		path.Points = append(path.Points, next.WorldPosition())
+		path.GridPoints = append(path.GridPoints, next.WorldPosition())
 		next = next.prevLink
 	}
 
-	path.Points = append(path.Points, other.WorldPosition())
+	path.GridPoints = append(path.GridPoints, other.WorldPosition())
 
 	return path
 
@@ -420,21 +420,21 @@ func (grid *Grid) Type() NodeType {
 
 // GridPath represents a sequence of grid points, used to traverse a path.
 type GridPath struct {
-	Points []Vector
+	GridPoints []Vector
 }
 
 func (gp *GridPath) Distance() float64 {
 
 	dist := 0.0
 
-	if len(gp.Points) <= 1 {
+	if len(gp.GridPoints) <= 1 {
 		return 0
 	}
 
-	start := gp.Points[0]
+	start := gp.GridPoints[0]
 
-	for i := 1; i < len(gp.Points); i++ {
-		next := gp.Points[i]
+	for i := 1; i < len(gp.GridPoints); i++ {
+		next := gp.GridPoints[i]
 		dist += next.Sub(start).Magnitude()
 		start = next
 	}
@@ -443,11 +443,8 @@ func (gp *GridPath) Distance() float64 {
 
 }
 
-func (gp *GridPath) points() []Vector {
-	points := make([]Vector, 0, len(gp.Points))
-	for _, p := range gp.Points {
-		points = append(points, p)
-	}
+func (gp *GridPath) Points() []Vector {
+	points := append(make([]Vector, 0, len(gp.GridPoints)), gp.GridPoints...)
 	return points
 }
 

@@ -678,6 +678,9 @@ func NewMatrix4RotateFromEuler(euler Vector) Matrix4 {
 // NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. to is the target's world position,
 // from is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
 func NewLookAtMatrix(from, to, up Vector) Matrix4 {
+	if from.Equals(to) {
+		return NewMatrix4()
+	}
 	z := to.Sub(from).Unit()
 	x := up.Cross(z).Unit()
 	y := z.Cross(x)
@@ -687,4 +690,12 @@ func NewLookAtMatrix(from, to, up Vector) Matrix4 {
 		{z.X, z.Y, z.Z, 0},
 		{0, 0, 0, 1},
 	}
+}
+
+// Lerp lerps a matrix to another, destination Matrix by the percent given. It does this by converting both
+// Matrices to Quaternions, lerping them, then converting the result back to a Matrix4.
+func (mat Matrix4) Lerp(other Matrix4, percent float64) Matrix4 {
+	q1 := mat.ToQuaternion()
+	q2 := other.ToQuaternion()
+	return q1.Lerp(q2, percent).ToMatrix4()
 }
