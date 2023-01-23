@@ -325,7 +325,7 @@ func (ps *ParticleSystem) Spawn() {
 
 		vertCount := len(ps.Root.Mesh.VertexPositions)
 
-		if ps.Root.Skinned {
+		if ps.Root.skinned {
 			pos = ps.Root.Mesh.vertexSkinnedPositions[ps.vertexSpawnIndex]
 		} else {
 			pos = ps.Root.Transform().MultVec(ps.Root.Mesh.VertexPositions[ps.vertexSpawnIndex])

@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.4.49",
+        "generator" : "Khronos glTF Blender I/O v3.5.13",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -566,9 +566,6 @@
     ],
     "meshes" : [
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "LevelGeometryMesh0.001",
             "primitives" : [
                 {
@@ -592,9 +589,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Cube",
             "primitives" : [
                 {
@@ -609,9 +603,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Cube.007",
             "primitives" : [
                 {
@@ -626,9 +617,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Cube.006",
             "primitives" : [
                 {
@@ -643,9 +631,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Cube.005",
             "primitives" : [
                 {
@@ -660,9 +645,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Cube.004",
             "primitives" : [
                 {
@@ -677,9 +659,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Cube.003",
             "primitives" : [
                 {
@@ -694,9 +673,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Cube.002",
             "primitives" : [
                 {
@@ -711,9 +687,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Cube.001",
             "primitives" : [
                 {

@@ -330,7 +330,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 		ap.ChannelsToNodes = map[*AnimationChannel]INode{}
 
-		childrenRecursive := ap.RootNode.ChildrenRecursive()
+		childrenRecursive := ap.RootNode.SearchTree().INodes()
 
 		for _, channel := range ap.Animation.Channels {
 

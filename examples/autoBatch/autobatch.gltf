@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.4.49",
+        "generator" : "Khronos glTF Blender I/O v3.5.13",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -1155,7 +1155,8 @@
             "extras" : {
                 "t3dVertexColorNames__" : [
                     "Col"
-                ]
+                ],
+                "t3dActiveVertexColorIndex__" : 0
             },
             "name" : "Cube.001",
             "primitives" : [
@@ -1175,7 +1176,8 @@
             "extras" : {
                 "t3dVertexColorNames__" : [
                     "Col"
-                ]
+                ],
+                "t3dActiveVertexColorIndex__" : 0
             },
             "name" : "Plane",
             "primitives" : [
@@ -1195,7 +1197,8 @@
             "extras" : {
                 "t3dVertexColorNames__" : [
                     "Col"
-                ]
+                ],
+                "t3dActiveVertexColorIndex__" : 0
             },
             "name" : "Cube.002",
             "primitives" : [

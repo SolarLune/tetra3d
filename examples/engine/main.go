@@ -83,12 +83,15 @@ func (g *Game) Update() error {
 		g.CreateFromTemplate(g.Library.Scenes[0].Root.Get("Player"))
 	}
 
-	for _, obj := range g.Scene.Root.ChildrenRecursive() {
+	for _, node := range g.Scene.Root.SearchTree().INodes() {
 
-		if data := obj.Data(); data != nil {
-			if gObj, ok := data.(GameObject); ok {
-				gObj.Update()
+		if node.Data() != nil {
+
+			d, ok := node.Data().(GameObject)
+			if ok {
+				d.Update()
 			}
+
 		}
 
 	}

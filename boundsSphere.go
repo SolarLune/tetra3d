@@ -102,7 +102,11 @@ func (sphere *BoundingSphere) Unparent() {
 // If the node doesn't have a parent, its index will be -1.
 func (sphere *BoundingSphere) Index() int {
 	if sphere.parent != nil {
-		return sphere.parent.Children().Index(sphere)
+		for i, c := range sphere.parent.Children() {
+			if c == sphere {
+				return i
+			}
+		}
 	}
 	return -1
 }

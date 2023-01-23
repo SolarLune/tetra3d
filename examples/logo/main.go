@@ -66,7 +66,7 @@ func (g *Game) Update() error {
 	g.Camera.Update()
 
 	// Spin the tetrahedrons in the logos around their local orientation:
-	for _, g := range g.Scene.Root.ChildrenRecursive().ByProperties("spin") {
+	for _, g := range g.Scene.Root.SearchTree().ByProperties("spin").INodes() {
 		g.Rotate(0, 1, 0, 0.05)
 	}
 
@@ -91,7 +91,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Offscreen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	// Render the screen objects individually after drawing the others; this way, we can ensure the TVs don't show up onscreen:
-	g.Camera.Render(g.Scene, g.Scene.Root.ChildrenRecursive().ByName("screen").Models()...)
+	g.Camera.Render(g.Scene, g.Scene.Root.SearchTree().ByName("screen").Models()...)
 
 	// And then just draw the color texture output:
 	screen.DrawImage(g.Camera.ColorTexture(), nil)

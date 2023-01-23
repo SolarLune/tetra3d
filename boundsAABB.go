@@ -282,7 +282,11 @@ func (box *BoundingAABB) Unparent() {
 // If the node doesn't have a parent, its index will be -1.
 func (box *BoundingAABB) Index() int {
 	if box.parent != nil {
-		return box.parent.Children().Index(box)
+		for i, c := range box.parent.Children() {
+			if c == box {
+				return i
+			}
+		}
 	}
 	return -1
 }

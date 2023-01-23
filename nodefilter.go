@@ -4,137 +4,142 @@ import (
 	"regexp"
 )
 
-// NodeFilter represents a filterable selection of INodes. For example,
-// `filter := scene.Root.ChildrenRecursive()` returns a NodeFilter composed of all nodes
-// underneath the root (excluding the root itself). From there, you can use additional
-// functions on the NodeFilter to filter it down further:
-// `filter = filter.ByName("player lamp", true, true).ByType(tetra3d.NodeTypeLight)`.
-type NodeFilter []INode
+// NodeFilter represents a chain of node filters, executed in sequence to collect the desired nodes
+// out of an entire hierarchy. The filters are executed lazily (so only one slice is allocated
+// in the process, and possibly one more for the end result, if you get the result as not just a
+// slice of INodes).
+type NodeFilter struct {
+	Filters             []func(INode) bool // The slice of filters that are currently active on the NodeFilter.
+	Start               INode              // The start (root) of the filter.
+	IncludeStartingNode bool               // If the starting node should be included in the filter.
+	MaxDepth            int                // How deep the node filter should search; a value that is less than zero means the entire tree will be traversed.
+	depth               int
+}
+
+func newNodeFilter(startingNode INode) *NodeFilter {
+	return &NodeFilter{
+		Start:    startingNode,
+		depth:    -1,
+		MaxDepth: -1,
+	}
+}
+
+func (nf *NodeFilter) execute(node INode) []INode {
+	nf.depth++
+	out := []INode{}
+	if node != nf.Start || nf.IncludeStartingNode {
+		add := true
+		for _, filter := range nf.Filters {
+			if !filter(node) {
+				add = false
+			}
+		}
+		if add {
+			out = append(out, node)
+		}
+	}
+	if nf.MaxDepth < 0 || nf.depth <= nf.MaxDepth {
+
+		for _, child := range node.Children() {
+			out = append(out, nf.execute(child)...)
+		}
+
+	}
+	nf.depth--
+	return out
+}
 
 // First returns the first Node in the NodeFilter; if the NodeFilter is empty, this function returns nil.
 func (nf NodeFilter) First() INode {
-	if len(nf) > 0 {
-		return nf[0]
+	out := nf.execute(nf.Start)
+	if len(out) == 0 {
+		return nil
 	}
-	return nil
+	return out[0]
 }
 
 // First returns the last Node in the NodeFilter; if the NodeFilter is empty, this function returns nil.
 func (nf NodeFilter) Last() INode {
-	if len(nf) > 0 {
-		return nf[len(nf)-1]
+	out := nf.execute(nf.Start)
+	if len(out) == 0 {
+		return nil
 	}
-	return nil
+	return out[len(out)-1]
 }
 
 // Get returns the Node at the given index in the NodeFilter; if index is invalid (<0 or >= len(nodes)), this function returns nil.
 func (nf NodeFilter) Get(index int) INode {
-	if index < 0 || index >= len(nf) {
+	out := nf.execute(nf.Start)
+	if index < 0 || index >= len(out) {
 		return nil
 	}
-	return nf[index]
+	return out[index]
 }
 
 // ByFunc allows you to filter a given selection of nodes by the provided filter function (which takes a Node
 // and returns a boolean, indicating whether or not to add that Node to the resulting NodeFilter).
 // If no matching Nodes are found, an empty NodeFilter is returned.
 func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
-	out := make([]INode, 0, len(nf))
-	i := 0
-	for _, node := range nf {
-		if filterFunc(node) {
-			out = append(out, node)
-			i++
-		}
-	}
-	return out
-}
-
-// ByName allows you to filter a given selection of nodes if their names are wholly equal
-// to the provided name string.
-// If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByName(name string) NodeFilter {
-	out := make([]INode, 0, len(nf))
-	for _, node := range nf {
-		if node.Name() == name {
-			out = append(out, node)
-		}
-	}
-	return out
-}
-
-// ByRegex allows you to filter a given selection of nodes by the given regex string.
-// If the regexp string is invalid or no matching Nodes are found, an empty NodeFilter is returned.
-// See https://regexr.com/ for regex help / reference.
-func (nf NodeFilter) ByRegex(regexString string) NodeFilter {
-	out := make([]INode, 0, len(nf))
-	for _, node := range nf {
-		match, _ := regexp.MatchString(regexString, node.Name())
-		if match {
-			out = append(out, node)
-		}
-	}
-	return out
-}
-
-// ByType allows you to filter a given selection of nodes by the provided NodeType.
-// If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
-
-	out := make([]INode, 0, len(nf))
-
-	for _, node := range nf {
-
-		if node.Type().Is(nodeType) {
-			out = append(out, node)
-		}
-
-	}
-
-	return out
-
+	nf.Filters = append(nf.Filters, filterFunc)
+	return nf
 }
 
 // ByProperties allows you to filter a given selection of nodes by the provided set of property names.
 // If no matching Nodes are found, an empty NodeFilter is returned.
 func (nf NodeFilter) ByProperties(propNames ...string) NodeFilter {
-	out := make([]INode, 0, len(nf))
-	for _, node := range nf {
-		if node.Properties().Has(propNames...) {
-			out = append(out, node)
+	nf.Filters = append(nf.Filters, func(node INode) bool { return node.Properties().Has(propNames...) })
+	return nf
+}
+
+// ByName allows you to filter a given selection of nodes if their names are wholly equal
+// to the provided name string.
+// If a Node's name doesn't match, it isn't added to the filter results.
+func (nf NodeFilter) ByName(name string) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool { return node.Name() == name })
+	return nf
+}
+
+// ByRegex allows you to filter a given selection of nodes by the given regex string.
+// If the regexp string is invalid or no matching Nodes are found, the node isn't
+// added to the filter results. See https://regexr.com/ for regex help / reference.
+func (nf NodeFilter) ByRegex(regexString string) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		match, _ := regexp.MatchString(regexString, node.Name())
+		return match
+	})
+	return nf
+}
+
+// ByType allows you to filter a given selection of nodes by the provided NodeType.
+// If no matching Nodes are found, an empty NodeFilter is returned.
+func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		return node.Type().Is(nodeType)
+	})
+	return nf
+}
+
+// ForEach executes the provided function on each Node filtered out. If the function
+// returns true, the loop continues; if it returns false, the NodeFilter stops executing
+// the function on the results.
+func (nf NodeFilter) ForEach(f func(node INode) bool) {
+	for _, o := range nf.execute(nf.Start) {
+		if !f(o) {
+			break
 		}
 	}
-	return out
-}
-
-// Children filters out a selection of Nodes, returning a NodeFilter composed strictly of that selection's children.
-func (nf NodeFilter) Children() NodeFilter {
-	out := make([]INode, 0, len(nf))
-	for _, node := range nf {
-		out = append(out, node.Children()...)
-	}
-	return out
-}
-
-// ChildrenRecursive filters out a selection of Nodes, returning a NodeFilter composed strictly of that selection's
-// recursive children.
-func (nf NodeFilter) ChildrenRecursive() NodeFilter {
-	out := make([]INode, 0, len(nf))
-	for _, node := range nf {
-		out = append(out, node.ChildrenRecursive()...)
-	}
-	return out
 }
 
 // Contains returns if the provided Node is contained in the NodeFilter.
 func (nf NodeFilter) Contains(node INode) bool {
-	return nf.Index(node) >= 0
+	return nf.Index(node) > 0
 }
 
 // Index returns the index of the given INode in the NodeFilter; if it doesn't exist in the filter,
 // then this function returns -1.
 func (nf NodeFilter) Index(node INode) int {
-	for index, child := range nf {
+	out := nf.execute(nf.Start)
+	for index, child := range out {
 		if child == node {
 			return index
 		}
@@ -144,14 +149,19 @@ func (nf NodeFilter) Index(node INode) int {
 
 // Empty returns true if the NodeFilter contains no Nodes.
 func (nf NodeFilter) Empty() bool {
-	return len(nf) == 0
+	return len(nf.execute(nf.Start)) == 0
 }
 
-// BoundingObjects returns a slice of the BoundingObjects contained within the NodeFilter. This is particularly useful when you're using
-// NodeFilters to filter down a selection of Nodes that you then need to pass into BoundingObject.CollisionTest().
-func (nc NodeFilter) BoundingObjects() []IBoundingObject {
-	boundings := make([]IBoundingObject, 0, len(nc))
-	for _, n := range nc {
+// INodes returns the NodeFilter's results as a slice of INodes.
+func (nf NodeFilter) INodes() []INode {
+	return nf.execute(nf.Start)
+}
+
+// BoundingObjects returns a slice of the IBoundingObjects contained within the NodeFilter.
+func (nf NodeFilter) BoundingObjects() []IBoundingObject {
+	out := nf.execute(nf.Start)
+	boundings := make([]IBoundingObject, 0, len(out))
+	for _, n := range out {
 		if b, ok := n.(IBoundingObject); ok {
 			boundings = append(boundings, b)
 		}
@@ -159,10 +169,11 @@ func (nc NodeFilter) BoundingObjects() []IBoundingObject {
 	return boundings
 }
 
-// Models returns a slice of the *Models contained within the NodeFilter.
-func (nc NodeFilter) Models() []*Model {
-	models := make([]*Model, 0, len(nc))
-	for _, n := range nc {
+// Models returns a slice of the Models contained within the NodeFilter.
+func (nf NodeFilter) Models() []*Model {
+	out := nf.execute(nf.Start)
+	models := make([]*Model, 0, len(out))
+	for _, n := range out {
 		if m, ok := n.(*Model); ok {
 			models = append(models, m)
 		}
@@ -171,9 +182,10 @@ func (nc NodeFilter) Models() []*Model {
 }
 
 // Lights returns a slice of the ILights contained within the NodeFilter.
-func (nc NodeFilter) Lights() []ILight {
-	lights := make([]ILight, 0, len(nc))
-	for _, n := range nc {
+func (nf NodeFilter) Lights() []ILight {
+	out := nf.execute(nf.Start)
+	lights := make([]ILight, 0, len(out))
+	for _, n := range out {
 		if m, ok := n.(ILight); ok {
 			lights = append(lights, m)
 		}
@@ -181,10 +193,11 @@ func (nc NodeFilter) Lights() []ILight {
 	return lights
 }
 
-// Grids returns a slice of the *Grids contained within the NodeFilter.
-func (nc NodeFilter) Grids() []*Grid {
-	grids := make([]*Grid, 0, len(nc))
-	for _, n := range nc {
+// Grids returns a slice of the Grid nodes contained within the NodeFilter.
+func (nf NodeFilter) Grids() []*Grid {
+	out := nf.execute(nf.Start)
+	grids := make([]*Grid, 0, len(out))
+	for _, n := range out {
 		if m, ok := n.(*Grid); ok {
 			grids = append(grids, m)
 		}

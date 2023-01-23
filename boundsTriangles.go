@@ -258,7 +258,11 @@ func (bt *BoundingTriangles) Unparent() {
 // If the node doesn't have a parent, its index will be -1.
 func (bt *BoundingTriangles) Index() int {
 	if bt.parent != nil {
-		return bt.parent.Children().Index(bt)
+		for i, c := range bt.parent.Children() {
+			if c == bt {
+				return i
+			}
+		}
 	}
 	return -1
 }

@@ -35,9 +35,15 @@ func NewNavigator(path IPath) *Navigator {
 		Path:       path,
 		Direction:  1,
 	}
-	if points := path.Points(); len(points) > 0 {
-		navigator.worldPos = points[0] // Just to start
+
+	if path != nil {
+
+		if points := path.Points(); len(points) > 0 {
+			navigator.worldPos = points[0] // Just to start
+		}
+
 	}
+
 	return navigator
 }
 
@@ -201,8 +207,10 @@ func (navigator *Navigator) SetPath(path IPath) {
 		navigator.Path = path
 		navigator.Percentage = 0
 		navigator.finished = false
-		if points := path.Points(); len(points) > 0 {
-			navigator.worldPos = points[0]
+		if path != nil {
+			if points := path.Points(); len(points) > 0 {
+				navigator.worldPos = points[0]
+			}
 		}
 	}
 }
@@ -308,7 +316,11 @@ func (path *Path) Type() NodeType {
 // If the node doesn't have a parent, its index will be -1.
 func (path *Path) Index() int {
 	if path.parent != nil {
-		return path.parent.Children().Index(path)
+		for i, c := range path.parent.Children() {
+			if c == path {
+				return i
+			}
+		}
 	}
 	return -1
 }

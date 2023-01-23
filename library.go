@@ -43,10 +43,8 @@ func (lib *Library) AddScene(sceneName string) *Scene {
 // FindNode will return nil.
 func (lib *Library) FindNode(objectName string) INode {
 	for _, scene := range lib.Scenes {
-		for _, n := range scene.Root.ChildrenRecursive() {
-			if n.Name() == objectName {
-				return n
-			}
+		if n := scene.Root.SearchTree().ByName(objectName).First(); n != nil {
+			return n
 		}
 	}
 	return nil

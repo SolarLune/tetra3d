@@ -1,6 +1,6 @@
 {
     "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.4.49",
+        "generator" : "Khronos glTF Blender I/O v3.5.13",
         "version" : "2.0"
     },
     "extensionsUsed" : [
@@ -42,6 +42,10 @@
                 "t3dExportOnSave__" : 1,
                 "t3dExportFormat__" : 2,
                 "t3dPackTextures__" : 1,
+                "t3dCameraResolution__" : [
+                    1920,
+                    1080
+                ],
                 "t3dCollections__" : {
                     "Collection" : {
                         "objects" : [
@@ -59,10 +63,6 @@
                         ]
                     }
                 },
-                "t3dCameraResolution__" : [
-                    1920,
-                    1080
-                ],
                 "t3dWorlds__" : {
                     "World" : {
                         "ambient color" : [
@@ -224,9 +224,6 @@
     ],
     "meshes" : [
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "Plane",
             "primitives" : [
                 {
@@ -241,9 +238,6 @@
             ]
         },
         {
-            "extras" : {
-                "t3dVertexColorNames__" : []
-            },
             "name" : "CubeTorus",
             "primitives" : [
                 {

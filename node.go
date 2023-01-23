@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -88,11 +89,11 @@ type INode interface {
 	// If the node doesn't have a parent, its index will be -1.
 	Index() int
 
-	// Children() returns the Node's children as a NodeFilter.
-	Children() NodeFilter
-	// ChildrenRecursive() returns the Node's recursive children (i.e. children, grandchildren, etc)
-	// as a NodeFilter.
-	ChildrenRecursive() NodeFilter
+	// Children() returns the Node's children as an INode.
+	Children() []INode
+
+	// SearchTree() returns a NodeFilter to search the given Node's hierarchical tree.
+	SearchTree() *NodeFilter
 
 	// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 	// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
@@ -389,7 +390,7 @@ func (node *Node) SetWorldTransform(transform Matrix4) {
 // rebuilt. This should be called when modifying the transformation properties (position, scale, rotation) of the Node.
 func (node *Node) dirtyTransform() {
 
-	for _, child := range node.ChildrenRecursive() {
+	for _, child := range node.SearchTree().INodes() {
 		child.dirtyTransform()
 	}
 
@@ -771,25 +772,23 @@ func (node *Node) ReindexChild(child INode, newPosition int) int {
 // If the node doesn't have a parent, its index will be -1.
 func (node *Node) Index() int {
 	if node.parent != nil {
-		return node.parent.Children().Index(node)
+		for i, c := range node.parent.Children() {
+			if c == node {
+				return i
+			}
+		}
 	}
 	return -1
 }
 
-// Children() returns the Node's children.
-func (node *Node) Children() NodeFilter {
-	return append(make(NodeFilter, 0, len(node.children)), node.children...)
+// Children returns the Node's children as a slice of INodes.
+func (node *Node) Children() []INode {
+	return append(make([]INode, 0, len(node.children)), node.children...)
 }
 
-// ChildrenRecursive() returns the Node's recursive children (i.e. children, grandchildren, etc)
-// as a NodeFilter.
-func (node *Node) ChildrenRecursive() NodeFilter {
-	out := node.Children()
-
-	for _, child := range node.children {
-		out = append(out, child.ChildrenRecursive()...)
-	}
-	return out
+// SearchTree returns a NodeFilter to search through and filter a Node's hierarchy.
+func (node *Node) SearchTree() *NodeFilter {
+	return newNodeFilter(node)
 }
 
 // Visible returns whether the Object is visible.
@@ -800,7 +799,7 @@ func (node *Node) Visible() bool {
 // SetVisible sets the object's visibility. If recursive is true, all recursive children of this Node will have their visibility set the same way.
 func (node *Node) SetVisible(visible bool, recursive bool) {
 	if recursive && node.visible != visible {
-		for _, child := range node.ChildrenRecursive() {
+		for _, child := range node.SearchTree().INodes() {
 			child.SetVisible(visible, true)
 		}
 	}
@@ -897,6 +896,18 @@ func (node *Node) HierarchyAsString() string {
 	}
 
 	return printNode(node, 0)
+}
+
+// If enabled, Nodes will be represented by their names when printed directly.
+// Otherwise, they will be represented by their pointer locations, like default.
+var ReadableNodes = true
+
+func (node *Node) String() string {
+	if ReadableNodes {
+		return ":" + node.name + ":"
+	} else {
+		return fmt.Sprintf("%p", node)
+	}
 }
 
 // Get searches a node's hierarchy using a string to find a specified node. The path is in the format of names of nodes, separated by forward

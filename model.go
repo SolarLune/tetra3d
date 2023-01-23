@@ -27,7 +27,7 @@ type Model struct {
 	DynamicBatchModels map[*MeshPart][]*Model // Models that are dynamically merged into this one.
 	DynamicBatchOwner  *Model
 
-	Skinned    bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
+	skinned    bool  // If the model is skinned and this is enabled, the model will tranform its vertices to match the skinning armature (Model.SkinRoot).
 	SkinRoot   INode // The root node of the armature skinning this Model.
 	skinMatrix Matrix4
 	bones      [][]*Node // The bones (nodes) of the Model, assuming it has been skinned. A Mesh's bones slice will point to indices indicating bones in the Model.
@@ -96,7 +96,7 @@ func (model *Model) Clone() INode {
 
 	newModel.DynamicBatchOwner = model.DynamicBatchOwner
 
-	newModel.Skinned = model.Skinned
+	newModel.skinned = model.skinned
 	newModel.SkinRoot = model.SkinRoot
 	for i := range model.bones {
 		newModel.bones = append(newModel.bones, append([]*Node{}, model.bones[i]...))
@@ -136,11 +136,8 @@ func (model *Model) onTransformUpdate() {
 	var center Vector
 
 	// We do this because if a model is skinned and we've parented the model to the armature, then the center is
-	// now from origin relative to the base of the armature on scene export.
-	if model.SkinRoot != nil && model.Skinned && model.parent == model.SkinRoot {
-		parent := model.parent.(*Node)
-		center = model.Mesh.Dimensions.Center().Sub(parent.originalLocalPosition).Sub(model.originalLocalPosition)
-	} else {
+	// now from origin relative to the base of the armature on scene export. Otherwise, it's the center of the mesh.
+	if !model.skinned {
 		center = model.Mesh.Dimensions.Center()
 	}
 
@@ -371,7 +368,7 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 		panic(`Error: Cannot reassign skinned Model [` + model.Path() + `] to armature bone [` + armatureRoot.Path() + `]. ReassignBones() should be called with the desired armature's root node.`)
 	}
 
-	bones := armatureRoot.ChildrenRecursive()
+	bones := armatureRoot.SearchTree().INodes()
 
 	boneMap := map[string]*Node{}
 
@@ -510,7 +507,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		for i := 0; i < 3; i++ {
 
-			if model.Skinned {
+			if model.skinned {
 
 				t := time.Now()
 
@@ -596,7 +593,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			// 	}
 
 			// }
-			// if model.Skinned {
+			// if model.skinned {
 			// 	v0 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.X]
 			// 	v1 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.Y]
 			// 	v2 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.Z]
@@ -912,7 +909,7 @@ func (model *Model) setParent(parent INode) {
 
 	if !batched {
 
-		for _, child := range model.ChildrenRecursive() {
+		for _, child := range model.SearchTree().INodes() {
 
 			if child, ok := child.(*Model); ok && child.AutoBatchMode != AutoBatchNone {
 
@@ -956,7 +953,11 @@ func (model *Model) Type() NodeType {
 // If the node doesn't have a parent, its index will be -1.
 func (model *Model) Index() int {
 	if model.parent != nil {
-		return model.parent.Children().Index(model)
+		for i, c := range model.parent.Children() {
+			if c == model {
+				return i
+			}
+		}
 	}
 	return -1
 }

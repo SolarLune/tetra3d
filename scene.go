@@ -69,7 +69,7 @@ func (scene *Scene) HandleAutobatch() {
 
 	if scene.updateAutobatch {
 
-		for _, node := range scene.Root.ChildrenRecursive() {
+		for _, node := range scene.Root.SearchTree().INodes() {
 
 			if model, ok := node.(*Model); ok {
 

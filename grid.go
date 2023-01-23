@@ -173,7 +173,11 @@ func (point *GridPoint) Unparent() {
 // If the node doesn't have a parent, its index will be -1.
 func (point *GridPoint) Index() int {
 	if point.parent != nil {
-		return point.parent.Children().Index(point)
+		for i, c := range point.parent.Children() {
+			if c == point {
+				return i
+			}
+		}
 	}
 	return -1
 }
@@ -408,7 +412,11 @@ func (grid *Grid) Unparent() {
 // If the node doesn't have a parent, its index will be -1.
 func (grid *Grid) Index() int {
 	if grid.parent != nil {
-		return grid.parent.Children().Index(grid)
+		for i, c := range grid.parent.Children() {
+			if c == grid {
+				return i
+			}
+		}
 	}
 	return -1
 }

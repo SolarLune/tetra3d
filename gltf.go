@@ -984,7 +984,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			// 	model.SetWorldRotation(skeletonRoot.WorldRotation())
 			// }
 
-			model.Skinned = true
+			model.skinned = true
 
 			// We should keep a local slice of bones because we can't simply loop through all bones with the matrix index, as
 			// the matrix index resets at 0 for each armature, naturally.
@@ -1083,7 +1083,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	// Set up SkinRoot for skinned Models; this should be the root node of a hierarchy of bone Nodes.
 	for _, n := range objects {
 
-		if model, isModel := n.(*Model); isModel && model.Skinned {
+		if model, isModel := n.(*Model); isModel && model.skinned {
 
 			parent := model.SkinRoot
 
@@ -1294,7 +1294,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		*/
 
-		for _, n := range scene.Root.ChildrenRecursive() {
+		for _, n := range scene.Root.SearchTree().INodes() {
 
 			if node, ok := n.(*Node); ok && len(node.collectionObjects) > 0 {
 

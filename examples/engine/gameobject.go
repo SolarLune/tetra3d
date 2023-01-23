@@ -23,7 +23,7 @@ type Player struct {
 func NewPlayer(node tetra3d.INode) *Player {
 	return &Player{
 		node:   node,
-		Bounds: node.ChildrenRecursive().ByType(tetra3d.NodeTypeBoundingAABB).First().(*tetra3d.BoundingAABB),
+		Bounds: node.SearchTree().ByType(tetra3d.NodeTypeBoundingAABB).First().(*tetra3d.BoundingAABB),
 	}
 }
 
@@ -52,7 +52,7 @@ func (player *Player) Update() {
 
 		tetra3d.CollisionTestSettings{
 
-			Others: player.node.Root().ChildrenRecursive().ByProperties("solid"),
+			Others: player.node.Root().SearchTree().ByProperties("solid").INodes(),
 
 			HandleCollision: func(col *tetra3d.Collision) bool {
 

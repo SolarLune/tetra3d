@@ -97,7 +97,11 @@ func (amb *AmbientLight) Type() NodeType {
 // If the node doesn't have a parent, its index will be -1.
 func (amb *AmbientLight) Index() int {
 	if amb.parent != nil {
-		return amb.parent.Children().Index(amb)
+		for i, c := range amb.parent.Children() {
+			if c == amb {
+				return i
+			}
+		}
 	}
 	return -1
 }
@@ -161,7 +165,7 @@ func (point *PointLight) beginModel(model *Model) {
 	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
 
-	if model.Skinned {
+	if model.skinned {
 		// point.cameraPosition = camera.WorldPosition()
 		point.workingPosition = point.WorldPosition()
 	} else {
@@ -191,7 +195,7 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 
 			// var triCenter Vector
 
-			// if model.Skinned {
+			// if model.skinned {
 			// 	v0 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
 			// 	v1 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
 			// 	v2 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
@@ -214,7 +218,7 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 
 		var vertPos, vertNormal Vector
 
-		if model.Skinned {
+		if model.skinned {
 			vertPos = model.Mesh.vertexSkinnedPositions[index]
 			vertNormal = model.Mesh.vertexSkinnedNormals[index]
 		} else {
@@ -274,7 +278,11 @@ func (point *PointLight) SetOn(on bool) {
 // If the node doesn't have a parent, its index will be -1.
 func (point *PointLight) Index() int {
 	if point.parent != nil {
-		return point.parent.Children().Index(point)
+		for i, c := range point.parent.Children() {
+			if c == point {
+				return i
+			}
+		}
 	}
 	return -1
 }
@@ -330,7 +338,7 @@ func (sun *DirectionalLight) beginRender() {
 }
 
 func (sun *DirectionalLight) beginModel(model *Model) {
-	if !model.Skinned {
+	if !model.skinned {
 		sun.workingModelRotation = model.WorldRotation().Inverted().Transposed()
 	}
 }
@@ -341,7 +349,7 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 	meshPart.ForEachVertexIndex(func(index int) {
 
 		var normal Vector
-		if model.Skinned {
+		if model.skinned {
 			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
 			normal = model.Mesh.vertexSkinnedNormals[index]
 		} else {
@@ -390,7 +398,11 @@ func (sun *DirectionalLight) SetOn(on bool) {
 // If the node doesn't have a parent, its index will be -1.
 func (sun *DirectionalLight) Index() int {
 	if sun.parent != nil {
-		return sun.parent.Children().Index(sun)
+		for i, c := range sun.parent.Children() {
+			if c == sun {
+				return i
+			}
+		}
 	}
 	return -1
 }
@@ -536,7 +548,7 @@ func (cube *CubeLight) beginModel(model *Model) {
 
 	cube.workingDimensions = cube.TransformedDimensions()
 
-	if model.Skinned {
+	if model.skinned {
 		cube.workingPosition = lightStartPos
 	} else {
 		// point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
@@ -566,7 +578,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 
 		// var triCenter Vector
 
-		// if model.Skinned {
+		// if model.skinned {
 		// 	v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
 		// 	v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
 		// 	v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
@@ -589,7 +601,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 
 		var vertPos, vertNormal Vector
 
-		if model.Skinned {
+		if model.skinned {
 			vertPos = model.Mesh.vertexSkinnedPositions[index]
 			vertNormal = model.Mesh.vertexSkinnedNormals[index]
 		} else {
@@ -674,7 +686,11 @@ func (cube *CubeLight) Unparent() {
 // If the node doesn't have a parent, its index will be -1.
 func (cube *CubeLight) Index() int {
 	if cube.parent != nil {
-		return cube.parent.Children().Index(cube)
+		for i, c := range cube.parent.Children() {
+			if c == cube {
+				return i
+			}
+		}
 	}
 	return -1
 }
@@ -814,7 +830,7 @@ func (cube *CubeLight) Type() NodeType {
 
 // 	for i := 0; i < 3; i++ {
 
-// 		if model.Skinned {
+// 		if model.skinned {
 // 			vertPos = model.Mesh.vertexSkinnedPositions[triIndex*3+i]
 // 			vertNormal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
 // 		} else {

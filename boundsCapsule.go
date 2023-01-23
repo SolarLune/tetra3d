@@ -173,7 +173,11 @@ func (capsule *BoundingCapsule) Unparent() {
 // If the node doesn't have a parent, its index will be -1.
 func (capsule *BoundingCapsule) Index() int {
 	if capsule.parent != nil {
-		return capsule.parent.Children().Index(capsule)
+		for i, c := range capsule.parent.Children() {
+			if c == capsule {
+				return i
+			}
+		}
 	}
 	return -1
 }

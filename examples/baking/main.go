@@ -56,13 +56,13 @@ func (g *Game) Init() {
 	// easily preview the differences, as well.
 
 	// We start by collecting all the lights we'll be baking. NodeFilter.Lights() will automatically give us just the lights out of our selection and discard any other INodes.
-	lights := g.Scene.Root.ChildrenRecursive().Lights()
+	lights := g.Scene.Root.SearchTree().Lights()
 
 	// // Don't forget the world's ambient light!
 	lights = append(lights, g.Scene.World.AmbientLight)
 
 	// Let's get all the solid, occluding models here.
-	models := g.Scene.Root.ChildrenRecursive().ByProperties("ao").Models()
+	models := g.Scene.Root.SearchTree().ByProperties("ao").Models()
 
 	// The idea is that we'll bake the lighting and AO of each ao-applicable Model.
 
@@ -110,25 +110,25 @@ func (g *Game) Update() error {
 
 	// Change the active vertex color channels
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
+		for _, model := range g.Scene.Root.SearchTree().Models() {
 			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelNone) // Switch to unlit
 		}
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
+		for _, model := range g.Scene.Root.SearchTree().Models() {
 			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelAO) // Switch to AO only
 		}
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key3) {
-		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
+		for _, model := range g.Scene.Root.SearchTree().Models() {
 			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelLight) // Switch to Lighting
 		}
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key4) {
-		for _, model := range g.Scene.Root.ChildrenRecursive().Models() {
+		for _, model := range g.Scene.Root.SearchTree().Models() {
 			model.Mesh.SelectVertices().SelectAll().SetActiveColorChannel(ChannelCombined) // Switch to lighting+AO
 		}
 	}

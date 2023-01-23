@@ -62,11 +62,19 @@ func (g *Game) Update() error {
 	light.AnimationPlayer().Play("LightAction")
 	light.AnimationPlayer().Update(1.0 / 60.0)
 
-	armature := g.Scene.Root.Get("Armature")
+	armature := g.Scene.Root.Get("Cube.008/Armature")
 
 	player := armature.AnimationPlayer()
 	player.Play("ArmatureAction")
 	player.Update(1.0 / 60.0)
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyA) {
+		if player.PlaySpeed > 0 {
+			player.PlaySpeed = 0
+		} else {
+			player.PlaySpeed = 1
+		}
+	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		g.Scene.World.LightingOn = !g.Scene.World.LightingOn

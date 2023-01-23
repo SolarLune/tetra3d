@@ -628,7 +628,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 		meshes = append(meshes, model)
 	}
 
-	nodes := rootNode.ChildrenRecursive()
+	nodes := rootNode.SearchTree().INodes()
 
 	for _, node := range nodes {
 		if model, ok := node.(*Model); ok && model.DynamicBatchOwner == nil {
@@ -667,7 +667,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	if scene.World == nil || scene.World.LightingOn {
 
-		for _, l := range scene.Root.ChildrenRecursive() {
+		for _, l := range scene.Root.SearchTree().INodes() {
 			if light, isLight := l.(ILight); isLight {
 				camera.DebugInfo.LightCount++
 				if light.IsOn() {
@@ -1405,7 +1405,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
 	camWidth, camHeight := camera.resultColorTexture.Size()
 
@@ -1484,7 +1484,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
 	for _, m := range allModels {
 
@@ -1523,7 +1523,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 // image provided.
 func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float64, color *Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
 	for _, m := range allModels {
 
@@ -1552,7 +1552,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 // in units. Color is the color to draw the normals.
 func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float64, color *Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
 	for _, m := range allModels {
 
@@ -1584,7 +1584,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 // DrawDebugCenters draws the center positions of nodes under the rootNode using the color given to the screen image provided.
 func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color *Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
 	c := color.ToRGBA64()
 
@@ -1681,7 +1681,7 @@ func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
 // won't be debug-rendered.
 func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor, trianglesAABBColor, trianglesBroadphaseColor *Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
 	for _, n := range allModels {
 
@@ -1879,7 +1879,7 @@ func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, rend
 // The shapes will be drawn in the color provided to the screen image provided.
 func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, color *Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.ChildrenRecursive()...)
+	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
 	for _, n := range allModels {
 
@@ -1926,7 +1926,11 @@ func (camera *Camera) Unparent() {
 // If the node doesn't have a parent, its index will be -1.
 func (camera *Camera) Index() int {
 	if camera.parent != nil {
-		return camera.parent.Children().Index(camera)
+		for i, c := range camera.parent.Children() {
+			if c == camera {
+				return i
+			}
+		}
 	}
 	return -1
 }
