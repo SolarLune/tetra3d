@@ -904,7 +904,7 @@ var ReadableNodes = true
 
 func (node *Node) String() string {
 	if ReadableNodes {
-		return ":" + node.name + ":"
+		return "<" + node.name + ">"
 	} else {
 		return fmt.Sprintf("%p", node)
 	}
