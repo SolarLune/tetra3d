@@ -358,6 +358,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 | Triangle       | ✅     | ⛔ (buggy) | ⛔ (buggy) | ✅      | ❌                        |
 | Capsule        | ✅     | ✅         | ✅         | ✅      | ❌                        |
 | Ray            | ❌     | ❌         | ❌         | ❌      | ❌                        |
+- [ ] -- An actual collision system?
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
 - [ ] **Optimization**

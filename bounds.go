@@ -242,7 +242,7 @@ func btSphereAABB(sphere *BoundingSphere, aabb *BoundingAABB) *Collision {
 			StartingPoint: spherePos,
 			ContactPoint:  intersection,
 			MTV:           delta,
-			Normal:        aabbNormalGuess(delta),
+			Normal:        aabbNormalGuess(spherePos.Sub(intersection)),
 		},
 	)
 
