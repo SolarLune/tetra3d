@@ -128,7 +128,7 @@ func (g *Game) Init() {
 	g.Scene.Root.AddChildren(batched)
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
-	g.Camera.Far = 120
+	g.Camera.SetFar(120)
 	g.Camera.SetLocalPosition(0, 0, 15)
 
 	g.System = examples.NewBasicSystemHandler(g)

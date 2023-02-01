@@ -69,15 +69,18 @@ func (g *Game) Update() error {
 		g.CamHandle.Move(-moveSpd, 0, 0)
 	}
 
+	scale := camera.OrthoScale()
+
 	// Adjusting orthoscale changes how much you can see from an orthographic camera - this is both zooming and FOV changes.
 	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		camera.OrthoScale += 0.5
+		scale += 0.5
 	} else if ebiten.IsKeyPressed(ebiten.KeyW) {
-		camera.OrthoScale -= 0.5
+		scale -= 0.5
 	}
 
 	// Limit orthoscale size.
-	camera.OrthoScale = math.Max(math.Min(camera.OrthoScale, 80), 10)
+	camera.SetOrthoScale(math.Max(math.Min(scale, 80), 10))
+	camera.SetPerspective(false)
 
 	if ebiten.IsKeyPressed(ebiten.KeyE) {
 		g.CamHandle.Rotate(0, 1, 0, -0.025)

@@ -447,7 +447,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	modelTransform := model.Transform()
 
-	far := camera.Far
+	far := camera.far
 
 	sortingTriIndex := 0
 

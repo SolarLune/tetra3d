@@ -1,6 +1,8 @@
 package tetra3d
 
 import (
+	"fmt"
+
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -151,4 +153,12 @@ func (material *Material) DisposeShader() {
 // Library returns the Library from which this Material was loaded. If it was created through code, this function will return nil.
 func (material *Material) Library() *Library {
 	return material.library
+}
+
+func (material *Material) String() string {
+	if ReadableReferences {
+		return "<" + material.Name + ">"
+	} else {
+		return fmt.Sprintf("%p", material)
+	}
 }

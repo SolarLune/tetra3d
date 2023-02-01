@@ -47,7 +47,7 @@ func (g *Game) Init() {
 	g.Scene = library.Scenes[0]
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
-	g.Camera.Far = 30
+	g.Camera.SetFar(30)
 	g.Camera.SetLocalPosition(0, 5, 15)
 
 	g.System = examples.NewBasicSystemHandler(g)

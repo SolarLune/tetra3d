@@ -668,15 +668,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			newCam.RenderDepth = gltfLoadOptions.CameraDepth
 
 			if gltfCam.Perspective != nil {
-				newCam.Near = float64(gltfCam.Perspective.Znear)
-				newCam.Far = float64(*gltfCam.Perspective.Zfar)
-				newCam.FieldOfView = float64(gltfCam.Perspective.Yfov) / (math.Pi * 2) * 360
-				newCam.Perspective = true
+				newCam.near = float64(gltfCam.Perspective.Znear)
+				newCam.far = float64(*gltfCam.Perspective.Zfar)
+				newCam.fieldOfView = float64(gltfCam.Perspective.Yfov) / (math.Pi * 2) * 360
+				newCam.perspective = true
 			} else if gltfCam.Orthographic != nil {
-				newCam.Near = float64(gltfCam.Orthographic.Znear)
-				newCam.Far = float64(gltfCam.Orthographic.Zfar)
-				newCam.OrthoScale = float64(gltfCam.Orthographic.Xmag)
-				newCam.Perspective = false
+				newCam.near = float64(gltfCam.Orthographic.Znear)
+				newCam.far = float64(gltfCam.Orthographic.Zfar)
+				newCam.orthoScale = float64(gltfCam.Orthographic.Xmag)
+				newCam.perspective = false
 			}
 
 			obj = newCam

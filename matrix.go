@@ -229,141 +229,193 @@ func (matrix Matrix4) Transposed() Matrix4 {
 // }
 
 // The ultimate sin; I'm just going to copy this code for inverting a 4x4 Matrix and call it a day.
-
-// Inverted returns an inverted (reversed) clone of a Matrix4. See: https://stackoverflow.com/questions/1148309/inverting-a-4x4-matrix
+// This code was obtained from https://stackoverflow.com/questions/1148309/inverting-a-4x4-matrix,
+// and is like 200x faster than my old inversion code, whaaaaa
 func (matrix Matrix4) Inverted() Matrix4 {
 
-	inv := NewMatrix4()
+	var A2323 = matrix[2][2]*matrix[3][3] - matrix[2][3]*matrix[3][2]
+	var A1323 = matrix[2][1]*matrix[3][3] - matrix[2][3]*matrix[3][1]
+	var A1223 = matrix[2][1]*matrix[3][2] - matrix[2][2]*matrix[3][1]
+	var A0323 = matrix[2][0]*matrix[3][3] - matrix[2][3]*matrix[3][0]
+	var A0223 = matrix[2][0]*matrix[3][2] - matrix[2][2]*matrix[3][0]
+	var A0123 = matrix[2][0]*matrix[3][1] - matrix[2][1]*matrix[3][0]
+	var A2313 = matrix[1][2]*matrix[3][3] - matrix[1][3]*matrix[3][2]
+	var A1313 = matrix[1][1]*matrix[3][3] - matrix[1][3]*matrix[3][1]
+	var A1213 = matrix[1][1]*matrix[3][2] - matrix[1][2]*matrix[3][1]
+	var A2312 = matrix[1][2]*matrix[2][3] - matrix[1][3]*matrix[2][2]
+	var A1312 = matrix[1][1]*matrix[2][3] - matrix[1][3]*matrix[2][1]
+	var A1212 = matrix[1][1]*matrix[2][2] - matrix[1][2]*matrix[2][1]
+	var A0313 = matrix[1][0]*matrix[3][3] - matrix[1][3]*matrix[3][0]
+	var A0213 = matrix[1][0]*matrix[3][2] - matrix[1][2]*matrix[3][0]
+	var A0312 = matrix[1][0]*matrix[2][3] - matrix[1][3]*matrix[2][0]
+	var A0212 = matrix[1][0]*matrix[2][2] - matrix[1][2]*matrix[2][0]
+	var A0113 = matrix[1][0]*matrix[3][1] - matrix[1][1]*matrix[3][0]
+	var A0112 = matrix[1][0]*matrix[2][1] - matrix[1][1]*matrix[2][0]
 
-	m := matrix.Index
+	var det = matrix[0][0]*(matrix[1][1]*A2323-matrix[1][2]*A1323+matrix[1][3]*A1223) -
+		matrix[0][1]*(matrix[1][0]*A2323-matrix[1][2]*A0323+matrix[1][3]*A0223) +
+		matrix[0][2]*(matrix[1][0]*A1323-matrix[1][1]*A0323+matrix[1][3]*A0123) -
+		matrix[0][3]*(matrix[1][0]*A1223-matrix[1][1]*A0223+matrix[1][2]*A0123)
 
-	inv.setIndex(0, m(5)*m(10)*m(15)-
-		m(5)*m(11)*m(14)-
-		m(9)*m(6)*m(15)+
-		m(9)*m(7)*m(14)+
-		m(13)*m(6)*m(11)-
-		m(13)*m(7)*m(10))
+	det = 1 / det
 
-	inv.setIndex(4, -m(4)*m(10)*m(15)+
-		m(4)*m(11)*m(14)+
-		m(8)*m(6)*m(15)-
-		m(8)*m(7)*m(14)-
-		m(12)*m(6)*m(11)+
-		m(12)*m(7)*m(10))
+	m := NewMatrix4()
 
-	inv.setIndex(8, m(4)*m(9)*m(15)-
-		m(4)*m(11)*m(13)-
-		m(8)*m(5)*m(15)+
-		m(8)*m(7)*m(13)+
-		m(12)*m(5)*m(11)-
-		m(12)*m(7)*m(9))
+	m[0][0] = det * (matrix[1][1]*A2323 - matrix[1][2]*A1323 + matrix[1][3]*A1223)
+	m[0][1] = det * -(matrix[0][1]*A2323 - matrix[0][2]*A1323 + matrix[0][3]*A1223)
+	m[0][2] = det * (matrix[0][1]*A2313 - matrix[0][2]*A1313 + matrix[0][3]*A1213)
+	m[0][3] = det * -(matrix[0][1]*A2312 - matrix[0][2]*A1312 + matrix[0][3]*A1212)
+	m[1][0] = det * -(matrix[1][0]*A2323 - matrix[1][2]*A0323 + matrix[1][3]*A0223)
+	m[1][1] = det * (matrix[0][0]*A2323 - matrix[0][2]*A0323 + matrix[0][3]*A0223)
+	m[1][2] = det * -(matrix[0][0]*A2313 - matrix[0][2]*A0313 + matrix[0][3]*A0213)
+	m[1][3] = det * (matrix[0][0]*A2312 - matrix[0][2]*A0312 + matrix[0][3]*A0212)
+	m[2][0] = det * (matrix[1][0]*A1323 - matrix[1][1]*A0323 + matrix[1][3]*A0123)
+	m[2][1] = det * -(matrix[0][0]*A1323 - matrix[0][1]*A0323 + matrix[0][3]*A0123)
+	m[2][2] = det * (matrix[0][0]*A1313 - matrix[0][1]*A0313 + matrix[0][3]*A0113)
+	m[2][3] = det * -(matrix[0][0]*A1312 - matrix[0][1]*A0312 + matrix[0][3]*A0112)
+	m[3][0] = det * -(matrix[1][0]*A1223 - matrix[1][1]*A0223 + matrix[1][2]*A0123)
+	m[3][1] = det * (matrix[0][0]*A1223 - matrix[0][1]*A0223 + matrix[0][2]*A0123)
+	m[3][2] = det * -(matrix[0][0]*A1213 - matrix[0][1]*A0213 + matrix[0][2]*A0113)
+	m[3][3] = det * (matrix[0][0]*A1212 - matrix[0][1]*A0212 + matrix[0][2]*A0112)
 
-	inv.setIndex(12, -m(4)*m(9)*m(14)+
-		m(4)*m(10)*m(13)+
-		m(8)*m(5)*m(14)-
-		m(8)*m(6)*m(13)-
-		m(12)*m(5)*m(10)+
-		m(12)*m(6)*m(9))
-
-	inv.setIndex(1, -m(1)*m(10)*m(15)+
-		m(1)*m(11)*m(14)+
-		m(9)*m(2)*m(15)-
-		m(9)*m(3)*m(14)-
-		m(13)*m(2)*m(11)+
-		m(13)*m(3)*m(10))
-
-	inv.setIndex(5, m(0)*m(10)*m(15)-
-		m(0)*m(11)*m(14)-
-		m(8)*m(2)*m(15)+
-		m(8)*m(3)*m(14)+
-		m(12)*m(2)*m(11)-
-		m(12)*m(3)*m(10))
-
-	inv.setIndex(9, -m(0)*m(9)*m(15)+
-		m(0)*m(11)*m(13)+
-		m(8)*m(1)*m(15)-
-		m(8)*m(3)*m(13)-
-		m(12)*m(1)*m(11)+
-		m(12)*m(3)*m(9))
-
-	inv.setIndex(13, m(0)*m(9)*m(14)-
-		m(0)*m(10)*m(13)-
-		m(8)*m(1)*m(14)+
-		m(8)*m(2)*m(13)+
-		m(12)*m(1)*m(10)-
-		m(12)*m(2)*m(9))
-
-	inv.setIndex(2, m(1)*m(6)*m(15)-
-		m(1)*m(7)*m(14)-
-		m(5)*m(2)*m(15)+
-		m(5)*m(3)*m(14)+
-		m(13)*m(2)*m(7)-
-		m(13)*m(3)*m(6))
-
-	inv.setIndex(6, -m(0)*m(6)*m(15)+
-		m(0)*m(7)*m(14)+
-		m(4)*m(2)*m(15)-
-		m(4)*m(3)*m(14)-
-		m(12)*m(2)*m(7)+
-		m(12)*m(3)*m(6))
-
-	inv.setIndex(10, m(0)*m(5)*m(15)-
-		m(0)*m(7)*m(13)-
-		m(4)*m(1)*m(15)+
-		m(4)*m(3)*m(13)+
-		m(12)*m(1)*m(7)-
-		m(12)*m(3)*m(5))
-
-	inv.setIndex(14, -m(0)*m(5)*m(14)+
-		m(0)*m(6)*m(13)+
-		m(4)*m(1)*m(14)-
-		m(4)*m(2)*m(13)-
-		m(12)*m(1)*m(6)+
-		m(12)*m(2)*m(5))
-
-	inv.setIndex(3, -m(1)*m(6)*m(11)+
-		m(1)*m(7)*m(10)+
-		m(5)*m(2)*m(11)-
-		m(5)*m(3)*m(10)-
-		m(9)*m(2)*m(7)+
-		m(9)*m(3)*m(6))
-
-	inv.setIndex(7, m(0)*m(6)*m(11)-
-		m(0)*m(7)*m(10)-
-		m(4)*m(2)*m(11)+
-		m(4)*m(3)*m(10)+
-		m(8)*m(2)*m(7)-
-		m(8)*m(3)*m(6))
-
-	inv.setIndex(11, -m(0)*m(5)*m(11)+
-		m(0)*m(7)*m(9)+
-		m(4)*m(1)*m(11)-
-		m(4)*m(3)*m(9)-
-		m(8)*m(1)*m(7)+
-		m(8)*m(3)*m(5))
-
-	inv.setIndex(15, m(0)*m(5)*m(10)-
-		m(0)*m(6)*m(9)-
-		m(4)*m(1)*m(10)+
-		m(4)*m(2)*m(9)+
-		m(8)*m(1)*m(6)-
-		m(8)*m(2)*m(5))
-
-	det := m(0)*inv.Index(0) + m(1)*inv.Index(4) + m(2)*inv.Index(8) + m(3)*inv.Index(12)
-
-	if det == 0 {
-		return NewMatrix4()
-	}
-
-	det = 1.0 / det
-
-	for i := 0; i < 16; i++ {
-		inv.setIndex(i, inv.Index(i)*det)
-	}
-
-	return inv
+	return m
 
 }
+
+// Inverted returns an inverted (reversed) clone of a Matrix4. See the above StackOverflow link.
+// func (matrix Matrix4) oldInverted() Matrix4 {
+
+// 	inv := NewMatrix4()
+
+// 	m := matrix.Index
+
+// 	inv.setIndex(0, m(5)*m(10)*m(15)-
+// 		m(5)*m(11)*m(14)-
+// 		m(9)*m(6)*m(15)+
+// 		m(9)*m(7)*m(14)+
+// 		m(13)*m(6)*m(11)-
+// 		m(13)*m(7)*m(10))
+
+// 	inv.setIndex(4, -m(4)*m(10)*m(15)+
+// 		m(4)*m(11)*m(14)+
+// 		m(8)*m(6)*m(15)-
+// 		m(8)*m(7)*m(14)-
+// 		m(12)*m(6)*m(11)+
+// 		m(12)*m(7)*m(10))
+
+// 	inv.setIndex(8, m(4)*m(9)*m(15)-
+// 		m(4)*m(11)*m(13)-
+// 		m(8)*m(5)*m(15)+
+// 		m(8)*m(7)*m(13)+
+// 		m(12)*m(5)*m(11)-
+// 		m(12)*m(7)*m(9))
+
+// 	inv.setIndex(12, -m(4)*m(9)*m(14)+
+// 		m(4)*m(10)*m(13)+
+// 		m(8)*m(5)*m(14)-
+// 		m(8)*m(6)*m(13)-
+// 		m(12)*m(5)*m(10)+
+// 		m(12)*m(6)*m(9))
+
+// 	inv.setIndex(1, -m(1)*m(10)*m(15)+
+// 		m(1)*m(11)*m(14)+
+// 		m(9)*m(2)*m(15)-
+// 		m(9)*m(3)*m(14)-
+// 		m(13)*m(2)*m(11)+
+// 		m(13)*m(3)*m(10))
+
+// 	inv.setIndex(5, m(0)*m(10)*m(15)-
+// 		m(0)*m(11)*m(14)-
+// 		m(8)*m(2)*m(15)+
+// 		m(8)*m(3)*m(14)+
+// 		m(12)*m(2)*m(11)-
+// 		m(12)*m(3)*m(10))
+
+// 	inv.setIndex(9, -m(0)*m(9)*m(15)+
+// 		m(0)*m(11)*m(13)+
+// 		m(8)*m(1)*m(15)-
+// 		m(8)*m(3)*m(13)-
+// 		m(12)*m(1)*m(11)+
+// 		m(12)*m(3)*m(9))
+
+// 	inv.setIndex(13, m(0)*m(9)*m(14)-
+// 		m(0)*m(10)*m(13)-
+// 		m(8)*m(1)*m(14)+
+// 		m(8)*m(2)*m(13)+
+// 		m(12)*m(1)*m(10)-
+// 		m(12)*m(2)*m(9))
+
+// 	inv.setIndex(2, m(1)*m(6)*m(15)-
+// 		m(1)*m(7)*m(14)-
+// 		m(5)*m(2)*m(15)+
+// 		m(5)*m(3)*m(14)+
+// 		m(13)*m(2)*m(7)-
+// 		m(13)*m(3)*m(6))
+
+// 	inv.setIndex(6, -m(0)*m(6)*m(15)+
+// 		m(0)*m(7)*m(14)+
+// 		m(4)*m(2)*m(15)-
+// 		m(4)*m(3)*m(14)-
+// 		m(12)*m(2)*m(7)+
+// 		m(12)*m(3)*m(6))
+
+// 	inv.setIndex(10, m(0)*m(5)*m(15)-
+// 		m(0)*m(7)*m(13)-
+// 		m(4)*m(1)*m(15)+
+// 		m(4)*m(3)*m(13)+
+// 		m(12)*m(1)*m(7)-
+// 		m(12)*m(3)*m(5))
+
+// 	inv.setIndex(14, -m(0)*m(5)*m(14)+
+// 		m(0)*m(6)*m(13)+
+// 		m(4)*m(1)*m(14)-
+// 		m(4)*m(2)*m(13)-
+// 		m(12)*m(1)*m(6)+
+// 		m(12)*m(2)*m(5))
+
+// 	inv.setIndex(3, -m(1)*m(6)*m(11)+
+// 		m(1)*m(7)*m(10)+
+// 		m(5)*m(2)*m(11)-
+// 		m(5)*m(3)*m(10)-
+// 		m(9)*m(2)*m(7)+
+// 		m(9)*m(3)*m(6))
+
+// 	inv.setIndex(7, m(0)*m(6)*m(11)-
+// 		m(0)*m(7)*m(10)-
+// 		m(4)*m(2)*m(11)+
+// 		m(4)*m(3)*m(10)+
+// 		m(8)*m(2)*m(7)-
+// 		m(8)*m(3)*m(6))
+
+// 	inv.setIndex(11, -m(0)*m(5)*m(11)+
+// 		m(0)*m(7)*m(9)+
+// 		m(4)*m(1)*m(11)-
+// 		m(4)*m(3)*m(9)-
+// 		m(8)*m(1)*m(7)+
+// 		m(8)*m(3)*m(5))
+
+// 	inv.setIndex(15, m(0)*m(5)*m(10)-
+// 		m(0)*m(6)*m(9)-
+// 		m(4)*m(1)*m(10)+
+// 		m(4)*m(2)*m(9)+
+// 		m(8)*m(1)*m(6)-
+// 		m(8)*m(2)*m(5))
+
+// 	det := m(0)*inv.Index(0) + m(1)*inv.Index(4) + m(2)*inv.Index(8) + m(3)*inv.Index(12)
+
+// 	if det == 0 {
+// 		return NewMatrix4()
+// 	}
+
+// 	det = 1.0 / det
+
+// 	for i := 0; i < 16; i++ {
+// 		inv.setIndex(i, inv.Index(i)*det)
+// 	}
+
+// 	return inv
+
+// }
 
 func (matrix *Matrix4) setIndex(index int, value float64) {
 	matrix[index/4][index%4] = value
@@ -377,9 +429,11 @@ func (matrix *Matrix4) Index(index int) float64 {
 
 // Equals returns true if the matrix equals the same values in the provided Other Matrix4.
 func (matrix Matrix4) Equals(other Matrix4) bool {
+
+	eps := 0.0001 // epsilon floating point error value
 	for i := 0; i < len(matrix); i++ {
 		for j := 0; j < len(matrix[i]); j++ {
-			if matrix[i][j] != other[i][j] {
+			if math.Abs(matrix[i][j]-other[i][j]) > eps {
 				return false
 			}
 		}
@@ -387,9 +441,11 @@ func (matrix Matrix4) Equals(other Matrix4) bool {
 	return true
 }
 
+var identityMatrix = NewMatrix4()
+
 // IsIdentity returns true if the matrix is an unmodified identity matrix.
 func (matrix Matrix4) IsIdentity() bool {
-	return matrix.Equals(NewMatrix4())
+	return matrix.Equals(identityMatrix)
 }
 
 // Row returns the indiced row from the Matrix4 as a Vector.
@@ -678,10 +734,24 @@ func NewMatrix4RotateFromEuler(euler Vector) Matrix4 {
 // NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. to is the target's world position,
 // from is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
 func NewLookAtMatrix(from, to, up Vector) Matrix4 {
+
+	// If from and to are the same, then an identity Matrix4 should be a sensible default
 	if from.Equals(to) {
 		return NewMatrix4()
 	}
 	z := to.Sub(from).Unit()
+
+	up = up.Unit()
+
+	// If z == up, then the matrix will be unusable, so we sub up out with another angle
+	if z.Equals(up) || z.Equals(up.Invert()) {
+		if !up.Equals(WorldRight) {
+			up = WorldRight
+		} else {
+			up = WorldBack
+		}
+	}
+
 	x := up.Cross(z).Unit()
 	y := z.Cross(x)
 	return Matrix4{

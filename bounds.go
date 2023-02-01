@@ -175,6 +175,7 @@ type CollisionTestSettings struct {
 // concerning whether an object that implements IBoundingObject is colliding with another IBoundingObject, and
 // if so, by how much.
 type IBoundingObject interface {
+	INode
 	// Colliding returns true if the BoundingObject is intersecting the other BoundingObject.
 	Colliding(other IBoundingObject) bool
 	// Collision returns a Collision if the BoundingObject is intersecting another BoundingObject. If

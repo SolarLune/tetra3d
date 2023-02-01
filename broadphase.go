@@ -15,6 +15,7 @@ type Broadphase struct {
 	Center            *Node
 	aabb              *BoundingAABB
 	TriSets           [][][][]uint16
+	allTriSet         map[uint16]bool
 	BoundingTriangles *BoundingTriangles
 }
 
@@ -57,6 +58,7 @@ func (bp *Broadphase) Clone() *Broadphase {
 	}
 
 	newBroadphase.TriSets = ts
+	newBroadphase.allTriSet = bp.allTriSet
 
 	return newBroadphase
 }
@@ -79,6 +81,7 @@ func (bp *Broadphase) Resize(gridSize int) {
 	bp.aabb.updateSize()
 
 	bp.TriSets = make([][][][]uint16, gridSize)
+	bp.allTriSet = make(map[uint16]bool)
 
 	hg := float64(bp.GridSize) / 2
 
@@ -108,6 +111,7 @@ func (bp *Broadphase) Resize(gridSize int) {
 					if bp.aabb.PointInside(closestOnTri) {
 						bp.TriSets[i][j][k] = append(bp.TriSets[i][j][k], tri.ID)
 					}
+					bp.allTriSet[tri.ID] = true
 
 				}
 
@@ -124,12 +128,8 @@ func (bp *Broadphase) Resize(gridSize int) {
 // once, of course.
 func (bp *Broadphase) TrianglesFromBounding(boundingObject IBoundingObject) map[uint16]bool {
 
-	if bp.GridSize <= 0 {
-		trianglesSet := make(map[uint16]bool, len(bp.BoundingTriangles.Mesh.Triangles))
-		for _, tri := range bp.BoundingTriangles.Mesh.Triangles {
-			trianglesSet[tri.ID] = true
-		}
-		return trianglesSet
+	if bp.GridSize <= 1 {
+		return bp.allTriSet
 	}
 
 	trianglesSet := make(map[uint16]bool, len(bp.TriSets))

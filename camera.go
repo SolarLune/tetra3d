@@ -55,10 +55,10 @@ type Camera struct {
 	AccumulateColorMode           int                      // The mode to use when rendering previous frames to the accumulation buffer. Defaults to AccumulateColorModeNone.
 	AccumulateDrawOptions         *ebiten.DrawImageOptions // Draw image options to use when rendering frames to the accumulation buffer; use this to fade out or color previous frames.
 
-	Near, Far   float64 // The near and far clipping plane. Near defaults to 0.1, Far to 100 (unless these settings are loaded from a camera in a GLTF file).
-	Perspective bool    // If the Camera has a perspective projection. If not, it would be orthographic
-	FieldOfView float64 // Vertical field of view in degrees for a perspective projection camera
-	OrthoScale  float64 // Scale of the view for an orthographic projection camera in units horizontally
+	near, far   float64 // The near and far clipping plane. Near defaults to 0.1, Far to 100 (unless these settings are loaded from a camera in a GLTF file).
+	perspective bool    // If the Camera has a perspective projection. If not, it would be orthographic
+	fieldOfView float64 // Vertical field of view in degrees for a perspective projection camera
+	orthoScale  float64 // Scale of the view for an orthographic projection camera in units horizontally
 
 	DebugInfo DebugInfo
 
@@ -76,6 +76,8 @@ type Camera struct {
 	sphereFactorX          float64
 	sphereFactorTang       float64
 	sphereFactorCalculated bool
+	updateProjectionMatrix bool
+	cachedProjectionMatrix Matrix4
 
 	debugTextTexture *ebiten.Image
 }
@@ -86,10 +88,12 @@ func NewCamera(w, h int) *Camera {
 	cam := &Camera{
 		Node:        NewNode("Camera"),
 		RenderDepth: true,
-		Near:        0.1,
-		Far:         100,
+		near:        0.1,
+		far:         100,
 
 		AccumulateDrawOptions: &ebiten.DrawImageOptions{},
+
+		orthoScale: 20,
 	}
 
 	depthShaderText := []byte(
@@ -276,7 +280,8 @@ func NewCamera(w, h int) *Camera {
 		cam.Resize(w, h)
 	}
 
-	cam.SetPerspective(60)
+	cam.SetPerspective(true)
+	cam.SetFieldOfView(60)
 
 	return cam
 }
@@ -287,11 +292,11 @@ func (camera *Camera) Clone() INode {
 	clone := NewCamera(w, h)
 
 	clone.RenderDepth = camera.RenderDepth
-	clone.Near = camera.Near
-	clone.Far = camera.Far
-	clone.Perspective = camera.Perspective
-	clone.FieldOfView = camera.FieldOfView
-	clone.OrthoScale = camera.OrthoScale
+	clone.near = camera.near
+	clone.far = camera.far
+	clone.perspective = camera.perspective
+	clone.fieldOfView = camera.fieldOfView
+	clone.orthoScale = camera.orthoScale
 
 	clone.AccumulateColorMode = camera.AccumulateColorMode
 	clone.AccumulateDrawOptions = camera.AccumulateDrawOptions
@@ -331,6 +336,7 @@ func (camera *Camera) Resize(w, h int) {
 	camera.depthIntermediate = ebiten.NewImage(w, h)
 	camera.clipAlphaIntermediate = ebiten.NewImage(w, h)
 	camera.sphereFactorCalculated = false
+	camera.updateProjectionMatrix = true
 
 }
 
@@ -356,36 +362,107 @@ func (camera *Camera) ViewMatrix() Matrix4 {
 // Projection returns the Camera's projection matrix.
 func (camera *Camera) Projection() Matrix4 {
 
+	if !camera.updateProjectionMatrix {
+		return camera.cachedProjectionMatrix
+	}
+
+	camera.updateProjectionMatrix = false
+
 	if !camera.sphereFactorCalculated {
-		angle := camera.FieldOfView * 3.1415 / 360
+		angle := camera.fieldOfView * 3.1415 / 360
 		camera.sphereFactorTang = math.Tan(angle)
 		camera.sphereFactorY = 1.0 / math.Cos(angle)
 		camera.sphereFactorX = 1.0 / math.Cos(math.Atan(camera.sphereFactorTang*camera.AspectRatio()))
 		camera.sphereFactorCalculated = true
 	}
 
-	if camera.Perspective {
-		return NewProjectionPerspective(camera.FieldOfView, camera.Near, camera.Far, float64(camera.resultColorTexture.Bounds().Dx()), float64(camera.resultColorTexture.Bounds().Dy()))
+	if camera.perspective {
+		camera.cachedProjectionMatrix = NewProjectionPerspective(camera.fieldOfView, camera.near, camera.far, float64(camera.resultColorTexture.Bounds().Dx()), float64(camera.resultColorTexture.Bounds().Dy()))
+	} else {
+
+		w, h := camera.resultColorTexture.Size()
+		asr := float64(h) / float64(w)
+
+		camera.cachedProjectionMatrix = NewProjectionOrthographic(camera.near, camera.far, 1*camera.orthoScale, -1*camera.orthoScale, asr*camera.orthoScale, -asr*camera.orthoScale)
 	}
-	w, h := camera.resultColorTexture.Size()
-	asr := float64(h) / float64(w)
 
-	return NewProjectionOrthographic(camera.Near, camera.Far, 1*camera.OrthoScale, -1*camera.OrthoScale, asr*camera.OrthoScale, -asr*camera.OrthoScale)
-	// return NewProjectionOrthographic(camera.Near, camera.Far, float64(camera.ColorTexture.Bounds().Dx())*camera.OrthoScale, float64(camera.ColorTexture.Bounds().Dy())*camera.OrthoScale)
+	return camera.cachedProjectionMatrix
+	// return NewProjectionOrthographic(camera.Near, camera.far, float64(camera.ColorTexture.Bounds().Dx())*camera.orthoScale, float64(camera.ColorTexture.Bounds().Dy())*camera.orthoScale)
 }
 
-// SetPerspective sets the Camera's projection to be a perspective projection. fovY indicates the vertical field of view (in degrees) for the camera's aperture.
-func (camera *Camera) SetPerspective(fovY float64) {
-	camera.FieldOfView = fovY
-	camera.Perspective = true
+// SetPerspective sets the Camera's projection to be a perspective (true) or orthographic (false) projection.
+func (camera *Camera) SetPerspective(perspective bool) {
+	if camera.perspective == perspective {
+		return
+	}
+	camera.perspective = perspective
 	camera.sphereFactorCalculated = false
+	camera.updateProjectionMatrix = true
 }
 
-// SetOrthographic sets the Camera's projection to be an orthographic projection. orthoScale indicates the scale of the camera in units horizontally.
-func (camera *Camera) SetOrthographic(orthoScale float64) {
-	camera.Perspective = false
-	camera.OrthoScale = orthoScale
+// Perspective returns whether the Camera is perspective or not (orthographic).
+func (camera *Camera) Perspective() bool {
+	return camera.perspective
+}
+
+// SetFieldOfView sets the vertical field of the view of the camera in degrees.
+func (camera *Camera) SetFieldOfView(fovY float64) {
+	if camera.fieldOfView == fovY {
+		return
+	}
+	camera.fieldOfView = fovY
 	camera.sphereFactorCalculated = false
+	camera.updateProjectionMatrix = true
+}
+
+// FieldOfView returns the vertical field of view in degrees.
+func (camera *Camera) FieldOfView() float64 {
+	return camera.fieldOfView
+}
+
+// SetOrthoScale sets the scale of an orthographic camera in world units across (horizontally).
+func (camera *Camera) SetOrthoScale(scale float64) {
+	if camera.orthoScale == scale {
+		return
+	}
+	camera.orthoScale = scale
+	camera.sphereFactorCalculated = false
+	camera.updateProjectionMatrix = true
+}
+
+// OrthoScale returns the scale of an orthographic camera in world units across (horizontally).
+func (camera *Camera) OrthoScale() float64 {
+	return camera.orthoScale
+}
+
+// Near returns the near plane of a camera.
+func (camera *Camera) Near() float64 {
+	return camera.near
+}
+
+// SetNear sets the near plane of a camera.
+func (camera *Camera) SetNear(near float64) {
+	if camera.near == near {
+		return
+	}
+	camera.near = near
+	camera.sphereFactorCalculated = false
+	camera.updateProjectionMatrix = true
+}
+
+// Far returns the far plane of a camera.
+func (camera *Camera) Far() float64 {
+	return camera.far
+}
+
+// SetFar sets the far plane of the camera.
+func (camera *Camera) SetFar(far float64) {
+	if camera.far == far {
+		return
+	}
+	camera.far = far
+	camera.sphereFactorCalculated = false
+	camera.updateProjectionMatrix = true
 }
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
@@ -394,7 +471,7 @@ func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width,
 
 	v3 := vert.W
 
-	if !camera.Perspective {
+	if !camera.perspective {
 		v3 = 1.0
 	}
 
@@ -431,6 +508,74 @@ func (camera *Camera) WorldToScreen(vert Vector) Vector {
 	return camera.ClipToScreen(v.MultVecW(NewVectorZero()))
 }
 
+// ScreenToWorld converts an x and y pixel position on screen to a 3D point right in front of the camera.
+// The depth argument changes how deep the returned Vector is in 3D world units.
+func (camera *Camera) ScreenToWorld(x, y int, depth float64) Vector {
+
+	projection := camera.ViewMatrix().Mult(camera.Projection()).Inverted()
+
+	w := camera.ColorTexture().Bounds().Dx()
+	h := camera.ColorTexture().Bounds().Dy()
+
+	if x < 0 {
+		x = 0
+	} else if x > w {
+		x = w
+	}
+
+	if y < 0 {
+		y = 0
+	} else if y > w {
+		y = w
+	}
+
+	// vec := Vector{float64(x)/float64(w) - 0.5, -(float64(y)/float64(h) - 0.5), (depth * 2) - 1, 1}
+
+	// For whatever reason, the depth isn't being properly transformed, so I do it manually sorta below
+	vec := Vector{float64(x)/float64(w) - 0.5, -(float64(y)/float64(h) - 0.5), -1, 1}
+
+	vecOut := projection.MultVecW(vec)
+
+	vecOut.X /= vecOut.W
+	vecOut.Y /= vecOut.W
+	vecOut.Z /= vecOut.W
+
+	// This part shouldn't be necessary if the inverted projection matrix properly transformed the depth part
+	// back into the Vector, but for whatever reason, it's not working, so here I basically hack in a manual solution
+	diff := vecOut.Sub(camera.WorldPosition()).Unit()
+	vecOut = camera.WorldPosition().Add(diff.Scale(depth))
+
+	return vecOut
+
+}
+
+// int glhUnProjectf(float winx, float winy, float winz, float *modelview, float *projection, int *viewport, float *objectCoordinate)
+// {
+// 	// Transformation matrices
+// 	float m[16], A[16];
+// 	float in[4], out[4];
+// 	// Calculation for inverting a matrix, compute projection x modelview
+// 	// and store in A[16]
+// 	MultiplyMatrices4by4OpenGL_FLOAT(A, projection, modelview);
+// 	// Now compute the inverse of matrix A
+// 	if(glhInvertMatrixf2(A, m)==0)
+// 	   return 0;
+// 	// Transformation of normalized coordinates between -1 and 1
+// 	in[0]=(winx-(float)viewport[0])/(float)viewport[2]*2.0-1.0;
+// 	in[1]=(winy-(float)viewport[1])/(float)viewport[3]*2.0-1.0;
+// 	in[2]=2.0*winz-1.0;
+// 	in[3]=1.0;
+// 	// Objects coordinates
+// 	MultiplyMatrixByVector4by4OpenGL_FLOAT(out, m, in);
+// 	if(out[3]==0.0)
+// 	   return 0;
+// 	out[3]=1.0/out[3];
+// 	objectCoordinate[0]=out[0]*out[3];
+// 	objectCoordinate[1]=out[1]*out[3];
+// 	objectCoordinate[2]=out[2]*out[3];
+// 	return 1;
+// }
+
 // WorldToClip transforms a 3D position in the world to clip coordinates (before screen normalization).
 func (camera *Camera) WorldToClip(vert Vector) Vector {
 	v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
@@ -444,13 +589,13 @@ func (camera *Camera) PointInFrustum(point Vector) bool {
 	pcZ := diff.Dot(camera.cameraForward)
 	aspectRatio := camera.AspectRatio()
 
-	if pcZ > camera.Far || pcZ < camera.Near {
+	if pcZ > camera.far || pcZ < camera.near {
 		return false
 	}
 
-	if camera.Perspective {
+	if camera.perspective {
 
-		h := pcZ * math.Tan(camera.FieldOfView/2)
+		h := pcZ * math.Tan(camera.fieldOfView/2)
 
 		pcY := diff.Dot(camera.cameraUp)
 
@@ -468,7 +613,7 @@ func (camera *Camera) PointInFrustum(point Vector) bool {
 
 	} else {
 
-		width := camera.OrthoScale / 2
+		width := camera.orthoScale / 2
 		height := width / camera.AspectRatio()
 
 		pcY := diff.Dot(camera.cameraUp)
@@ -497,11 +642,11 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 	diff := sphere.WorldPosition().Sub(camera.WorldPosition())
 	pcZ := diff.Dot(camera.cameraForward)
 
-	if pcZ > camera.Far+radius || pcZ < camera.Near-radius {
+	if pcZ > camera.far+radius || pcZ < camera.near-radius {
 		return false
 	}
 
-	if camera.Perspective {
+	if camera.perspective {
 
 		d := camera.sphereFactorY * radius
 		pcZ *= camera.sphereFactorTang
@@ -523,7 +668,7 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 
 	} else {
 
-		width := camera.OrthoScale
+		width := camera.orthoScale
 		height := width / camera.AspectRatio()
 
 		pcY := diff.Dot(camera.cameraUp)
@@ -806,9 +951,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	camWidth, camHeight := camera.resultColorTexture.Size()
 
-	far := camera.Far
-	near := camera.Near
-	if !camera.Perspective {
+	far := camera.far
+	near := camera.near
+	if !camera.perspective {
 		far = 2.0
 		near = 0
 	}
@@ -1333,7 +1478,7 @@ func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...Spri
 
 		out := camera.ViewMatrix().Mult(camera.Projection()).MultVec(rs.WorldPosition)
 
-		depth := float32(out.Z / camera.Far)
+		depth := float32(out.Z / camera.far)
 
 		if depth < 0 {
 			depth = 0
