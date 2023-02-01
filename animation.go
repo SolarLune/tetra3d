@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"time"
@@ -211,6 +212,14 @@ func (animation *Animation) AddChannel(name string) *AnimationChannel {
 // Library returns the Library from which this Animation was loaded. If it was created in code, this function would return nil.
 func (animation *Animation) Library() *Library {
 	return animation.library
+}
+
+func (animation *Animation) String() string {
+	if ReadableReferences {
+		return "<" + animation.Name + ">"
+	} else {
+		return fmt.Sprintf("%p", animation)
+	}
 }
 
 // AnimationValues indicate the current position, scale, and rotation for a Node.

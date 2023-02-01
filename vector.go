@@ -303,7 +303,7 @@ func (vec Vector) RotateVec(axis Vector, angle float64) Vector {
 }
 
 // Rotate returns a copy of the Vector, rotated around an axis Vector with the x, y, and z components provided, by the angle
-// provided (in radians).
+// provided (in radians), counter-clockwise.
 // The function is most efficient if passed an orthogonal, normalized axis (i.e. the X, Y, or Z constants).
 // Note that this function ignores the W component of both Vectors.
 func (vec Vector) Rotate(x, y, z, angle float64) Vector {

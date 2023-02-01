@@ -10,8 +10,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-//go:embed shapes.gltf
-var shapes []byte
+//go:embed rays.gltf
+var blendFile []byte
 
 type Game struct {
 	Scene *tetra3d.Scene
@@ -32,7 +32,7 @@ func (g *Game) Init() {
 
 	// Load the GLTF file and turn it into a Library, which is a collection of scenes and data shared between them (like meshes or animations).
 
-	library, err := tetra3d.LoadGLTFData(shapes, nil)
+	library, err := tetra3d.LoadGLTFData(blendFile, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -40,29 +40,26 @@ func (g *Game) Init() {
 	g.Scene = library.FindScene("Scene")
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
+	g.System = examples.NewBasicSystemHandler(g)
+	// g.Camera.Resize(320, 180)
 
-	g.Camera.SetFar(30)
+	g.Camera.SetFieldOfView(100)
 
 }
 
 func (g *Game) Update() error {
 
-	// Fog controls
-	if ebiten.IsKeyPressed(ebiten.Key1) {
-		g.Scene.World.FogColor.Set(1, 0, 0, 1)
-		g.Scene.World.FogMode = tetra3d.FogAdd
-	} else if ebiten.IsKeyPressed(ebiten.Key2) {
-		g.Scene.World.FogColor.Set(0, 0, 0, 1)
-		g.Scene.World.FogMode = tetra3d.FogMultiply
-	} else if ebiten.IsKeyPressed(ebiten.Key3) {
-		g.Scene.World.FogColor.Set(0, 0, 0, 1)
-		g.Scene.World.FogMode = tetra3d.FogOverwrite
-	} else if ebiten.IsKeyPressed(ebiten.Key4) {
-		g.Scene.World.FogColor = colors.White()
-		g.Scene.World.FogMode = tetra3d.FogOverwrite
-	} else if ebiten.IsKeyPressed(ebiten.Key5) {
-		g.Scene.World.FogMode = tetra3d.FogOff
-		g.Scene.World.FogColor = colors.Black() // With the fog being off, setting the color doesn't do anything directly, but the clear color is set below to the fog color
+	results := g.Camera.MouseRayTest(g.Camera.Far(), g.Scene.Root.SearchTree().BoundingObjects()...)
+	if len(results) > 0 {
+
+		marker := g.Scene.Root.Get("Marker")
+
+		marker.SetWorldPositionVec(results[0].Position.Add(results[0].Normal.Scale(0.5)))
+
+		mat := tetra3d.NewLookAtMatrix(marker.WorldPosition(), results[0].Position, tetra3d.WorldUp)
+
+		marker.SetWorldRotation(mat)
+
 	}
 
 	g.Camera.Update()
@@ -84,11 +81,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.System.Draw(screen, g.Camera.Camera)
 
 	if g.System.DrawDebugText {
-		txt := `1: Change fog to red additive
-2: Change fog to black multiply
-3: Change fog to black overwrite
-4: Change fog to white overwrite
-5: Turn off fog`
+		txt := `In this example, a ray is cast
+from the mouse, forward. Whatever is hit will
+be marked with a blue arrow. If the mouse is locked
+to the game window, then the ray shoots directly forward
+from the center of the screen.
+`
 		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 
@@ -99,7 +97,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 }
 
 func main() {
-	ebiten.SetWindowTitle("Tetra3d - Shapes Test")
+	ebiten.SetWindowTitle("Tetra3d - Ray Test")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	game := NewGame()

@@ -147,8 +147,8 @@ type collisionPlane struct {
 	Distance float64
 }
 
-func newCollisionPlane() *collisionPlane {
-	return &collisionPlane{}
+func newCollisionPlane() collisionPlane {
+	return collisionPlane{}
 }
 
 func (plane *collisionPlane) Set(v0, v1, v2 Vector) {
@@ -167,6 +167,27 @@ func (plane *collisionPlane) ClosestPoint(point Vector) Vector {
 
 	dist := plane.Normal.Dot(point) - plane.Distance
 	return point.Sub(plane.Normal.Scale(dist))
+
+}
+
+func (plane *collisionPlane) RayAgainstPlane(from, to Vector) (Vector, bool) {
+
+	dir := to.Sub(from).Unit()
+
+	nd := dir.Dot(plane.Normal)
+	pn := from.Dot(plane.Normal)
+
+	if nd >= 0 {
+		return Vector{}, false
+	}
+
+	t := (plane.Distance - pn) / nd
+
+	if t >= 0 {
+		return from.Add(dir.Scale(t)), true
+	}
+
+	return Vector{}, false
 
 }
 

@@ -350,14 +350,14 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Composing collision shapes out of multiple sub-shapes (this can be done by simply creating them, parenting them to some node, and then testing against that node)
 - [X] -- Bounding / Broadphase collision checking
 
+| Collision Type | Sphere | AABB       | Triangle   | Capsule |
+| ---------------- | -------- | ------------ | ------------ | --------- |
+| Sphere         | ✅     | ✅         | ✅         | ✅      |
+| AABB           | ✅     | ✅         | ⛔ (buggy) | ✅      |
+| Triangle       | ✅     | ⛔ (buggy) | ⛔ (buggy) | ✅      |
+| Capsule        | ✅     | ✅         | ✅         | ⛔ (buggy)      |
+| Ray            | ✅     | ✅         | ✅         | ✅      |
 
-| Collision Type | Sphere | AABB       | Triangle   | Capsule | Ray (not implemented yet) |
-| ---------------- | -------- | ------------ | ------------ | --------- | --------------------------- |
-| Sphere         | ✅     | ✅         | ✅         | ✅      | ❌                        |
-| AABB           | ✅     | ✅         | ⛔ (buggy) | ✅      | ❌                        |
-| Triangle       | ✅     | ⛔ (buggy) | ⛔ (buggy) | ✅      | ❌                        |
-| Capsule        | ✅     | ✅         | ✅         | ✅      | ❌                        |
-| Ray            | ❌     | ❌         | ❌         | ❌      | ❌                        |
 - [ ] -- An actual collision system?
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
@@ -370,6 +370,13 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Replace Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)?
 - [X] -- Custom Vectors
 - [ ] -- Matrix pools?
+- [ ] -- Raytest optimization
+- [ ] -- -- Sphere?
+- [ ] -- -- AABB?
+- [ ] -- -- Capsule?
+- [ ] -- -- Triangles
+- [ ] -- -- -- Maybe we can combine contiguous triangles into faces and just check faces?
+- [ ] -- -- -- We could use the broadphase system to find triangles that are in the raycast area, specifically
 - [ ] -- Instead of doing cosllision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
 - [ ] -- Lighting speed improvements
 - [ ] -- Occlusion culling - this should be possible using octrees to determine if an object is visible before rendering it; see: https://www.gamedeveloper.com/programming/occlusion-culling-algorithms

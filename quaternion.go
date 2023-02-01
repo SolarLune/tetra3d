@@ -165,6 +165,7 @@ func (quat Quaternion) ToMatrix4() Matrix4 {
 	return m1.Mult(m2)
 }
 
+// RotateVec rotates the given vector around using the Quaternion counter-clockwise.
 func (quat Quaternion) RotateVec(v Vector) Vector {
 
 	// xyz := NewVector(quat.X, quat.Y, quat.Z)
@@ -231,7 +232,7 @@ func (quat Quaternion) ToAxisAngle() (Vector, float64) {
 
 }
 
-// NewQuaternionFromAxisAngle returns a new Quaternion
+// NewQuaternionFromAxisAngle returns a new Quaternion from the given axis and angle combination.
 func NewQuaternionFromAxisAngle(axis Vector, angle float64) Quaternion {
 	axis = axis.Unit()
 	halfAngle := angle / 2

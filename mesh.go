@@ -934,6 +934,76 @@ func NewPlaneMesh() *Mesh {
 
 }
 
+// NewCylinderMesh creates a new cylinder Mesh and gives it a new material (suitably named "Cylinder").
+// sideCount is how many sides the cylinder should have, while radius is the radius of the cylinder in world units.
+// if createCaps is true, then the cylinder will have triangle caps.
+func NewCylinderMesh(sideCount int, radius float64, createCaps bool) *Mesh {
+
+	if sideCount < 3 {
+		sideCount = 3
+	}
+
+	mesh := NewMesh("Cylinder")
+
+	verts := []VertexInfo{}
+
+	for i := 0; i < sideCount; i++ {
+
+		pos := NewVector(radius, 1, 0)
+		pos = pos.Rotate(0, 1, 0, float64(i)/float64(sideCount)*math.Pi*2)
+		verts = append(verts, NewVertex(pos.X, pos.Y, pos.Z, 0, 0))
+
+	}
+
+	for i := 0; i < sideCount; i++ {
+
+		pos := NewVector(radius, -1, 0)
+		pos = pos.Rotate(0, 1, 0, float64(i)/float64(sideCount)*math.Pi*2)
+		verts = append(verts, NewVertex(pos.X, pos.Y, pos.Z, 0, 0))
+
+	}
+
+	if createCaps {
+		verts = append(verts, NewVertex(0, 1, 0, 0, 0))
+		verts = append(verts, NewVertex(0, -1, 0, 0, 0))
+	}
+
+	mesh.AddVertices(verts...)
+
+	indices := []int{}
+	for i := 0; i < sideCount; i++ {
+		if i < sideCount-1 {
+			indices = append(indices, i, i+sideCount, i+1)
+			indices = append(indices, i+1, i+sideCount, i+sideCount+1)
+		} else {
+			indices = append(indices, i, i+sideCount, 0)
+			indices = append(indices, 0, i+sideCount, sideCount)
+		}
+	}
+
+	if createCaps {
+		for i := 0; i < sideCount; i++ {
+			topCenter := len(verts) - 2
+			bottomCenter := len(verts) - 1
+			if i < sideCount-1 {
+				indices = append(indices, i, i+1, topCenter)
+				indices = append(indices, i+sideCount+1, i+sideCount, bottomCenter)
+			} else {
+				indices = append(indices, i, 0, topCenter)
+				indices = append(indices, sideCount, i+sideCount, bottomCenter)
+			}
+		}
+	}
+
+	mesh.AddMeshPart(NewMaterial("Cylinder"), indices...)
+
+	mesh.UpdateBounds()
+	mesh.AutoNormal()
+
+	return mesh
+
+}
+
 // func NewWeirdDebuggingStatueThing() *Mesh {
 
 // 	mesh := NewMesh("Weird Statue")

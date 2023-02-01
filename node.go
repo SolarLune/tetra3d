@@ -898,12 +898,12 @@ func (node *Node) HierarchyAsString() string {
 	return printNode(node, 0)
 }
 
-// If enabled, Nodes will be represented by their names when printed directly.
-// Otherwise, they will be represented by their pointer locations, like default.
-var ReadableNodes = true
+// If enabled, Nodes, Materials, and other object types will be represented by their names when
+// printed directly. Otherwise, they will be represented by their pointer locations, like default.
+var ReadableReferences = true
 
 func (node *Node) String() string {
-	if ReadableNodes {
+	if ReadableReferences {
 		return "<" + node.name + ">"
 	} else {
 		return fmt.Sprintf("%p", node)
