@@ -775,9 +775,9 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 		// 	closestCapsulePoint = capsuleBottom
 		// }
 
-		// v0 := triangles.Mesh.VertexPositions[tri.ID*3]
-		// v1 := triangles.Mesh.VertexPositions[tri.ID*3+1]
-		// v2 := triangles.Mesh.VertexPositions[tri.ID*3+2]
+		// v0 := triangles.mesh.VertexPositions[tri.ID*3]
+		// v1 := triangles.mesh.VertexPositions[tri.ID*3+1]
+		// v2 := triangles.mesh.VertexPositions[tri.ID*3+2]
 
 		// closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
 

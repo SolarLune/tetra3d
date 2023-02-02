@@ -80,7 +80,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	mat := merged.Mesh.MeshParts[0].Material
+	mat := merged.Mesh().MeshParts[0].Material
 	mat.Shadeless = true
 	mat.Texture = ebiten.NewImageFromImage(img)
 

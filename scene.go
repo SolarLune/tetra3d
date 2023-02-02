@@ -77,7 +77,7 @@ func (scene *Scene) HandleAutobatch() {
 
 					mat := autobatchBlankMat
 
-					if mats := model.Mesh.Materials(); len(mats) > 0 {
+					if mats := model.mesh.Materials(); len(mats) > 0 {
 						mat = mats[0]
 					}
 
@@ -91,7 +91,7 @@ func (scene *Scene) HandleAutobatch() {
 							scene.autobatchDynamicMap[mat] = m
 							scene.Root.AddChildren(m)
 						}
-						scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].Mesh.MeshParts[0], model)
+						scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].mesh.MeshParts[0], model)
 
 					} else if model.AutoBatchMode == AutoBatchStatic {
 

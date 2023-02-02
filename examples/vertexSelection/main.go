@@ -69,7 +69,7 @@ func (g *Game) Init() {
 	// Oh, and by default, when we export a mesh with vertex colors, the first vertex color channel is active.
 
 	// Here, we'll select our vertices and store it in the Game struct.
-	mesh := g.Cube.Mesh
+	mesh := g.Cube.Mesh()
 
 	// VertexSelection.SelectInChannel selects all vertices that have a non-black color in a specified color channel.
 	// mesh.VertexColorChannelNames stores the various vertex color channel names with their related channel indices.

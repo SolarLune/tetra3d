@@ -303,7 +303,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 
 		// if len(normals) > 0 {
 
-		// 	for _, part := range mesh.MeshParts {
+		// 	for _, part := range mesh.meshParts {
 
 		// 		for _, tri := range part.Triangles {
 
@@ -330,7 +330,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 		// }
 
 		if options.CorrectYUp {
-			// for _, part := range mesh.MeshParts {
+			// for _, part := range mesh.meshParts {
 			// 	part.ApplyMatrix(NewMatrix4Rotate(1, 0, 0, -math.Pi/2))
 			// 	mesh.UpdateBounds()
 			// }

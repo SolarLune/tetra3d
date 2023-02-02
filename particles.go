@@ -225,9 +225,9 @@ type ParticleSystem struct {
 func NewParticleSystem(systemNode *Model, particles ...*Model) *ParticleSystem {
 
 	for _, part := range particles {
-		mat := part.Mesh.MeshParts[0].Material
-		if systemNode.Mesh.FindMeshPart(mat.Name) == nil {
-			systemNode.Mesh.AddMeshPart(part.Mesh.MeshParts[0].Material)
+		mat := part.mesh.MeshParts[0].Material
+		if systemNode.mesh.FindMeshPart(mat.Name) == nil {
+			systemNode.mesh.AddMeshPart(part.mesh.MeshParts[0].Material)
 		}
 	}
 
@@ -297,7 +297,7 @@ func (ps *ParticleSystem) Spawn() {
 	} else {
 		part = NewParticle(ps, ps.ParticleFactories)
 		for _, newModel := range part.ModelBank {
-			ps.Root.DynamicBatchAdd(ps.Root.Mesh.FindMeshPart(part.Model.Mesh.MeshParts[0].Material.Name), newModel)
+			ps.Root.DynamicBatchAdd(ps.Root.mesh.FindMeshPart(part.Model.mesh.MeshParts[0].Material.Name), newModel)
 		}
 	}
 
@@ -323,12 +323,12 @@ func (ps *ParticleSystem) Spawn() {
 
 	if ps.Settings.VertexSpawnMode != ParticleVertexSpawnModeOff {
 
-		vertCount := len(ps.Root.Mesh.VertexPositions)
+		vertCount := len(ps.Root.mesh.VertexPositions)
 
 		if ps.Root.skinned {
-			pos = ps.Root.Mesh.vertexSkinnedPositions[ps.vertexSpawnIndex]
+			pos = ps.Root.vertexSkinnedPositions[ps.vertexSpawnIndex]
 		} else {
-			pos = ps.Root.Transform().MultVec(ps.Root.Mesh.VertexPositions[ps.vertexSpawnIndex])
+			pos = ps.Root.Transform().MultVec(ps.Root.mesh.VertexPositions[ps.vertexSpawnIndex])
 		}
 
 		switch ps.Settings.VertexSpawnMode {

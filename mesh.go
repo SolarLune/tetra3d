@@ -163,12 +163,8 @@ type Mesh struct {
 	// Vertices are stored as a struct-of-arrays for simplified and faster rendering.
 	// Each vertex property (position, normal, UV, colors, weights, bones, etc) is stored
 	// here and indexed in order of index.
-	vertexTransforms         []Vector
 	VertexPositions          []Vector
 	VertexNormals            []Vector
-	vertexSkinnedNormals     []Vector
-	vertexSkinnedPositions   []Vector
-	vertexTransformedNormals []Vector
 	VertexUVs                []Vector
 	VertexColors             [][]*Color
 	VertexActiveColorChannel []int
@@ -195,12 +191,9 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 		VertexColorChannelNames: map[string]int{},
 		Properties:              NewProperties(),
 
-		vertexTransforms:         []Vector{},
-		VertexPositions:          []Vector{},
-		VertexNormals:            []Vector{},
-		vertexSkinnedNormals:     []Vector{},
-		vertexSkinnedPositions:   []Vector{},
-		vertexTransformedNormals: []Vector{},
+		VertexPositions: []Vector{},
+		VertexNormals:   []Vector{},
+
 		vertexLights:             []*Color{},
 		VertexUVs:                []Vector{},
 		VertexColors:             [][]*Color{},
@@ -267,22 +260,6 @@ func (mesh *Mesh) Clone() *Mesh {
 		}
 	}
 
-	for v := range mesh.vertexTransforms {
-		newMesh.vertexTransforms = append(newMesh.vertexTransforms, mesh.vertexTransforms[v])
-	}
-
-	for v := range mesh.vertexSkinnedNormals {
-		newMesh.vertexSkinnedNormals = append(newMesh.vertexSkinnedNormals, mesh.vertexSkinnedNormals[v])
-	}
-
-	for v := range mesh.vertexTransformedNormals {
-		newMesh.vertexTransformedNormals = append(newMesh.vertexTransformedNormals, mesh.vertexTransformedNormals[v])
-	}
-
-	for v := range mesh.vertexSkinnedPositions {
-		newMesh.vertexSkinnedPositions = append(newMesh.vertexSkinnedPositions, mesh.vertexSkinnedPositions[v])
-	}
-
 	newMesh.Triangles = make([]*Triangle, 0, len(mesh.Triangles))
 
 	for _, part := range mesh.MeshParts {
@@ -334,14 +311,6 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 	mesh.VertexBones = append(make([][]uint16, 0, vertexCount), mesh.VertexBones...)
 
 	mesh.VertexWeights = append(make([][]float32, 0, vertexCount), mesh.VertexWeights...)
-
-	mesh.vertexTransforms = append(make([]Vector, 0, vertexCount), mesh.vertexTransforms...)
-
-	mesh.vertexSkinnedNormals = append(make([]Vector, 0, vertexCount), mesh.vertexSkinnedNormals...)
-
-	mesh.vertexTransformedNormals = append(make([]Vector, 0, vertexCount), mesh.vertexTransformedNormals...)
-
-	mesh.vertexSkinnedPositions = append(make([]Vector, 0, vertexCount), mesh.vertexSkinnedPositions...)
 
 }
 
@@ -460,10 +429,6 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 		mesh.VertexWeights = append(mesh.VertexWeights, vertInfo.Weights)
 
 		mesh.vertexLights = append(mesh.vertexLights, NewColor(0, 0, 0, 1))
-		mesh.vertexTransforms = append(mesh.vertexTransforms, Vector{0, 0, 0, 0}) // x, y, z, w
-		mesh.vertexSkinnedNormals = append(mesh.vertexSkinnedNormals, Vector{0, 0, 0, 0})
-		mesh.vertexTransformedNormals = append(mesh.vertexTransformedNormals, Vector{0, 0, 0, 0})
-		mesh.vertexSkinnedPositions = append(mesh.vertexSkinnedPositions, Vector{0, 0, 0, 0})
 
 	}
 

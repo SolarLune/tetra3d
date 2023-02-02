@@ -3,7 +3,9 @@ package tetra3d
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -82,6 +84,11 @@ type Camera struct {
 	cachedProjectionMatrix Matrix4
 
 	debugTextTexture *ebiten.Image
+
+	processFrame uint64
+
+	multithreadProcessChannels []chan multithreadRenderRequest
+	multithreadWaitGroup       sync.WaitGroup
 }
 
 // NewCamera creates a new Camera with the specified width and height.
@@ -285,7 +292,47 @@ func NewCamera(w, h int) *Camera {
 	cam.SetPerspective(true)
 	cam.SetFieldOfView(60)
 
+	if threadCount > 1 {
+
+		for i := 0; i < threadCount; i++ {
+
+			cam.multithreadProcessChannels = append(cam.multithreadProcessChannels, make(chan multithreadRenderRequest, 1))
+
+			threadIndex := i
+
+			go func(index int) {
+
+				runtime.LockOSThread()
+
+				for {
+
+					request := <-cam.multithreadProcessChannels[index]
+					cam.multithreadWaitGroup.Add(1)
+
+					// t := time.Now()
+
+					for _, model := range request.Models {
+						model.ProcessVertices(request.VpMatrix, cam, request.Scene)
+					}
+
+					// fmt.Println(index, time.Since(t))
+
+					cam.multithreadWaitGroup.Done()
+
+				}
+
+			}(threadIndex)
+
+		}
+	}
+
 	return cam
+}
+
+type multithreadRenderRequest struct {
+	VpMatrix Matrix4
+	Scene    *Scene
+	Models   []*Model
 }
 
 func (camera *Camera) Clone() INode {
@@ -761,6 +808,8 @@ func (camera *Camera) Clear() {
 	camera.cameraRight = cameraRot.Right()
 	camera.cameraUp = cameraRot.Up()
 
+	camera.processFrame++
+
 }
 
 // RenderScene renders the provided Scene.
@@ -898,7 +947,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 					if !transparent {
 
-						for _, mp := range child.Mesh.MeshParts {
+						for _, mp := range child.mesh.MeshParts {
 
 							if child.isTransparent(mp) {
 								transparent = true
@@ -927,11 +976,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			}
 
-		} else if model.Mesh != nil {
+		} else if model.mesh != nil {
 
 			modelIsTransparent := false
 
-			for _, mp := range model.Mesh.MeshParts {
+			for _, mp := range model.mesh.MeshParts {
 				if model.isTransparent(mp) {
 					transparents = append(transparents, renderPair{model, mp})
 					modelIsTransparent = true
@@ -966,6 +1015,68 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		near = 0
 	}
 
+	if threadCount > 1 && len(models) > threadCount {
+
+		start := 0
+
+		length := len(models) / threadCount
+		if length < 1 {
+			length = 1
+		}
+
+		for i := 0; i < threadCount; i++ {
+
+			camera.multithreadProcessChannels[i] <- multithreadRenderRequest{
+				VpMatrix: vpMatrix,
+				Scene:    scene,
+				Models:   models[start : start+length],
+			}
+
+			start += length
+
+			if start+length == len(models)-1 {
+				length++
+			}
+
+		}
+
+		camera.multithreadWaitGroup.Wait()
+
+	} else {
+		for _, model := range models {
+			model.ProcessVertices(vpMatrix, camera, scene)
+		}
+	}
+
+	// if threadCount > 1 && len(models) >= threadCount {
+
+	// 	prevStart := 0
+
+	// 	length := len(models) / threadCount
+
+	// 	for i := 0; i < threadCount; i++ {
+
+	// 		go func(start, end int, processFrame uint64) {
+	// 			runtime.LockOSThread()
+
+	// 			runtime.UnlockOSThread()
+	// 		}(prevStart, length, camera.processFrame)
+
+	// 		prevStart += length
+
+	// 		// Last section
+	// 		if prevStart+length == len(models)-1 {
+	// 			length++
+	// 		}
+
+	// 	}
+
+	// } else {
+	// 	for _, model := range models {
+	// 		model.ProcessVertices(vpMatrix, camera, scene)
+	// 	}
+	// }
+
 	render := func(rp renderPair) {
 
 		// startingVertexListIndex := vertexListIndex
@@ -973,7 +1084,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		model := rp.Model
 
 		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
-		if model.Mesh == nil {
+		if model.mesh == nil {
 			return
 		}
 
@@ -1006,7 +1117,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			camera.DebugInfo.BatchedParts++
 		}
 
-		sortingTris := model.ProcessVertices(vpMatrix, camera, meshPart, scene)
+		sortingTris := model.SortTriangles(camera, meshPart)
 
 		srcW := 0.0
 		srcH := 0.0
@@ -1037,9 +1148,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		}
 
-		mesh := model.Mesh
+		mesh := model.mesh
 
-		maxSpan := model.Mesh.Dimensions.MaxSpan()
+		maxSpan := model.mesh.Dimensions.MaxSpan()
 		modelPos := model.WorldPosition()
 
 		// Here we do all vertex transforms first because of data locality (it's faster to access all vertex transformations, then go back and do all UV values, etc)
@@ -1092,9 +1203,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				// }
 
 				// triIndex := meshPart.sortingTriangles[t].ID
-				// tri := meshPart.Mesh.Triangles[triIndex]
+				// tri := meshPart.mesh.Triangles[triIndex]
 
-				clipped = camera.clipToScreen(meshPart.Mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight))
+				clipped = camera.clipToScreen(model.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight))
 
 				// if visible {
 				// 	renderedAnything = trueForEachVertexIndex
@@ -1123,9 +1234,9 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				if camera.RenderNormals {
 					normalVertexList[vertexListIndex] = depthVertexList[vertexListIndex]
-					normalVertexList[vertexListIndex].ColorR = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
-					normalVertexList[vertexListIndex].ColorG = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
-					normalVertexList[vertexListIndex].ColorB = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
+					normalVertexList[vertexListIndex].ColorR = float32(model.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
+					normalVertexList[vertexListIndex].ColorG = float32(model.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
+					normalVertexList[vertexListIndex].ColorB = float32(model.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
 				}
 
 				// Vertex colors
@@ -1153,7 +1264,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
 					margin := 1.0
-					depth := mesh.vertexTransforms[vertIndex].Z / (far + margin)
+					depth := model.vertexTransforms[vertIndex].Z / (far + margin)
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -1169,7 +1280,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
-					depth := float32((mesh.vertexTransforms[vertIndex].Z+near)/far + 0.03)
+					depth := float32((model.vertexTransforms[vertIndex].Z+near)/far + 0.03)
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -1379,7 +1490,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 						continue
 					}
 
-					for _, part := range merged.Mesh.MeshParts {
+					for _, part := range merged.mesh.MeshParts {
 						render(renderPair{Model: merged, MeshPart: part})
 					}
 				}
@@ -1417,7 +1528,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 						continue
 					}
 
-					for _, part := range merged.Mesh.MeshParts {
+					for _, part := range merged.mesh.MeshParts {
 						render(renderPair{Model: merged, MeshPart: part})
 					}
 				}
@@ -1580,16 +1691,16 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			}
 
-			for _, meshPart := range model.Mesh.MeshParts {
+			for _, meshPart := range model.mesh.MeshParts {
 
-				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
+				model.ProcessVertices(vpMatrix, camera, nil)
 
 				meshPart.ForEachTri(func(tri *Triangle) {
 
 					indices := tri.VertexIndices
-					v0 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[0]])
-					v1 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[1]])
-					v2 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[2]])
+					v0 := camera.ClipToScreen(model.vertexTransforms[indices[0]])
+					v1 := camera.ClipToScreen(model.vertexTransforms[indices[1]])
+					v2 := camera.ClipToScreen(model.vertexTransforms[indices[2]])
 
 					if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 						(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
@@ -1657,9 +1768,9 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 			}
 
-			for _, meshPart := range model.Mesh.MeshParts {
+			for _, meshPart := range model.mesh.MeshParts {
 
-				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
+				model.ProcessVertices(vpMatrix, camera, nil)
 
 				for triIndex, sortingTri := range meshPart.sortingTriangles {
 
@@ -1698,7 +1809,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 			screenPos := camera.WorldToScreen(model.WorldPosition())
 
-			camera.DebugDrawText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+			camera.DebugDrawText(screen, fmt.Sprintf("%d", len(model.mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 		}
 
@@ -1725,7 +1836,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 
 			}
 
-			for _, tri := range model.Mesh.Triangles {
+			for _, tri := range model.mesh.Triangles {
 
 				center := camera.WorldToScreen(model.Transform().MultVecW(tri.Center))
 				transformedNormal := camera.WorldToScreen(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(normalLength))))

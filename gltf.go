@@ -834,16 +834,16 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							boundsSize := getOrDefaultFloatSlice("t3dAABBCustomSize__", []float64{2, 2, 2})
 							aabb = NewBoundingAABB("BoundingAABB", boundsSize[0], boundsSize[1], boundsSize[2])
 
-						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-							mesh := obj.(*Model).Mesh
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+							mesh := obj.(*Model).mesh
 							dim := mesh.Dimensions
 							aabb = NewBoundingAABB("BoundingAABB", dim.Width(), dim.Height(), dim.Depth())
 						}
 
 						if aabb != nil {
 
-							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								aabb.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+								aabb.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(aabb)
@@ -860,16 +860,16 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							height := getOrDefaultFloat("t3dCapsuleCustomHeight__", 2)
 							radius := getOrDefaultFloat("t3dCapsuleCustomRadius__", 0.5)
 							capsule = NewBoundingCapsule("BoundingCapsule", height, radius)
-						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-							mesh := obj.(*Model).Mesh
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+							mesh := obj.(*Model).mesh
 							dim := mesh.Dimensions
 							capsule = NewBoundingCapsule("BoundingCapsule", dim.Height(), math.Max(dim.Width(), dim.Depth())/2)
 						}
 
 						if capsule != nil {
 
-							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								capsule.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+								capsule.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(capsule)
@@ -885,10 +885,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						if sphereCustomEnabled := getOrDefaultBool("t3dSphereCustomEnabled__", false); sphereCustomEnabled {
 							radius := getOrDefaultFloat("t3dSphereCustomRadius__", 1)
 							sphere = NewBoundingSphere("BoundingSphere", radius)
-						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 
 							model := obj.(*Model)
-							dim := model.Mesh.Dimensions
+							dim := model.mesh.Dimensions
 							scale := model.WorldScale()
 
 							dim.Min = dim.Min.HadamardMult(scale)
@@ -899,8 +899,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 						if sphere != nil {
 
-							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								sphere.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+								sphere.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(sphere)
@@ -911,7 +911,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 					case 4: // Triangles
 
-						if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+						if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 
 							gridSize := 20.0
 
@@ -919,7 +919,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 								gridSize = getOrDefaultFloat("t3dTrianglesCustomBroadphaseGridSize__", 20)
 							}
 
-							triangles := NewBoundingTriangles("BoundingTriangles", obj.(*Model).Mesh, gridSize)
+							triangles := NewBoundingTriangles("BoundingTriangles", obj.(*Model).mesh, gridSize)
 
 							obj.AddChildren(triangles)
 						}
@@ -1016,17 +1016,17 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
-			for vertIndex, boneIndices := range model.Mesh.VertexBones {
+			for vertIndex, boneIndices := range model.mesh.VertexBones {
 				model.bones = append(model.bones, []*Node{})
 
 				for _, boneID := range boneIndices {
 					model.bones[vertIndex] = append(model.bones[vertIndex], allBones[boneID])
 				}
 
-				// model.Mesh.VertexBones[i] = append(model.Mesh.VertexBones[i], )
+				// model.mesh.VertexBones[i] = append(model.mesh.VertexBones[i], )
 			}
 
-			// for _, part := range model.Mesh.MeshParts {
+			// for _, part := range model.mesh.meshParts {
 
 			// 	for _, vertex := range part.Vertices {
 

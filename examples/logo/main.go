@@ -54,7 +54,7 @@ func (g *Game) Init() {
 	// This is another way to do it:
 
 	// screen := g.Scene.Root.Get("Screen").(*tetra3d.Model)
-	// screen.Mesh.FindMeshPart("ScreenTexture").Material.Texture = g.Offscreen
+	// screen.Mesh().FindMeshPart("ScreenTexture").Material.Texture = g.Offscreen
 
 	g.Scene.World.LightingOn = false
 

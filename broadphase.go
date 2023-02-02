@@ -269,13 +269,13 @@ func (bp *Broadphase) allAABBPositions() []*BoundingAABB {
 // 		{float64(gridSize) * cellSize, float64(gridSize) * cellSize, float64(gridSize) * cellSize},
 // 	}
 
-// 	for _, tri := range bp.BoundingTriangles.Mesh.Triangles {
+// 	for _, tri := range bp.BoundingTriangles.mesh.Triangles {
 // 		for i := range bp.AABBs {
 // 			for j := range bp.AABBs[i] {
 // 				for k := range bp.AABBs[i][j] {
-// 					v0 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3]
-// 					v1 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3+1]
-// 					v2 := bp.BoundingTriangles.Mesh.VertexPositions[tri.ID*3+2]
+// 					v0 := bp.BoundingTriangles.mesh.VertexPositions[tri.ID*3]
+// 					v1 := bp.BoundingTriangles.mesh.VertexPositions[tri.ID*3+1]
+// 					v2 := bp.BoundingTriangles.mesh.VertexPositions[tri.ID*3+2]
 // 					closestOnAABB := bp.AABBs[i][j][k].ClosestPoint(tri.Center)
 // 					closestOnTri := closestPointOnTri(closestOnAABB, v0, v1, v2)
 // 					// if bp.AABBs[i][j][k].PointInside(v0) || bp.AABBs[i][j][k].PointInside(v1) || bp.AABBs[i][j][k].PointInside(v2) {

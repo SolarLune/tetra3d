@@ -17,6 +17,7 @@ var indexList = make([]uint16, ebiten.MaxIndicesCount)
 var vertexListIndex = 0
 var indexListIndex = 0
 var indexListStart = 0
+var threadCount = 4
 
 const MaxTriangleCount = 21845
 

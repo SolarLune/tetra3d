@@ -54,9 +54,9 @@ func (g *Game) Init() {
 	g.System = examples.NewBasicSystemHandler(g)
 
 	g.Character = g.Scene.Root.Get("Character").(*tetra3d.Model)
-	clone := g.Character.Mesh.Clone()
+	clone := g.Character.Mesh().Clone()
 	clone.Name = "Cloned Character"
-	g.Character.Mesh = clone
+	g.Character.SetMesh(clone)
 
 	// Firstly, we create a TexturePlayer, which animates a collection of vertices' UV values to
 	// animate a texture on them.

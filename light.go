@@ -188,7 +188,7 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 
 		if point.Distance > 0 {
 
-			dist := point.workingPosition.DistanceSquared(model.Mesh.VertexPositions[index])
+			dist := point.workingPosition.DistanceSquared(model.mesh.VertexPositions[index])
 			if dist > point.distanceSquared {
 				return
 			}
@@ -196,9 +196,9 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 			// var triCenter Vector
 
 			// if model.skinned {
-			// 	v0 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
-			// 	v1 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
-			// 	v2 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
+			// 	v0 := model.mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
+			// 	v1 := model.mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
+			// 	v2 := model.mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
 			// 	triCenter = Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
 			// } else {
 			// 	triCenter = tri.Center
@@ -212,18 +212,18 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 		}
 
 		// If you're on the other side of the plane, just assume it's not visible.
-		// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
+		// if dot(model.mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
 		// 	return light
 		// }
 
 		var vertPos, vertNormal Vector
 
 		if model.skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[index]
-			vertNormal = model.Mesh.vertexSkinnedNormals[index]
+			vertPos = model.vertexSkinnedPositions[index]
+			vertNormal = model.vertexSkinnedNormals[index]
 		} else {
-			vertPos = model.Mesh.VertexPositions[index]
-			vertNormal = model.Mesh.VertexNormals[index]
+			vertPos = model.mesh.VertexPositions[index]
+			vertNormal = model.mesh.VertexNormals[index]
 		}
 
 		lightVec := point.workingPosition.Sub(vertPos).Unit()
@@ -351,9 +351,9 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 		var normal Vector
 		if model.skinned {
 			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
-			normal = model.Mesh.vertexSkinnedNormals[index]
+			normal = model.vertexSkinnedNormals[index]
 		} else {
-			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[index])
+			normal = sun.workingModelRotation.MultVec(model.mesh.VertexNormals[index])
 		}
 
 		diffuseFactor := normal.Dot(sun.workingForward)
@@ -448,7 +448,7 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 // NewCubeLightFromModel creates a new CubeLight from the Model's dimensions and world transform. Note that this does not
 // add it to the Model's hierarchy in any way - the newly created CubeLight is still its own Node.
 func NewCubeLightFromModel(name string, model *Model) *CubeLight {
-	cube := NewCubeLight(name, model.Mesh.Dimensions)
+	cube := NewCubeLight(name, model.mesh.Dimensions)
 	cube.SetWorldTransform(model.Transform())
 	return cube
 }
@@ -579,13 +579,13 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 		// var triCenter Vector
 
 		// if model.skinned {
-		// 	v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
-		// 	v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
-		// 	v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
+		// 	v0 := model.mesh.vertexSkinnedPositions[triIndex*3].Clone()
+		// 	v1 := model.mesh.vertexSkinnedPositions[triIndex*3+1]
+		// 	v2 := model.mesh.vertexSkinnedPositions[triIndex*3+2]
 		// 	vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0)
 		// 	triCenter = v0
 		// } else {
-		// 	triCenter = model.Mesh.Triangles[triIndex].Center
+		// 	triCenter = model.mesh.Triangles[triIndex].Center
 		// }
 
 		// dist := fastVectorDistanceSquared(cube.workingPosition, triCenter)
@@ -595,18 +595,18 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 		// }
 
 		// If you're on the other side of the plane, just assume it's not visible.
-		// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
+		// if dot(model.mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
 		// 	return light
 		// }
 
 		var vertPos, vertNormal Vector
 
 		if model.skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[index]
-			vertNormal = model.Mesh.vertexSkinnedNormals[index]
+			vertPos = model.vertexSkinnedPositions[index]
+			vertNormal = model.vertexSkinnedNormals[index]
 		} else {
-			vertPos = model.Mesh.VertexPositions[index]
-			vertNormal = model.Mesh.VertexNormals[index]
+			vertPos = model.mesh.VertexPositions[index]
+			vertNormal = model.mesh.VertexNormals[index]
 		}
 
 		var diffuse, diffuseFactor float64
@@ -737,7 +737,7 @@ func (cube *CubeLight) Type() NodeType {
 
 // 	poly.lightCells = [][][]*polygonLightCell{}
 
-// 	dim := poly.Model.Mesh.Dimensions
+// 	dim := poly.Model.mesh.Dimensions
 
 // 	transform := poly.Model.Transform()
 
@@ -764,10 +764,10 @@ func (cube *CubeLight) Type() NodeType {
 // 				}
 // 				gridPos = transform.MultVec(gridPos)
 
-// 				// closest := poly.Model.Mesh.Triangles[0]
+// 				// closest := poly.Model.mesh.Triangles[0]
 // 				closestDistance := math.MaxFloat64
 
-// 				for _, tri := range poly.Model.Mesh.Triangles {
+// 				for _, tri := range poly.Model.mesh.Triangles {
 
 // 					tc := transform.MultVec(tri.Center)
 
@@ -831,11 +831,11 @@ func (cube *CubeLight) Type() NodeType {
 // 	for i := 0; i < 3; i++ {
 
 // 		if model.skinned {
-// 			vertPos = model.Mesh.vertexSkinnedPositions[triIndex*3+i]
-// 			vertNormal = model.Mesh.vertexSkinnedNormals[triIndex*3+i]
+// 			vertPos = model.mesh.vertexSkinnedPositions[triIndex*3+i]
+// 			vertNormal = model.mesh.vertexSkinnedNormals[triIndex*3+i]
 // 		} else {
-// 			vertPos = model.Mesh.VertexPositions[triIndex*3+i]
-// 			vertNormal = model.Mesh.VertexNormals[triIndex*3+i]
+// 			vertPos = model.mesh.VertexPositions[triIndex*3+i]
+// 			vertNormal = model.mesh.VertexNormals[triIndex*3+i]
 // 		}
 
 // 		lightVec := vector.In(fastVectorSub(lightPos, vertPos)).Unit()

@@ -157,7 +157,7 @@ func (g *Game) Update() error {
 		dyn := g.Scene.Root.Get("DynamicBatching").(*tetra3d.Model)
 
 		if len(dyn.DynamicBatchModels) == 0 {
-			dyn.DynamicBatchAdd(dyn.Mesh.MeshParts[0], g.Cubes...) // Note that Model.DynamicBatchAdd() can return an error if batching the specified objects would push it over the vertex limit.
+			dyn.DynamicBatchAdd(dyn.Mesh().MeshParts[0], g.Cubes...) // Note that Model.DynamicBatchAdd() can return an error if batching the specified objects would push it over the vertex limit.
 		} else {
 			dyn.DynamicBatchRemove(g.Cubes...)
 		}
