@@ -168,6 +168,7 @@ type Mesh struct {
 	VertexNormals            []Vector
 	vertexSkinnedNormals     []Vector
 	vertexSkinnedPositions   []Vector
+	vertexTransformedNormals []Vector
 	VertexUVs                []Vector
 	VertexColors             [][]*Color
 	VertexActiveColorChannel []int
@@ -199,6 +200,7 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 		VertexNormals:            []Vector{},
 		vertexSkinnedNormals:     []Vector{},
 		vertexSkinnedPositions:   []Vector{},
+		vertexTransformedNormals: []Vector{},
 		vertexLights:             []*Color{},
 		VertexUVs:                []Vector{},
 		VertexColors:             [][]*Color{},
@@ -273,6 +275,10 @@ func (mesh *Mesh) Clone() *Mesh {
 		newMesh.vertexSkinnedNormals = append(newMesh.vertexSkinnedNormals, mesh.vertexSkinnedNormals[v])
 	}
 
+	for v := range mesh.vertexTransformedNormals {
+		newMesh.vertexTransformedNormals = append(newMesh.vertexTransformedNormals, mesh.vertexTransformedNormals[v])
+	}
+
 	for v := range mesh.vertexSkinnedPositions {
 		newMesh.vertexSkinnedPositions = append(newMesh.vertexSkinnedPositions, mesh.vertexSkinnedPositions[v])
 	}
@@ -332,6 +338,8 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 	mesh.vertexTransforms = append(make([]Vector, 0, vertexCount), mesh.vertexTransforms...)
 
 	mesh.vertexSkinnedNormals = append(make([]Vector, 0, vertexCount), mesh.vertexSkinnedNormals...)
+
+	mesh.vertexTransformedNormals = append(make([]Vector, 0, vertexCount), mesh.vertexTransformedNormals...)
 
 	mesh.vertexSkinnedPositions = append(make([]Vector, 0, vertexCount), mesh.vertexSkinnedPositions...)
 
@@ -454,6 +462,7 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 		mesh.vertexLights = append(mesh.vertexLights, NewColor(0, 0, 0, 1))
 		mesh.vertexTransforms = append(mesh.vertexTransforms, Vector{0, 0, 0, 0}) // x, y, z, w
 		mesh.vertexSkinnedNormals = append(mesh.vertexSkinnedNormals, Vector{0, 0, 0, 0})
+		mesh.vertexTransformedNormals = append(mesh.vertexTransformedNormals, Vector{0, 0, 0, 0})
 		mesh.vertexSkinnedPositions = append(mesh.vertexSkinnedPositions, Vector{0, 0, 0, 0})
 
 	}

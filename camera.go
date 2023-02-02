@@ -42,10 +42,12 @@ const (
 type Camera struct {
 	*Node
 
-	RenderDepth bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture will hold the depth texture render results.
+	RenderDepth   bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture() will hold the depth texture render results.
+	RenderNormals bool // If the Camera should attempt to render a normal texture; if this is true, then NormalTexture() will hold the normal texture render results. Defaults to false.
 
 	resultColorTexture    *ebiten.Image // ColorTexture holds the color results of rendering any models.
 	resultDepthTexture    *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
+	resultNormalTexture   *ebiten.Image // NormalTexture holds a texture indicating the normal render
 	colorIntermediate     *ebiten.Image
 	depthIntermediate     *ebiten.Image
 	clipAlphaIntermediate *ebiten.Image
@@ -321,6 +323,7 @@ func (camera *Camera) Resize(w, h int) {
 
 		camera.resultColorTexture.Dispose()
 		camera.resultAccumulatedColorTexture.Dispose()
+		camera.resultNormalTexture.Dispose()
 		camera.accumulatedBackBuffer.Dispose()
 		camera.resultDepthTexture.Dispose()
 		camera.colorIntermediate.Dispose()
@@ -332,6 +335,7 @@ func (camera *Camera) Resize(w, h int) {
 	camera.accumulatedBackBuffer = ebiten.NewImage(w, h)
 	camera.resultColorTexture = ebiten.NewImage(w, h)
 	camera.resultDepthTexture = ebiten.NewImage(w, h)
+	camera.resultNormalTexture = ebiten.NewImage(w, h)
 	camera.colorIntermediate = ebiten.NewImage(w, h)
 	camera.depthIntermediate = ebiten.NewImage(w, h)
 	camera.clipAlphaIntermediate = ebiten.NewImage(w, h)
@@ -721,6 +725,10 @@ func (camera *Camera) Clear() {
 		camera.resultDepthTexture.Clear()
 	}
 
+	if camera.RenderNormals {
+		camera.resultNormalTexture.Clear()
+	}
+
 	if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 
 		if !camera.DebugInfo.tickTime.IsZero() {
@@ -1097,8 +1105,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				colorVertexList[vertexListIndex].DstX = float32(clipped.X)
 				colorVertexList[vertexListIndex].DstY = float32(clipped.Y)
 
-				depthVertexList[vertexListIndex].DstX = float32(clipped.X)
-				depthVertexList[vertexListIndex].DstY = float32(clipped.Y)
+				depthVertexList[vertexListIndex] = colorVertexList[vertexListIndex]
 
 				depthVertexList[vertexListIndex].ColorR = 1
 				depthVertexList[vertexListIndex].ColorG = 1
@@ -1113,6 +1120,13 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				colorVertexList[vertexListIndex].SrcX = uvU
 				colorVertexList[vertexListIndex].SrcY = uvV
+
+				if camera.RenderNormals {
+					normalVertexList[vertexListIndex] = depthVertexList[vertexListIndex]
+					normalVertexList[vertexListIndex].ColorR = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
+					normalVertexList[vertexListIndex].ColorG = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
+					normalVertexList[vertexListIndex].ColorB = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
+				}
 
 				// Vertex colors
 
@@ -1150,13 +1164,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					depthVertexList[vertexListIndex].ColorG = float32(depth)
 					depthVertexList[vertexListIndex].ColorB = float32(depth)
 					depthVertexList[vertexListIndex].ColorA = 1
-
-					// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
-					depthVertexList[vertexListIndex].SrcX = uvU
-
-					// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
-					// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
-					depthVertexList[vertexListIndex].SrcY = uvV
 
 				} else if scene.World != nil && scene.World.FogMode != FogOff {
 
@@ -1303,6 +1310,12 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		t.CompositeMode = ebiten.CompositeModeSourceOver
 		rectShaderOptions.CompositeMode = ebiten.CompositeModeSourceOver
+
+		if camera.RenderNormals {
+			camera.colorIntermediate.Clear()
+			camera.colorIntermediate.DrawTriangles(normalVertexList[:vertexListIndex], indexList[:indexListIndex], img, t)
+			camera.resultNormalTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
+		}
 
 		if camera.RenderDepth {
 
@@ -1810,6 +1823,15 @@ func (camera *Camera) DepthTexture() *ebiten.Image {
 		return nil
 	}
 	return camera.resultDepthTexture
+}
+
+// NormalTexture returns the camera's final result normal texture from any previous Render() or RenderNodes() calls. If Camera.RenderNormals is set to false,
+// the function will return nil instead.
+func (camera *Camera) NormalTexture() *ebiten.Image {
+	if !camera.RenderNormals {
+		return nil
+	}
+	return camera.resultNormalTexture
 }
 
 // AccumulationColorTexture returns the camera's final result accumulation color texture from previous renders. If the Camera's AccumulateColorMode

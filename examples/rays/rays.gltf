@@ -727,7 +727,6 @@
             }
         },
         {
-            "doubleSided" : true,
             "extras" : {
                 "t3dMaterialColor__" : [
                     1.0,

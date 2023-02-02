@@ -491,6 +491,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	// Reslice to fill the capacity
 	meshPart.sortingTriangles = meshPart.sortingTriangles[:cap(meshPart.sortingTriangles)]
 
+	var mvJustRForNormals Matrix4
+	if camera.RenderNormals {
+		_, _, mvJustRForNormals = modelTransform.Mult(camera.ViewMatrix()).Decompose()
+	}
+
 	for ti := meshPart.TriangleStart; ti <= meshPart.TriangleEnd; ti++ {
 
 		tri := mesh.Triangles[ti]
@@ -532,6 +537,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 				mesh.vertexTransforms[tri.VertexIndices[i]] = mvp.MultVecW(v0)
 
+			}
+
+			if camera.RenderNormals {
+				mesh.vertexTransformedNormals[tri.VertexIndices[i]] = mvJustRForNormals.MultVecW(mesh.VertexNormals[tri.VertexIndices[i]])
 			}
 
 			w := mesh.vertexTransforms[tri.VertexIndices[i]].W
@@ -647,8 +656,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	meshPart.sortingTriangles = meshPart.sortingTriangles[:sortingTriIndex]
-
-	// Preliminary tests indicate sort.SliceStable is faster than sort.Slice for our purposes
 
 	if sortMode == TriangleSortModeBackToFront {
 		sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
