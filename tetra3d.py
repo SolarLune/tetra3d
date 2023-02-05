@@ -1,6 +1,6 @@
 # Add-on for Tetra3D > Blender exporting
 
-import bpy, os
+import bpy, os, bmesh
 from bpy.app.handlers import persistent
 
 bl_info = {
@@ -50,7 +50,7 @@ materialBillboardModes = [
 worldFogCompositeModes = [
     ("OFF", "Off", "No fog. Object colors aren't changed with distance from the camera", 0, 0),
     ("ADDITIVE", "Additive", "Additive fog - this fog mode brightens objects in the distance, with full effect being adding the color given to the object's color at maximum distance (according to the camera's far range)", 0, 1),
-    ("MULTIPLY", "Multiply", "Multiplicative fog - this fog mode darkens objects in the distance, with full effect being multiplying the object's color by the fog color at maximum distance (according to the camera's far range)", 0, 2),
+    ("SUBTRACT", "Subtractive", "Subtractive fog - this fog mode darkens objects in the distance, with full effect being subtracting the object's color by the fog color at maximum distance (according to the camera's far range)", 0, 2),
     ("OVERWRITE", "Overwrite", "Overwrite fog - this fog mode overwrites the object's color with the fog color, with maximum distance being the camera's far distance", 0, 3),
     ("TRANSPARENT", "Transparent", "Transparent fog - this fog mode fades the object out over distance, such that at maximum distance / fog range, the object is wholly transparent.", 0, 4),
 ]
@@ -341,6 +341,15 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             row.prop(context.object, "t3dTrianglesCustomBroadphaseEnabled__")
             if context.object.t3dTrianglesCustomBroadphaseEnabled__:
                 row.prop(context.object, "t3dTrianglesCustomBroadphaseGridSize__")
+        
+        row = self.layout.row()
+
+        if context.object.type == "MESH":
+
+            row.prop(context.object, "t3dAutoSubdivide__")
+            if context.object.t3dAutoSubdivide__:
+                row.prop(context.object, "t3dAutoSubdivideSize__")
+
         row = self.layout.row()
         row.separator()
 
@@ -522,6 +531,8 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         # row.operator("image.open")
         row = self.layout.row()
         row.prop(context.material, "t3dMaterialShadeless__")
+        row.prop(context.material, "t3dMaterialFogless__")
+        row = self.layout.row()
         row.prop(context.material, "use_backface_culling")
         row = self.layout.row()
         row.prop(context.material, "blend_method")
@@ -602,9 +613,15 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.prop(context.scene.render, "fps")
 
-
 def export():
     scene = bpy.context.scene
+
+    was_edit_mode = False
+    old_active = bpy.context.active_object
+    old_selected = bpy.context.selected_objects.copy()
+    if bpy.context.mode == 'EDIT_MESH':
+        bpy.ops.object.mode_set(mode='OBJECT')
+        was_edit_mode = True
         
     blendPath = bpy.context.blend_data.filepath
     if scene.t3dExportFilepath__ != "":
@@ -692,12 +709,24 @@ def export():
             if scene.world:
                 scene["t3dCurrentWorld__"] = scene.world.name
             
+            autoSubdivides = []
+
             for layer in scene.view_layers:
                 for obj in layer.objects:
 
                     obj["t3dOriginalLocalPosition__"] = obj.location
 
                     if obj.type == "MESH":
+
+                        if obj.t3dAutoSubdivide__:
+
+                            origMesh = obj.data.copy()
+                            obj["t3dOriginalMesh"] = origMesh
+
+                            autoSubdivides.append({
+                                "mesh": obj.data,
+                                "size": obj.t3dAutoSubdivideSize__,
+                            })
                         
                         if len(obj.data.color_attributes) > 0:
                             vertexColors = [layer.name for layer in obj.data.color_attributes]
@@ -728,6 +757,9 @@ def export():
                             obj["t3dGridConnections__"] = gridConnections
                             obj["t3dGridEntries__"] = gridEntries
 
+                    if obj.type == "CAMERA":
+                        obj["t3dFovY__"] = obj.data.angle
+
                     # Record relevant information for curves
                     if obj.type == "CURVE":
                         points = []
@@ -747,6 +779,155 @@ def export():
                         # We don't want to export a linked collection directly, as that 1) will duplicate mesh data from externally linked blend files to put into the GLTF file, and
                         # 2) will apply the collection's offset to the object's position for some reason (which is annoying because we use OpenGL's axes for positioning compared to Blender)
                         obj.instance_collection = None
+
+            for mesh in autoSubdivides:
+
+                bm = bmesh.new()
+
+                bm.from_mesh(mesh["mesh"])
+                bm.select_mode = {"EDGE", "VERT", "FACE"}
+
+                # The below works, but the triangulation is super wonky and over-heavy
+
+                # bmesh.ops.triangulate(bm, faces=bm.faces)
+
+                # for x in range(1000):
+
+                #     subdiv = False
+
+                #     edges = []
+
+                #     for edge in bm.edges:
+
+                #         edge.select = edge.calc_length() > mesh["size"]
+                #         if edge.select:
+                #             subdiv = True
+                #             edges.append(edge)
+                    
+                #     if not subdiv:
+                #         break
+
+                #     bm.select_flush(True)
+
+                #     bmesh.ops.subdivide_edges(bm, edges=[e for e in bm.edges if e.select], cuts=1)
+
+                #     bmesh.ops.triangulate(bm, faces=bm.faces)
+
+                # The below works really well, but tris mess it up, I think
+
+                invalidEdges = set()
+
+                for x in range(100):
+
+                    edges = set()
+
+                    workingEdge = None
+
+                    edgeCount = len(bm.edges)
+
+                    for edge in bm.edges:
+
+                        if edge in invalidEdges:
+                            continue
+
+                        if edge.calc_length() > mesh["size"]:
+
+                            edges.add(edge)
+                            if workingEdge is None:
+                                workingEdge = edge
+
+                            nextLoop = edge.link_loops[0]
+
+                            passedCount = 0
+
+                            for x in range(100):
+
+                                nextLoop = nextLoop.link_loop_next.link_loop_next.link_loop_radial_next
+        
+                                if nextLoop.edge == workingEdge:
+                                    passedCount += 1
+                                    if passedCount >= 2:
+                                        break
+
+                                edges.add(nextLoop.edge)
+
+                        if workingEdge:
+                            break
+
+                    if len(edges) == 0:
+                        break
+
+                    bmesh.ops.subdivide_edgering(bm, edges=list(edges), cuts=1, profile_shape="LINEAR", smooth=0)
+
+                    if len(bm.edges) == edgeCount:
+                        invalidEdges.add(workingEdge)
+
+                # Subdivide individual islands of faces that can't be loop-cut
+
+                for x in range(100):
+
+                    toCut = []
+
+                    for edge in bm.edges:
+
+                        if edge.calc_length() > mesh["size"]:
+
+                            toCut.append(edge)
+
+                    if len(toCut) == 0:
+                        break
+
+                    bmesh.ops.subdivide_edges(bm, edges=toCut, cuts=1)
+
+                ################
+
+                # for x in range(1):
+
+                #     bm.faces.index_update()
+                #     bm.edges.index_update()
+                #     bm.verts.index_update()
+
+                #     edges = set()
+
+                #     for face in bm.faces:
+
+                #         # subdivide non-quad faces later
+                #         if len(face.edges) != 4:
+                #             continue
+
+                #         firstEdge = None
+
+                #         for edge in face.edges:
+
+                #             print(edge.calc_length())
+
+                #             if edge.calc_length() > mesh["size"]:
+
+                #                 firstEdge = edge
+                #                 edges.add(edge)
+                #                 break
+
+                #         if firstEdge:
+
+                #             nextLoop = edge.link_loops[0]
+
+                #             for x in range(1000):
+
+                #                 nextLoop = nextLoop.link_loop_next.link_loop_next.link_loop_radial_next
+
+                #                 edges.add(nextLoop.edge)
+
+                #             if len(edges) > 0:
+                #                 break
+                            
+                #             if len(edges) == 0:
+                #                 continue
+
+                #     bmesh.ops.subdivide_edgering(bm, edges=list(edges), cuts=1, profile_shape="LINEAR", smooth=0)
+
+                bm.to_mesh(mesh["mesh"])
+
+                bm.free()
 
     # Gather marker information and put them into the actions.
     for action in bpy.data.actions:
@@ -770,6 +951,11 @@ def export():
         export_lights=scene.t3dExportLights__, 
         export_keep_originals=not scene.t3dPackTextures__,
         export_attributes=True,
+        
+        export_current_frame=False,
+        export_nla_strips=True,
+        export_animations=True,
+        export_frame_range = False,
 
         export_extras=True,
         export_yup=True,
@@ -784,11 +970,20 @@ def export():
         if scene.world and "t3dCurrentWorld__" in scene:
             del(scene["t3dCurrentWorld__"])
 
+        meshesToRemove = []
+
         if scene.users > 0:
 
             for layer in scene.view_layers:
 
                 for obj in layer.objects:
+
+                    if "t3dOriginalMesh" in obj:
+                        meshesToRemove.append(obj.data)
+                        obj.data = obj["t3dOriginalMesh"]
+                        del(obj["t3dOriginalMesh"])
+                    if "t3dFovY" in obj:
+                        del(obj["t3dFovY"])
 
                     if "t3dOriginalLocalPosition__" in obj:
                         del(obj["t3dOriginalLocalPosition__"])
@@ -812,12 +1007,26 @@ def export():
                             del(obj["t3dGridEntries__"])
                             obj.data = ogGrids[obj] # Restore the mesh reference afterward
 
+        for m in meshesToRemove:
+            bpy.data.meshes.remove(m)
+
     for action in bpy.data.actions:
         if "t3dMarkers__" in action:
             del(action["t3dMarkers__"])
 
     globalDel("t3dCollections__")
     globalDel("t3dWorlds__")
+
+    # restore context
+    bpy.ops.object.select_all(action='DESELECT')
+    if old_active:
+        old_active.select_set(True)
+        bpy.context.view_layer.objects.active = old_active
+    if bpy.context.active_object is not None and was_edit_mode:
+        bpy.ops.object.mode_set(mode='EDIT')
+    for obj in old_selected:
+        if obj:
+            obj.select_set(True)
 
     return True
 
@@ -857,6 +1066,8 @@ objectProps = {
     "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
     "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
     "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),
+    "t3dAutoSubdivide__" : bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, you can force meshes to loop cut when their edges are beyond the given size before export."),
+    "t3dAutoSubdivideSize__" : bpy.props.FloatProperty(name="Max Edge Length", description="The maximum length an edge is allowed to be before automatically cutting prior to export", min=0.0, default=1.0)
 }
 
 
@@ -995,6 +1206,7 @@ def register():
 
     bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
+    bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
     bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
     
@@ -1048,6 +1260,7 @@ def unregister():
 
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__
+    del bpy.types.Material.t3dMaterialFogless__
     del bpy.types.Material.t3dCompositeMode__
     del bpy.types.Material.t3dBillboardMode__
 

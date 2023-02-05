@@ -210,6 +210,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					newMat.Shadeless = s.(float64) > 0.5
 				}
 
+				if s, exists := dataMap["t3dMaterialFogless__"]; exists {
+					newMat.Fogless = s.(float64) > 0.5
+				}
+
 				if s, exists := dataMap["t3dCompositeMode__"]; exists {
 					switch int(s.(float64)) {
 					case 0:
@@ -666,11 +670,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			newCam := NewCamera(camWidth, camHeight)
 			newCam.name = node.Name
 			newCam.RenderDepth = gltfLoadOptions.CameraDepth
+			newCam.updateProjectionMatrix = true
 
 			if gltfCam.Perspective != nil {
 				newCam.near = float64(gltfCam.Perspective.Znear)
 				newCam.far = float64(*gltfCam.Perspective.Zfar)
-				newCam.fieldOfView = float64(gltfCam.Perspective.Yfov) / (math.Pi * 2) * 360
+				// For whatever reason, the yFOV from Blender in GLTF is modulated by the aspect ratio.
+				if node.Extras != nil && nodeHasProp(node, "t3dFovY__") {
+					newCam.fieldOfView = ToDegrees(node.Extras.(map[string]interface{})["t3dFovY__"].(float64))
+				}
 				newCam.perspective = true
 			} else if gltfCam.Orthographic != nil {
 				newCam.near = float64(gltfCam.Orthographic.Znear)
@@ -1197,14 +1205,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				}
 
 				if v, exists := props["fog mode"]; exists {
+					world.FogOn = true
 					fm := v.(string)
 					switch fm {
 					case "OFF":
-						world.FogMode = FogOff
+						world.FogOn = false
 					case "ADDITIVE":
 						world.FogMode = FogAdd
-					case "MULTIPLY":
-						world.FogMode = FogMultiply
+					case "SUBTRACT":
+						world.FogMode = FogSub
 					case "OVERWRITE":
 						world.FogMode = FogOverwrite
 					case "TRANSPARENT":

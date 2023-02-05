@@ -85,9 +85,15 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 }
 
 // ByProperties allows you to filter a given selection of nodes by the provided set of property names.
+// If parentHas is true, then a Node will be accepted if its parent has the property.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByProperties(propNames ...string) NodeFilter {
-	nf.Filters = append(nf.Filters, func(node INode) bool { return node.Properties().Has(propNames...) })
+func (nf NodeFilter) ByProperties(parentHas bool, propNames ...string) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		if parentHas && node.Parent() != nil {
+			return node.Parent().Properties().Has(propNames...) || node.Properties().Has(propNames...)
+		}
+		return node.Properties().Has(propNames...)
+	})
 	return nf
 }
 

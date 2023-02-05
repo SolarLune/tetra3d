@@ -445,8 +445,9 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 	return cube
 }
 
-// NewCubeLightFromModel creates a new CubeLight from the Model's dimensions and world transform. Note that this does not
-// add it to the Model's hierarchy in any way - the newly created CubeLight is still its own Node.
+// NewCubeLightFromModel creates a new CubeLight from the Model's dimensions and world transform.
+// Note that this does not add it to the Model's hierarchy in any way - the newly created CubeLight
+// is still its own Node.
 func NewCubeLightFromModel(name string, model *Model) *CubeLight {
 	cube := NewCubeLight(name, model.Mesh.Dimensions)
 	cube.SetWorldTransform(model.Transform())

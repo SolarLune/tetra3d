@@ -201,6 +201,7 @@ func NewCamera(w, h int) *Camera {
 		var Fog vec4
 		var FogRange [2]float
 		var DitherSize float
+		var Fogless float
 
 		var BayerMatrix [16]float
 
@@ -217,20 +218,24 @@ func NewCamera(w, h int) *Camera {
 				
 				d := smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
 
-				if Fog.a == 1 {
-					colorTex.rgb += Fog.rgb * d * colorTex.a
-				} else if Fog.a == 2 {
-					colorTex.rgb -= Fog.rgb * d * colorTex.a
-				} else if Fog.a == 3 {
-					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
-				} else if Fog.a == 4 {
-					colorTex.a *= abs(1-d)
-					if DitherSize > 0 {
-						yc := int(position.y / DitherSize)%4
-						xc := int(position.x / DitherSize)%4
-						colorTex.a *= step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
+				if Fogless == 0 {
+
+					if Fog.a == 0 {
+						colorTex.rgb += Fog.rgb * d * colorTex.a
+					} else if Fog.a == 1 {
+						colorTex.rgb -= Fog.rgb * d * colorTex.a
+					} else if Fog.a == 2 {
+						colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
+					} else if Fog.a == 3 {
+						colorTex.a *= abs(1-d)
+						if DitherSize > 0 {
+							yc := int(position.y / DitherSize)%4
+							xc := int(position.x / DitherSize)%4
+							colorTex.a *= step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
+						}
+						colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
 					}
-					colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
+
 				}
 
 				return colorTex
@@ -1165,7 +1170,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					depthVertexList[vertexListIndex].ColorB = float32(depth)
 					depthVertexList[vertexListIndex].ColorA = 1
 
-				} else if scene.World != nil && scene.World.FogMode != FogOff {
+				} else if scene.World != nil && scene.World.FogOn {
 
 					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
 					// depth can be negative but still be in front of the camera and not behind it.
@@ -1184,7 +1189,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 						colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * depth
 						colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * depth
 						colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * depth
-					} else if scene.World.FogMode == FogMultiply {
+					} else if scene.World.FogMode == FogSub {
 						colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * depth
 						colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * depth
 						colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * depth
@@ -1308,13 +1313,20 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		// If we're not rendering depth, but still rendering through the shader, we can render to the intermediate texture, and then from there composite.
 		// Otherwise, we can just draw the triangles normally.
 
+		fogless := float32(0)
+		if mat != nil && mat.Fogless {
+			fogless = 1
+		}
+
+		rectShaderOptions.Uniforms["Fogless"] = fogless
+
 		t.CompositeMode = ebiten.CompositeModeSourceOver
 		rectShaderOptions.CompositeMode = ebiten.CompositeModeSourceOver
 
 		if camera.RenderNormals {
 			camera.colorIntermediate.Clear()
 			camera.colorIntermediate.DrawTriangles(normalVertexList[:vertexListIndex], indexList[:indexListIndex], img, t)
-			camera.resultNormalTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
+			camera.resultNormalTexture.DrawRectShader(w, h, camera.colorShader, nil)
 		}
 
 		if camera.RenderDepth {

@@ -44,6 +44,7 @@ type Material struct {
 	BackfaceCulling   bool                 // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
 	TriangleSortMode  int                  // TriangleSortMode influences how triangles with this Material are sorted.
 	Shadeless         bool                 // If the material should be shadeless (unlit) or not
+	Fogless           bool                 // If the material should be fogless or not
 	CompositeMode     ebiten.CompositeMode // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
 	BillboardMode     int                  // Billboard mode
 
@@ -90,6 +91,7 @@ func (material *Material) Clone() *Material {
 	newMat.BackfaceCulling = material.BackfaceCulling
 	newMat.TriangleSortMode = material.TriangleSortMode
 	newMat.Shadeless = material.Shadeless
+	newMat.Fogless = material.Fogless
 	newMat.TransparencyMode = material.TransparencyMode
 	newMat.TextureFilterMode = material.TextureFilterMode
 	newMat.TextureWrapMode = material.TextureWrapMode

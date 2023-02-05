@@ -273,6 +273,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Frustum culling
 - [X] -- Far triangle culling
 - [ ] -- Triangle clipping to view (this isn't implemented, but not having it doesn't seem to be too much of a problem for now)
+- [ ] -- Sectors - The general idea is that the camera can be set up to only render sectors that it's in / neighboring (up to a customizeable depth)
 - [X] **Debug**
 - [X] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
 - [X] -- Wireframe debug rendering

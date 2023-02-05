@@ -1,9 +1,8 @@
 package tetra3d
 
 const (
-	FogOff         = iota // No fog
-	FogAdd                // Additive blended fog
-	FogMultiply           // Multiplicative blended fog
+	FogAdd         = iota // Additive blended fog
+	FogSub                // Subtractive blended fog
 	FogOverwrite          // Color overwriting fog (mixing base with fog color over depth distance)
 	FogTransparent        // Fog influences transparency of the render
 )
@@ -22,6 +21,7 @@ type World struct {
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
 	// ranging from 0 to 1. The first indicates the start of the fog, and the second the end, in
 	// terms of total depth of the near / far clipping plane. The default is [0, 1].
+	FogOn           bool
 	DitheredFogSize float32 // If greater than zero, how large the dithering effect is for transparent fog. If <= 0, dithering is disabled.
 	FogRange        []float32
 	LightingOn      bool          // If lighting is enabled when rendering the scene.
@@ -35,6 +35,7 @@ func NewWorld(name string) *World {
 		Name:            name,
 		FogColor:        NewColor(0, 0, 0, 0),
 		FogRange:        []float32{0, 1},
+		FogOn:           true,
 		LightingOn:      true,
 		DitheredFogSize: 0,
 		ClearColor:      NewColor(0.08, 0.09, 0.1, 1),
@@ -70,10 +71,8 @@ func (world *World) fogAsFloatSlice() []float32 {
 		float32(world.FogMode),
 	}
 
-	if world.FogMode == FogMultiply {
-		fog[0] = 1 - fog[0]
-		fog[1] = 1 - fog[1]
-		fog[2] = 1 - fog[2]
+	if !world.FogOn {
+		fog[3] = -1
 	}
 
 	return fog

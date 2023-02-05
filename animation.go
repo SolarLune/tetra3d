@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -324,9 +325,14 @@ func (ap *AnimationPlayer) PlayAnim(animation *Animation) {
 
 }
 
-// Play plays back an animation by name, accessing it through the AnimationPlayer's root node's library.
-func (ap *AnimationPlayer) Play(animationName string) {
-	ap.PlayAnim(ap.RootNode.Library().Animations[animationName])
+// Play plays back an animation by name, accessing it through the AnimationPlayer's root node's library. If the animation isn't found,
+// it will return an error.
+func (ap *AnimationPlayer) Play(animationName string) error {
+	anim, ok := ap.RootNode.Library().Animations[animationName]
+	if ok {
+		ap.PlayAnim(anim)
+	}
+	return errors.New("Animation named {" + animationName + "} not found in node's owning Library")
 }
 
 // assignChannels assigns the player's root node's children to channels in the player. This is called when the channels need to be

@@ -242,7 +242,7 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 
 					// If the distance from the start point to the triangle is longer than the ray,
 					// then we know it can't be struck and we can bail early
-					if from.DistanceSquared(tri.Center) > maxRayDist+(tri.MaxSpan*tri.MaxSpan) {
+					if invFrom.DistanceSquared(tri.Center) > maxRayDist+(tri.MaxSpan*tri.MaxSpan) {
 						continue
 					}
 

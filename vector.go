@@ -152,6 +152,16 @@ func (vec Vector) ClampMagnitude(maxMag float64) Vector {
 	return vec
 }
 
+// SubMagnitude subtacts the given magnitude from the Vector's. If the vector's magnitude is less than the given magnitude to subtract,
+// a zero-length Vector will be returned.
+func (vec Vector) SubMagnitude(mag float64) Vector {
+	if vec.Magnitude() > mag {
+		return vec.Sub(vec.Unit().Scale(mag))
+	}
+	return Vector{0, 0, 0, vec.W}
+
+}
+
 // Distance returns the distance from the calling Vector to the other Vector provided.
 func (vec Vector) Distance(other Vector) float64 {
 	return vec.Sub(other).Magnitude()
@@ -483,6 +493,21 @@ func (ip ModVector) ClampMagnitude(maxMag float64) ModVector {
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
 	return ip
+}
+
+// SubMagnitude subtacts the given magnitude from the Vector's. If the vector's magnitude is less than the given magnitude to subtract,
+// a zero-length Vector will be returned.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) SubMagnitude(mag float64) ModVector {
+	if ip.Magnitude() > mag {
+		ip.Sub(ip.Vector.Unit().Scale(mag))
+	} else {
+		ip.X = 0
+		ip.Y = 0
+		ip.Z = 0
+	}
+	return ip
+
 }
 
 // String converts the ModVector to a string. Because it's a ModVector, it's represented with a *.
