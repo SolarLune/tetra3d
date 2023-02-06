@@ -50,6 +50,17 @@ func (scene *Scene) Clone() *Scene {
 
 	newScene.updateAutobatch = true
 
+	// Update sectors after cloning the scene
+	models := newScene.Root.SearchTree().bySectors().Models()
+
+	for _, n := range models {
+		n.Sector.Neighbors.Clear()
+	}
+
+	for _, n := range models {
+		n.Sector.UpdateNeighbors(models...)
+	}
+
 	return newScene
 
 }

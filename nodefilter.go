@@ -9,11 +9,11 @@ import (
 // in the process, and possibly one more for the end result, if you get the result as not just a
 // slice of INodes).
 type NodeFilter struct {
-	Filters             []func(INode) bool // The slice of filters that are currently active on the NodeFilter.
-	Start               INode              // The start (root) of the filter.
-	IncludeStartingNode bool               // If the starting node should be included in the filter.
-	MaxDepth            int                // How deep the node filter should search; a value that is less than zero means the entire tree will be traversed.
-	depth               int
+	Filters        []func(INode) bool // The slice of filters that are currently active on the NodeFilter.
+	Start          INode              // The start (root) of the filter.
+	StopOnFiltered bool               // If the filter should continue through to a node's children if the node itself doesn't pass the filter
+	MaxDepth       int                // How deep the node filter should search; a value that is less than zero means the entire tree will be traversed.
+	depth          int
 }
 
 func newNodeFilter(startingNode INode) *NodeFilter {
@@ -27,11 +27,13 @@ func newNodeFilter(startingNode INode) *NodeFilter {
 func (nf *NodeFilter) execute(node INode) []INode {
 	nf.depth++
 	out := []INode{}
-	if node != nf.Start || nf.IncludeStartingNode {
+	added := true
+	if node != nf.Start {
 		add := true
 		for _, filter := range nf.Filters {
 			if !filter(node) {
 				add = false
+				added = false
 			}
 		}
 		if add {
@@ -40,8 +42,12 @@ func (nf *NodeFilter) execute(node INode) []INode {
 	}
 	if nf.MaxDepth < 0 || nf.depth <= nf.MaxDepth {
 
-		for _, child := range node.Children() {
-			out = append(out, nf.execute(child)...)
+		if !nf.StopOnFiltered || added {
+
+			for _, child := range node.Children() {
+				out = append(out, nf.execute(child)...)
+			}
+
 		}
 
 	}
@@ -121,6 +127,20 @@ func (nf NodeFilter) ByRegex(regexString string) NodeFilter {
 func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		return node.Type().Is(nodeType)
+	})
+	return nf
+}
+
+func (nf NodeFilter) bySectors() NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		return node.Type() == NodeTypeModel && node.(*Model).Sector != nil
+	})
+	return nf
+}
+
+func (nf NodeFilter) byNotSectors() NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		return node.Type() == NodeTypeModel && node.(*Model).Sector == nil
 	})
 	return nf
 }

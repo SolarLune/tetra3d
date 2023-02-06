@@ -316,6 +316,16 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             row.label(text="Object Type: ")
             row.prop(context.object, "t3dObjectType__", expand=True)
 
+            row = box.row()
+            row.enabled = context.object.t3dObjectType__ == 'MESH'
+            row.prop(context.object, "t3dAutoSubdivide__")
+            if context.object.t3dAutoSubdivide__:
+                row.prop(context.object, "t3dAutoSubdivideSize__") 
+            
+            row = box.row()
+            row.enabled = context.object.t3dObjectType__ == 'MESH'
+            row.prop(context.object, "t3dSector__")
+
         row = self.layout.row()
         row.prop(context.object, "t3dBoundsType__")
         
@@ -341,14 +351,6 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             row.prop(context.object, "t3dTrianglesCustomBroadphaseEnabled__")
             if context.object.t3dTrianglesCustomBroadphaseEnabled__:
                 row.prop(context.object, "t3dTrianglesCustomBroadphaseGridSize__")
-        
-        row = self.layout.row()
-
-        if context.object.type == "MESH":
-
-            row.prop(context.object, "t3dAutoSubdivide__")
-            if context.object.t3dAutoSubdivide__:
-                row.prop(context.object, "t3dAutoSubdivideSize__")
 
         row = self.layout.row()
         row.separator()
@@ -604,6 +606,12 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box.prop(context.scene, "t3dPackTextures__")
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
+
+        box = self.layout.box()
+        box.prop(context.scene, "t3dSectorRendering__")
+        row = box.row()
+        row.enabled = context.scene.t3dSectorRendering__
+        row.prop(context.scene, "t3dSectorRenderDepth__")
 
         row = self.layout.row()
         row.prop(context.scene.render, "resolution_x")
@@ -1066,9 +1074,30 @@ objectProps = {
     "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
     "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
     "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),
-    "t3dAutoSubdivide__" : bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, you can force meshes to loop cut when their edges are beyond the given size before export."),
-    "t3dAutoSubdivideSize__" : bpy.props.FloatProperty(name="Max Edge Length", description="The maximum length an edge is allowed to be before automatically cutting prior to export", min=0.0, default=1.0)
+    "t3dAutoSubdivide__" : bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, Tetra3D will do its best to loop cut edges that are too large before export."),
+    "t3dAutoSubdivideSize__" : bpy.props.FloatProperty(name="Max Edge Length", description="The maximum length an edge is allowed to be before automatically cutting prior to export", min=0.0, default=1.0),
+    "t3dSector__" : bpy.props.BoolProperty(name="Is a Sector", description="If enabled, this identifies a mesh as being a Sector. When this is the case and sector-based rendering has been enabled on a Camera, this allows you to granularly restrict how far the camera renders, not based off of near/far plane only, but also based off of which sector you're in and how many sectors in you can look")
 }
+
+
+def getSectorRendering(self):
+    s = globalGet("t3dSectorRendering__")
+    if s is None:
+        s = False
+    return s
+
+def setSectorRendering(self, value):
+    globalSet("t3dSectorRendering__", value)
+
+
+def getSectorRenderDepth(self):
+    s = globalGet("t3dSectorRenderDepth__")
+    if s is None:
+        s = False
+    return s
+
+def setSectorRenderDepth(self, value):
+    globalSet("t3dSectorRenderDepth__", value)
 
 
 def getExportOnSave(self):
@@ -1183,6 +1212,12 @@ def register():
     
     bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
 
+    bpy.types.Scene.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not", default=False, 
+    get=getSectorRendering, set=setSectorRendering)
+
+    bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=0, 
+    get=getSectorRenderDepth, set=setSectorRenderDepth)
+
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
     get=getExportOnSave, set=setExportOnSave)
     
@@ -1248,6 +1283,8 @@ def unregister():
 
     del bpy.types.Scene.t3dGameProperties__
 
+    del bpy.types.Scene.t3dSectorRendering__
+    del bpy.types.Scene.t3dSectorRenderDepth__
     del bpy.types.Scene.t3dExportOnSave__
     del bpy.types.Scene.t3dExportFilepath__
     del bpy.types.Scene.t3dExportFormat__

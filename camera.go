@@ -42,8 +42,11 @@ const (
 type Camera struct {
 	*Node
 
-	RenderDepth   bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture() will hold the depth texture render results.
-	RenderNormals bool // If the Camera should attempt to render a normal texture; if this is true, then NormalTexture() will hold the normal texture render results. Defaults to false.
+	RenderDepth       bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture() will hold the depth texture render results.
+	RenderNormals     bool // If the Camera should attempt to render a normal texture; if this is true, then NormalTexture() will hold the normal texture render results. Defaults to false.
+	SectorRendering   bool // If the Camera should render using sectors or not; if no sectors are present, then it won't attempt to render with them
+	SectorRenderDepth int  // How far out the Camera renders other sectors
+	currentSector     *Sector
 
 	resultColorTexture    *ebiten.Image // ColorTexture holds the color results of rendering any models.
 	resultDepthTexture    *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
@@ -96,6 +99,9 @@ func NewCamera(w, h int) *Camera {
 		AccumulateDrawOptions: &ebiten.DrawImageOptions{},
 
 		orthoScale: 20,
+
+		SectorRendering:   false,
+		SectorRenderDepth: 1,
 	}
 
 	depthShaderText := []byte(
@@ -304,6 +310,7 @@ func (camera *Camera) Clone() INode {
 	clone.perspective = camera.perspective
 	clone.fieldOfView = camera.fieldOfView
 	clone.orthoScale = camera.orthoScale
+	clone.SectorRendering = camera.SectorRendering
 
 	clone.AccumulateColorMode = camera.AccumulateColorMode
 	clone.AccumulateDrawOptions = camera.AccumulateDrawOptions
@@ -786,17 +793,74 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 		meshes = append(meshes, model)
 	}
 
-	nodes := rootNode.SearchTree().INodes()
+	if camera.SectorRendering {
 
-	for _, node := range nodes {
-		if model, ok := node.(*Model); ok && model.DynamicBatchOwner == nil {
-			meshes = append(meshes, model)
+		// Gather sectors
+		sectorModels := rootNode.SearchTree().bySectors().Models()
+
+		// Set them all to be invisible by default
+		for _, sectorModel := range sectorModels {
+			if sectorModel.DynamicBatchOwner == nil {
+				sectorModel.Sector.sectorVisible = false
+			} else {
+				// Making a sector dynamically batched is just way too much to deal with, I'm sorry
+				panic("Can't make a sector " + sectorModel.Path() + " dynamically batched as well")
+			}
+		}
+
+		var insideSector *Sector
+
+		// Find which one the camera's inside
+		for _, s := range sectorModels {
+			sector := s.Sector
+			if sector.AABB.PointInside(camera.WorldPosition()) {
+				if insideSector == nil || sector.AABB.Dimensions.MaxSpan() < insideSector.AABB.Dimensions.MaxSpan() {
+					insideSector = sector
+					insideSector.sectorVisible = true
+					break
+				}
+			}
+		}
+
+		if insideSector != nil {
+
+			for r := range insideSector.NeighborsWithinRange(camera.SectorRenderDepth) {
+				r.sectorVisible = true
+			}
+
+		}
+
+		// Make sectors and objects under their tree visible
+		for _, s := range sectorModels {
+			if s.Sector.sectorVisible {
+				search := s.SearchTree()
+				meshes = append(meshes, s)
+				meshes = append(meshes, search.Models()...)
+			}
+		}
+
+		s := rootNode.SearchTree()
+		s.StopOnFiltered = true
+
+		meshes = append(meshes, s.byNotSectors().Models()...)
+
+		camera.currentSector = insideSector
+
+	} else {
+		models := rootNode.SearchTree().Models()
+		for _, model := range models {
+			if model.DynamicBatchOwner == nil {
+				meshes = append(meshes, model)
+			}
 		}
 	}
 
 	camera.Render(scene, meshes...)
 
 }
+
+// CurrentSector returns the current sector the Camera is in, if sector-based rendering is enabled.
+func (camera *Camera) CurrentSector() *Sector { return camera.currentSector }
 
 type renderPair struct {
 	Model    *Model

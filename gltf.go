@@ -105,6 +105,9 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	camHeight := gltfLoadOptions.CameraHeight
 	camSetSize := false
 
+	sectorRendering := false
+	sectorRenderDepth := 0
+
 	if gltfLoadOptions.CameraWidth <= 0 && gltfLoadOptions.CameraHeight <= 0 {
 		camWidth = 1920
 		camHeight = 1080
@@ -152,6 +155,14 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					panic(err)
 				}
 
+			}
+
+			if on, exists := globalExporterSettings["t3dSectorRendering__"]; exists {
+				sectorRendering = on.(float64) > 0
+			}
+
+			if depth, exists := globalExporterSettings["t3dSectorRenderDepth__"]; exists {
+				sectorRenderDepth = depth.(int)
 			}
 
 		}
@@ -687,6 +698,9 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				newCam.perspective = false
 			}
 
+			newCam.SectorRendering = sectorRendering
+			newCam.SectorRenderDepth = sectorRenderDepth
+
 			obj = newCam
 
 		} else if lighting := node.Extensions["KHR_lights_punctual"]; lighting != nil {
@@ -968,6 +982,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		}
 
+		if nodeHasProp(node, "t3dSector__") {
+			obj.(*Model).Sector = newSector(obj.(*Model))
+		}
+
 		objects = append(objects, obj)
 
 	}
@@ -1172,6 +1190,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		}
 	}
 
+	// Set up worlds
 	if len(doc.Scenes) > 0 && doc.Scenes[0].Extras != nil {
 
 		dataMap := doc.Scenes[0].Extras.(map[string]interface{})
@@ -1249,6 +1268,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
+	// Set up scene roots
+
 	for _, s := range doc.Scenes {
 
 		scene := library.AddScene(s.Name)
@@ -1324,6 +1345,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				node.Unparent()
 
+			}
+
+			models := scene.Root.SearchTree().Models()
+			if model, ok := n.(*Model); ok && model.Sector != nil {
+				model.Sector.UpdateNeighbors(models...)
 			}
 
 		}

@@ -55,6 +55,8 @@ type Model struct {
 	AutoBatchMode  int
 	autoBatched    bool
 	dynamicBatcher bool
+
+	Sector *Sector // Sector is a reference to the Sector object that the Model stands in for, if sector-based rendering is enabled.
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -117,6 +119,11 @@ func (model *Model) Clone() INode {
 	newModel.VertexClipFunction = model.VertexClipFunction
 	newModel.VertexTransformFunction = model.VertexTransformFunction
 	newModel.dynamicBatcher = model.dynamicBatcher
+
+	if model.Sector != nil {
+		newModel.Sector = model.Sector.Clone()
+		newModel.Sector.Model = newModel
+	}
 
 	return newModel
 
