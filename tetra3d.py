@@ -1215,7 +1215,7 @@ def register():
     bpy.types.Scene.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not", default=False, 
     get=getSectorRendering, set=setSectorRendering)
 
-    bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=0, 
+    bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=1, min=0,
     get=getSectorRenderDepth, set=setSectorRenderDepth)
 
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 

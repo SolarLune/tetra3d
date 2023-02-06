@@ -311,6 +311,7 @@ func (camera *Camera) Clone() INode {
 	clone.fieldOfView = camera.fieldOfView
 	clone.orthoScale = camera.orthoScale
 	clone.SectorRendering = camera.SectorRendering
+	clone.SectorRenderDepth = camera.SectorRenderDepth
 
 	clone.AccumulateColorMode = camera.AccumulateColorMode
 	clone.AccumulateDrawOptions = camera.AccumulateDrawOptions

@@ -162,7 +162,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			}
 
 			if depth, exists := globalExporterSettings["t3dSectorRenderDepth__"]; exists {
-				sectorRenderDepth = depth.(int)
+				sectorRenderDepth = int(depth.(float64))
 			}
 
 		}
