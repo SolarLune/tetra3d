@@ -1029,11 +1029,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	camWidth, camHeight := camera.resultColorTexture.Size()
 
-	far := camera.far
-	near := camera.near
+	farSq := camera.far * camera.far
+	nearSq := camera.near * camera.near
 	if !camera.perspective {
-		far = 2.0
-		near = 0
+		farSq = 2.0
+		nearSq = 0
 	}
 
 	render := func(rp renderPair) {
@@ -1062,7 +1062,15 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		camera.DebugInfo.TotalParts++
 		camera.DebugInfo.TotalTris += meshPart.TriangleCount()
 
-		model.Transform()
+		p, s, r := model.Transform().Inverted().Decompose()
+
+		invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
+
+		// p, s, r := model.Transform().Inverted().Decompose()
+
+		// invertedCameraPos := r.MultVec(p).Add(camera.WorldPosition().HadamardMult(s))
+
+		// invertedCameraPos := model.Transform().Inverted().MultVec(camera.WorldPosition())
 
 		if model.FrustumCulling {
 
@@ -1220,10 +1228,17 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				if camera.RenderDepth {
 
-					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
-					// depth can be negative but still be in front of the camera and not behind it.
-					margin := 1.0
-					depth := mesh.vertexTransforms[vertIndex].Z / (far + margin)
+					// We used to use the transformed vertex positions, but that made fog shift
+					// aggressively as you turned the camera (as points closer to the corners of
+					// the screen appear to be closer to the camera because of projection); this
+					// fixed version is more stable
+					depth := 0.0
+					if model.skinned {
+						depth = (invertedCameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+					} else {
+						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+					}
+
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -1237,9 +1252,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				} else if scene.World != nil && scene.World.FogOn {
 
-					// We're adding 0.03 for a margin because for whatever reason, at close range / wide FOV,
-					// depth can be negative but still be in front of the camera and not behind it.
-					depth := float32((mesh.vertexTransforms[vertIndex].Z+near)/far + 0.03)
+					depth := float32((invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq))
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -1391,7 +1404,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 		if camera.RenderNormals {
 			camera.colorIntermediate.Clear()
 			camera.colorIntermediate.DrawTriangles(normalVertexList[:vertexListIndex], indexList[:indexListIndex], img, t)
-			camera.resultNormalTexture.DrawRectShader(w, h, camera.colorShader, nil)
+			camera.resultNormalTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
 		}
 
 		if camera.RenderDepth {

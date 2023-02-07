@@ -100,27 +100,22 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 				second = tmp
 			}
 
-			if result, ok := sphereRayTest(first, radius, from, to); ok {
+			// test the cylinder in-between. This is done with a plain cylinder mesh because I'm too stupid to
+			// figure out how to do it otherwise lmbo
+			rayCylinder.SetWorldTransform(test.Transform())
+			rayCylinder.SetLocalScale(radius, (test.Height/2)-radius, radius)
+
+			if results := RayTest(from, to, rayCylinder); len(results) > 0 {
+				for _, r := range results {
+					r.Object = test
+				}
+				rays = append(rays, results...)
+			} else if result, ok := sphereRayTest(first, radius, from, to); ok {
 				result.Object = test
 				rays = append(rays, result)
-			} else {
-
-				// test the cylinder in-between. This is done with a plain cylinder mesh because I'm too stupid to
-				// figure out how to do it otherwise lmbo
-
-				rayCylinder.SetWorldTransform(test.Transform())
-				rayCylinder.SetLocalScale(radius, test.Height/2, radius)
-
-				if results := RayTest(from, to, rayCylinder); len(results) > 0 {
-					for _, r := range results {
-						r.Object = test
-					}
-					rays = append(rays, results...)
-				} else if result, ok := sphereRayTest(second, radius, from, to); ok {
-					result.Object = test
-					rays = append(rays, result)
-				}
-
+			} else if result, ok := sphereRayTest(second, radius, from, to); ok {
+				result.Object = test
+				rays = append(rays, result)
 			}
 
 			// segment := to.Sub(from)

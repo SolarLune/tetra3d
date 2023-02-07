@@ -983,7 +983,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		}
 
 		if nodeHasProp(node, "t3dSector__") {
-			obj.(*Model).Sector = newSector(obj.(*Model))
+			obj.(*Model).Sector = NewSector(obj.(*Model))
 		}
 
 		objects = append(objects, obj)

@@ -40,7 +40,7 @@ type Sector struct {
 	sectorVisible bool
 }
 
-func newSector(model *Model) *Sector {
+func NewSector(model *Model) *Sector {
 
 	mesh := model.Mesh
 	margin := 0.01

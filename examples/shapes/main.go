@@ -41,27 +41,32 @@ func (g *Game) Init() {
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
 
-	g.Camera.SetFar(30)
+	g.Camera.SetFar(20)
 
 }
 
 func (g *Game) Update() error {
 
 	// Fog controls
+
 	if ebiten.IsKeyPressed(ebiten.Key1) {
+		g.Scene.World.FogOn = true
 		g.Scene.World.FogColor.Set(1, 0, 0, 1)
 		g.Scene.World.FogMode = tetra3d.FogAdd
 	} else if ebiten.IsKeyPressed(ebiten.Key2) {
-		g.Scene.World.FogColor.Set(0, 0, 0, 1)
+		g.Scene.World.FogOn = true
+		g.Scene.World.FogColor.Set(1, 1, 1, 1)
 		g.Scene.World.FogMode = tetra3d.FogSub
 	} else if ebiten.IsKeyPressed(ebiten.Key3) {
+		g.Scene.World.FogOn = true
 		g.Scene.World.FogColor.Set(0, 0, 0, 1)
 		g.Scene.World.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key4) {
+		g.Scene.World.FogOn = true
 		g.Scene.World.FogColor = colors.White()
 		g.Scene.World.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key5) {
-		g.Scene.World.FogMode = tetra3d.FogOff
+		g.Scene.World.FogOn = false
 		g.Scene.World.FogColor = colors.Black() // With the fog being off, setting the color doesn't do anything directly, but the clear color is set below to the fog color
 	}
 
