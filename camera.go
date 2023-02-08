@@ -152,15 +152,13 @@ func NewCamera(w, h int) *Camera {
 		}
 
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+			
 			tex := imageSrc0UnsafeAt(texCoord)
 			if (tex.a == 0) {
 				discard()
 			}
 			return vec4(encodeDepth(color.r).rgb, tex.a)
-			
-			// TODO: This shader needs to discard if tex.a is transparent. We can't sample the texture to return 
-			// what's underneath here, so discard is basically necessary. We need to implement it once the dicard
-			// keyword / function is implemented (if it ever is; hopefully it will be).
+
 		}
 
 		`,
@@ -944,6 +942,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 	depths := map[*Model]float64{}
 
+	cameraPos := camera.WorldPosition()
+
 	for _, model := range models {
 
 		if !model.visible {
@@ -964,7 +964,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 						continue
 					}
 
-					dynamicDepths[child] = camera.WorldPosition().DistanceSquared(child.WorldPosition())
+					dynamicDepths[child] = cameraPos.DistanceSquared(child.WorldPosition())
 
 					if !transparent {
 
@@ -987,11 +987,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				if transparent {
 					transparents = append(transparents, renderPair{model, meshPart})
-					depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
+					depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
 				} else {
 					solids = append(solids, renderPair{model, meshPart})
 					if !camera.RenderDepth {
-						depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
+						depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
 					}
 				}
 
@@ -1011,7 +1011,8 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 
 			if !camera.RenderDepth || modelIsTransparent {
-				depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
+				depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
+				// depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
 			}
 
 		}

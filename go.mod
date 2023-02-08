@@ -3,7 +3,7 @@ module github.com/solarlune/tetra3d
 go 1.18
 
 require (
-	github.com/hajimehoshi/ebiten/v2 v2.4.8
+	github.com/hajimehoshi/ebiten/v2 v2.4.16
 	github.com/qmuntal/gltf v0.23.1
 	golang.org/x/image v0.1.0
 )
