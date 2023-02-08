@@ -1184,13 +1184,6 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 				colorVertexList[vertexListIndex].DstX = float32(clipped.X)
 				colorVertexList[vertexListIndex].DstY = float32(clipped.Y)
 
-				depthVertexList[vertexListIndex] = colorVertexList[vertexListIndex]
-
-				depthVertexList[vertexListIndex].ColorR = 1
-				depthVertexList[vertexListIndex].ColorG = 1
-				depthVertexList[vertexListIndex].ColorB = 1
-				depthVertexList[vertexListIndex].ColorA = 1
-
 				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
 				uvU := float32(mesh.VertexUVs[vertIndex].X * srcW)
 				// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
@@ -1199,6 +1192,13 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				colorVertexList[vertexListIndex].SrcX = uvU
 				colorVertexList[vertexListIndex].SrcY = uvV
+
+				depthVertexList[vertexListIndex] = colorVertexList[vertexListIndex]
+
+				depthVertexList[vertexListIndex].ColorR = 1
+				depthVertexList[vertexListIndex].ColorG = 1
+				depthVertexList[vertexListIndex].ColorB = 1
+				depthVertexList[vertexListIndex].ColorA = 1
 
 				if camera.RenderNormals {
 					normalVertexList[vertexListIndex] = depthVertexList[vertexListIndex]
