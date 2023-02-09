@@ -62,7 +62,7 @@ func (amb *AmbientLight) beginModel(model *Model) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
 func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
-	meshPart.ForEachVertexIndex(func(vertIndex int) {
+	meshPart.forEachVisibleVertexIndex(func(vertIndex int) {
 		targetColors[vertIndex].AddRGBA(amb.result[0], amb.result[1], amb.result[2], 0)
 	})
 }
@@ -159,18 +159,16 @@ func (point *PointLight) beginRender() {
 
 func (point *PointLight) beginModel(model *Model) {
 
-	p, _, r := model.Transform().Inverted().Decompose()
+	p, s, r := model.Transform().Inverted().Decompose()
 
 	// Rather than transforming all vertices of all triangles of a mesh, we can just transform the
 	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
 
 	if model.skinned {
-		// point.cameraPosition = camera.WorldPosition()
 		point.workingPosition = point.WorldPosition()
 	} else {
-		// point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
-		point.workingPosition = r.MultVec(point.WorldPosition()).Add(p)
+		point.workingPosition = r.MultVec(point.WorldPosition()).Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 	}
 
 }
@@ -182,14 +180,27 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-	meshPart.ForEachVertexIndex(func(index int) {
+	meshPart.forEachVisibleVertexIndex(func(index int) {
 
 		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
+		distance := 0.0
+
+		var vertPos, vertNormal Vector
+
+		if model.skinned {
+			vertPos = model.Mesh.vertexSkinnedPositions[index]
+			vertNormal = model.Mesh.vertexSkinnedNormals[index]
+		} else {
+			vertPos = model.Mesh.VertexPositions[index]
+			vertNormal = model.Mesh.VertexNormals[index]
+		}
+
+		distance = point.workingPosition.DistanceSquared(vertPos)
+
 		if point.Distance > 0 {
 
-			dist := point.workingPosition.DistanceSquared(model.Mesh.VertexPositions[index])
-			if dist > point.distanceSquared {
+			if distance > point.distanceSquared {
 				return
 			}
 
@@ -209,6 +220,10 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 			// 	return
 			// }
 
+		} else {
+			if 1/distance*float64(point.Energy) < 0.001 {
+				return
+			}
 		}
 
 		// If you're on the other side of the plane, just assume it's not visible.
@@ -216,38 +231,27 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 		// 	return light
 		// }
 
-		var vertPos, vertNormal Vector
-
-		if model.skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[index]
-			vertNormal = model.Mesh.vertexSkinnedNormals[index]
-		} else {
-			vertPos = model.Mesh.VertexPositions[index]
-			vertNormal = model.Mesh.VertexNormals[index]
-		}
-
 		lightVec := point.workingPosition.Sub(vertPos).Unit()
-		diffuse := vertNormal.Dot(Vector(lightVec))
+		diffuse := vertNormal.Dot(lightVec)
 
-		if diffuse < 0 {
-			diffuse = 0
+		if diffuse > 0 {
+
+			diffuseFactor := 0.0
+
+			if point.Distance == 0 {
+				diffuseFactor = diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
+			} else {
+				diffuseFactor = diffuse * clamp(1.0-(pow((distance/point.distanceSquared), 4)), 0, 1)
+			}
+
+			targetColors[index].AddRGBA(
+				point.Color.R*float32(diffuseFactor)*point.Energy,
+				point.Color.G*float32(diffuseFactor)*point.Energy,
+				point.Color.B*float32(diffuseFactor)*point.Energy,
+				0,
+			)
+
 		}
-
-		var diffuseFactor float64
-		distance := point.workingPosition.DistanceSquared(vertPos)
-
-		if point.Distance == 0 {
-			diffuseFactor = diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
-		} else {
-			diffuseFactor = diffuse * clamp(1.0-(pow((distance/point.distanceSquared), 4)), 0, 1)
-		}
-
-		targetColors[index].AddRGBA(
-			point.Color.R*float32(diffuseFactor)*point.Energy,
-			point.Color.G*float32(diffuseFactor)*point.Energy,
-			point.Color.B*float32(diffuseFactor)*point.Energy,
-			0,
-		)
 
 	})
 
@@ -346,7 +350,7 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
 func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
 
-	meshPart.ForEachVertexIndex(func(index int) {
+	meshPart.forEachVisibleVertexIndex(func(index int) {
 
 		var normal Vector
 		if model.skinned {
@@ -558,8 +562,8 @@ func (cube *CubeLight) beginModel(model *Model) {
 		cube.workingDimensions.Min = r.MultVec(cube.workingDimensions.Min)
 		cube.workingDimensions.Max = r.MultVec(cube.workingDimensions.Max)
 
-		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(s).Add(p)
-		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(s).Add(p)
+		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 0}))
+		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 0}))
 
 	}
 
@@ -568,8 +572,7 @@ func (cube *CubeLight) beginModel(model *Model) {
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
 func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
 
-	// forEachVertexIndexInTriangles(triangles, func(index int, tri *Triangle) {
-	meshPart.ForEachVertexIndex(func(index int) {
+	meshPart.forEachVisibleVertexIndex(func(index int) {
 
 		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 

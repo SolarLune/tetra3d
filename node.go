@@ -200,6 +200,10 @@ type INode interface {
 	AnimationPlayer() *AnimationPlayer
 
 	setOriginalLocalPosition(Vector)
+
+	// Sector returns the Sector this Node is in.
+	Sector() *Sector
+	sectorHierarchy() *Sector
 }
 
 var nodeID uint64 = 0
@@ -1016,4 +1020,41 @@ func (node *Node) IsBone() bool {
 // AnimationPlayer returns the object's animation player - every object has an AnimationPlayer by default.
 func (node *Node) AnimationPlayer() *AnimationPlayer {
 	return node.animationPlayer
+}
+
+func (node *Node) sectorHierarchy() *Sector {
+
+	if node.parent != nil {
+		model, ok := node.parent.(*Model)
+		if ok && model.sector != nil {
+			return model.sector
+		} else {
+			parentSector := node.parent.sectorHierarchy()
+			if parentSector != nil {
+				return parentSector
+			}
+		}
+	}
+
+	return nil
+
+}
+
+// Sector returns the Sector this node is in hierarchically. If that fails, then
+// Sector() will search the scene tree spatially to see which of the sectors the
+// calling Node lies in.
+func (node *Node) Sector() *Sector {
+
+	if sectorHierarchy := node.sectorHierarchy(); sectorHierarchy != nil {
+		return sectorHierarchy
+	}
+
+	for _, sectorModel := range node.Root().SearchTree().bySectors().Models() {
+		if sectorModel.sector.AABB.PointInside(node.WorldPosition()) {
+			return sectorModel.sector
+		}
+	}
+
+	return nil
+
 }

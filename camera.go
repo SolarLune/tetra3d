@@ -740,7 +740,7 @@ func (camera *Camera) Clear() {
 		camera.resultNormalTexture.Clear()
 	}
 
-	if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
+	if camera.DebugInfo.frameCount > 0 && time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 
 		if !camera.DebugInfo.tickTime.IsZero() {
 
@@ -787,6 +787,7 @@ func (camera *Camera) RenderScene(scene *Scene) {
 func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	meshes := []*Model{}
+	lights := []ILight{}
 
 	if model, isModel := rootNode.(*Model); isModel {
 		meshes = append(meshes, model)
@@ -795,12 +796,21 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 	if camera.SectorRendering {
 
 		// Gather sectors
-		sectorModels := rootNode.SearchTree().bySectors().Models()
+		sectorSearch := rootNode.SearchTree().bySectors()
+
+		nonSectorSearch := rootNode.SearchTree().ByFunc(func(node INode) bool {
+			model, ok := node.(*Model)
+			return !ok || model.sector == nil
+		})
+
+		nonSectorSearch.StopOnFiltered = true
+
+		sectorModels := sectorSearch.Models()
 
 		// Set them all to be invisible by default
 		for _, sectorModel := range sectorModels {
 			if sectorModel.DynamicBatchOwner == nil {
-				sectorModel.Sector.sectorVisible = false
+				sectorModel.sector.sectorVisible = false
 			} else {
 				// Making a sector dynamically batched is just way too much to deal with, I'm sorry
 				panic("Can't make a sector " + sectorModel.Path() + " dynamically batched as well")
@@ -811,7 +821,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 		// Find which one the camera's inside
 		for _, s := range sectorModels {
-			sector := s.Sector
+			sector := s.sector
 			if sector.AABB.PointInside(camera.WorldPosition()) {
 				if insideSector == nil || sector.AABB.Dimensions.MaxSpan() < insideSector.AABB.Dimensions.MaxSpan() {
 					insideSector = sector
@@ -831,22 +841,40 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 		// Make sectors and objects under their tree visible
 		for _, s := range sectorModels {
-			if s.Sector.sectorVisible {
-				search := s.SearchTree()
+
+			if s.sector.sectorVisible {
+
+				search := s.SearchTree().INodes()
 				meshes = append(meshes, s)
-				meshes = append(meshes, search.Models()...)
+				for _, n := range search {
+					if model, ok := n.(*Model); ok {
+						meshes = append(meshes, model)
+					}
+					if light, ok := n.(ILight); ok && light.IsOn() {
+						lights = append(lights, light)
+					}
+				}
+
 			}
+
 		}
 
-		s := rootNode.SearchTree()
-		s.StopOnFiltered = true
+		// Now search for non-Sectors
 
-		meshes = append(meshes, s.byNotSectors().Models()...)
+		for _, i := range nonSectorSearch.INodes() {
+			if model, ok := i.(*Model); ok {
+				meshes = append(meshes, model)
+			}
+			if light, ok := i.(ILight); ok && light.IsOn() {
+				lights = append(lights, light)
+			}
+		}
 
 		camera.currentSector = insideSector
 
 	} else {
 		models := rootNode.SearchTree().Models()
+		lights = rootNode.SearchTree().Lights()
 		for _, model := range models {
 			if model.DynamicBatchOwner == nil {
 				meshes = append(meshes, model)
@@ -854,7 +882,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 		}
 	}
 
-	camera.Render(scene, meshes...)
+	camera.Render(scene, lights, meshes...)
 
 }
 
@@ -877,36 +905,51 @@ var bayerMatrix = []float32{
 // Render renders all of the models passed using the provided Scene's properties (fog, for example). Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 // Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
-func (camera *Camera) Render(scene *Scene, models ...*Model) {
+func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	scene.HandleAutobatch()
 
 	frametimeStart := time.Now()
 
-	sceneLights := []ILight{}
-	lights := sceneLights
+	sceneLights := make([]ILight, 0, len(lights))
 
-	if scene.World == nil || scene.World.LightingOn {
+	if scene.World != nil && scene.World.LightingOn {
 
-		for _, l := range scene.Root.SearchTree().INodes() {
-			if light, isLight := l.(ILight); isLight {
-				camera.DebugInfo.LightCount++
-				if light.IsOn() {
-					sceneLights = append(sceneLights, light)
-					light.beginRender()
-					camera.DebugInfo.ActiveLightCount++
-				}
+		lights = append(lights, scene.World.AmbientLight)
+
+		for _, light := range lights {
+			if light.IsOn() {
+				camera.DebugInfo.ActiveLightCount++
+				light.beginRender()
+				sceneLights = append(sceneLights, light)
 			}
 		}
 
-		if scene.World != nil && scene.World.AmbientLight != nil && scene.World.AmbientLight.IsOn() {
-			sceneLights = append(sceneLights, scene.World.AmbientLight)
-			scene.World.AmbientLight.beginRender()
-			camera.DebugInfo.LightCount++
-			camera.DebugInfo.ActiveLightCount++
-		}
-
 	}
+
+	camera.DebugInfo.LightCount = len(lights)
+
+	// if scene.World == nil || scene.World.LightingOn {
+
+	// 	for _, l := range scene.Root.SearchTree().INodes() {
+	// 		if light, isLight := l.(ILight); isLight {
+	// 			camera.DebugInfo.LightCount++
+	// 			if light.IsOn() {
+	// 				sceneLights = append(sceneLights, light)
+	// 				light.beginRender()
+	// 				camera.DebugInfo.ActiveLightCount++
+	// 			}
+	// 		}
+	// 	}
+
+	// 	if scene.World != nil && scene.World.AmbientLight != nil && scene.World.AmbientLight.IsOn() {
+	// 		sceneLights = append(sceneLights, scene.World.AmbientLight)
+	// 		scene.World.AmbientLight.beginRender()
+	// 		camera.DebugInfo.LightCount++
+	// 		camera.DebugInfo.ActiveLightCount++
+	// 	}
+
+	// }
 
 	// By multiplying the camera's position against the view matrix (which contains the negated camera position), we're left with just the rotation
 	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
@@ -948,6 +991,17 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 		if !model.visible {
 			continue
+		}
+
+		camera.DebugInfo.TotalParts++
+
+		if model.FrustumCulling {
+
+			if !camera.SphereInFrustum(model.BoundingSphere) {
+				continue
+			}
+			model.refreshVertexVisibility()
+
 		}
 
 		if len(model.DynamicBatchModels) > 0 {
@@ -1060,26 +1114,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 			}
 		}
 
-		camera.DebugInfo.TotalParts++
 		camera.DebugInfo.TotalTris += meshPart.TriangleCount()
 
 		p, s, r := model.Transform().Inverted().Decompose()
 
 		invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
-
-		// p, s, r := model.Transform().Inverted().Decompose()
-
-		// invertedCameraPos := r.MultVec(p).Add(camera.WorldPosition().HadamardMult(s))
-
-		// invertedCameraPos := model.Transform().Inverted().MultVec(camera.WorldPosition())
-
-		if model.FrustumCulling {
-
-			if !camera.SphereInFrustum(model.BoundingSphere) {
-				return
-			}
-
-		}
 
 		if model.DynamicBatchOwner != nil {
 			camera.DebugInfo.BatchedParts++
@@ -1099,16 +1138,14 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			t := time.Now()
 
-			lights = sceneLights
-
 			if model.LightGroup != nil && model.LightGroup.Active {
-				lights = model.LightGroup.Lights
+				sceneLights = model.LightGroup.Lights
 				for _, l := range model.LightGroup.Lights {
 					l.beginRender() // Call this because it's relatively cheap and necessary if a light doesn't exist in the Scene
 				}
 			}
 
-			for _, light := range lights {
+			for _, light := range sceneLights {
 				light.beginModel(model)
 			}
 
@@ -1133,11 +1170,11 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 			t := time.Now()
 
-			meshPart.ForEachVertexIndex(func(vertIndex int) {
+			meshPart.forEachVisibleVertexIndex(func(vertIndex int) {
 				meshPart.Mesh.vertexLights[vertIndex].Set(0, 0, 0, 1)
 			})
 
-			for _, light := range lights {
+			for _, light := range sceneLights {
 
 				// Skip calculating lighting for objects that are too far away from light sources.
 				if point, ok := light.(*PointLight); ok && point.Distance > 0 {
@@ -1235,7 +1272,7 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 					// fixed version is more stable
 					depth := 0.0
 					if model.skinned {
-						depth = (invertedCameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
 					} else {
 						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
 					}
@@ -1253,7 +1290,13 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 				} else if scene.World != nil && scene.World.FogOn {
 
-					depth := float32((invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq))
+					depth := 0.0
+					if model.skinned {
+						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+					} else {
+						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+					}
+
 					if depth < 0 {
 						depth = 0
 					} else if depth > 1 {
@@ -1262,16 +1305,16 @@ func (camera *Camera) Render(scene *Scene, models ...*Model) {
 
 					// depth = 1 - depth
 
-					depth = scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - depth)
+					depth = float64(scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - float32(depth)))
 
 					if scene.World.FogMode == FogAdd {
-						colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * depth
-						colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * depth
-						colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * depth
+						colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * float32(depth)
+						colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * float32(depth)
+						colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * float32(depth)
 					} else if scene.World.FogMode == FogSub {
-						colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * depth
-						colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * depth
-						colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * depth
+						colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * float32(depth)
+						colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * float32(depth)
+						colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * float32(depth)
 					}
 
 				}

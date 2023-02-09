@@ -174,6 +174,7 @@ type Mesh struct {
 	VertexActiveColorChannel []int
 	VertexWeights            [][]float32 // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
 	VertexBones              [][]uint16  // TODO: Replace this with [][8]uint16 (or however many the maximum number of bones affecting a single vertex is for GLTF)
+	visibleVertices          []bool
 
 	vertexLights  []*Color
 	vertsAddStart int
@@ -197,6 +198,7 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 
 		vertexTransforms:         []Vector{},
 		VertexPositions:          []Vector{},
+		visibleVertices:          []bool{},
 		VertexNormals:            []Vector{},
 		vertexSkinnedNormals:     []Vector{},
 		vertexSkinnedPositions:   []Vector{},
@@ -228,6 +230,7 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	for i := range mesh.VertexPositions {
 		newMesh.VertexPositions = append(newMesh.VertexPositions, mesh.VertexPositions[i])
+		newMesh.visibleVertices = append(newMesh.visibleVertices, false)
 	}
 
 	for i := range mesh.VertexNormals {
@@ -320,6 +323,9 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 	}
 
 	mesh.VertexPositions = append(make([]Vector, 0, vertexCount), mesh.VertexPositions...)
+	if len(mesh.visibleVertices) < vertexCount {
+		mesh.visibleVertices = make([]bool, vertexCount)
+	}
 
 	mesh.VertexNormals = append(make([]Vector, 0, vertexCount), mesh.VertexNormals...)
 
@@ -1264,6 +1270,14 @@ func (part *MeshPart) ForEachTri(triFunc func(tri *Triangle)) {
 func (part *MeshPart) ForEachVertexIndex(vertFunc func(vertIndex int)) {
 	for i := part.VertexIndexStart; i < part.VertexIndexEnd; i++ {
 		vertFunc(i)
+	}
+}
+
+func (part *MeshPart) forEachVisibleVertexIndex(vertFunc func(vertIndex int)) {
+	for i := part.VertexIndexStart; i < part.VertexIndexEnd; i++ {
+		if part.Mesh.visibleVertices[i] {
+			vertFunc(i)
+		}
 	}
 }
 

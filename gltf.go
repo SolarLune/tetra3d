@@ -655,6 +655,19 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
+	nodeGetProp := func(node *gltf.Node, propName string) interface{} {
+
+		if node.Extras == nil {
+			return nil
+		}
+
+		if value, exists := node.Extras.(map[string]interface{})[propName]; exists {
+			return value
+		}
+		return nil
+
+	}
+
 	// Node / Object creation
 	for _, node := range doc.Nodes {
 
@@ -982,8 +995,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		}
 
-		if nodeHasProp(node, "t3dSector__") {
-			obj.(*Model).Sector = NewSector(obj.(*Model))
+		if value := nodeGetProp(node, "t3dSector__"); value != nil && value.(float64) > 0 {
+			obj.(*Model).sector = NewSector(obj.(*Model))
 		}
 
 		objects = append(objects, obj)
@@ -1348,8 +1361,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			}
 
 			models := scene.Root.SearchTree().Models()
-			if model, ok := n.(*Model); ok && model.Sector != nil {
-				model.Sector.UpdateNeighbors(models...)
+			if model, ok := n.(*Model); ok && model.sector != nil {
+				model.sector.UpdateNeighbors(models...)
 			}
 
 		}

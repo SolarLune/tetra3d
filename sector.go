@@ -81,9 +81,9 @@ func (sector *Sector) UpdateNeighbors(otherModels ...*Model) {
 			continue
 		}
 
-		if otherModel.Sector != nil && sector.AABB.Colliding(otherModel.Sector.AABB) {
-			sector.Neighbors[otherModel.Sector] = true
-			otherModel.Sector.Neighbors[sector] = true
+		if otherModel.sector != nil && sector.AABB.Colliding(otherModel.sector.AABB) {
+			sector.Neighbors[otherModel.sector] = true
+			otherModel.sector.Neighbors[sector] = true
 		}
 
 	}

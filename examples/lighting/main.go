@@ -62,7 +62,7 @@ func (g *Game) Update() error {
 	light.AnimationPlayer().Play("LightAction")
 	light.AnimationPlayer().Update(1.0 / 60.0)
 
-	armature := g.Scene.Root.Get("Cube.008/Armature")
+	armature := g.Scene.Root.Get("Armature")
 
 	player := armature.AnimationPlayer()
 	player.Play("ArmatureAction")

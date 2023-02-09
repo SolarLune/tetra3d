@@ -56,7 +56,7 @@ type Model struct {
 	autoBatched    bool
 	dynamicBatcher bool
 
-	Sector *Sector // Sector is a reference to the Sector object that the Model stands in for, if sector-based rendering is enabled.
+	sector *Sector // Sector is a reference to the Sector object that the Model stands in for, if sector-based rendering is enabled.
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
@@ -120,9 +120,9 @@ func (model *Model) Clone() INode {
 	newModel.VertexTransformFunction = model.VertexTransformFunction
 	newModel.dynamicBatcher = model.dynamicBatcher
 
-	if model.Sector != nil {
-		newModel.Sector = model.Sector.Clone()
-		newModel.Sector.Model = newModel
+	if model.sector != nil {
+		newModel.sector = model.sector.Clone()
+		newModel.sector.Model = newModel
 	}
 
 	return newModel
@@ -442,6 +442,12 @@ var transformedVertexPositions = [3]Vector{
 	{0, 0, 0, 0},
 }
 
+func (model *Model) refreshVertexVisibility() {
+	for i := range model.Mesh.visibleVertices {
+		model.Mesh.visibleVertices[i] = false
+	}
+}
+
 // ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
 // matrix, a camera, and the MeshPart being rendered.
 func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, scene *Scene) []sortingTriangle {
@@ -657,6 +663,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		if sortMode != TriangleSortModeNone {
 			meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamPos.DistanceSquared(tri.Center))
 		}
+
+		mesh.visibleVertices[tri.VertexIndices[0]] = true
+		mesh.visibleVertices[tri.VertexIndices[1]] = true
+		mesh.visibleVertices[tri.VertexIndices[2]] = true
 
 		sortingTriIndex++
 
@@ -974,4 +984,11 @@ func (model *Model) Index() int {
 		}
 	}
 	return -1
+}
+
+func (model *Model) Sector() *Sector {
+	if model.sector != nil {
+		return model.sector
+	}
+	return model.Node.Sector()
 }

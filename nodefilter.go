@@ -133,14 +133,7 @@ func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 
 func (nf NodeFilter) bySectors() NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
-		return node.Type() == NodeTypeModel && node.(*Model).Sector != nil
-	})
-	return nf
-}
-
-func (nf NodeFilter) byNotSectors() NodeFilter {
-	nf.Filters = append(nf.Filters, func(node INode) bool {
-		return node.Type() == NodeTypeModel && node.(*Model).Sector == nil
+		return node.Type() == NodeTypeModel && node.(*Model).sector != nil
 	})
 	return nf
 }

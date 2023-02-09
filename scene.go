@@ -54,11 +54,11 @@ func (scene *Scene) Clone() *Scene {
 	models := newScene.Root.SearchTree().bySectors().Models()
 
 	for _, n := range models {
-		n.Sector.Neighbors.Clear()
+		n.sector.Neighbors.Clear()
 	}
 
 	for _, n := range models {
-		n.Sector.UpdateNeighbors(models...)
+		n.sector.UpdateNeighbors(models...)
 	}
 
 	return newScene
