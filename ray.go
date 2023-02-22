@@ -195,6 +195,10 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 			tmin := max(max(min(t1, t2), min(t3, t4)), min(t5, t6))
 			tmax := min(min(max(t1, t2), max(t3, t4)), max(t5, t6))
 
+			if math.IsNaN(tmin) || math.IsNaN(tmax) {
+				continue
+			}
+
 			if tmin < 0 {
 				continue
 			}
@@ -218,7 +222,8 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 			rays = append(rays, RayHit{
 				Object:   test,
 				Position: contact,
-				Normal:   aabbNormalGuess(contact.Sub(pos)),
+				// Normal:   aabbNormalGuess(contact.Sub(pos)),
+				Normal: test.normalFromContactPoint(contact),
 			})
 
 		case *BoundingTriangles:

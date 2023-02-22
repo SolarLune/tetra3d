@@ -131,6 +131,21 @@ func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 	return nf
 }
 
+// Not allows you to filter OUT a given NodeFilter of nodes.
+// If a node is in the provided slice of INodes, then it will not be added to the
+// final NodeFilter.
+func (nf NodeFilter) Not(others []INode) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		for _, other := range others {
+			if node == other {
+				return false
+			}
+		}
+		return true
+	})
+	return nf
+}
+
 func (nf NodeFilter) bySectors() NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		return node.Type() == NodeTypeModel && node.(*Model).sector != nil

@@ -77,12 +77,17 @@ func (color *Color) Multiply(other *Color) *Color {
 }
 
 // Sub subtracts the other Color from the calling Color instance.
-func (color *Color) Sub(other *Color) *Color {
-	color.R -= other.R
-	color.G -= other.G
-	color.B -= other.B
-	color.A -= other.A
+func (color *Color) SubRGBA(r, g, b, a float32) *Color {
+	color.R -= r
+	color.G -= g
+	color.B -= b
+	color.A -= a
 	return color
+}
+
+// Sub subtracts the other Color from the calling Color instance.
+func (color *Color) Sub(other *Color) *Color {
+	return color.SubRGBA(other.ToFloat32s())
 }
 
 // Mix mixes the calling Color with the other Color, mixed to the percentage given (ranging from 0 - 1).

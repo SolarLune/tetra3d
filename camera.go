@@ -224,20 +224,37 @@ func NewCamera(w, h int) *Camera {
 
 				if Fogless == 0 {
 
-					if Fog.a == 0 {
-						colorTex.rgb += Fog.rgb * d * colorTex.a
-					} else if Fog.a == 1 {
-						colorTex.rgb -= Fog.rgb * d * colorTex.a
-					} else if Fog.a == 2 {
-						colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
-					} else if Fog.a == 3 {
-						colorTex.a *= abs(1-d)
-						if DitherSize > 0 {
-							yc := int(position.y / DitherSize)%4
-							xc := int(position.x / DitherSize)%4
-							colorTex.a *= step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
+					if DitherSize > 0 {
+
+						yc := int(position.y / DitherSize)%4
+						xc := int(position.x / DitherSize)%4
+
+						fogMult := step(0, d - BayerMatrix[(yc*4) + xc])
+
+						if Fog.a == 0 {
+							colorTex.rgb += Fog.rgb * fogMult * colorTex.a
+						} else if Fog.a == 1 {
+							colorTex.rgb -= Fog.rgb * fogMult * colorTex.a
+						} else if Fog.a == 2 {
+							colorTex.rgb = mix(colorTex.rgb, Fog.rgb, fogMult) * colorTex.a
+						} else if Fog.a == 3 {
+							colorTex.a *= abs(1-d) * step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
+							colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
 						}
-						colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
+
+					} else {
+
+						if Fog.a == 0 {
+							colorTex.rgb += Fog.rgb * d * colorTex.a
+						} else if Fog.a == 1 {
+							colorTex.rgb -= Fog.rgb * d * colorTex.a
+						} else if Fog.a == 2 {
+							colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
+						} else if Fog.a == 3 {
+							colorTex.a *= abs(1-d)
+							colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
+						}
+
 					}
 
 				}

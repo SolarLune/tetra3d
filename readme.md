@@ -368,8 +368,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Reusing vertex indices for adjacent triangles
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?
-- [ ] -- Replace Vector usage with struct-based custom vectors (that aren't allocated to the heap or reallocated unnecessarily, ideally)?
 - [X] -- Custom Vectors
+- [ ] -- -- Vector pools again? 
 - [ ] -- Matrix pools?
 - [ ] -- Raytest optimization
 - [ ] -- -- Sphere?

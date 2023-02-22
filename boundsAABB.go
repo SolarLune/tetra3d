@@ -152,43 +152,29 @@ func (box *BoundingAABB) ClosestPoint(point Vector) Vector {
 	return out
 }
 
-// aabbNormalGuess guesses which normal to return for an AABB given an MTV vector. Basically, if you have an MTV vector indicating a sphere, for example,
+// normalFromContactPoint guesses which normal to return for an AABB given an MTV vector. Basically, if you have an MTV vector indicating a sphere, for example,
 // moves up by 0.1 when colliding with an AABB, it must be colliding with the top, and so the returned normal would be [0, 1, 0].
-func aabbNormalGuess(dir Vector) Vector {
+func (box *BoundingAABB) normalFromContactPoint(contactPoint Vector) Vector {
 
-	if dir.X == 0 && dir.Y == 0 && dir.Z == 0 {
+	if contactPoint.Equals(box.WorldPosition()) {
 		return NewVectorZero()
 	}
 
-	ax := math.Abs(dir.X)
-	ay := math.Abs(dir.Y)
-	az := math.Abs(dir.Z)
-
-	if ax > az && ax > ay {
-		// X is greatest axis
-		if dir.X > 0 {
-			return Vector{1, 0, 0, 0}
-		} else {
-			return Vector{-1, 0, 0, 0}
-		}
+	p := contactPoint.Sub(box.WorldPosition())
+	d := Vector{
+		box.Dimensions.Width() / 2,
+		box.Dimensions.Height() / 2,
+		box.Dimensions.Depth() / 2,
+		0,
 	}
+	normal := Vector{
+		float64(math.Round(p.X / d.X)),
+		float64(math.Round(p.Y / d.Y)),
+		float64(math.Round(p.Z / d.Z)),
+		0,
+	}.Unit()
 
-	if ay > az {
-		// Y is greatest axis
-
-		if dir.Y > 0 {
-			return Vector{0, 1, 0, 0}
-		} else {
-			return Vector{0, -1, 0, 0}
-		}
-	}
-
-	// Z is greatest axis
-	if dir.Z > 0 {
-		return Vector{0, 0, 1, 0}
-	} else {
-		return Vector{0, 0, -1, 0}
-	}
+	return normal
 
 }
 

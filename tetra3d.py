@@ -565,9 +565,8 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
 
             if context.world.t3dFogMode__ != "TRANSPARENT":
                 box.prop(context.world, "t3dFogColor__")
-            else:
-                box.prop(context.world, "t3dTransparentFogDithered__")
-            
+
+            box.prop(context.world, "t3dFogDithered__")            
             box.prop(context.world, "t3dFogRangeStart__", slider=True)
             box.prop(context.world, "t3dFogRangeEnd__", slider=True)
         
@@ -614,12 +613,12 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         row.prop(context.scene, "t3dSectorRenderDepth__")
 
         row = self.layout.row()
-        row.prop(context.scene.render, "resolution_x")
-        row.prop(context.scene.render, "resolution_y")
+        row.prop(context.scene, "t3dRenderResolutionW__")
+        row.prop(context.scene, "t3dRenderResolutionH__")
         row = self.layout.row()
         row.label(text="Animation Playback Framerate (in Blender):")
         row = self.layout.row()
-        row.prop(context.scene.render, "fps")
+        row.prop(context.scene, "t3dPlaybackFPS__")
 
 def export():
     scene = bpy.context.scene
@@ -670,9 +669,6 @@ def export():
     
     globalSet("t3dCollections__", collections)
 
-    # set global camera resolution
-    globalSet("t3dCameraResolution__", [bpy.context.scene.render.resolution_x, bpy.context.scene.render.resolution_y])
-
     worlds = {}
 
     for world in bpy.data.worlds:
@@ -697,8 +693,8 @@ def export():
             worldData["clear color"] = world.t3dClearColor__
         if "t3dFogMode__" in world:
             worldData["fog mode"] = world.t3dFogMode__
-        if "t3dTransparentFogDithered__" in world:
-            worldData["dithered transparency"] = world.t3dTransparentFogDithered__
+        if "t3dFogDithered__" in world:
+            worldData["dithered transparency"] = world.t3dFogDithered__
         if "t3dFogColor__" in world:
             worldData["fog color"] = world.t3dFogColor__
         if "t3dFogRangeStart__" in world:
@@ -943,7 +939,7 @@ def export():
         for marker in action.pose_markers:
             markerInfo = {
                 "name": marker.name,
-                "time": marker.frame / scene.render.fps,
+                "time": marker.frame / globalGet("t3dPlaybackFPS__"),
             }
             markers.append(markerInfo)
         if len(markers) > 0:
@@ -1099,6 +1095,52 @@ def getSectorRenderDepth(self):
 def setSectorRenderDepth(self, value):
     globalSet("t3dSectorRenderDepth__", value)
 
+#####
+
+def getRenderResolutionW(self):
+    s = globalGet("t3dRenderResolutionW__")
+    if s is None:
+        s = 640
+    bpy.context.scene.render.resolution_x = s
+    return s
+
+def setRenderResolutionW(self, value):
+    globalSet("t3dRenderResolutionW__", value)
+    bpy.context.scene.render.resolution_x = value
+
+#####
+
+def getRenderResolutionH(self):
+    s = globalGet("t3dRenderResolutionH__")
+    if s is None:
+        s = 360
+    bpy.context.scene.render.resolution_y = s
+    return s
+
+def setRenderResolutionH(self, value):
+    globalSet("t3dRenderResolutionH__", value)
+    bpy.context.scene.render.resolution_y = value
+
+######
+
+def getPlaybackFPS(self):
+    s = globalGet("t3dPlaybackFPS__")
+    if s is None:
+        s = 60
+    bpy.context.scene.render.fps = s
+    return s
+
+def setPlaybackFPS(self, value):
+    globalSet("t3dPlaybackFPS__", value)
+    bpy.context.scene.render.fps = value
+
+# row = self.layout.row()
+# row.prop(context.scene.render, "resolution_x")
+# row.prop(context.scene.render, "resolution_y")
+# row = self.layout.row()
+# row.label(text="Animation Playback Framerate (in Blender):")
+# row = self.layout.row()
+# row.prop(context.scene.render, "fps")
 
 def getExportOnSave(self):
     s = globalGet("t3dExportOnSave__")
@@ -1236,6 +1278,15 @@ def register():
     bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(name="Pack Textures", description="Whether Blender should pack textures into the GLTF file on export", default=False,
     get=getPackTextures, set=setPackTextures)
 
+    bpy.types.Scene.t3dRenderResolutionW__ = bpy.props.IntProperty(name="Render Resolution Width", description="How wide to render the game scene", default=640, min=0,
+    get=getRenderResolutionW, set=setRenderResolutionW)
+
+    bpy.types.Scene.t3dRenderResolutionH__ = bpy.props.IntProperty(name="Render Resolution Height", description="How wide to render the game scene", default=360, min=0,
+    get=getRenderResolutionH, set=setRenderResolutionH)
+
+    bpy.types.Scene.t3dPlaybackFPS__ = bpy.props.IntProperty(name="Playback FPS", description="Animation Playback Framerate (in Blender)", default=60, min=0,
+    get=getPlaybackFPS, set=setPlaybackFPS)
+
     bpy.types.Scene.t3dExpandGameProps__ = bpy.props.BoolProperty(name="Expand Game Properties", default=True)
     bpy.types.Scene.t3dExpandOverrideProps__ = bpy.props.BoolProperty(name="Expand Overridden Properties", default=True)
 
@@ -1248,7 +1299,7 @@ def register():
     bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="Fog color", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")
-    bpy.types.World.t3dTransparentFogDithered__ = bpy.props.FloatProperty(name="Dithered Transparency Size", description="How large bayer matrix dithering is when using transparent fog. If set to 0, dithering is disabled", default=1, min=0, step=1)
+    bpy.types.World.t3dFogDithered__ = bpy.props.FloatProperty(name="Fog Dither Size", description="How large bayer matrix dithering is when using fog. If set to 0, dithering is disabled", default=0, min=0, step=1)
 
     bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
     bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
@@ -1292,6 +1343,10 @@ def unregister():
     del bpy.types.Scene.t3dExportLights__
     del bpy.types.Scene.t3dPackTextures__
 
+    del bpy.types.Scene.t3dRenderResolutionW__
+    del bpy.types.Scene.t3dRenderResolutionH__
+    del bpy.types.Scene.t3dPlaybackFPS__
+
     del bpy.types.Scene.t3dExpandGameProps__
     del bpy.types.Scene.t3dExpandOverrideProps__
 
@@ -1306,7 +1361,7 @@ def unregister():
     del bpy.types.World.t3dFogMode__
     del bpy.types.World.t3dFogRangeStart__
     del bpy.types.World.t3dFogRangeEnd__
-    del bpy.types.World.t3dTransparentFogDithered__
+    del bpy.types.World.t3dFogDithered__
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)

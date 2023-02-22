@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"time"
 )
 
@@ -239,7 +238,8 @@ type AnimationPlayer struct {
 	ChannelsToNodes        map[*AnimationChannel]INode
 	ChannelsUpdated        bool
 	Animation              *Animation
-	Playhead               float64    // Playhead of the animation. Setting this to 0 restarts the animation.
+	Playhead               float64 // Playhead of the animation. Setting this to 0 restarts the animation.
+	prevPlayhead           float64
 	PlaySpeed              float64    // Playback speed in percentage - defaults to 1 (100%)
 	Playing                bool       // Whether the player is playing back or not.
 	FinishMode             FinishMode // What to do when the player finishes playback. Defaults to looping.
@@ -429,23 +429,33 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 			}
 
-			prevPlayhead := ap.Playhead
 			ap.Playhead += dt * ap.PlaySpeed
-
-			for _, marker := range ap.Animation.Markers {
-				if math.Abs(ap.Playhead-marker.Time) < 0.001 && prevPlayhead <= marker.Time {
-					if ap.OnMarkerTouch != nil {
-						ap.OnMarkerTouch(marker, ap.Animation)
-					}
-					ap.touchedMarkers = append(ap.touchedMarkers, marker)
-				}
-			}
 
 			ph := ap.Playhead
 
 			if !ap.PlayLastFrame {
 				ph += dt * ap.PlaySpeed
 			}
+
+			if ap.PlaySpeed != 0 {
+
+				for _, marker := range ap.Animation.Markers {
+					// fmt.Println(ph, prevPlayhead, marker.Time, ph >= marker.Time, prevPlayhead <= marker.Time)
+					// fmt.Println(gteWithMargin(ph, marker.Time))
+					// fmt.Println(lteWithMargin(prevPlayhead, marker.Time))
+					// if gteWithMargin(ph, marker.Time) && lteWithMargin(prevPlayhead, marker.Time) {
+					if ph >= marker.Time && ap.prevPlayhead <= marker.Time {
+						// if ap.Playhead >= marker.Time && prevPlayhead <= marker.Time {
+						if ap.OnMarkerTouch != nil {
+							ap.OnMarkerTouch(marker, ap.Animation)
+						}
+						ap.touchedMarkers = append(ap.touchedMarkers, marker)
+					}
+				}
+
+			}
+
+			ap.prevPlayhead = ph
 
 			if ap.FinishMode == FinishModeLoop && (ph >= ap.Animation.Length || ph < 0) {
 

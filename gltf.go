@@ -103,16 +103,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	camWidth := gltfLoadOptions.CameraWidth
 	camHeight := gltfLoadOptions.CameraHeight
-	camSetSize := false
+	camDefaultSize := false
 
 	sectorRendering := false
 	sectorRenderDepth := 0
 
 	if gltfLoadOptions.CameraWidth <= 0 && gltfLoadOptions.CameraHeight <= 0 {
-		camWidth = 1920
-		camHeight = 1080
-	} else {
-		camSetSize = true
+		camWidth = 640
+		camHeight = 360
+		camDefaultSize = true
 	}
 
 	if len(doc.Scenes) > 0 {
@@ -121,14 +120,16 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			globalExporterSettings := doc.Scenes[0].Extras.(map[string]interface{})
 
-			if !camSetSize {
+			if camDefaultSize {
 
-				if cr, exists := globalExporterSettings["t3dCameraResolution__"]; exists {
-					res := cr.([]interface{})
-					if w, ok := res[0].(float64); ok {
+				if cr, exists := globalExporterSettings["t3dRenderResolutionW__"]; exists {
+					if w, ok := cr.(float64); ok {
 						camWidth = int(w)
 					}
-					if h, ok := res[1].(float64); ok {
+				}
+
+				if cr, exists := globalExporterSettings["t3dRenderResolutionH__"]; exists {
+					if h, ok := cr.(float64); ok {
 						camHeight = int(h)
 					}
 				}
