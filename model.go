@@ -110,8 +110,6 @@ func (model *Model) Clone() INode {
 		child.setParent(newModel)
 	}
 
-	newModel.originalLocalPosition = model.originalLocalPosition
-
 	if model.LightGroup != nil {
 		newModel.LightGroup = model.LightGroup.Clone()
 	}

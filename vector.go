@@ -172,8 +172,8 @@ func (vec Vector) DistanceSquared(other Vector) float64 {
 	return vec.Sub(other).MagnitudeSquared()
 }
 
-// HadamardMult performs Hadamard (component-wise) multiplication on the calling Vector with the other Vector provided, returning a copy with the result (and ignoring the Vector's W component).
-func (vec Vector) HadamardMult(other Vector) Vector {
+// Mult performs Hadamard (component-wise) multiplication on the calling Vector with the other Vector provided, returning a copy with the result (and ignoring the Vector's W component).
+func (vec Vector) Mult(other Vector) Vector {
 	vec.X *= other.X
 	vec.Y *= other.Y
 	vec.Z *= other.Z
@@ -411,9 +411,9 @@ func (ip ModVector) Expand(margin, min float64) ModVector {
 	return ip
 }
 
-// HadamardMult performs Hadamard (component-wise) multiplication with the Vector on the other Vector provided.
+// Mult performs Hadamard (component-wise) multiplication with the Vector on the other Vector provided.
 // This function returns the calling ModVector for method chaining.
-func (ip ModVector) HadamardMult(other Vector) ModVector {
+func (ip ModVector) Mult(other Vector) ModVector {
 	ip.X *= other.X
 	ip.Y *= other.Y
 	ip.Z *= other.Z

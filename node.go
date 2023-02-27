@@ -104,10 +104,18 @@ type INode interface {
 	// updateLocalTransform(newParent INode)
 	dirtyTransform()
 
-	// ResetLocalTransform resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
-	// by default, when you parent one Node to another, the local transform properties (position, scale, and rotation) are altered to keep the
-	// object in the same absolute location, even though the origin changes.
-	ResetLocalTransform()
+	// ClearLocalTransform clears the local transform properties (position, scale, and rotation) for the Node, reverting it to essentially an
+	// identity matrix (0, 0, 0 for position, 1, 1, 1 for scale, and an identity Matrix4 for rotation, indicating no rotation).
+	// This can be useful because by default, when you parent one Node to another, the local transform properties (position,
+	// scale, and rotation) are altered to keep the object in the same absolute location, even though the origin changes.
+	ClearLocalTransform()
+
+	// ResetTransform resets the local transform properties (position, scale, and rotation) for the Node to the original transform when
+	// the Node was first created / cloned / instantiated in the Scene.
+	ResetTransform()
+
+	setOriginalTransform()
+
 	// SetWorldTransform sets the Node's global (world) transform to the full 4x4 transformation matrix provided.
 	SetWorldTransform(transform Matrix4)
 
@@ -199,8 +207,6 @@ type INode interface {
 	// AnimationPlayer returns the object's animation player - every object has an AnimationPlayer by default.
 	AnimationPlayer() *AnimationPlayer
 
-	setOriginalLocalPosition(Vector)
-
 	// Sector returns the Sector this Node is in.
 	Sector() *Sector
 	sectorHierarchy() *Sector
@@ -212,27 +218,27 @@ var nodeID uint64 = 0
 // into their structs to automatically easily implement Node.
 
 type Node struct {
-	id                    uint64 // Unique ID for this node
-	name                  string
-	position              Vector
-	scale                 Vector
-	rotation              Matrix4
-	originalLocalPosition Vector
-	visible               bool
-	data                  interface{} // A place to store a pointer to something if you need it
-	children              []INode
-	parent                INode
-	cachedTransform       Matrix4
-	isTransformDirty      bool
-	props                 *Properties // Properties is an unordered set of properties, representing a means of identifying and setting game properties on Nodes.
-	animationPlayer       *AnimationPlayer
-	inverseBindMatrix     Matrix4 // Specifically for bones in an armature used for animating skinned meshes
-	isBone                bool
-	collectionObjects     []INode // Returns if the node is a collection instance
-	boneInfluence         Matrix4
-	library               *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
-	scene                 *Scene
-	onTransformUpdate     func()
+	id                uint64 // Unique ID for this node
+	name              string
+	position          Vector
+	scale             Vector
+	rotation          Matrix4
+	originalTransform Matrix4
+	visible           bool
+	data              interface{} // A place to store a pointer to something if you need it
+	children          []INode
+	parent            INode
+	cachedTransform   Matrix4
+	isTransformDirty  bool
+	props             *Properties // Properties is an unordered set of properties, representing a means of identifying and setting game properties on Nodes.
+	animationPlayer   *AnimationPlayer
+	inverseBindMatrix Matrix4 // Specifically for bones in an armature used for animating skinned meshes
+	isBone            bool
+	collectionObjects []INode // Returns if the node is a collection instance
+	boneInfluence     Matrix4
+	library           *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
+	scene             *Scene
+	onTransformUpdate func()
 }
 
 // NewNode returns a new Node.
@@ -263,10 +269,6 @@ func NewNode(name string) *Node {
 // ID returns the object's unique ID.
 func (node *Node) ID() uint64 {
 	return node.id
-}
-
-func (node *Node) setOriginalLocalPosition(position Vector) {
-	node.originalLocalPosition = position
 }
 
 // Name returns the object's name.
@@ -301,6 +303,7 @@ func (node *Node) Clone() INode {
 	newNode.rotation = node.rotation.Clone()
 	newNode.visible = node.visible
 	newNode.data = node.data
+	newNode.setOriginalTransform()
 
 	newNode.props = node.props.Clone()
 	newNode.animationPlayer = node.animationPlayer.Clone()
@@ -453,10 +456,11 @@ func (node *Node) LocalPosition() Vector {
 	return node.position
 }
 
-// ResetLocalTransform resets the local transform properties (position, scale, and rotation) for the Node. This can be useful because
-// by default, when you parent one Node to another, the local transform properties (position, scale, and rotation) are altered to keep the
-// object in the same absolute location, even though the origin changes.
-func (node *Node) ResetLocalTransform() {
+// ClearLocalTransform clears the local transform properties (position, scale, and rotation) for the Node, reverting it to essentially an
+// identity matrix (0, 0, 0 for position, 1, 1, 1 for scale, and an identity Matrix4 for rotation, indicating no rotation).
+// This can be useful because by default, when you parent one Node to another, the local transform properties (position,
+// scale, and rotation) are altered to keep the object in the same absolute location, even though the origin changes.
+func (node *Node) ClearLocalTransform() {
 	node.position.X = 0
 	node.position.Y = 0
 	node.position.Z = 0
@@ -465,6 +469,17 @@ func (node *Node) ResetLocalTransform() {
 	node.scale.Z = 1
 	node.rotation = NewMatrix4()
 	node.dirtyTransform()
+}
+
+// ResetTransform resets the Node's world transform properties (position, scale, and rotation) for the Node to the original
+// values when the Node was first instantiated in the Scene or cloned.
+func (node *Node) ResetTransform() {
+	node.SetWorldTransform(node.originalTransform)
+	node.dirtyTransform()
+}
+
+func (node *Node) setOriginalTransform() {
+	node.originalTransform = node.Transform()
 }
 
 // WorldPosition returns a 3D Vector consisting of the object's world position (position relative to the world origin point of {0, 0, 0}).

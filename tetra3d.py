@@ -1,6 +1,6 @@
 # Add-on for Tetra3D > Blender exporting
 
-import bpy, os, bmesh
+import bpy, os, bmesh, math
 from bpy.app.handlers import persistent
 
 bl_info = {
@@ -96,6 +96,13 @@ class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
 
     def execute(self, context):
         
+        if self.mode == "scene":
+            target = context.scene
+        elif self.mode == "object":
+            target = context.object
+        elif self.mode == "material":
+            target = context.object.active_material
+
         target = getattr(context, self.mode)
         target.t3dGameProperties__.add()
         target.t3dGameProperties__.move(len(target.t3dGameProperties__)-1, 0)
@@ -112,7 +119,13 @@ class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
 
     def execute(self, context):
 
-        target = getattr(context, self.mode)
+        if self.mode == "scene":
+            target = context.scene
+        elif self.mode == "object":
+            target = context.object
+        elif self.mode == "material":
+            target = context.object.active_material
+            
         target.t3dGameProperties__.remove(self.index)
         return {'FINISHED'}
 
@@ -128,7 +141,12 @@ class OBJECT_OT_tetra3dReorderProps(bpy.types.Operator):
 
     def execute(self, context):
 
-        target = getattr(context, self.mode)
+        if self.mode == "scene":
+            target = context.scene
+        elif self.mode == "object":
+            target = context.object
+        elif self.mode == "material":
+            target = context.object.active_material
 
         if self.moveUp:
             target.t3dGameProperties__.move(self.index, self.index-1)
@@ -145,21 +163,28 @@ class OBJECT_OT_tetra3dSetVector(bpy.types.Operator):
 
     index : bpy.props.IntProperty()
     mode : bpy.props.StringProperty()
+    buttonMode : bpy.props.StringProperty()
 
     @classmethod
     def description(cls, context, properties):
-        if properties.mode == "object location":
+        if properties.buttonMode == "object location":
             return "Set to object world position"
         else:
             return "Set to 3D Cursor position"
 
     def execute(self, context):
-        if self.mode == "object location":
-            context.object.t3dGameProperties__[self.index].valueVector3D = context.object.location
-        elif self.mode == "object 3D cursor":
-            context.object.t3dGameProperties__[self.index].valueVector3D = context.scene.cursor.location
-        elif self.mode == "scene 3D cursor":
-            context.scene.t3dGameProperties__[self.index].valueVector3D = context.scene.cursor.location
+
+        if self.mode == "scene":
+            target = context.scene
+        elif self.mode == "object":
+            target = context.object
+        elif self.mode == "material":
+            target = context.object.active_material
+
+        if self.buttonMode == "object location":
+            target.t3dGameProperties__[self.index].valueVector3D = context.object.location
+        elif self.buttonMode == "3D cursor":
+            target.t3dGameProperties__[self.index].valueVector3D = context.scene.cursor.location
 
         return {'FINISHED'}
 
@@ -262,15 +287,25 @@ class OBJECT_OT_tetra3dCopyNodePathToClipboard(bpy.types.Operator):
         return {'FINISHED'}
 
 class OBJECT_OT_tetra3dClearProps(bpy.types.Operator):
-   bl_idname = "object.tetra3dclearprops"
-   bl_label = "Clear Game Properties"
-   bl_description= "Clears game properties from all currently selected objects"
-   bl_options = {'REGISTER', 'UNDO'}
+    bl_idname = "object.tetra3dclearprops"
+    bl_label = "Clear Game Properties"
+    bl_description= "Clears game properties from all currently selected objects"
+    bl_options = {'REGISTER', 'UNDO'}
 
-   def execute(self, context):
+    mode : bpy.props.StringProperty()
 
-        for o in context.selected_objects:
-            o.t3dGameProperties__.clear()
+    def execute(self, context):
+        
+        if self.mode == "object":
+
+            for o in context.selected_objects:
+                o.t3dGameProperties__.clear()
+
+        elif self.mode == "scene":
+            context.scene.t3dGameProperties__.clear()
+
+        elif self.mode == "material" and context.object.active_material is not None:
+            context.object.active_material.t3dGameProperties__.clear()
 
         return {'FINISHED'}
 
@@ -429,7 +464,9 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             row = self.layout.row()
 
             # No scene equivalent for this, so there is no mode property for this class
-            row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+            clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+            clear.mode = "object"
+
 
 class SCENE_PT_tetra3d(bpy.types.Panel):
     bl_idname = "SCENE_PT_tetra3d"
@@ -470,7 +507,33 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
             handleT3DProperty(index, box, prop, "scene")
         
         row = self.layout.row()
-        row.operator("scene.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+        clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+        clear.mode = "scene"
+
+class CAMERA_PT_tetra3d(bpy.types.Panel):
+    bl_idname = "CAMERA_PT_tetra3d"
+    bl_label = "Tetra3d Camera Properties"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "data"
+
+    @classmethod
+    def poll(self,context):
+        return context.object is not None and context.object.type == "CAMERA"
+
+    def draw(self, context):
+
+        row = self.layout.row()
+        row.prop(context.object.data, "type")
+        row = self.layout.row()
+        if context.object.data.type == "PERSP":
+            row.prop(context.object.data, "t3dFOV__")
+        else:
+            row.prop(context.object.data, "ortho_scale")
+        row = self.layout.row()
+        row.prop(context.object.data, "clip_start")
+        row.prop(context.object.data, "clip_end")
+
 
 def handleT3DProperty(index, box, prop, operatorType, enabled=True):
 
@@ -499,20 +562,17 @@ def handleT3DProperty(index, box, prop, operatorType, enabled=True):
         row.enabled = enabled
         row.prop(prop, "valueVector3D")
 
-        if operatorType == "object":
+        if operatorType == "object" or operatorType == "material":
             
             setCur = row.operator("object.t3dsetvec", text="", icon="OBJECT_ORIGIN")
             setCur.index = index
-            setCur.mode = "object location"
-            
-            setCur = row.operator("object.t3dsetvec", text="", icon="PIVOT_CURSOR")
-            setCur.index = index
-            setCur.mode = "object 3D cursor"
+            setCur.mode = operatorType
+            setCur.buttonMode = "object location"
 
-        else:
-            setCur = row.operator("object.t3dsetvec", text="", icon="PIVOT_CURSOR")
-            setCur.index = index
-            setCur.mode = "scene 3D cursor"
+        setCur = row.operator("object.t3dsetvec", text="", icon="PIVOT_CURSOR")
+        setCur.index = index
+        setCur.mode = operatorType
+        setCur.buttonMode = "3D cursor"
         
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"
@@ -542,6 +602,37 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.prop(context.material, "t3dCompositeMode__")
         row = self.layout.row()
         row.prop(context.material, "t3dBillboardMode__")
+
+        if context.object.active_material != None:
+
+            row = self.layout.row()
+            add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
+            add.mode = "material"
+
+            for index, prop in enumerate(context.object.active_material.t3dGameProperties__):
+                box = self.layout.box()
+                row = box.row()
+                row.prop(prop, "name")
+                
+                moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
+                moveUpOptions.index = index
+                moveUpOptions.moveUp = True
+                moveUpOptions.mode = "material"
+
+                moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
+                moveDownOptions.index = index
+                moveDownOptions.moveUp = False
+                moveDownOptions.mode = "material"
+
+                deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
+                deleteOptions.index = index
+                deleteOptions.mode = "material"
+
+                handleT3DProperty(index, box, prop, "material")
+
+            row = self.layout.row()
+            clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+            clear.mode = "material"
 
 class WORLD_PT_tetra3d(bpy.types.Panel):
     bl_idname = "WORLD_PT_tetra3d"
@@ -706,7 +797,11 @@ def export():
 
     globalSet("t3dWorlds__", worlds)
 
+    currentFrame = {}
+
     for scene in bpy.data.scenes:
+
+        currentFrame[scene] = scene.frame_current
 
         if scene.users > 0:
 
@@ -760,9 +855,6 @@ def export():
                                 
                             obj["t3dGridConnections__"] = gridConnections
                             obj["t3dGridEntries__"] = gridEntries
-
-                    if obj.type == "CAMERA":
-                        obj["t3dFovY__"] = obj.data.angle
 
                     # Record relevant information for curves
                     if obj.type == "CURVE":
@@ -966,10 +1058,13 @@ def export():
         export_apply=True,
         convert_lighting_mode="COMPAT", # We want to use the compatible lighting model, not the "realistic" / real-world-accurate one
     )
-
+    
     # Undo changes that we've made after export
 
     for scene in bpy.data.scenes:
+
+        # Exporting animations sets the frame "late"; we restore the current frame to avoid this
+        scene.frame_set(currentFrame[scene])
 
         if scene.world and "t3dCurrentWorld__" in scene:
             del(scene["t3dCurrentWorld__"])
@@ -986,8 +1081,6 @@ def export():
                         meshesToRemove.append(obj.data)
                         obj.data = obj["t3dOriginalMesh"]
                         del(obj["t3dOriginalMesh"])
-                    if "t3dFovY" in obj:
-                        del(obj["t3dFovY"])
 
                     if "t3dOriginalLocalPosition__" in obj:
                         del(obj["t3dOriginalLocalPosition__"])
@@ -1226,10 +1319,40 @@ def fogRangeEndGet(self):
         return self["t3dFogRangeEnd__"]
     return 1
 
+####
+
+# We don't need to actually store a FOV value, but rather modify the Blender camera's usual FOV variable
+def getFOV(self):
+
+    # Huge thanks to this blender.stackexchange post: https://blender.stackexchange.com/questions/23431/how-to-set-camera-horizontal-and-vertical-fov
+
+    w = getRenderResolutionW(None)
+    h = getRenderResolutionH(None)
+    aspect = w / h
+
+    if aspect > 1:
+        value = math.degrees(2 * math.atan((0.5 * h) / (0.5 * w / math.tan(self.angle / 2))))
+    else:
+        value = math.degrees(self.angle)
+
+    return int(value)
+
+def setFOV(self, value):
+
+    w = getRenderResolutionW(None)
+    h = getRenderResolutionH(None)
+    aspect = w / h
+
+    if aspect > 1:
+        self.angle = 2 * math.atan((0.5 * w) / (0.5 * h / math.tan(math.radians(value) / 2)))
+    else:
+        self.angle = math.radians(value)
+
 def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
     bpy.utils.register_class(RENDER_PT_tetra3d)
+    bpy.utils.register_class(CAMERA_PT_tetra3d)
     bpy.utils.register_class(MATERIAL_PT_tetra3d)
     bpy.utils.register_class(WORLD_PT_tetra3d)
     bpy.utils.register_class(SCENE_PT_tetra3d)
@@ -1251,6 +1374,10 @@ def register():
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
+
+    # We don't actually need to store or export the FOV; we just modify the camera's actual field of view (angle) property
+    bpy.types.Camera.t3dFOV__ = bpy.props.IntProperty(name="FOV", description="Vertical field of view", default=75,
+    get=getFOV, set=setFOV, min=1, max=179)
     
     bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
 
@@ -1296,6 +1423,8 @@ def register():
     bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
     
+    bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
+    
     bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="Fog color", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")
@@ -1310,6 +1439,7 @@ def register():
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
     bpy.utils.unregister_class(RENDER_PT_tetra3d)
+    bpy.utils.unregister_class(CAMERA_PT_tetra3d)
     bpy.utils.unregister_class(MATERIAL_PT_tetra3d)
     bpy.utils.unregister_class(WORLD_PT_tetra3d)
     bpy.utils.unregister_class(SCENE_PT_tetra3d)
@@ -1355,6 +1485,7 @@ def unregister():
     del bpy.types.Material.t3dMaterialFogless__
     del bpy.types.Material.t3dCompositeMode__
     del bpy.types.Material.t3dBillboardMode__
+    del bpy.types.Material.t3dGameProperties__
 
     del bpy.types.World.t3dClearColor__
     del bpy.types.World.t3dFogColor__
@@ -1362,6 +1493,8 @@ def unregister():
     del bpy.types.World.t3dFogRangeStart__
     del bpy.types.World.t3dFogRangeEnd__
     del bpy.types.World.t3dFogDithered__
+
+    del bpy.types.Camera.t3dFOV__
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)

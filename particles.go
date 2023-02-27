@@ -48,7 +48,7 @@ func NewParticle(partSystem *ParticleSystem, partModels []*Model) *Particle {
 
 func (part *Particle) Reinit() {
 	part.Model = part.ModelBank[rand.Intn(len(part.ModelBank))]
-	part.Model.ResetLocalTransform()
+	part.Model.ClearLocalTransform()
 }
 
 // Update updates the particle's color and movement.

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"time"
 )
 
@@ -161,9 +162,12 @@ func newAnimationTrack(trackType string) *AnimationTrack {
 	}
 }
 
+// AnimationChannel represents a set of tracks (one for position, scale, and rotation) for the various nodes contained within the Animation.
 type AnimationChannel struct {
-	Name   string
-	Tracks map[string]*AnimationTrack
+	Name                string
+	Tracks              map[string]*AnimationTrack
+	startingPositionSet bool
+	startingPosition    Vector
 }
 
 func NewAnimationChannel(name string) *AnimationChannel {
@@ -187,8 +191,9 @@ type Marker struct {
 
 // Animation represents an animation of some description; it can have multiple channels, indicating movement, scale, or rotational change of one or more Nodes in the Animation.
 type Animation struct {
-	library  *Library
-	Name     string
+	library *Library
+	Name    string
+	// A Channel represents a set of tracks (one for position, scale, and rotation) for the various nodes contained within the Animation.
 	Channels map[string]*AnimationChannel
 	Length   float64  // Length of the animation in seconds
 	Markers  []Marker // Markers as specified in the Animation from the modeler
@@ -230,6 +235,7 @@ type AnimationValues struct {
 	ScaleExists    bool
 	Rotation       Quaternion
 	RotationExists bool
+	channel        *AnimationChannel
 }
 
 // AnimationPlayer is an object that allows you to play back an animation on a Node.
@@ -256,6 +262,18 @@ type AnimationPlayer struct {
 	// Otherwise, it will only play frames 1 - 9, which can be good if your last frame is a repeat of the first to make a cyclical animation.
 	// The default for PlayLastFrame is false.
 	PlayLastFrame bool
+
+	// When true, animations will play back relative to the node's transform prior to
+	// starting the animation. When false, the animation will play back in absolute space.
+	// For example, let's say an animation moved a cube from {0, 1, 2} to {10, 1, 2}.
+	// If RelativeMotion is on, then if the cube started at position {3, 3, 3}, it would end up at
+	// {13, 4, 5}. If RelativeMotion were off, it would teleport to {0, 1, 2} when the animation started.
+	// This has to be set to true or false prior to beginning
+	// animation playback to properly take effect.
+	RelativeMotion   bool
+	startingPosition Vector
+	startingScale    Vector
+	startingRotation Matrix4
 }
 
 // NewAnimationPlayer returns a new AnimationPlayer for the Node.
@@ -304,6 +322,12 @@ func (ap *AnimationPlayer) PlayAnim(animation *Animation) {
 		return
 	}
 
+	if ap.Animation != animation {
+		ap.startingPosition = ap.RootNode.LocalPosition()
+		ap.startingRotation = ap.RootNode.LocalRotation()
+		ap.startingScale = ap.RootNode.LocalScale()
+	}
+
 	ap.Animation = animation
 	ap.Playing = true
 
@@ -335,178 +359,190 @@ func (ap *AnimationPlayer) Play(animationName string) error {
 	return errors.New("Animation named {" + animationName + "} not found in node's owning Library")
 }
 
+// Stop stops the AnimationPlayer's playback. Note that this is fundamentally the same as calling ap.Playing = false (for now).
+func (ap *AnimationPlayer) Stop() {
+	ap.Playing = false
+}
+
 // assignChannels assigns the player's root node's children to channels in the player. This is called when the channels need to be
 // updated after the root node changes.
 func (ap *AnimationPlayer) assignChannels() {
 
-	if ap.Animation != nil {
+	if !ap.ChannelsUpdated {
 
-		ap.AnimatedProperties = map[INode]*AnimationValues{}
+		if ap.Animation != nil {
 
-		ap.ChannelsToNodes = map[*AnimationChannel]INode{}
+			ap.AnimatedProperties = map[INode]*AnimationValues{}
 
-		childrenRecursive := ap.RootNode.SearchTree().INodes()
+			ap.ChannelsToNodes = map[*AnimationChannel]INode{}
 
-		for _, channel := range ap.Animation.Channels {
+			childrenRecursive := ap.RootNode.SearchTree().INodes()
 
-			if ap.RootNode.Name() == channel.Name {
-				ap.ChannelsToNodes[channel] = ap.RootNode
-				ap.AnimatedProperties[ap.RootNode] = &AnimationValues{}
-				continue
-			}
+			for _, channel := range ap.Animation.Channels {
 
-			found := false
+				if ap.RootNode.Name() == channel.Name {
+					ap.ChannelsToNodes[channel] = ap.RootNode
+					ap.AnimatedProperties[ap.RootNode] = &AnimationValues{
+						channel: channel,
+					}
+					continue
+				}
 
-			for _, n := range childrenRecursive {
+				found := false
 
-				if n.Name() == channel.Name {
-					ap.ChannelsToNodes[channel] = n
-					ap.AnimatedProperties[n] = &AnimationValues{}
-					found = true
-					break
+				for _, n := range childrenRecursive {
+
+					if n.Name() == channel.Name {
+						ap.ChannelsToNodes[channel] = n
+						ap.AnimatedProperties[n] = &AnimationValues{
+							channel: channel,
+						}
+						found = true
+						break
+					}
+
+				}
+
+				// If no channel matches, we'll just go with the root
+
+				if !found {
+					ap.ChannelsToNodes[channel] = ap.RootNode
+					ap.AnimatedProperties[ap.RootNode] = &AnimationValues{
+						channel: channel,
+					}
 				}
 
 			}
 
-			// If no channel matches, we'll just go with the root
-
-			if !found {
-				ap.ChannelsToNodes[channel] = ap.RootNode
-				ap.AnimatedProperties[ap.RootNode] = &AnimationValues{}
-			}
-
 		}
 
-	}
+		ap.ChannelsUpdated = true
 
-	ap.ChannelsUpdated = true
+	}
 
 }
 
 func (ap *AnimationPlayer) updateValues(dt float64) {
 
-	if ap.Playing {
+	if ap.Animation != nil {
 
-		if ap.Animation != nil {
+		ap.assignChannels()
 
-			if !ap.ChannelsUpdated {
-				ap.assignChannels()
-			}
+		for _, channel := range ap.Animation.Channels {
 
-			for _, channel := range ap.Animation.Channels {
+			node := ap.ChannelsToNodes[channel]
 
-				node := ap.ChannelsToNodes[channel]
+			if node == nil {
+				log.Println("Error: Cannot find matching node for channel " + channel.Name + " for root " + ap.RootNode.Name())
+			} else {
 
-				if node == nil {
-					log.Println("Error: Cannot find matching node for channel " + channel.Name + " for root " + ap.RootNode.Name())
-				} else {
+				if track, exists := channel.Tracks[TrackTypePosition]; exists {
+					// node.SetLocalPositionVecVec(track.ValueAsVector(ap.Playhead))
+					if vec, exists := track.ValueAsVector(ap.Playhead); exists {
+						ap.AnimatedProperties[node].Position = vec
+						ap.AnimatedProperties[node].PositionExists = true
 
-					if track, exists := channel.Tracks[TrackTypePosition]; exists {
-						// node.SetLocalPositionVecVec(track.ValueAsVector(ap.Playhead))
-						if vec, exists := track.ValueAsVector(ap.Playhead); exists {
-							ap.AnimatedProperties[node].Position = vec
-							ap.AnimatedProperties[node].PositionExists = true
+						// set the starting position for the animation; for relative motion, all
+						// movement is relative to this position
+						if !channel.startingPositionSet {
+							channel.startingPositionSet = true
+							channel.startingPosition, _ = track.ValueAsVector(-math.MaxFloat64)
 						}
-					}
 
-					if track, exists := channel.Tracks[TrackTypeScale]; exists {
-						// node.SetLocalScaleVec(track.ValueAsVector(ap.Playhead))
-						if vec, exists := track.ValueAsVector(ap.Playhead); exists {
-							ap.AnimatedProperties[node].Scale = vec
-							ap.AnimatedProperties[node].ScaleExists = true
-						}
 					}
-
-					if track, exists := channel.Tracks[TrackTypeRotation]; exists {
-						if quat, exists := track.ValueAsQuaternion(ap.Playhead); exists {
-							// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
-							ap.AnimatedProperties[node].Rotation = quat
-							ap.AnimatedProperties[node].RotationExists = true
-						}
-					}
-
 				}
 
-			}
+				if track, exists := channel.Tracks[TrackTypeScale]; exists {
+					// node.SetLocalScaleVec(track.ValueAsVector(ap.Playhead))
+					if vec, exists := track.ValueAsVector(ap.Playhead); exists {
+						ap.AnimatedProperties[node].Scale = vec
+						ap.AnimatedProperties[node].ScaleExists = true
+					}
+				}
 
-			ap.Playhead += dt * ap.PlaySpeed
-
-			ph := ap.Playhead
-
-			if !ap.PlayLastFrame {
-				ph += dt * ap.PlaySpeed
-			}
-
-			if ap.PlaySpeed != 0 {
-
-				for _, marker := range ap.Animation.Markers {
-					// fmt.Println(ph, prevPlayhead, marker.Time, ph >= marker.Time, prevPlayhead <= marker.Time)
-					// fmt.Println(gteWithMargin(ph, marker.Time))
-					// fmt.Println(lteWithMargin(prevPlayhead, marker.Time))
-					// if gteWithMargin(ph, marker.Time) && lteWithMargin(prevPlayhead, marker.Time) {
-					if ph >= marker.Time && ap.prevPlayhead <= marker.Time {
-						// if ap.Playhead >= marker.Time && prevPlayhead <= marker.Time {
-						if ap.OnMarkerTouch != nil {
-							ap.OnMarkerTouch(marker, ap.Animation)
-						}
-						ap.touchedMarkers = append(ap.touchedMarkers, marker)
+				if track, exists := channel.Tracks[TrackTypeRotation]; exists {
+					if quat, exists := track.ValueAsQuaternion(ap.Playhead); exists {
+						// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
+						ap.AnimatedProperties[node].Rotation = quat
+						ap.AnimatedProperties[node].RotationExists = true
 					}
 				}
 
 			}
 
-			ap.prevPlayhead = ph
+		}
 
-			if ap.FinishMode == FinishModeLoop && (ph >= ap.Animation.Length || ph < 0) {
+		ap.Playhead += dt * ap.PlaySpeed
 
-				if ph > ap.Animation.Length {
-					ap.Playhead -= ap.Animation.Length
+		ph := ap.Playhead
+
+		if !ap.PlayLastFrame {
+			ph += dt * ap.PlaySpeed
+		}
+
+		if ap.PlaySpeed != 0 {
+
+			for _, marker := range ap.Animation.Markers {
+				if (ap.PlaySpeed > 0 && ph >= marker.Time && ap.prevPlayhead <= marker.Time) || (ap.PlaySpeed < 0 && ph <= marker.Time && ap.prevPlayhead >= marker.Time) {
+					if ap.OnMarkerTouch != nil {
+						ap.OnMarkerTouch(marker, ap.Animation)
+					}
+					ap.touchedMarkers = append(ap.touchedMarkers, marker)
 				}
-
-				if ph < 0 {
-					ap.Playhead += ap.Animation.Length
-				}
-
-				if ap.OnFinish != nil {
-					ap.OnFinish()
-				}
-				ap.finished = true
-
-			} else if ap.FinishMode == FinishModePingPong && (ph > ap.Animation.Length || ph < 0) {
-
-				if ph > ap.Animation.Length {
-					ap.Playhead -= ph - ap.Animation.Length
-				}
-
-				finishedLoop := false
-				if ph < 0 {
-					ap.Playhead *= -1
-					finishedLoop = true
-				}
-
-				if finishedLoop && ap.OnFinish != nil {
-					ap.OnFinish()
-				}
-				ap.finished = true
-
-				ap.PlaySpeed *= -1
-
-			} else if ap.FinishMode == FinishModeStop && ((ph > ap.Animation.Length && ap.PlaySpeed > 0) || (ph < 0 && ap.PlaySpeed < 0)) {
-
-				if ph > ap.Animation.Length {
-					ap.Playhead = ap.Animation.Length
-				} else if ph < 0 {
-					ap.Playhead = 0
-				}
-
-				if ap.OnFinish != nil {
-					ap.OnFinish()
-				}
-				ap.finished = true
-
-				ap.Playing = false
-
 			}
+
+		}
+
+		ap.prevPlayhead = ph
+
+		if ap.FinishMode == FinishModeLoop && (ph >= ap.Animation.Length || ph < 0) {
+
+			if ph > ap.Animation.Length {
+				ap.Playhead -= ap.Animation.Length
+			}
+
+			if ph < 0 {
+				ap.Playhead += ap.Animation.Length
+			}
+
+			if ap.OnFinish != nil {
+				ap.OnFinish()
+			}
+			ap.finished = true
+
+		} else if ap.FinishMode == FinishModePingPong && (ph > ap.Animation.Length || ph < 0) {
+
+			if ph > ap.Animation.Length {
+				ap.Playhead -= ph - ap.Animation.Length
+			}
+
+			finishedLoop := false
+			if ph < 0 {
+				ap.Playhead *= -1
+				finishedLoop = true
+			}
+
+			if finishedLoop && ap.OnFinish != nil {
+				ap.OnFinish()
+			}
+			ap.finished = true
+
+			ap.PlaySpeed *= -1
+
+		} else if ap.FinishMode == FinishModeStop && ((ph > ap.Animation.Length && ap.PlaySpeed > 0) || (ph < 0 && ap.PlaySpeed < 0)) {
+
+			if ph > ap.Animation.Length {
+				ap.Playhead = ap.Animation.Length
+			} else if ph < 0 {
+				ap.Playhead = 0
+			}
+
+			if ap.OnFinish != nil {
+				ap.OnFinish()
+			}
+			ap.finished = true
+
+			ap.Playing = false
 
 		}
 
@@ -520,8 +556,6 @@ func (ap *AnimationPlayer) Update(dt float64) {
 	ap.finished = false
 	ap.touchedMarkers = []Marker{}
 
-	ap.updateValues(dt)
-
 	if !ap.Playing && !ap.blendStart.IsZero() {
 		ap.blendStart = time.Time{}
 		ap.prevAnimatedProperties = map[INode]*AnimationValues{}
@@ -531,9 +565,31 @@ func (ap *AnimationPlayer) Update(dt float64) {
 		return
 	}
 
+	ap.forceUpdate(dt)
+
+}
+
+// SetPlayhead sets the playhead of the animation player to the specified time in seconds, and
+// also performs an update of the animated nodes.
+func (ap *AnimationPlayer) SetPlayhead(time float64) {
+	ap.Playhead = time
+	ap.forceUpdate(0)
+}
+
+func (ap *AnimationPlayer) forceUpdate(dt float64) {
+
+	ap.updateValues(dt)
+
 	for node, props := range ap.AnimatedProperties {
 
 		_, prevExists := ap.prevAnimatedProperties[node]
+
+		var targetPosition Vector
+		var posSet bool
+		var targetScale Vector
+		var scaleSet bool
+		var targetRotation Matrix4
+		var rotSet bool
 
 		if !ap.blendStart.IsZero() && prevExists {
 
@@ -546,29 +602,38 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 			if start.PositionExists && props.PositionExists {
 				diff := props.Position.Sub(start.Position)
-				node.SetLocalPositionVec(start.Position.Add(diff.Scale(bp)))
+				targetPosition = start.Position.Add(diff.Scale(bp))
+				posSet = true
 			} else if props.PositionExists {
-				node.SetLocalPositionVec(props.Position)
+				targetPosition = props.Position
+				posSet = true
 			} else if start.PositionExists {
-				node.SetLocalPositionVec(start.Position)
+				targetPosition = start.Position
+				posSet = true
 			}
 
 			if start.ScaleExists && props.ScaleExists {
 				diff := props.Scale.Sub(start.Scale)
-				node.SetLocalScaleVec(start.Scale.Add(diff.Scale(bp)))
+				targetScale = start.Scale.Add(diff.Scale(bp))
+				scaleSet = true
 			} else if props.ScaleExists {
-				node.SetLocalScaleVec(props.Scale)
+				targetScale = props.Scale
+				scaleSet = true
 			} else if start.ScaleExists {
-				node.SetLocalScaleVec(start.Scale)
+				targetScale = start.Scale
+				scaleSet = true
 			}
 
 			if start.RotationExists && props.RotationExists {
 				rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
-				node.SetLocalRotation(rot.ToMatrix4())
+				targetRotation = rot.ToMatrix4()
+				rotSet = true
 			} else if props.RotationExists {
-				node.SetLocalRotation(props.Rotation.ToMatrix4())
+				targetRotation = props.Rotation.ToMatrix4()
+				rotSet = true
 			} else if start.RotationExists {
-				node.SetLocalRotation(start.Rotation.ToMatrix4())
+				targetRotation = start.Rotation.ToMatrix4()
+				rotSet = true
 			}
 
 			if bp == 1 {
@@ -579,15 +644,42 @@ func (ap *AnimationPlayer) Update(dt float64) {
 		} else {
 
 			if props.PositionExists {
-				node.SetLocalPositionVec(props.Position)
+				targetPosition = props.Position
+				posSet = true
 			}
 			if props.ScaleExists {
-				node.SetLocalScaleVec(props.Scale)
+				targetScale = props.Scale
+				scaleSet = true
 			}
 			if props.RotationExists {
-				node.SetLocalRotation(props.Rotation.ToMatrix4())
+				targetRotation = props.Rotation.ToMatrix4()
+				rotSet = true
 			}
 
+		}
+
+		if posSet {
+			if ap.RelativeMotion {
+				node.SetLocalPositionVec(ap.startingPosition.Add(targetPosition.Sub(props.channel.startingPosition)))
+			} else {
+				node.SetLocalPositionVec(targetPosition)
+			}
+		}
+
+		if scaleSet {
+			if ap.RelativeMotion {
+				node.SetLocalScaleVec(ap.startingScale.Mult(targetScale))
+			} else {
+				node.SetLocalScaleVec(targetScale)
+			}
+		}
+
+		if rotSet {
+			if ap.RelativeMotion {
+				node.SetLocalRotation(ap.startingRotation.Mult(targetRotation))
+			} else {
+				node.SetLocalRotation(targetRotation)
+			}
 		}
 
 	}

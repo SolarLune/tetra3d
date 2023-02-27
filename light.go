@@ -168,7 +168,7 @@ func (point *PointLight) beginModel(model *Model) {
 	if model.skinned {
 		point.workingPosition = point.WorldPosition()
 	} else {
-		point.workingPosition = r.MultVec(point.WorldPosition()).Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
+		point.workingPosition = r.MultVec(point.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 	}
 
 }
@@ -562,8 +562,8 @@ func (cube *CubeLight) beginModel(model *Model) {
 		cube.workingDimensions.Min = r.MultVec(cube.workingDimensions.Min)
 		cube.workingDimensions.Max = r.MultVec(cube.workingDimensions.Max)
 
-		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 0}))
-		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 0}))
+		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 0}))
+		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 0}))
 
 	}
 

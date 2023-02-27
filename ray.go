@@ -11,6 +11,7 @@ import (
 type RayHit struct {
 	Object   INode  // Object is a pointer to the object that was struck by the raycast.
 	Position Vector // Position is the world position that the object was struct.
+	from     Vector
 	Normal   Vector // Normal is the normal of the surface the ray struck.
 	// What triangle the raycast hit - note that this is only set to a non-nil value for raycasts against BoundingTriangle objects
 	Triangle *Triangle
@@ -19,6 +20,11 @@ type RayHit struct {
 // Slope returns the slope of the RayHit's normal, in radians. This ranges from 0 (straight up) to pi (straight down).
 func (r RayHit) Slope() float64 {
 	return WorldUp.Angle(r.Normal)
+}
+
+// Distance returns the distance from the RayHit's originating ray source point to the struck position.
+func (r RayHit) Distance() float64 {
+	return r.from.Distance(r.Position)
 }
 
 func sphereRayTest(center Vector, radius float64, from, to Vector) (RayHit, bool) {
@@ -51,6 +57,7 @@ func sphereRayTest(center Vector, radius float64, from, to Vector) (RayHit, bool
 		strikePos := from.Add(dir.Scale(vecLength))
 		return RayHit{
 			Position: strikePos,
+			from:     from,
 			Normal:   strikePos.Sub(center).Unit(),
 		}, true
 	}
@@ -222,8 +229,8 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 			rays = append(rays, RayHit{
 				Object:   test,
 				Position: contact,
-				// Normal:   aabbNormalGuess(contact.Sub(pos)),
-				Normal: test.normalFromContactPoint(contact),
+				Normal:   test.normalFromContactPoint(contact),
+				from:     from,
 			})
 
 		case *BoundingTriangles:
@@ -268,6 +275,7 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 							rays = append(rays, RayHit{
 								Object:   test,
 								Position: test.Transform().MultVec(vec),
+								from:     from,
 								Triangle: tri,
 								Normal:   r.MultVec(tri.Normal),
 							})

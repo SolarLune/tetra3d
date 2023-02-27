@@ -253,10 +253,23 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				}
 
+				// At this point, parenting should be set up.
+
+				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {
+
+					for _, p := range gameProps.([]interface{}) {
+
+						name, value := handleGameProperties(p)
+
+						newMat.properties.Get(name).Set(value)
+
+					}
+				}
+
 				// Non-Tetra3D custom data
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-						newMat.Properties.Get(tagName).Set(data)
+						newMat.properties.Get(tagName).Set(data)
 					}
 				}
 			}
@@ -700,15 +713,12 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			if gltfCam.Perspective != nil {
 				newCam.near = float64(gltfCam.Perspective.Znear)
 				newCam.far = float64(*gltfCam.Perspective.Zfar)
-				// For whatever reason, the yFOV from Blender in GLTF is modulated by the aspect ratio.
-				if node.Extras != nil && nodeHasProp(node, "t3dFovY__") {
-					newCam.fieldOfView = ToDegrees(node.Extras.(map[string]interface{})["t3dFovY__"].(float64))
-				}
+				newCam.fieldOfView = ToDegrees(float64(gltfCam.Perspective.Yfov))
 				newCam.perspective = true
 			} else if gltfCam.Orthographic != nil {
 				newCam.near = float64(gltfCam.Orthographic.Znear)
 				newCam.far = float64(gltfCam.Orthographic.Zfar)
-				newCam.orthoScale = float64(gltfCam.Orthographic.Xmag)
+				newCam.orthoScale = float64(gltfCam.Orthographic.Xmag * 2)
 				newCam.perspective = false
 			}
 
@@ -840,19 +850,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					return defaultValues
 				}
 
-				getOrDefaultVector3D := func(path string, defaultX, defaultY, defaultZ float64) Vector {
-					if value, exists := dataMap[path]; exists {
-						floats := []float64{}
-						for _, v := range value.([]interface{}) {
-							floats = append(floats, v.(float64))
-						}
-						return Vector{floats[0], floats[2], -floats[1], 0}
-					}
-					return Vector{defaultX, defaultY, defaultZ, 0}
-				}
-
-				obj.setOriginalLocalPosition(getOrDefaultVector3D("t3dOriginalLocalPosition__", 0, 0, 0))
-
 				obj.SetVisible(getOrDefaultBool("t3dVisible__", true), false)
 
 				if bt, exists := dataMap["t3dBoundsType__"]; exists {
@@ -927,8 +924,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							dim := model.Mesh.Dimensions
 							scale := model.WorldScale()
 
-							dim.Min = dim.Min.HadamardMult(scale)
-							dim.Max = dim.Max.HadamardMult(scale)
+							dim.Min = dim.Min.Mult(scale)
+							dim.Max = dim.Max.Mult(scale)
 
 							sphere = NewBoundingSphere("BoundingSphere", dim.MaxDimension()/2)
 						}
@@ -1339,6 +1336,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		*/
 
 		for _, n := range scene.Root.SearchTree().INodes() {
+
+			n.setOriginalTransform()
 
 			if node, ok := n.(*Node); ok && len(node.collectionObjects) > 0 {
 

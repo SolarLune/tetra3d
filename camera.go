@@ -1103,10 +1103,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	farSq := camera.far * camera.far
 	nearSq := camera.near * camera.near
-	if !camera.perspective {
-		farSq = 2.0
-		nearSq = 0
-	}
 
 	render := func(rp renderPair) {
 
@@ -1135,7 +1131,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		p, s, r := model.Transform().Inverted().Decompose()
 
-		invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.HadamardMult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
+		invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 
 		if model.DynamicBatchOwner != nil {
 			camera.DebugInfo.BatchedParts++
