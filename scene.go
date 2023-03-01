@@ -98,6 +98,7 @@ func (scene *Scene) HandleAutobatch() {
 							mesh := NewMesh("auto dynamic batch")
 							mesh.AddMeshPart(mat)
 							m := NewModel(mesh, "auto dynamic batch")
+							m.FrustumCulling = false
 							m.dynamicBatcher = true
 							scene.autobatchDynamicMap[mat] = m
 							scene.Root.AddChildren(m)

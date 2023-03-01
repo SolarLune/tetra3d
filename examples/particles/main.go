@@ -61,12 +61,12 @@ func (g *Game) Init() {
 	g.FireParticleSystem = tetra3d.NewParticleSystem(partSystem, g.Scene.Root.Get("Particle").(*tetra3d.Model))
 
 	settings := g.FireParticleSystem.Settings
-	settings.Lifetime.Set(1, 1)        // Lifetime can vary randomly; we're setting both the minimum and maximum bounds here to 1.
-	settings.SpawnRate = 0.025         // How often particles are spawned
-	settings.SpawnCount = 2            // How many particles are spawned each time
-	settings.Scale.SetRanges(0.2, 0.4) // The scale of a particle can vary randomly...
-	settings.Scale.Uniform = true      // But we also want the particles to scale uniformly, so they don't appear squashed or stretched
-	settings.Growth.SetAll(0.02)       // Growth is how quickly particles grow in size. If a particle reaches a scale of 0, it will die (unless you disable ParticleSystemSettings.AllowNegativeScale).
+	settings.Lifetime.Set(1, 1)          // Lifetime can vary randomly; we're setting both the minimum and maximum bounds here to 1.
+	settings.SpawnRate.Set(0.025, 0.025) // How often particles are spawned
+	settings.SpawnCount.Set(2, 2)        // How many particles are spawned each time
+	settings.Scale.SetRanges(0.2, 0.4)   // The scale of a particle can vary randomly...
+	settings.Scale.Uniform = true        // But we also want the particles to scale uniformly, so they don't appear squashed or stretched
+	settings.Growth.SetAll(0.02)         // Growth is how quickly particles grow in size. If a particle reaches a scale of 0, it will die (unless you disable ParticleSystemSettings.AllowNegativeScale).
 	settings.Growth.Uniform = true
 
 	settings.SpawnOffset.SetRangeX(-0.1, 0.1) // SpawnOffset is how far the particle can spawn away from the center of the particle system
@@ -87,8 +87,8 @@ func (g *Game) Init() {
 	g.FieldParticleSystem = tetra3d.NewParticleSystem(partSystem, g.Scene.Root.Get("Particle").(*tetra3d.Model), g.Scene.Root.Get("Particle2").(*tetra3d.Model))
 
 	settings = g.FieldParticleSystem.Settings
-	settings.SpawnRate = 0.1
-	settings.SpawnCount = 4
+	settings.SpawnRate.Set(0.1, 0.1)
+	settings.SpawnCount.Set(4, 4)
 	settings.Lifetime.Set(2, 3)
 	settings.Scale.SetRanges(0.05, 0.2)
 	settings.Scale.Uniform = true
@@ -132,8 +132,8 @@ func (g *Game) Init() {
 	}
 
 	settings.SpawnOffset.SetRanges(-0.1, 0.1)
-	settings.SpawnRate = 0.025
-	settings.SpawnCount = 8
+	settings.SpawnRate.Set(0.025, 0.025)
+	settings.SpawnCount.Set(8, 8)
 	settings.Scale.SetRanges(0.25, 0.5)
 	settings.Scale.Uniform = true
 	settings.Growth.SetRanges(0.002, 0.004) // Steadily grow just a little bit, with some randomness

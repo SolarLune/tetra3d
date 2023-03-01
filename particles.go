@@ -47,8 +47,10 @@ func NewParticle(partSystem *ParticleSystem, partModels []*Model) *Particle {
 }
 
 func (part *Particle) Reinit() {
+
 	part.Model = part.ModelBank[rand.Intn(len(part.ModelBank))]
 	part.Model.ClearLocalTransform()
+	part.Life = 0
 }
 
 // Update updates the particle's color and movement.
@@ -128,10 +130,10 @@ func (part *Particle) Update(dt float64) {
 }
 
 type ParticleSystemSettings struct {
-	SpawnRate      float64      // SpawnRate is how often a particle is spawned
-	SpawnCount     int          // SpawnCount is how many particles are spawned at a time when a particle is spawned
-	Lifetime       *NumberRange // Lifetime is how long a particle lives in seconds
-	ParentToSystem bool         // If particles should be parented to the owning particle system
+	SpawnRate      *FloatRange // SpawnRate is how often a particle is spawned in seconds
+	SpawnCount     *IntRange   // SpawnCount is how many particles are spawned at a time when a particle is spawned
+	Lifetime       *FloatRange // Lifetime is how long a particle lives in seconds
+	ParentToSystem bool        // If particles should be parented to the owning particle system
 
 	Velocity           *VectorRange
 	Acceleration       *VectorRange
@@ -161,12 +163,20 @@ func NewParticleSystemSettings() *ParticleSystemSettings {
 	scale := NewVectorRange()
 	scale.SetRanges(1, 1)
 
-	lifetime := NewNumberRange()
+	lifetime := NewFloatRange()
 	lifetime.Set(1, 1)
 
+	spawnRate := NewFloatRange()
+	spawnRate.Min = 1
+	spawnRate.Max = 1
+
+	spawnCount := NewIntRange()
+	spawnCount.Min = 1
+	spawnCount.Max = 1
+
 	return &ParticleSystemSettings{
-		SpawnRate:  1,
-		SpawnCount: 1,
+		SpawnRate:  spawnRate,
+		SpawnCount: spawnCount,
 		Lifetime:   lifetime,
 
 		Velocity:     NewVectorRange(),
@@ -210,13 +220,14 @@ func (pss *ParticleSystemSettings) Clone() *ParticleSystemSettings {
 // ParticleSystem represents a collection of particles.
 type ParticleSystem struct {
 	LivingParticles []*Particle
-	ToRemove        []*Particle
+	toRemove        []*Particle
 	DeadParticles   []*Particle
+	On              bool
 
 	ParticleFactories []*Model
 	Root              *Model
 
-	SpawnTimer       float64
+	spawnTimer       float64
 	Settings         *ParticleSystemSettings
 	vertexSpawnIndex int
 }
@@ -233,16 +244,26 @@ func NewParticleSystem(systemNode *Model, particles ...*Model) *ParticleSystem {
 
 	// systemNode.FrustumCulling = false // if we leave frustum culling on, the particles will turn invisible if the batch goes offscreen
 
-	return &ParticleSystem{
+	// for _, p := range particles {
+	// 	p.AutoBatchMode = AutoBatchDynamic
+	// }
+
+	partSys := &ParticleSystem{
 		ParticleFactories: particles,
 		Root:              systemNode,
 
 		LivingParticles: []*Particle{},
 		DeadParticles:   []*Particle{},
-		ToRemove:        []*Particle{},
+		toRemove:        []*Particle{},
 
 		Settings: NewParticleSystemSettings(),
+
+		On: true,
 	}
+
+	partSys.Root.SetVisible(false, false)
+
+	return partSys
 
 }
 
@@ -258,31 +279,41 @@ func (ps *ParticleSystem) Clone() *ParticleSystem {
 // Update should be called once per tick.
 func (ps *ParticleSystem) Update(dt float64) {
 
-	if ps.SpawnTimer <= 0 {
-		for i := 0; i < ps.Settings.SpawnCount; i++ {
-			ps.Spawn()
-		}
-		ps.SpawnTimer = ps.Settings.SpawnRate
-	}
-
-	ps.SpawnTimer -= dt
-
 	for _, part := range ps.LivingParticles {
 		part.Update(dt)
 	}
 
-	for _, toRemove := range ps.ToRemove {
+	for _, toRemove := range ps.toRemove {
 		for i, part := range ps.LivingParticles {
 			if part == toRemove {
 				ps.LivingParticles[i] = nil
 				ps.LivingParticles = append(ps.LivingParticles[:i], ps.LivingParticles[i+1:]...)
 				ps.DeadParticles = append(ps.DeadParticles, part)
+				part.Model.Unparent()
 				break
 			}
 		}
 	}
 
-	ps.ToRemove = []*Particle{}
+	ps.toRemove = []*Particle{}
+
+	if !ps.On {
+		return
+	}
+
+	if ps.spawnTimer <= 0 {
+		spawnCount := int(ps.Settings.SpawnCount.Value())
+		for i := 0; i < spawnCount; i++ {
+			ps.Spawn()
+		}
+		ps.spawnTimer = ps.Settings.SpawnRate.Value()
+	}
+
+	ps.spawnTimer -= dt
+
+	if len(ps.Root.DynamicBatchModels) > 0 {
+		ps.Root.SetVisible(true, true)
+	}
 
 }
 
@@ -303,7 +334,6 @@ func (ps *ParticleSystem) Spawn() {
 
 	ps.LivingParticles = append(ps.LivingParticles, part)
 
-	part.Life = 0
 	part.Lifetime = ps.Settings.Lifetime.Value()
 
 	part.Reinit()
@@ -361,32 +391,59 @@ func (ps *ParticleSystem) Spawn() {
 
 // Remove removes a particle from the ParticleSystem, recycling the Particle for the next time a particle is spawned.
 func (ps *ParticleSystem) Remove(part *Particle) {
-	ps.ToRemove = append(ps.ToRemove, part)
+	ps.toRemove = append(ps.toRemove, part)
 }
 
-type NumberRange struct {
+type FloatRange struct {
 	Min, Max float64
 }
 
-func NewNumberRange() *NumberRange {
-	return &NumberRange{}
+func NewFloatRange() *FloatRange {
+	return &FloatRange{}
 }
 
-func (ran *NumberRange) Clone() *NumberRange {
-	return &NumberRange{
+func (ran *FloatRange) Clone() *FloatRange {
+	return &FloatRange{
 		Min: ran.Min,
 		Max: ran.Max,
 	}
 }
 
-func (ran *NumberRange) Set(min, max float64) {
+func (ran *FloatRange) Set(min, max float64) {
 	ran.Min = min
 	ran.Max = max
 }
 
-func (ran *NumberRange) Value() float64 {
+func (ran *FloatRange) Value() float64 {
 	random := rand.Float64()
 	return ran.Min + ((ran.Max - ran.Min) * random)
+}
+
+type IntRange struct {
+	Min, Max int
+}
+
+func NewIntRange() *IntRange {
+	return &IntRange{}
+}
+
+func (ran *IntRange) Clone() *IntRange {
+	return &IntRange{
+		Min: ran.Min,
+		Max: ran.Max,
+	}
+}
+
+func (ran *IntRange) Set(min, max int) {
+	ran.Min = min
+	ran.Max = max
+}
+
+func (ran *IntRange) Value() int {
+	if ran.Min >= ran.Max {
+		return ran.Min
+	}
+	return ran.Min + rand.Intn(ran.Max-ran.Min)
 }
 
 // VectorRange represents a range of possible values, and allows Tetra3D to get a random value from within

@@ -1014,6 +1014,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		if model.FrustumCulling {
 
+			model.Transform()
+
 			if !camera.SphereInFrustum(model.BoundingSphere) {
 				continue
 			}
@@ -1514,26 +1516,30 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		// end - this saves a lot of time if we're rendering singular low-poly objects, at the cost of each
 		// object sharing the same material / object-level properties (color / material blending mode, for
 		// example).
+
 		if pair.Model.dynamicBatcher {
 
-			if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
+			modelSlice := pair.Model.DynamicBatchModels[pair.MeshPart]
 
-				modelSlice := dyn[pair.MeshPart]
+			for _, merged := range modelSlice {
 
-				for _, merged := range modelSlice {
+				if !merged.visible {
+					continue
+				}
 
-					if !merged.visible {
+				if merged.FrustumCulling {
+					merged.Transform()
+					if !camera.SphereInFrustum(merged.BoundingSphere) {
 						continue
-					}
-
-					for _, part := range merged.Mesh.MeshParts {
-						render(renderPair{Model: merged, MeshPart: part})
 					}
 				}
 
-				flush(pair)
-
+				for _, part := range merged.Mesh.MeshParts {
+					render(renderPair{Model: merged, MeshPart: part})
+				}
 			}
+
+			flush(pair)
 
 		} else {
 			render(pair)
