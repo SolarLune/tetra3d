@@ -57,20 +57,24 @@ func (g *Game) Init() {
 
 	// You then change the ParticleSystemSettings struct to make the particles spawn and move as you wish.
 
-	partSystem := g.Scene.Root.Get("Fire").(*tetra3d.Model)
-	g.FireParticleSystem = tetra3d.NewParticleSystem(partSystem, g.Scene.Root.Get("Particle").(*tetra3d.Model))
+	// We don't parent the fire particle system to the fire particle system node itself because we want the particles to move
+	// independent of the node
+	g.FireParticleSystem = tetra3d.NewParticleSystem(g.Scene.Root, g.Scene.Root.Get("Particle").(*tetra3d.Model))
 
 	settings := g.FireParticleSystem.Settings
-	settings.Lifetime.Set(1, 1)          // Lifetime can vary randomly; we're setting both the minimum and maximum bounds here to 1.
-	settings.SpawnRate.Set(0.025, 0.025) // How often particles are spawned
-	settings.SpawnCount.Set(2, 2)        // How many particles are spawned each time
-	settings.Scale.SetRanges(0.2, 0.4)   // The scale of a particle can vary randomly...
-	settings.Scale.Uniform = true        // But we also want the particles to scale uniformly, so they don't appear squashed or stretched
-	settings.Growth.SetAll(0.02)         // Growth is how quickly particles grow in size. If a particle reaches a scale of 0, it will die (unless you disable ParticleSystemSettings.AllowNegativeScale).
+	settings.Lifetime.Set(1, 1)        // Lifetime can vary randomly; we're setting both the minimum and maximum bounds here to 1.
+	settings.Rate.Set(0.025, 0.025)    // How often particles are spawned
+	settings.Count.Set(2, 2)           // How many particles are spawned each time
+	settings.Scale.SetRanges(0.2, 0.4) // The scale of a particle can vary randomly...
+	settings.Scale.Uniform = true      // But we also want the particles to scale uniformly, so they don't appear squashed or stretched
+	settings.Growth.SetAll(0.02)       // Growth is how quickly particles grow in size. If a particle reaches a scale of 0, it will die (unless you disable ParticleSystemSettings.AllowNegativeScale).
 	settings.Growth.Uniform = true
 
 	settings.SpawnOffset.SetRangeX(-0.1, 0.1) // SpawnOffset is how far the particle can spawn away from the center of the particle system
 	settings.SpawnOffset.SetRangeZ(-0.1, 0.1)
+	settings.SpawnOffsetFunction = func(particle *tetra3d.Particle) {
+		particle.Model.SetWorldPositionVec(g.Scene.Root.Get("Fire").WorldPosition())
+	}
 
 	settings.Velocity.SetRangeY(0.04, 0.04) // Velocity controls a Particle's linear movement, while settings.Acceleration controls a Particle's acceleration (it gathers over time)
 
@@ -83,12 +87,12 @@ func (g *Game) Init() {
 
 	// Now, for the Field particle system.
 
-	partSystem = g.Scene.Root.Get("Field").(*tetra3d.Model)
+	partSystem := g.Scene.Root.Get("Field").(*tetra3d.Model)
 	g.FieldParticleSystem = tetra3d.NewParticleSystem(partSystem, g.Scene.Root.Get("Particle").(*tetra3d.Model), g.Scene.Root.Get("Particle2").(*tetra3d.Model))
 
 	settings = g.FieldParticleSystem.Settings
-	settings.SpawnRate.Set(0.1, 0.1)
-	settings.SpawnCount.Set(4, 4)
+	settings.Rate.Set(0.1, 0.1)
+	settings.Count.Set(4, 4)
 	settings.Lifetime.Set(2, 3)
 	settings.Scale.SetRanges(0.05, 0.2)
 	settings.Scale.Uniform = true
@@ -132,8 +136,8 @@ func (g *Game) Init() {
 	}
 
 	settings.SpawnOffset.SetRanges(-0.1, 0.1)
-	settings.SpawnRate.Set(0.025, 0.025)
-	settings.SpawnCount.Set(8, 8)
+	settings.Rate.Set(0.025, 0.025)
+	settings.Count.Set(8, 8)
 	settings.Scale.SetRanges(0.25, 0.5)
 	settings.Scale.Uniform = true
 	settings.Growth.SetRanges(0.002, 0.004) // Steadily grow just a little bit, with some randomness
@@ -154,6 +158,13 @@ func (g *Game) Init() {
 	g.Camera.Move(0, 5, 5)
 	g.System = examples.NewBasicSystemHandler(g)
 
+	g.Scene.Root.SearchTree().
+		ByType(tetra3d.NodeTypeModel).
+		Not(g.Scene.Root.Get("Fire")).
+		ForEach(func(node tetra3d.INode) {
+			node.Move(0, 10, 0)
+		})
+
 }
 
 func (g *Game) Update() error {
@@ -165,7 +176,7 @@ func (g *Game) Update() error {
 	g.FieldParticleSystem.Update(1.0 / 60.0)
 	g.RingParticleSystem.Update(1.0 / 60.0)
 
-	g.FireParticleSystem.Root.Move(math.Sin(g.Time)*0.05, 0, 0)
+	g.Scene.Root.Get("Fire").Move(math.Sin(g.Time)*0.05, 0, 0)
 
 	g.Camera.Update()
 

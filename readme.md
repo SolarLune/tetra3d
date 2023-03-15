@@ -78,7 +78,7 @@ func NewGame() *Game {
 
 	// First, we load a scene from a .gltf or .glb file. LoadGLTFFile takes a filepath and
 	// any loading options (nil can be taken as a valid default set of loading options), and 
-	// returns a tetra3d.*Library and an error if it was unsuccessful. We can also use 
+	// returns a *tetra3d.Library and an error if it was unsuccessful. We can also use 
 	// tetra3d.LoadGLTFData() if we don't have access to the host OS's filesystem (if the 
 	// assets are embedded, for example).
 
@@ -97,7 +97,7 @@ func NewGame() *Game {
 	// copy of it.
 	g.GameScene = library.ExportedScene.Clone()
 
-	// Tetra3D uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Forward), 
+	// Tetra3D uses OpenGL's coordinate system (+X = Right, +Y = Up, +Z = Backward [towards the camera]), 
 	// in comparison to Blender's coordinate system (+X = Right, +Y = Forward, 
 	// +Z = Up). Note that when loading models in via GLTF or DAE, models are
 	// converted automatically (so up is +Z in Blender and +Y in Tetra3D automatically).
@@ -109,7 +109,7 @@ func NewGame() *Game {
 
 	// However, we can also just grab an existing camera from the scene if it 
 	// were exported from the GLTF file - if exported through Blender's Tetra3D add-on,
-	// then the camera size can be set from within Blender.
+	// then the camera size can be easily set from within Blender.
 
 	g.Camera = g.GameScene.Root.Get("Camera").(*tetra3d.Camera)
 
@@ -131,10 +131,12 @@ func NewGame() *Game {
 
 	// scene.Root.AddChildren(object)
 
-	// To remove them, either use Node.RemoveChildren() (so something like, scene.Root.RemoveChildren(object)) 
-	// or Node.Unparent() (in this case, object.Unparent() ).
+	// To remove them, you can unparent them from either the parent (Node.RemoveChildren())
+	// or the child (Node.Unparent()). When a Node is unparented, it is removed from the scene
+	// tree; if you want to destroy the Node, then dropping any references to this Node 
+	// at this point would be sufficient.
 
-	// For Cameras, we don't actually need to place them in the scene to view it, since
+	// For Cameras, we don't actually need to place them in a scene to view the Scene, since
 	// the presence of the Camera in the Scene node tree doesn't impact what it would see.
 
 	// We can see the tree "visually" by printing out the hierarchy:
@@ -162,16 +164,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// individual Models, or Camera.RenderNodes() to render a subset of a scene tree.
 	g.Camera.RenderScene(g.GameScene) 
 
-	// To see the result, we draw the Camera's ColorTexture to the screen. Before doing so, we'll clear the screen first; 
-	// in this case, with a color, though we can also go with screen.Clear().
+	// To see the result, we draw the Camera's ColorTexture to the screen. 
+	// Before doing so, we'll clear the screen first. In this case, we'll do this 
+	// with a color, though we can also go with screen.Clear().
 	screen.Fill(color.RGBA{20, 30, 40, 255})
 
 	// Draw the resulting texture to the screen, and you're done! You can 
-	// also visualize the depth texture with g.Camera.DepthTexture.
-	screen.DrawImage(g.Camera.ColorTexture, nil) 
+	// also visualize the depth texture with g.Camera.DepthTexture().
+	screen.DrawImage(g.Camera.ColorTexture(), nil) 
 
 	// Note that the resulting texture is indeed just an ordinary *ebiten.Image, so 
-	// you can also use this as a texture for a mesh, as an example.
+	// you can also use this as a texture for a Model's Material, as an example.
 
 }
 
@@ -181,7 +184,7 @@ func (g *Game) Layout(w, h int) (int, int) {
 	// scaling the camera's output to the window size and letterboxing as necessary. 
 
 	// If you wanted to extend the camera according to window size, you would 
-	// have to resize the camera using the new width and height.
+	// have to resize the camera using the window's new width and height.
 	return g.Camera.Size()
 
 }
@@ -214,14 +217,16 @@ func NewGame() *Game {
 
 	g := &Game{}
 
-	// Create a new BoundingCapsule named "player", 1 unit tall with a 0.25 unit radius for the caps at the ends.
+	// Create a new BoundingCapsule named "player", 1 unit tall with a 
+	// 0.25 unit radius for the caps at the ends.
 	g.Capsule = tetra3d.NewBoundingCapsule("player", 1, 0.25)
 
-	// Create a new BoundingAABB named "block", of 0.5 width, height, and depth (in that order).
+	// Create a new BoundingAABB named "block", of 0.5 width, height, 
+	// and depth (in that order).
 	g.Cube = tetra3d.NewBoundingAABB("block", 0.5, 0.5, 0.5)
 
-	// Move it over on the X axis by 4 units.
-	g.Cube.Move(4, 0, 0)
+	// Move the cube over on the X axis by 4 units.
+	g.Cube.Move(-4, 0, 0)
 
 	return g
 
@@ -232,7 +237,7 @@ func (g *Game) Update() {
 	// Move the capsule 0.2 units to the right every frame.
 	g.Capsule.Move(0.2, 0, 0)
 
-	// Will print the result of the Collision, or nil, if there was no intersection.
+	// Will print the result of the Collision, (or nil), if there was no intersection.
 	fmt.Println(g.Capsule.Collision(g.Cube))
 
 }
@@ -339,9 +344,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Specular lighting (shininess)
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
+- [X] **Particles**
+- [X] -- Basic particle system support
+- [ ] -- Fix layering issue when rendering a particle system underneath another one (visible in the Particles example)
 - [X] **Shaders**
 - [X] -- Custom fragment shaders
-- [ ] -- Normal rendering (useful for, say, screen-space shaders)
+- [X] -- Normal rendering (useful for, say, screen-space shaders)
 - [X] **Collision Testing**
 - [X] -- Normal reporting
 - [X] -- Slope reporting
@@ -352,7 +360,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Bounding / Broadphase collision checking
 
 | Collision Type | Sphere | AABB       | Triangle   | Capsule |
-| ---------------- | -------- | ------------ | ------------ | --------- |
+| -------------- | ------ | ---------- | ---------- | ------- |
 | Sphere         | ✅     | ✅         | ✅         | ✅      |
 | AABB           | ✅     | ✅         | ⛔ (buggy) | ✅      |
 | Triangle       | ✅     | ⛔ (buggy) | ⛔ (buggy) | ✅      |
@@ -361,11 +369,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 - [ ] -- An actual collision system?
 
-- [ ] **3D Sound** (adjusting panning of sound sources based on 3D location)
+- [ ] **3D Sound** (adjusting panning of sound sources based on 3D location?)
 - [ ] **Optimization**
 - [ ] -- It might be possible to not have to write depth manually
-- [ ] -- Make NodeFilters work lazily, rather than gathering all nodes in the filter at once
-- [x] -- Reusing vertex indices for adjacent triangles
+- [X] -- Make NodeFilters work lazily, rather than gathering all nodes in the filter at once
+- [X] -- Reusing vertex indices for adjacent triangles
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?
 - [X] -- Custom Vectors
@@ -377,8 +385,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- Capsule?
 - [ ] -- -- Triangles
 - [ ] -- -- -- Maybe we can combine contiguous triangles into faces and just check faces?
-- [ ] -- -- -- We could use the broadphase system to find triangles that are in the raycast area, specifically
-- [ ] -- Instead of doing cosllision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
+- [ ] -- -- -- We could use the broadphase system to find triangles that are in the raycast's general area, specifically
+- [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
 - [ ] -- Lighting speed improvements
 - [ ] -- Occlusion culling - this should be possible using octrees to determine if an object is visible before rendering it; see: https://www.gamedeveloper.com/programming/occlusion-culling-algorithms
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards

@@ -48,18 +48,17 @@ type TexturePlayer struct {
 	Animation       *TextureAnimation // Animation is a pointer to the currently playing Animation.
 	// Playhead increases as the TexturePlayer plays. The integer portion of Playhead is the frame that the TexturePlayer
 	// resides in (so a Playhead of 1.2 indicates that it is in frame 1, the second frame).
-	Playhead float64
-	Speed    float64 // Speed indicates the playback speed and direction of the TexturePlayer, with a value of 1.0 being 100%.
-	Playing  bool    // Playing indicates whether the TexturePlayer is currently playing or not.
-
-	Mesh *Mesh
+	Playhead        float64
+	Speed           float64 // Speed indicates the playback speed and direction of the TexturePlayer, with a value of 1.0 being 100%.
+	Playing         bool    // Playing indicates whether the TexturePlayer is currently playing or not.
+	vertexSelection *VertexSelection
 }
 
 // NewTexturePlayer returns a new TexturePlayer instance.
-func NewTexturePlayer(mesh *Mesh, vertexSelection *VertexSelection) *TexturePlayer {
+func NewTexturePlayer(vertexSelection *VertexSelection) *TexturePlayer {
 	player := &TexturePlayer{
-		Mesh:  mesh,
-		Speed: 1,
+		Speed:           1,
+		vertexSelection: vertexSelection,
 	}
 	player.Reset(vertexSelection)
 	return player
@@ -69,8 +68,9 @@ func NewTexturePlayer(mesh *Mesh, vertexSelection *VertexSelection) *TexturePlay
 // to use the current values of the passed vertices in the slice.
 func (player *TexturePlayer) Reset(vertexSelection *VertexSelection) {
 	player.OriginalOffsets = map[int]Vector{}
+	mesh := vertexSelection.Mesh
 	for vert := range vertexSelection.Indices {
-		player.OriginalOffsets[vert] = player.Mesh.VertexUVs[vert]
+		player.OriginalOffsets[vert] = mesh.VertexUVs[vert]
 	}
 }
 
@@ -109,8 +109,9 @@ func (player *TexturePlayer) Update(dt float64) {
 // ApplyUVOffset applies a specified UV offset to all vertices a player is assigned to. This offset is not additive, but rather is
 // set once, regardless of how many times ApplyUVOffset is called.
 func (player *TexturePlayer) ApplyUVOffset(offsetX, offsetY float64) {
+	mesh := player.vertexSelection.Mesh
 	for vertIndex, ogOffset := range player.OriginalOffsets {
-		player.Mesh.VertexUVs[vertIndex].X = ogOffset.X + offsetX
-		player.Mesh.VertexUVs[vertIndex].Y = ogOffset.Y + offsetY
+		mesh.VertexUVs[vertIndex].X = ogOffset.X + offsetX
+		mesh.VertexUVs[vertIndex].Y = ogOffset.Y + offsetY
 	}
 }

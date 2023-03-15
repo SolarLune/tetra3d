@@ -817,6 +817,8 @@ def export():
 
                     if obj.type == "MESH":
 
+                        # BUG: This causes a problem when subdividing; this is only really a problem if automatic tesselation when rendering in Tetra3D isn't on, though
+
                         if obj.t3dAutoSubdivide__:
 
                             origMesh = obj.data.copy()

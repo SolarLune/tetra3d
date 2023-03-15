@@ -87,7 +87,7 @@ func (bt *BoundingTriangles) Colliding(other IBoundingObject) bool {
 // no intersection is reported, Collision returns nil. (Note that BoundingTriangles > AABB collision is buggy at the moment.)
 func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 
-	if other == bt {
+	if other == bt || other == nil {
 		return nil
 	}
 

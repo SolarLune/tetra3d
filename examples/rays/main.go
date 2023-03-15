@@ -49,7 +49,7 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	results := g.Camera.MouseRayTest(g.Camera.Far(), g.Scene.Root.SearchTree().BoundingObjects()...)
+	results := g.Camera.MouseRayTest(g.Camera.Far(), g.Scene.Root.SearchTree().IBoundingObjects()...)
 	if len(results) > 0 {
 
 		marker := g.Scene.Root.Get("Marker")

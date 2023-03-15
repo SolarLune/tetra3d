@@ -210,6 +210,10 @@ type INode interface {
 	// Sector returns the Sector this Node is in.
 	Sector() *Sector
 	sectorHierarchy() *Sector
+
+	// DistanceTo returns the distance between the given Nodes' centers.
+	// Quick syntactic sugar for Node.WorldPosition().Distance(otherNode.WorldPosition()).
+	DistanceTo(otherNode INode) float64
 }
 
 var nodeID uint64 = 0
@@ -1072,4 +1076,8 @@ func (node *Node) Sector() *Sector {
 
 	return nil
 
+}
+
+func (node *Node) DistanceTo(other INode) float64 {
+	return node.WorldPosition().Distance(other.WorldPosition())
 }

@@ -19,7 +19,7 @@ func NewBoundingCapsule(name string, height, radius float64) *BoundingCapsule {
 		Node:           NewNode(name),
 		Height:         math.Max(radius, height),
 		Radius:         radius,
-		internalSphere: NewBoundingSphere("internal sphere", 0),
+		internalSphere: NewBoundingSphere("internal capsule sphere", 0),
 	}
 }
 
@@ -49,7 +49,7 @@ func (capsule *BoundingCapsule) Colliding(other IBoundingObject) bool {
 // no intersection is reported, Collision returns nil.
 func (capsule *BoundingCapsule) Collision(other IBoundingObject) *Collision {
 
-	if other == capsule {
+	if other == capsule || other == nil {
 		return nil
 	}
 

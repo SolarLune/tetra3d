@@ -12,7 +12,7 @@ type NodeFilter struct {
 	Filters        []func(INode) bool // The slice of filters that are currently active on the NodeFilter.
 	Start          INode              // The start (root) of the filter.
 	StopOnFiltered bool               // If the filter should continue through to a node's children if the node itself doesn't pass the filter
-	MaxDepth       int                // How deep the node filter should search; a value that is less than zero means the entire tree will be traversed.
+	MaxDepth       int                // How deep the node filter should search in the starting node's hierarchy; a value that is less than zero means the entire tree will be traversed.
 	depth          int
 }
 
@@ -55,6 +55,36 @@ func (nf *NodeFilter) execute(node INode) []INode {
 	return out
 }
 
+func (nf *NodeFilter) executeFilters(node INode, execute func(INode)) {
+	nf.depth++
+
+	successfulFilter := true
+	if node != nf.Start {
+		ok := true
+		for _, filter := range nf.Filters {
+			if !filter(node) {
+				ok = false
+				successfulFilter = false
+			}
+		}
+		if ok {
+			execute(node)
+		}
+	}
+	if nf.MaxDepth < 0 || nf.depth <= nf.MaxDepth {
+
+		if !nf.StopOnFiltered || successfulFilter {
+
+			for _, child := range node.Children() {
+				nf.executeFilters(child, execute)
+			}
+
+		}
+
+	}
+	nf.depth--
+}
+
 // First returns the first Node in the NodeFilter; if the NodeFilter is empty, this function returns nil.
 func (nf NodeFilter) First() INode {
 	out := nf.execute(nf.Start)
@@ -90,15 +120,21 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 	return nf
 }
 
-// ByProperties allows you to filter a given selection of nodes by the provided set of property names.
-// If parentHas is true, then a Node will be accepted if its parent has the property.
+// ByProps allows you to filter a given selection of nodes by the provided set of property names.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByProperties(parentHas bool, propNames ...string) NodeFilter {
+func (nf NodeFilter) ByProps(propNames ...string) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
-		if parentHas && node.Parent() != nil {
-			return node.Parent().Properties().Has(propNames...) || node.Properties().Has(propNames...)
-		}
 		return node.Properties().Has(propNames...)
+	})
+	return nf
+}
+
+// ByParentProps allows you to filter a given selection of nodes if the node has a parent with the provided
+// set of property names.
+// If no matching Nodes are found, an empty NodeFilter is returned.
+func (nf NodeFilter) ByParentProps(propNames ...string) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		return node.Parent() != nil && node.Parent().Properties().Has(propNames...)
 	})
 	return nf
 }
@@ -134,7 +170,7 @@ func (nf NodeFilter) ByType(nodeType NodeType) NodeFilter {
 // Not allows you to filter OUT a given NodeFilter of nodes.
 // If a node is in the provided slice of INodes, then it will not be added to the
 // final NodeFilter.
-func (nf NodeFilter) Not(others []INode) NodeFilter {
+func (nf NodeFilter) Not(others ...INode) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		for _, other := range others {
 			if node == other {
@@ -153,15 +189,9 @@ func (nf NodeFilter) bySectors() NodeFilter {
 	return nf
 }
 
-// ForEach executes the provided function on each Node filtered out. If the function
-// returns true, the loop continues; if it returns false, the NodeFilter stops executing
-// the function on the results.
-func (nf NodeFilter) ForEach(f func(node INode) bool) {
-	for _, o := range nf.execute(nf.Start) {
-		if !f(o) {
-			break
-		}
-	}
+// ForEach executes the provided function on each Node filtered out, without creating a slice of the nodes.
+func (nf NodeFilter) ForEach(f func(node INode)) {
+	nf.executeFilters(nf.Start, f)
 }
 
 // Contains returns if the provided Node is contained in the NodeFilter.
@@ -191,8 +221,8 @@ func (nf NodeFilter) INodes() []INode {
 	return nf.execute(nf.Start)
 }
 
-// BoundingObjects returns a slice of the IBoundingObjects contained within the NodeFilter.
-func (nf NodeFilter) BoundingObjects() []IBoundingObject {
+// IBoundingObjects returns a slice of the IBoundingObjects contained within the NodeFilter.
+func (nf NodeFilter) IBoundingObjects() []IBoundingObject {
 	out := nf.execute(nf.Start)
 	boundings := make([]IBoundingObject, 0, len(out))
 	for _, n := range out {
@@ -201,6 +231,12 @@ func (nf NodeFilter) BoundingObjects() []IBoundingObject {
 		}
 	}
 	return boundings
+}
+
+// IBoundingObjectsWithProps is a helper function that returns a slice of IBoundingObjects who have parents
+// with the specified properties.
+func (nf NodeFilter) IBoundingObjectsWithProps(props ...string) []IBoundingObject {
+	return nf.ByParentProps(props...).IBoundingObjects()
 }
 
 // Models returns a slice of the Models contained within the NodeFilter.

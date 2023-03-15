@@ -62,7 +62,7 @@ func (g *Game) Update() error {
 	gravity := 0.05
 
 	bounds := g.Controlling.Children()[0].(tetra3d.IBoundingObject)
-	solids := g.Scene.Root.SearchTree().ByType(tetra3d.NodeTypeBoundingObject).INodes()
+	solids := g.Scene.Root.SearchTree().ByType(tetra3d.NodeTypeBoundingObject).IBoundingObjects()
 
 	movement := g.Movement.Modify() // Modification Vector
 

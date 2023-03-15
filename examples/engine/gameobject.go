@@ -23,7 +23,7 @@ type Player struct {
 func NewPlayer(node tetra3d.INode) *Player {
 	return &Player{
 		node:   node,
-		Bounds: node.SearchTree().ByType(tetra3d.NodeTypeBoundingAABB).First().(*tetra3d.BoundingAABB),
+		Bounds: node.Get("BoundingAABB").(*tetra3d.BoundingAABB),
 	}
 }
 
@@ -52,7 +52,7 @@ func (player *Player) Update() {
 
 		tetra3d.CollisionTestSettings{
 
-			Others: player.node.Root().SearchTree().ByProperties(false, "solid").INodes(),
+			Others: player.node.Root().SearchTree().IBoundingObjectsWithProps("solid"),
 
 			HandleCollision: func(col *tetra3d.Collision) bool {
 

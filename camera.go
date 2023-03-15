@@ -1010,8 +1010,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			continue
 		}
 
-		camera.DebugInfo.TotalParts++
-
 		if model.FrustumCulling {
 
 			model.Transform()
@@ -1068,6 +1066,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					}
 				}
 
+				camera.DebugInfo.TotalParts += len(modelSlice)
+
 			}
 
 		} else if model.Mesh != nil {
@@ -1087,6 +1087,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
 				// depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
 			}
+
+			camera.DebugInfo.TotalParts++
 
 		}
 
@@ -1211,6 +1213,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			camera.DebugInfo.lightTime += time.Since(t)
 
 		}
+
+		// TODO: Implement PS1-style automatic tesselation
 
 		meshPart.ForEachVertexIndex(
 
@@ -1570,6 +1574,13 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 						continue
 					}
 
+					if merged.FrustumCulling {
+						merged.Transform()
+						if !camera.SphereInFrustum(merged.BoundingSphere) {
+							continue
+						}
+					}
+
 					for _, part := range merged.Mesh.MeshParts {
 						render(renderPair{Model: merged, MeshPart: part})
 					}
@@ -1593,33 +1604,33 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 }
 
-func encodeDepth(depth float64) *Color {
+// func encodeDepth(depth float64) *Color {
 
-	r := math.Floor(depth*255) / 255
-	_, f := math.Modf(depth * 255)
-	g := math.Floor(f*255) / 255
-	_, f = math.Modf(depth * 255 * 255)
-	b := f
+// 	r := math.Floor(depth*255) / 255
+// 	_, f := math.Modf(depth * 255)
+// 	g := math.Floor(f*255) / 255
+// 	_, f = math.Modf(depth * 255 * 255)
+// 	b := f
 
-	if r < 0 {
-		r = 0
-	} else if r > 1 {
-		r = 1
-	}
-	if g < 0 {
-		g = 0
-	} else if g > 1 {
-		g = 1
-	}
-	if b < 0 {
-		b = 0
-	} else if b > 1 {
-		b = 1
-	}
+// 	if r < 0 {
+// 		r = 0
+// 	} else if r > 1 {
+// 		r = 1
+// 	}
+// 	if g < 0 {
+// 		g = 0
+// 	} else if g > 1 {
+// 		g = 1
+// 	}
+// 	if b < 0 {
+// 		b = 0
+// 	} else if b > 1 {
+// 		b = 1
+// 	}
 
-	return NewColor(float32(r), float32(g), float32(b), 1)
+// 	return NewColor(float32(r), float32(g), float32(b), 1)
 
-}
+// }
 
 type SpriteRender3d struct {
 	Image         *ebiten.Image

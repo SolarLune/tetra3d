@@ -39,15 +39,11 @@ func (intersection *Intersection) SlideAgainstNormal(movementVec Vector) Vector 
 // colliding sphere / aabb, the closest point in the capsule, the center of the closest triangle, etc) to the
 // contact point.
 type Collision struct {
-	BoundingObject INode // The BoundingObject collided with
-	// The root colliding object; this can be the same or different from Collision.BoundingObject, depending
-	// on which object was tested against (either an individual BoundingObject, or the parent / grandparent of a tree
-	// that contains one or more BoundingObjects)
-	Root          INode
-	Intersections []*Intersection // The slice of Intersections, one for each object or triangle intersected with, arranged in order of distance (far to close).
+	BoundingObject IBoundingObject // The BoundingObject collided with
+	Intersections  []*Intersection // The slice of Intersections, one for each object or triangle intersected with, arranged in order of distance (far to close).
 }
 
-func newCollision(collidedObject INode) *Collision {
+func newCollision(collidedObject IBoundingObject) *Collision {
 	return &Collision{
 		BoundingObject: collidedObject,
 		Intersections:  []*Intersection{},
@@ -164,11 +160,7 @@ type CollisionTestSettings struct {
 	// the Model's children would be tested for collision (which means the BoundingObject), and the Model would be the
 	// collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
 	// object in the Collision object returned.
-	Others []INode
-
-	// Skip is a slice of INodes to skip checking (i.e. you can use this to skip
-	// checking certain colliders in an object's tree).
-	Skip []INode
+	Others []IBoundingObject
 }
 
 // IBoundingObject represents a Node type that can be tested for collision. The exposed functions are essentially just
@@ -659,14 +651,22 @@ func btCapsuleCapsule(capsuleA, capsuleB *BoundingCapsule) *Collision {
 	capsuleB.internalSphere.SetLocalPositionVec(capsuleB.ClosestPoint(caClosest))
 	capsuleB.internalSphere.Radius = capsuleB.Radius
 
-	return btSphereSphere(capsuleA.internalSphere, capsuleB.internalSphere)
+	col := btSphereSphere(capsuleA.internalSphere, capsuleB.internalSphere)
+	if col != nil {
+		col.BoundingObject = capsuleB
+	}
+	return col
 }
 
 func btSphereCapsule(sphere *BoundingSphere, capsule *BoundingCapsule) *Collision {
 	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
 	capsule.internalSphere.SetLocalPositionVec(capsule.ClosestPoint(sphere.WorldPosition()))
 	capsule.internalSphere.Radius = capsule.Radius
-	return btSphereSphere(sphere, capsule.internalSphere)
+	col := btSphereSphere(sphere, capsule.internalSphere)
+	if col != nil {
+		col.BoundingObject = capsule
+	}
+	return col
 }
 
 func btCapsuleAABB(capsule *BoundingCapsule, aabb *BoundingAABB) *Collision {
@@ -819,45 +819,22 @@ func CommonCollisionTest(node INode, settings CollisionTestSettings) []*Collisio
 
 	collisions := []*Collision{}
 
-	var test func(checking, parent INode)
+	for _, checking := range settings.Others {
 
-	continueChecking := true
+		if node == checking || checking == nil {
+			continue
+		}
 
-	test = func(checking, parent INode) {
+		if collision := node.(IBoundingObject).Collision(checking); collision != nil {
 
-		if continueChecking {
+			collisions = append(collisions, collision)
 
-			if settings.Skip != nil {
-				for _, node := range settings.Skip {
-					if node == checking {
-						return
-					}
-				}
-			}
-
-			if c, ok := checking.(IBoundingObject); ok {
-
-				if collision := node.(IBoundingObject).Collision(c); collision != nil {
-					collision.Root = parent
-
-					if settings.HandleCollision != nil && !settings.HandleCollision(collision) {
-						continueChecking = false
-					}
-					collisions = append(collisions, collision)
-				}
-
-			}
-
-			for _, child := range checking.Children() {
-				test(child, parent)
+			if settings.HandleCollision != nil && !settings.HandleCollision(collision) {
+				break
 			}
 
 		}
 
-	}
-
-	for _, o := range settings.Others {
-		test(o, o)
 	}
 
 	// Sort the IntersectionResults by distance (closer intersections come up "sooner").

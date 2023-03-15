@@ -68,7 +68,7 @@ func (g *Game) Init() {
 
 	// And then create a TexturePlayer, which steps through all vertices and assigns their UV values according
 	// to the TexturePlayer's playing animation.
-	g.AnimatedTexture = tetra3d.NewTexturePlayer(mesh, selection)
+	g.AnimatedTexture = tetra3d.NewTexturePlayer(selection)
 
 	// Next we create the animation using NewTextureAnimationPixels():
 	bloopAnim := tetra3d.NewTextureAnimationPixels(15, mesh.MeshParts[0].Material.Texture,

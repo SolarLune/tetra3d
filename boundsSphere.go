@@ -47,7 +47,7 @@ func (sphere *BoundingSphere) Colliding(other IBoundingObject) bool {
 // no intersection is reported, Collision returns nil.
 func (sphere *BoundingSphere) Collision(other IBoundingObject) *Collision {
 
-	if other == sphere {
+	if other == sphere || other == nil {
 		return nil
 	}
 

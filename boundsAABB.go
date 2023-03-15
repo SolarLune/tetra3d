@@ -188,7 +188,7 @@ func (box *BoundingAABB) Colliding(other IBoundingObject) bool {
 // is buggy at the moment.)
 func (box *BoundingAABB) Collision(other IBoundingObject) *Collision {
 
-	if other == box {
+	if other == box || other == nil {
 		return nil
 	}
 

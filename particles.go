@@ -33,6 +33,7 @@ func NewParticle(partSystem *ParticleSystem, partModels []*Model) *Particle {
 		clone := p.Clone().(*Model)
 		clone.visible = false
 		// clone.FrustumCulling = false
+		clone.AutoBatchMode = AutoBatchDynamic
 		bank = append(bank, clone)
 	}
 
@@ -56,7 +57,9 @@ func (part *Particle) Reinit() {
 // Update updates the particle's color and movement.
 func (part *Particle) Update(dt float64) {
 
-	part.Model.visible = part.ParticleSystem.Root.visible
+	part.Model.visible = true
+
+	// part.Model.visible = part.ParticleSystem.Root.Visible()
 
 	part.Life += dt
 
@@ -130,10 +133,9 @@ func (part *Particle) Update(dt float64) {
 }
 
 type ParticleSystemSettings struct {
-	SpawnRate      *FloatRange // SpawnRate is how often a particle is spawned in seconds
-	SpawnCount     *IntRange   // SpawnCount is how many particles are spawned at a time when a particle is spawned
-	Lifetime       *FloatRange // Lifetime is how long a particle lives in seconds
-	ParentToSystem bool        // If particles should be parented to the owning particle system
+	Rate     *FloatRange // SpawnRate is how often a particle is spawned in seconds
+	Count    *IntRange   // SpawnCount is how many particles are spawned at a time when a particle is spawned
+	Lifetime *FloatRange // Lifetime is how long a particle lives in seconds
 
 	Velocity           *VectorRange
 	Acceleration       *VectorRange
@@ -144,7 +146,8 @@ type ParticleSystemSettings struct {
 	Friction           float64 // Friction to apply to velocity
 	AllowNegativeScale bool    // If negative scale should be allowed for particles. By default, this is false.
 
-	VertexSpawnMode int // VertexSpawnMode influences where a particle spawns. By default, this is ParticleVertexSpawnModeOff.
+	VertexSpawnMode  int // VertexSpawnMode influences where a particle spawns. By default, this is ParticleVertexSpawnModeOff.
+	VertexSpawnModel *Model
 
 	// SpawnOffsetFunction is a function the user can use to customize spawning position of the particles within the system. This function
 	// is called additively to the SpawnOffset setting.
@@ -175,9 +178,9 @@ func NewParticleSystemSettings() *ParticleSystemSettings {
 	spawnCount.Max = 1
 
 	return &ParticleSystemSettings{
-		SpawnRate:  spawnRate,
-		SpawnCount: spawnCount,
-		Lifetime:   lifetime,
+		Rate:     spawnRate,
+		Count:    spawnCount,
+		Lifetime: lifetime,
 
 		Velocity:     NewVectorRange(),
 		SpawnOffset:  NewVectorRange(),
@@ -194,9 +197,9 @@ func NewParticleSystemSettings() *ParticleSystemSettings {
 func (pss *ParticleSystemSettings) Clone() *ParticleSystemSettings {
 
 	newPS := &ParticleSystemSettings{
-		SpawnRate:  pss.SpawnRate,
-		SpawnCount: pss.SpawnCount,
-		Lifetime:   pss.Lifetime.Clone(),
+		Rate:     pss.Rate,
+		Count:    pss.Count,
+		Lifetime: pss.Lifetime.Clone(),
 
 		Velocity:     pss.Velocity.Clone(),
 		Acceleration: pss.Acceleration.Clone(),
@@ -225,7 +228,7 @@ type ParticleSystem struct {
 	On              bool
 
 	ParticleFactories []*Model
-	Root              *Model
+	Root              INode
 
 	spawnTimer       float64
 	Settings         *ParticleSystemSettings
@@ -233,14 +236,14 @@ type ParticleSystem struct {
 }
 
 // NewParticleSystem creates a new ParticleSystem, operating on the systemNode and randomly creating particles from the provided collection of particle Models.
-func NewParticleSystem(systemNode *Model, particles ...*Model) *ParticleSystem {
+func NewParticleSystem(systemNode INode, particles ...*Model) *ParticleSystem {
 
-	for _, part := range particles {
-		mat := part.Mesh.MeshParts[0].Material
-		if systemNode.Mesh.FindMeshPart(mat.Name) == nil {
-			systemNode.Mesh.AddMeshPart(part.Mesh.MeshParts[0].Material)
-		}
-	}
+	// for _, part := range particles {
+	// 	mat := part.Mesh.MeshParts[0].Material
+	// 	if systemNode.Mesh.FindMeshPart(mat.Name) == nil {
+	// 		systemNode.Mesh.AddMeshPart(part.Mesh.MeshParts[0].Material)
+	// 	}
+	// }
 
 	// systemNode.FrustumCulling = false // if we leave frustum culling on, the particles will turn invisible if the batch goes offscreen
 
@@ -261,7 +264,7 @@ func NewParticleSystem(systemNode *Model, particles ...*Model) *ParticleSystem {
 		On: true,
 	}
 
-	partSys.Root.SetVisible(false, false)
+	// partSys.Root.SetVisible(false, false)
 
 	return partSys
 
@@ -302,18 +305,18 @@ func (ps *ParticleSystem) Update(dt float64) {
 	}
 
 	if ps.spawnTimer <= 0 {
-		spawnCount := int(ps.Settings.SpawnCount.Value())
+		spawnCount := int(ps.Settings.Count.Value())
 		for i := 0; i < spawnCount; i++ {
 			ps.Spawn()
 		}
-		ps.spawnTimer = ps.Settings.SpawnRate.Value()
+		ps.spawnTimer = ps.Settings.Rate.Value()
 	}
 
 	ps.spawnTimer -= dt
 
-	if len(ps.Root.DynamicBatchModels) > 0 {
-		ps.Root.SetVisible(true, true)
-	}
+	// if len(ps.Root.DynamicBatchModels) > 0 {
+	// 	ps.Root.SetVisible(true, true)
+	// }
 
 }
 
@@ -327,9 +330,9 @@ func (ps *ParticleSystem) Spawn() {
 		ps.DeadParticles = ps.DeadParticles[1:]
 	} else {
 		part = NewParticle(ps, ps.ParticleFactories)
-		for _, newModel := range part.ModelBank {
-			ps.Root.DynamicBatchAdd(ps.Root.Mesh.FindMeshPart(part.Model.Mesh.MeshParts[0].Material.Name), newModel)
-		}
+		// for _, newModel := range part.ModelBank {
+		// 	ps.Root.DynamicBatchAdd(ps.Root.Mesh.FindMeshPart(part.Model.Mesh.MeshParts[0].Material.Name), newModel)
+		// }
 	}
 
 	ps.LivingParticles = append(ps.LivingParticles, part)
@@ -338,9 +341,7 @@ func (ps *ParticleSystem) Spawn() {
 
 	part.Reinit()
 
-	if ps.Settings.ParentToSystem {
-		ps.Root.AddChildren(part.Model)
-	}
+	ps.Root.AddChildren(part.Model)
 
 	part.Model.SetWorldScaleVec(ps.Settings.Scale.Value())
 
@@ -351,14 +352,16 @@ func (ps *ParticleSystem) Spawn() {
 
 	var pos Vector
 
-	if ps.Settings.VertexSpawnMode != ParticleVertexSpawnModeOff {
+	if ps.Settings.VertexSpawnMode != ParticleVertexSpawnModeOff && ps.Settings.VertexSpawnModel != nil {
 
-		vertCount := len(ps.Root.Mesh.VertexPositions)
+		model := ps.Settings.VertexSpawnModel
 
-		if ps.Root.skinned {
-			pos = ps.Root.Mesh.vertexSkinnedPositions[ps.vertexSpawnIndex]
+		vertCount := len(model.Mesh.VertexPositions)
+
+		if model.skinned {
+			pos = model.Mesh.vertexSkinnedPositions[ps.vertexSpawnIndex]
 		} else {
-			pos = ps.Root.Transform().MultVec(ps.Root.Mesh.VertexPositions[ps.vertexSpawnIndex])
+			pos = model.Transform().MultVec(model.Mesh.VertexPositions[ps.vertexSpawnIndex])
 		}
 
 		switch ps.Settings.VertexSpawnMode {
