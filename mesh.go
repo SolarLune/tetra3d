@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"math"
+
+	"github.com/scylladb/go-set/i32set"
 )
 
 // Dimensions represents the minimum and maximum spatial dimensions of a Mesh arranged in a 2-space Vector slice.
@@ -174,7 +176,6 @@ type Mesh struct {
 	VertexActiveColorChannel []int
 	VertexWeights            [][]float32 // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
 	VertexBones              [][]uint16  // TODO: Replace this with [][8]uint16 (or however many the maximum number of bones affecting a single vertex is for GLTF)
-	visibleVertices          []bool
 
 	vertexLights  []*Color
 	vertsAddStart int
@@ -198,7 +199,6 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 
 		vertexTransforms:         []Vector{},
 		VertexPositions:          []Vector{},
-		visibleVertices:          []bool{},
 		VertexNormals:            []Vector{},
 		vertexSkinnedNormals:     []Vector{},
 		vertexSkinnedPositions:   []Vector{},
@@ -230,7 +230,6 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	for i := range mesh.VertexPositions {
 		newMesh.VertexPositions = append(newMesh.VertexPositions, mesh.VertexPositions[i])
-		newMesh.visibleVertices = append(newMesh.visibleVertices, false)
 	}
 
 	for i := range mesh.VertexNormals {
@@ -323,9 +322,6 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 	}
 
 	mesh.VertexPositions = append(make([]Vector, 0, vertexCount), mesh.VertexPositions...)
-	if len(mesh.visibleVertices) < vertexCount {
-		mesh.visibleVertices = make([]bool, vertexCount)
-	}
 
 	mesh.VertexNormals = append(make([]Vector, 0, vertexCount), mesh.VertexNormals...)
 
@@ -1053,8 +1049,10 @@ func NewCylinderMesh(sideCount int, radius float64, createCaps bool) *Mesh {
 // sortingTriangle is used specifically for sorting triangles when rendering. Less data means more data fits in cache,
 // which means sorting is faster.
 type sortingTriangle struct {
-	Triangle *Triangle
-	depth    float32
+	Triangle    *Triangle
+	Tessellated bool
+	depth       float32
+	visible     bool
 }
 
 // A Triangle represents the smallest renderable object in Tetra3D. A triangle contains very little data, and is mainly used to help identify triads of vertices.
@@ -1201,18 +1199,23 @@ type MeshPart struct {
 	TriangleStart    int
 	TriangleEnd      int
 
-	sortingTriangles []sortingTriangle
+	renderState *renderState
 }
 
 // NewMeshPart creates a new MeshPart that renders using the specified Material.
 func NewMeshPart(mesh *Mesh, material *Material) *MeshPart {
-	return &MeshPart{
-		Mesh:             mesh,
-		Material:         material,
-		sortingTriangles: []sortingTriangle{},
+	mp := &MeshPart{
+		Mesh:     mesh,
+		Material: material,
+
 		TriangleStart:    math.MaxInt,
 		VertexIndexStart: mesh.vertsAddStart,
 	}
+	mp.renderState = &renderState{
+		meshPart: mp,
+		indices:  i32set.NewWithSize(len(mesh.Triangles) * 3),
+	}
+	return mp
 }
 
 // Clone clones the MeshPart, returning the copy.
@@ -1220,18 +1223,15 @@ func (part *MeshPart) Clone() *MeshPart {
 
 	newMP := NewMeshPart(part.Mesh, part.Material)
 
-	for i := 0; i < len(part.sortingTriangles); i++ {
-		newMP.sortingTriangles = append(newMP.sortingTriangles, sortingTriangle{
-			Triangle: part.sortingTriangles[i].Triangle,
-		})
-	}
-
 	newMP.VertexIndexStart = part.VertexIndexStart
 	newMP.VertexIndexEnd = part.VertexIndexEnd
 	newMP.TriangleStart = part.TriangleStart
 	newMP.TriangleEnd = part.TriangleEnd
 
 	newMP.Material = part.Material
+
+	newMP.renderState.SetToMesh(part.Mesh)
+
 	return newMP
 }
 
@@ -1243,13 +1243,15 @@ func (part *MeshPart) AssignToMesh(mesh *Mesh) {
 		}
 	}
 
-	newSorts := make([]sortingTriangle, 0, len(part.sortingTriangles))
-	for _, tri := range part.sortingTriangles {
-		newSorts = append(newSorts, sortingTriangle{
-			Triangle: part.Mesh.Triangles[tri.Triangle.ID],
-		})
-	}
-	part.sortingTriangles = newSorts
+	part.renderState.SetToMesh(mesh)
+
+	// newSorts := make([]sortingTriangle, 0, len(part.sortingTriangles))
+	// for _, tri := range part.sortingTriangles {
+	// 	newSorts = append(newSorts, sortingTriangle{
+	// 		Triangle: part.Mesh.Triangles[tri.Triangle.ID],
+	// 	})
+	// }
+	// part.sortingTriangles = newSorts
 
 	mesh.MeshParts = append(mesh.MeshParts, part)
 
@@ -1270,14 +1272,6 @@ func (part *MeshPart) ForEachTri(triFunc func(tri *Triangle)) {
 func (part *MeshPart) ForEachVertexIndex(vertFunc func(vertIndex int)) {
 	for i := part.VertexIndexStart; i < part.VertexIndexEnd; i++ {
 		vertFunc(i)
-	}
-}
-
-func (part *MeshPart) forEachVisibleVertexIndex(vertFunc func(vertIndex int)) {
-	for i := part.VertexIndexStart; i < part.VertexIndexEnd; i++ {
-		if part.Mesh.visibleVertices[i] {
-			vertFunc(i)
-		}
 	}
 }
 
@@ -1326,9 +1320,6 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 		newTri := NewTriangle(part, uint16(mesh.triIndex), indices[i]+part.VertexIndexStart, indices[i+1]+part.VertexIndexStart, indices[i+2]+part.VertexIndexStart)
 		newTri.RecalculateCenter()
 		newTri.RecalculateNormal()
-		part.sortingTriangles = append(part.sortingTriangles, sortingTriangle{
-			Triangle: newTri,
-		})
 		mesh.Triangles = append(mesh.Triangles, newTri)
 		mesh.triIndex++
 
@@ -1341,6 +1332,8 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 		}
 		log.Println("warning: mesh [" + part.Mesh.Name + "] has part with material named [" + matName + "], which has " + fmt.Sprintf("%d", part.TriangleCount()) + " triangles. This exceeds the renderable maximum of 21845 triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into multiple models. Otherwise, the game will crash if it renders over the maximum number of triangles.")
 	}
+
+	part.renderState.SetToMesh(mesh)
 
 }
 

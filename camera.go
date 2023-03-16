@@ -499,7 +499,7 @@ func (camera *Camera) SetFar(far float64) {
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
 // does this by taking outVec, a vertex (Vector) that it stores the values in and returns, which avoids reallocation.
-func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width, height float64) Vector {
+func (camera *Camera) clipToScreen(vert Vector, vertID int, vertexClipFunction func(vertexPosition Vector, vertexIndex int) Vector, width, height float64) Vector {
 
 	v3 := vert.W
 
@@ -520,8 +520,8 @@ func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width,
 	vert.Z = vert.Z / v3
 	vert.W = 1
 
-	if model != nil && model.VertexClipFunction != nil {
-		vert = model.VertexClipFunction(vert, vertID)
+	if vertexClipFunction != nil {
+		vert = vertexClipFunction(vert, vertID)
 	}
 
 	return vert
@@ -995,7 +995,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 	}
 
 	// Reusing vectors rather than reallocating for all triangles for all models
-	clipped := Vector{0, 0, 0, 0}
+	// clipped := Vector{0, 0, 0, 0}
 
 	solids := []renderPair{}
 	transparents := []renderPair{}
@@ -1017,7 +1017,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			if !camera.SphereInFrustum(model.BoundingSphere) {
 				continue
 			}
-			model.refreshVertexVisibility()
 
 		}
 
@@ -1103,10 +1102,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	}
 
-	camWidth, camHeight := camera.resultColorTexture.Size()
+	// camWidth, camHeight := camera.resultColorTexture.Size()
 
-	farSq := camera.far * camera.far
-	nearSq := camera.near * camera.near
+	// farSq := camera.far * camera.far
+	// nearSq := camera.near * camera.near
 
 	render := func(rp renderPair) {
 
@@ -1133,23 +1132,23 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		camera.DebugInfo.TotalTris += meshPart.TriangleCount()
 
-		p, s, r := model.Transform().Inverted().Decompose()
+		// p, s, r := model.Transform().Inverted().Decompose()
 
-		invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
+		// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 
 		if model.DynamicBatchOwner != nil {
 			camera.DebugInfo.BatchedParts++
 		}
 
-		sortingTris := model.ProcessVertices(vpMatrix, camera, meshPart, scene)
+		// sortingTris := model.ProcessVertices(vpMatrix, camera, meshPart, scene)
 
-		srcW := 0.0
-		srcH := 0.0
+		// srcW := 0.0
+		// srcH := 0.0
 
-		if mat != nil && mat.Texture != nil {
-			srcW = float64(mat.Texture.Bounds().Dx())
-			srcH = float64(mat.Texture.Bounds().Dy())
-		}
+		// if mat != nil && mat.Texture != nil {
+		// 	srcW = float64(mat.Texture.Bounds().Dx())
+		// 	srcH = float64(mat.Texture.Bounds().Dy())
+		// }
 
 		if lighting {
 
@@ -1170,193 +1169,194 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		}
 
-		mesh := model.Mesh
+		renderState := model.ProcessVertices(vpMatrix, camera, meshPart, scene)
 
-		maxSpan := model.Mesh.Dimensions.MaxSpan()
-		modelPos := model.WorldPosition()
+		renderState.ApplyToVertices(camera, model, lighting)
+
+		// mesh := model.Mesh
+
+		// maxSpan := model.Mesh.Dimensions.MaxSpan()
+		// modelPos := model.WorldPosition()
 
 		// Here we do all vertex transforms first because of data locality (it's faster to access all vertex transformations, then go back and do all UV values, etc)
 
-		mpColor := model.Color.Clone()
+		// if lighting && len(sortingTris.triangles) > 0 {
 
-		if meshPart.Material != nil {
-			mpColor.MultiplyRGBA(meshPart.Material.Color.ToFloat32s())
-		}
+		// 	t := time.Now()
 
-		if lighting && len(sortingTris) > 0 {
+		// 	sortingTris.ForEachIndex(func(vertIndex int) {
+		// 		meshPart.Mesh.vertexLights[vertIndex].Set(0, 0, 0, 1)
+		// 	})
 
-			t := time.Now()
+		// 	for _, light := range sceneLights {
 
-			meshPart.forEachVisibleVertexIndex(func(vertIndex int) {
-				meshPart.Mesh.vertexLights[vertIndex].Set(0, 0, 0, 1)
-			})
+		// 		// Skip calculating lighting for objects that are too far away from light sources.
+		// 		if point, ok := light.(*PointLight); ok && point.Distance > 0 {
+		// 			dist := maxSpan + point.Distance
+		// 			if modelPos.DistanceSquared(point.WorldPosition()) > dist*dist {
+		// 				continue
+		// 			}
+		// 		} else if cube, ok := light.(*CubeLight); ok && cube.Distance > 0 {
+		// 			dist := maxSpan + cube.Distance
+		// 			if modelPos.DistanceSquared(cube.WorldPosition()) > dist*dist {
+		// 				continue
+		// 			}
+		// 		}
 
-			for _, light := range sceneLights {
+		// 		light.Light(sortingTris, model, mesh.vertexLights)
 
-				// Skip calculating lighting for objects that are too far away from light sources.
-				if point, ok := light.(*PointLight); ok && point.Distance > 0 {
-					dist := maxSpan + point.Distance
-					if modelPos.DistanceSquared(point.WorldPosition()) > dist*dist {
-						continue
-					}
-				} else if cube, ok := light.(*CubeLight); ok && cube.Distance > 0 {
-					dist := maxSpan + cube.Distance
-					if modelPos.DistanceSquared(cube.WorldPosition()) > dist*dist {
-						continue
-					}
-				}
+		// 	}
 
-				light.Light(meshPart, model, mesh.vertexLights)
+		// 	camera.DebugInfo.lightTime += time.Since(t)
 
-			}
-
-			camera.DebugInfo.lightTime += time.Since(t)
-
-		}
+		// }
 
 		// TODO: Implement PS1-style automatic tesselation
 
-		meshPart.ForEachVertexIndex(
+		// sortingTris.ForEachIndex(
 
-			func(vertIndex int) {
+		// 	func(vertIndex int) {
 
-				// visible := true
+		// 		// visible := true
 
-				// if !meshPart.sortingTriangles[t].rendered {
-				// 	visible = false
-				// }
+		// 		// if !meshPart.sortingTriangles[t].rendered {
+		// 		// 	visible = false
+		// 		// }
 
-				// triIndex := meshPart.sortingTriangles[t].ID
-				// tri := meshPart.Mesh.Triangles[triIndex]
+		// 		// triIndex := meshPart.sortingTriangles[t].ID
+		// 		// tri := meshPart.Mesh.Triangles[triIndex]
 
-				clipped = camera.clipToScreen(meshPart.Mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight))
+		// 		clipped = camera.clipToScreen(meshPart.Mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight))
 
-				// if visible {
-				// 	renderedAnything = trueForEachVertexIndex
-				// }
+		// 		// if visible {
+		// 		// 	renderedAnything = trueForEachVertexIndex
+		// 		// }
 
-				// meshPart.sortingTriangles[t].rendered = visible
+		// 		// meshPart.sortingTriangles[t].rendered = visible
 
-				colorVertexList[vertexListIndex].DstX = float32(clipped.X)
-				colorVertexList[vertexListIndex].DstY = float32(clipped.Y)
+		// 		colorVertexList[vertexListIndex].DstX = float32(clipped.X)
+		// 		colorVertexList[vertexListIndex].DstY = float32(clipped.Y)
 
-				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
-				uvU := float32(mesh.VertexUVs[vertIndex].X * srcW)
-				// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
-				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
-				uvV := float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
+		// 		// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
+		// 		uvU := float32(mesh.VertexUVs[vertIndex].X * srcW)
+		// 		// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
+		// 		// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
+		// 		uvV := float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
 
-				colorVertexList[vertexListIndex].SrcX = uvU
-				colorVertexList[vertexListIndex].SrcY = uvV
+		// 		colorVertexList[vertexListIndex].SrcX = uvU
+		// 		colorVertexList[vertexListIndex].SrcY = uvV
 
-				depthVertexList[vertexListIndex] = colorVertexList[vertexListIndex]
+		// 		depthVertexList[vertexListIndex] = colorVertexList[vertexListIndex]
 
-				depthVertexList[vertexListIndex].ColorR = 1
-				depthVertexList[vertexListIndex].ColorG = 1
-				depthVertexList[vertexListIndex].ColorB = 1
-				depthVertexList[vertexListIndex].ColorA = 1
+		// 		depthVertexList[vertexListIndex].ColorR = 1
+		// 		depthVertexList[vertexListIndex].ColorG = 1
+		// 		depthVertexList[vertexListIndex].ColorB = 1
+		// 		depthVertexList[vertexListIndex].ColorA = 1
 
-				if camera.RenderNormals {
-					normalVertexList[vertexListIndex] = depthVertexList[vertexListIndex]
-					normalVertexList[vertexListIndex].ColorR = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
-					normalVertexList[vertexListIndex].ColorG = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
-					normalVertexList[vertexListIndex].ColorB = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
-				}
+		// 		if camera.RenderNormals {
+		// 			normalVertexList[vertexListIndex] = depthVertexList[vertexListIndex]
+		// 			normalVertexList[vertexListIndex].ColorR = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
+		// 			normalVertexList[vertexListIndex].ColorG = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
+		// 			normalVertexList[vertexListIndex].ColorB = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
+		// 		}
 
-				// Vertex colors
+		// 		// Vertex colors
 
-				if activeChannel := mesh.VertexActiveColorChannel[vertIndex]; activeChannel >= 0 {
-					colorVertexList[vertexListIndex].ColorR = mesh.VertexColors[vertIndex][activeChannel].R * mpColor.R
-					colorVertexList[vertexListIndex].ColorG = mesh.VertexColors[vertIndex][activeChannel].G * mpColor.G
-					colorVertexList[vertexListIndex].ColorB = mesh.VertexColors[vertIndex][activeChannel].B * mpColor.B
-					colorVertexList[vertexListIndex].ColorA = mesh.VertexColors[vertIndex][activeChannel].A * mpColor.A
-				} else {
-					colorVertexList[vertexListIndex].ColorR = mpColor.R
-					colorVertexList[vertexListIndex].ColorG = mpColor.G
-					colorVertexList[vertexListIndex].ColorB = mpColor.B
-					colorVertexList[vertexListIndex].ColorA = mpColor.A
-				}
+		// 		if activeChannel := mesh.VertexActiveColorChannel[vertIndex]; activeChannel >= 0 {
+		// 			colorVertexList[vertexListIndex].ColorR = mesh.VertexColors[vertIndex][activeChannel].R * mpColor.R
+		// 			colorVertexList[vertexListIndex].ColorG = mesh.VertexColors[vertIndex][activeChannel].G * mpColor.G
+		// 			colorVertexList[vertexListIndex].ColorB = mesh.VertexColors[vertIndex][activeChannel].B * mpColor.B
+		// 			colorVertexList[vertexListIndex].ColorA = mesh.VertexColors[vertIndex][activeChannel].A * mpColor.A
+		// 		} else {
+		// 			colorVertexList[vertexListIndex].ColorR = mpColor.R
+		// 			colorVertexList[vertexListIndex].ColorG = mpColor.G
+		// 			colorVertexList[vertexListIndex].ColorB = mpColor.B
+		// 			colorVertexList[vertexListIndex].ColorA = mpColor.A
+		// 		}
 
-				if lighting {
-					colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights[vertIndex].R
-					colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights[vertIndex].G
-					colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights[vertIndex].B
-				}
+		// 		if lighting {
+		// 			colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights[vertIndex].R
+		// 			colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights[vertIndex].G
+		// 			colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights[vertIndex].B
+		// 		}
 
-				if camera.RenderDepth {
+		// 		if camera.RenderDepth {
 
-					// We used to use the transformed vertex positions, but that made fog shift
-					// aggressively as you turned the camera (as points closer to the corners of
-					// the screen appear to be closer to the camera because of projection); this
-					// fixed version is more stable
-					depth := 0.0
-					if model.skinned {
-						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
-					} else {
-						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
-					}
+		// 			// We used to use the transformed vertex positions, but that made fog shift
+		// 			// aggressively as you turned the camera (as points closer to the corners of
+		// 			// the screen appear to be closer to the camera because of projection); this
+		// 			// fixed version is more stable
+		// 			depth := 0.0
+		// 			if model.skinned {
+		// 				depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+		// 			} else {
+		// 				depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+		// 			}
 
-					if depth < 0 {
-						depth = 0
-					} else if depth > 1 {
-						depth = 1
-					}
+		// 			if depth < 0 {
+		// 				depth = 0
+		// 			} else if depth > 1 {
+		// 				depth = 1
+		// 			}
 
-					depthVertexList[vertexListIndex].ColorR = float32(depth)
-					depthVertexList[vertexListIndex].ColorG = float32(depth)
-					depthVertexList[vertexListIndex].ColorB = float32(depth)
-					depthVertexList[vertexListIndex].ColorA = 1
+		// 			depthVertexList[vertexListIndex].ColorR = float32(depth)
+		// 			depthVertexList[vertexListIndex].ColorG = float32(depth)
+		// 			depthVertexList[vertexListIndex].ColorB = float32(depth)
+		// 			depthVertexList[vertexListIndex].ColorA = 1
 
-				} else if scene.World != nil && scene.World.FogOn {
+		// 		} else if scene.World != nil && scene.World.FogOn {
 
-					depth := 0.0
-					if model.skinned {
-						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
-					} else {
-						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
-					}
+		// 			depth := 0.0
+		// 			if model.skinned {
+		// 				depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+		// 			} else {
+		// 				depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+		// 			}
 
-					if depth < 0 {
-						depth = 0
-					} else if depth > 1 {
-						depth = 1
-					}
+		// 			if depth < 0 {
+		// 				depth = 0
+		// 			} else if depth > 1 {
+		// 				depth = 1
+		// 			}
 
-					// depth = 1 - depth
+		// 			// depth = 1 - depth
 
-					depth = float64(scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - float32(depth)))
+		// 			depth = float64(scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - float32(depth)))
 
-					if scene.World.FogMode == FogAdd {
-						colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * float32(depth)
-						colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * float32(depth)
-						colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * float32(depth)
-					} else if scene.World.FogMode == FogSub {
-						colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * float32(depth)
-						colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * float32(depth)
-						colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * float32(depth)
-					}
+		// 			if scene.World.FogMode == FogAdd {
+		// 				colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * float32(depth)
+		// 				colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * float32(depth)
+		// 				colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * float32(depth)
+		// 			} else if scene.World.FogMode == FogSub {
+		// 				colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * float32(depth)
+		// 				colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * float32(depth)
+		// 				colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * float32(depth)
+		// 			}
 
-				}
+		// 		}
 
-				vertexListIndex++
+		// 		vertexListIndex++
 
-			},
-		)
+		// 	},
+		// )
 
-		if vertexListIndex == 0 {
-			return
-		}
+		// if vertexListIndex == 0 {
+		// 	return
+		// }
 
-		for _, sortingTri := range sortingTris {
+		// sortingTris.ForEachTriangle(func(triIndex int) {
+		// 	indexList[indexListIndex] = uint16(triIndex - meshPart.VertexIndexStart + indexListStart)
+		// 	indexListIndex++
+		// })
 
-			for _, index := range sortingTri.Triangle.VertexIndices {
-				indexList[indexListIndex] = uint16(index - sortingTri.Triangle.MeshPart.VertexIndexStart + indexListStart)
-				indexListIndex++
-			}
+		// for _, sortingTri := range sortingTris {
 
-		}
+		// 	for _, index := range sortingTri.Triangle.VertexIndices {
+		// 		indexList[indexListIndex] = uint16(index - sortingTri.Triangle.MeshPart.VertexIndexStart + indexListStart)
+		// 		indexListIndex++
+		// 	}
 
-		indexListStart = vertexListIndex
+		// }
 
 		// for i := 0; i < vertexListIndex; i++ {
 		// 	indexList[i] = uint16(i)
@@ -1428,6 +1428,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					Images: [4]*ebiten.Image{camera.resultDepthTexture},
 				}
 
+				fmt.Println("vertices:", vertexListIndex, depthVertexList[:vertexListIndex])
+				fmt.Println("indices:", indexListIndex, indexList[:indexListIndex])
 				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:indexListIndex], camera.depthShader, shaderOpt)
 			}
 
@@ -1505,7 +1507,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		vertexListIndex = 0
 		indexListIndex = 0
-		indexListStart = 0
 
 	}
 
@@ -1825,7 +1826,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
 
-				for triIndex, sortingTri := range meshPart.sortingTriangles {
+				for triIndex, sortingTri := range meshPart.renderState.sortingTriangles {
 
 					screenPos := camera.WorldToScreen(model.Transform().MultVec(sortingTri.Triangle.Center))
 

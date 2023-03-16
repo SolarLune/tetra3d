@@ -16,7 +16,6 @@ var depthVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesCount)
 var indexList = make([]uint16, ebiten.MaxIndicesCount)
 var vertexListIndex = 0
 var indexListIndex = 0
-var indexListStart = 0
 
 const MaxTriangleCount = 21845
 

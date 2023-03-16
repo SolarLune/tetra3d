@@ -10,7 +10,7 @@ type ILight interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model)
 
-	Light(meshPart *MeshPart, model *Model, targetColors []*Color) // Light lights the triangles
+	Light(sortingTriangles *renderState, model *Model, targetColors []*Color) // Light lights the triangles
 	// Light(triangles []sortingTriangle, model *Model, targetColors []*Color) // Light lights the triangles
 	IsOn() bool    // isOn is simply used tfo tell if a "generic" Light is on or not.
 	SetOn(on bool) // SetOn sets whether the light is on or not
@@ -61,8 +61,8 @@ func (amb *AmbientLight) beginRender() {
 func (amb *AmbientLight) beginModel(model *Model) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
-	meshPart.forEachVisibleVertexIndex(func(vertIndex int) {
+func (amb *AmbientLight) Light(sortingTriangles *renderState, model *Model, targetColors []*Color) {
+	sortingTriangles.ForEachIndex(func(vertIndex int) {
 		targetColors[vertIndex].AddRGBA(amb.result[0], amb.result[1], amb.result[2], 0)
 	})
 }
@@ -174,13 +174,13 @@ func (point *PointLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
+func (point *PointLight) Light(sortingTriangles *renderState, model *Model, targetColors []*Color) {
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-	meshPart.forEachVisibleVertexIndex(func(index int) {
+	sortingTriangles.ForEachIndex(func(index int) {
 
 		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
@@ -348,9 +348,9 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
+func (sun *DirectionalLight) Light(sortingTriangles *renderState, model *Model, targetColors []*Color) {
 
-	meshPart.forEachVisibleVertexIndex(func(index int) {
+	sortingTriangles.ForEachIndex(func(index int) {
 
 		var normal Vector
 		if model.skinned {
@@ -570,9 +570,9 @@ func (cube *CubeLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
+func (cube *CubeLight) Light(sortingTriangles *renderState, model *Model, targetColors []*Color) {
 
-	meshPart.forEachVisibleVertexIndex(func(index int) {
+	sortingTriangles.ForEachIndex(func(index int) {
 
 		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
