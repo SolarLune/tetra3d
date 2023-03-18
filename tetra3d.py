@@ -55,6 +55,12 @@ worldFogCompositeModes = [
     ("TRANSPARENT", "Transparent", "Transparent fog - this fog mode fades the object out over distance, such that at maximum distance / fog range, the object is wholly transparent.", 0, 4),
 ]
 
+worldFogCurveTypes = [
+    ("LINEAR", "Smooth", "Smooth fog (Ease: Linear); this goes from 0% in the near range to 100% in the far range evenly", "LINCURVE", 0),
+    ("OUTCIRC", "Dense", "Dense fog (Ease: Out Circ); fog will increase aggressively in the near range, ramping up to 100% at the far range", "SPHERECURVE", 1),
+    ("INCIRC", "Light", "Light fog (Ease: In Circ); fog will increase aggressively towards the far range, ramping up to 100% at the far range", "SHARPCURVE", 2),
+]
+
 gamePropTypes = [
     ("bool", "Bool", "Boolean data type", 0, 0),
     ("int", "Int", "Int data type", 0, 1),
@@ -245,6 +251,26 @@ class OBJECT_OT_tetra3dCopyProps(bpy.types.Operator):
             o.t3dGameProperties__.clear()
             for prop in selected.t3dGameProperties__:
                 newProp = o.t3dGameProperties__.add()
+                copyProp(prop, newProp)
+
+        return {'FINISHED'}
+
+class MATERIAL_OT_tetra3dMaterialCopyProps(bpy.types.Operator):
+    bl_idname = "material.tetra3dcopyprops"
+    bl_label = "Overwrite Game Property on All Materials"
+    bl_description= "Overwrites game properties from the currently selected material to all other materials on this object"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+
+        selected = context.object
+
+        for slot in selected.material_slots:
+            if slot.material == None or slot.material == selected.active_material:
+                continue
+            slot.material.t3dGameProperties__.clear()
+            for prop in selected.active_material.t3dGameProperties__:
+                newProp = slot.material.t3dGameProperties__.add()
                 copyProp(prop, newProp)
 
         return {'FINISHED'}
@@ -609,6 +635,8 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
             add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
             add.mode = "material"
 
+            row.operator("material.tetra3dcopyprops", icon="COPYDOWN")
+            
             for index, prop in enumerate(context.object.active_material.t3dGameProperties__):
                 box = self.layout.box()
                 row = box.row()
@@ -653,6 +681,8 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
         row.prop(context.world, "t3dFogMode__")
 
         if context.world.t3dFogMode__ != "OFF":
+
+            box.prop(context.world, "t3dFogCurve__")
 
             if context.world.t3dFogMode__ != "TRANSPARENT":
                 box.prop(context.world, "t3dFogColor__")
@@ -786,6 +816,8 @@ def export():
             worldData["fog mode"] = world.t3dFogMode__
         if "t3dFogDithered__" in world:
             worldData["dithered transparency"] = world.t3dFogDithered__
+        if "t3dFogCurve__" in world:
+            worldData["fog curve"] = world.t3dFogCurve__
         if "t3dFogColor__" in world:
             worldData["fog color"] = world.t3dFogColor__
         if "t3dFogRangeStart__" in world:
@@ -799,6 +831,8 @@ def export():
 
     currentFrame = {}
 
+    autoSubdivides = {}
+
     for scene in bpy.data.scenes:
 
         currentFrame[scene] = scene.frame_current
@@ -807,8 +841,6 @@ def export():
 
             if scene.world:
                 scene["t3dCurrentWorld__"] = scene.world.name
-            
-            autoSubdivides = []
 
             for layer in scene.view_layers:
                 for obj in layer.objects:
@@ -817,17 +849,19 @@ def export():
 
                     if obj.type == "MESH":
 
-                        # BUG: This causes a problem when subdividing; this is only really a problem if automatic tesselation when rendering in Tetra3D isn't on, though
+                        # BUG: This causes a problem when subdividing; this is only really a problem if automatic tesselation when rendering in Tetra3D isn't implemented, though
 
                         if obj.t3dAutoSubdivide__:
 
-                            origMesh = obj.data.copy()
-                            obj["t3dOriginalMesh"] = origMesh
+                            obj["t3dOriginalMesh"] = obj.data.name
 
-                            autoSubdivides.append({
-                                "mesh": obj.data,
-                                "size": obj.t3dAutoSubdivideSize__,
-                            })
+                            if not obj.data.name in autoSubdivides:
+
+                                autoSubdivides[obj.data.name] = {
+                                    "edit": obj.data,
+                                    "original": obj.data.copy(),
+                                    "size": obj.t3dAutoSubdivideSize__,
+                                }   
                         
                         if len(obj.data.color_attributes) > 0:
                             vertexColors = [layer.name for layer in obj.data.color_attributes]
@@ -878,11 +912,13 @@ def export():
                         # 2) will apply the collection's offset to the object's position for some reason (which is annoying because we use OpenGL's axes for positioning compared to Blender)
                         obj.instance_collection = None
 
-            for mesh in autoSubdivides:
+            for meshName in autoSubdivides:
+        
+                mesh = autoSubdivides[meshName]
 
                 bm = bmesh.new()
 
-                bm.from_mesh(mesh["mesh"])
+                bm.from_mesh(mesh["edit"])
                 bm.select_mode = {"EDGE", "VERT", "FACE"}
 
                 # The below works, but the triangulation is super wonky and over-heavy
@@ -1023,7 +1059,7 @@ def export():
 
                 #     bmesh.ops.subdivide_edgering(bm, edges=list(edges), cuts=1, profile_shape="LINEAR", smooth=0)
 
-                bm.to_mesh(mesh["mesh"])
+                bm.to_mesh(mesh["edit"])
 
                 bm.free()
 
@@ -1063,6 +1099,29 @@ def export():
     
     # Undo changes that we've made after export
 
+    for meshName in autoSubdivides:
+
+        mesh = autoSubdivides[meshName]
+
+        bm = bmesh.new()
+        bm.from_mesh(mesh["original"])
+        bm.to_mesh(mesh["edit"])
+        bm.free()
+
+        removed = False
+
+        try:
+            mesh["original"].user_clear()
+            removed = True
+        except:
+            pass
+
+        if removed:
+            try:
+                bpy.data.meshes.remove(mesh["original"])
+            except:
+                pass
+
     for scene in bpy.data.scenes:
 
         # Exporting animations sets the frame "late"; we restore the current frame to avoid this
@@ -1071,17 +1130,16 @@ def export():
         if scene.world and "t3dCurrentWorld__" in scene:
             del(scene["t3dCurrentWorld__"])
 
-        meshesToRemove = []
-
         if scene.users > 0:
 
             for layer in scene.view_layers:
 
                 for obj in layer.objects:
 
+                    if obj is None:
+                        continue
+
                     if "t3dOriginalMesh" in obj:
-                        meshesToRemove.append(obj.data)
-                        obj.data = obj["t3dOriginalMesh"]
                         del(obj["t3dOriginalMesh"])
 
                     if "t3dOriginalLocalPosition__" in obj:
@@ -1106,8 +1164,6 @@ def export():
                             del(obj["t3dGridEntries__"])
                             obj.data = ogGrids[obj] # Restore the mesh reference afterward
 
-        for m in meshesToRemove:
-            bpy.data.meshes.remove(m)
 
     for action in bpy.data.actions:
         if "t3dMarkers__" in action:
@@ -1158,14 +1214,14 @@ objectProps = {
     "t3dTrianglesCustomBroadphaseEnabled__" : bpy.props.BoolProperty(name="Custom Broadphase Size", description="If enabled, you can manually set the BoundingTriangle's broadphase settings. If disabled, the BoundingTriangle's broadphase settings will be automatically determined by this object's size", default=False),
     "t3dTrianglesCustomBroadphaseGridSize__" : bpy.props.IntProperty(name="Broadphase Cell Size", description="How large the cells are in the broadphase collision grid (a cell size of 0 disables broadphase collision)", min=0, default=20),
     "t3dCapsuleCustomEnabled__" : bpy.props.BoolProperty(name="Custom Capsule Size", description="If enabled, you can manually set the BoundingCapsule node's size properties. If disabled, the Capsule's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingCapsule node will be generated)", default=False),
-    "t3dCapsuleCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="The radius of the BoundingCapsule node.", min=0.0, default=0.5),
-    "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Height", description="The height of the BoundingCapsule node.", min=0.0, default=2),
+    "t3dCapsuleCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="The radius of the BoundingCapsule node", min=0.0, default=0.5),
+    "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Height", description="The height of the BoundingCapsule node", min=0.0, default=2),
     "t3dSphereCustomEnabled__" : bpy.props.BoolProperty(name="Custom Sphere Size", description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)", default=False),
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
     "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
     "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
     "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),
-    "t3dAutoSubdivide__" : bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, Tetra3D will do its best to loop cut edges that are too large before export."),
+    "t3dAutoSubdivide__" : bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, Tetra3D will do its best to loop cut edges that are too large before export"),
     "t3dAutoSubdivideSize__" : bpy.props.FloatProperty(name="Max Edge Length", description="The maximum length an edge is allowed to be before automatically cutting prior to export", min=0.0, default=1.0),
     "t3dSector__" : bpy.props.BoolProperty(name="Is a Sector", description="If enabled, this identifies a mesh as being a Sector. When this is the case and sector-based rendering has been enabled on a Camera, this allows you to granularly restrict how far the camera renders, not based off of near/far plane only, but also based off of which sector you're in and how many sectors in you can look")
 }
@@ -1368,6 +1424,8 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
     bpy.utils.register_class(OBJECT_OT_tetra3dOverrideProp)
 
+    bpy.utils.register_class(MATERIAL_OT_tetra3dMaterialCopyProps)
+
     bpy.utils.register_class(OBJECT_OT_tetra3dSetVector)
     
     bpy.utils.register_class(EXPORT_OT_tetra3d)
@@ -1432,6 +1490,7 @@ def register():
     bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")
     bpy.types.World.t3dFogDithered__ = bpy.props.FloatProperty(name="Fog Dither Size", description="How large bayer matrix dithering is when using fog. If set to 0, dithering is disabled", default=0, min=0, step=1)
 
+    bpy.types.World.t3dFogCurve__ = bpy.props.EnumProperty(items=worldFogCurveTypes, name="Fog Curve", description="What curve to use for the fog's gradience", default="LINEAR")
     bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
     bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
 
@@ -1456,6 +1515,8 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_tetra3dOverrideProp)
 
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetVector)
+
+    bpy.utils.unregister_class(MATERIAL_OT_tetra3dMaterialCopyProps)
 
     bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
@@ -1495,6 +1556,7 @@ def unregister():
     del bpy.types.World.t3dFogRangeStart__
     del bpy.types.World.t3dFogRangeEnd__
     del bpy.types.World.t3dFogDithered__
+    del bpy.types.World.t3dFogCurve__
 
     del bpy.types.Camera.t3dFOV__
 

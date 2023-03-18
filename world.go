@@ -7,6 +7,14 @@ const (
 	FogTransparent        // Fog influences transparency of the render
 )
 
+const (
+	FogCurveLinear = iota
+	FogCurveOutCirc
+	FogCurveInCirc
+	// FogCurveInOutCirc   //easeInOutCirc
+	// FogCurveInOutBounce //easeInOutBounce
+)
+
 type FogMode int
 
 // World represents a collection of settings that one uses to control lighting and ambience. This includes the screen clear color, fog color,
@@ -22,8 +30,9 @@ type World struct {
 	// ranging from 0 to 1. The first indicates the start of the fog, and the second the end, in
 	// terms of total depth of the near / far clipping plane. The default is [0, 1].
 	FogOn           bool
-	DitheredFogSize float32 // If greater than zero, how large the dithering effect is for transparent fog. If <= 0, dithering is disabled.
-	FogRange        []float32
+	DitheredFogSize float32   // If greater than zero, how large the dithering effect is for transparent fog. If <= 0, dithering is disabled.
+	FogRange        []float32 // The distances at which the fog is at 0% and 100%, respectively.
+	FogCurve        int
 	LightingOn      bool          // If lighting is enabled when rendering the scene.
 	AmbientLight    *AmbientLight // Ambient lighting for this world
 }
@@ -55,6 +64,7 @@ func (world *World) Clone() *World {
 	newWorld.FogRange[0] = world.FogRange[0]
 	newWorld.FogRange[1] = world.FogRange[1]
 	newWorld.LightingOn = world.LightingOn
+	newWorld.FogCurve = world.FogCurve
 	newWorld.AmbientLight = world.AmbientLight.Clone().(*AmbientLight)
 	newWorld.DitheredFogSize = world.DitheredFogSize
 

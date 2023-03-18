@@ -205,12 +205,21 @@ func NewCamera(w, h int) *Camera {
 		var Fog vec4
 		var FogRange [2]float
 		var DitherSize float
+		var FogCurve float
 		var Fogless float
 
 		var BayerMatrix [16]float
 
 		func decodeDepth(rgba vec4) float {
 			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+		}
+
+		func OutCirc(v float) float {
+			return sqrt(1 - pow(v - 1, 2))
+		}
+
+		func InCirc(v float) float {
+			return 1 - sqrt(1 - pow(v, 2))
 		}
 		
 		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
@@ -219,8 +228,16 @@ func NewCamera(w, h int) *Camera {
 			
 			if depth.a > 0 {
 				colorTex := imageSrc0UnsafeAt(texCoord)
+
+				var d float
 				
-				d := smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
+				if FogCurve == 0 {
+					d = smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
+				} else if FogCurve == 1 {
+					d = smoothstep(FogRange[0], FogRange[1], OutCirc(decodeDepth(depth)))
+				} else if FogCurve == 2 {
+					d = smoothstep(FogRange[0], FogRange[1], InCirc(decodeDepth(depth)))
+				}
 
 				if Fogless == 0 {
 
@@ -982,6 +999,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			"Fog":         scene.World.fogAsFloatSlice(),
 			"FogRange":    scene.World.FogRange,
 			"DitherSize":  scene.World.DitheredFogSize,
+			"FogCurve":    float32(scene.World.FogCurve),
 			"BayerMatrix": bayerMatrix,
 		}
 

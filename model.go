@@ -513,7 +513,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		meshPart.sortingTriangles[sortingTriIndex].Triangle = mesh.Triangles[ti]
 
-		// if invertedCamPos.DistanceSquared(tri.Center) > pow(camera.Far+tri.MaxSpan, 2) {
+		// if invertedCamPos.DistanceSquared(tri.Center) > pow(camera.far+tri.MaxSpan, 2) {
 		// 	continue
 		// }
 

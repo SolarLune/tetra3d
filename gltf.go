@@ -1250,6 +1250,19 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						world.FogMode = FogTransparent
 					}
 				}
+
+				if v, exists := props["fog curve"]; exists {
+					fc := v.(string)
+					switch fc {
+					case "LINEAR":
+						world.FogCurve = FogCurveLinear
+					case "OUTCIRC":
+						world.FogCurve = FogCurveOutCirc
+					case "INCIRC":
+						world.FogCurve = FogCurveInCirc
+					}
+				}
+
 				if v, exists := props["dithered transparency"]; exists {
 					world.DitheredFogSize = float32(v.(float64))
 				}
