@@ -167,14 +167,17 @@ func (box *BoundingAABB) normalFromContactPoint(contactPoint Vector) Vector {
 		box.Dimensions.Depth() / 2,
 		0,
 	}
-	normal := Vector{
-		float64(math.Round(p.X / d.X)),
-		float64(math.Round(p.Y / d.Y)),
-		float64(math.Round(p.Z / d.Z)),
-		0,
-	}.Unit()
 
-	return normal
+	nx := p.X / d.X
+	ny := p.Y / d.Y
+	nz := p.Z / d.Z
+
+	if math.Abs(nx) > math.Abs(ny) && math.Abs(nx) > math.Abs(nz) {
+		return Vector{nx, 0, 0, 0}.Unit()
+	} else if math.Abs(ny) > math.Abs(nx) && math.Abs(ny) > math.Abs(nz) {
+		return Vector{0, ny, 0, 0}.Unit()
+	}
+	return Vector{0, 0, nz, 0}.Unit()
 
 }
 

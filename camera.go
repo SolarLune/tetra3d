@@ -1013,8 +1013,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 	}
 
 	// Reusing vectors rather than reallocating for all triangles for all models
-	clipped := Vector{0, 0, 0, 0}
-
 	solids := []renderPair{}
 	transparents := []renderPair{}
 
@@ -1125,6 +1123,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	farSq := camera.far * camera.far
 	nearSq := camera.near * camera.near
+	camSpread := farSq - nearSq
+
+	colorVertex := ebiten.Vertex{}
+	depthVertex := colorVertex
+	normalVertex := colorVertex
 
 	render := func(rp renderPair) {
 
@@ -1206,7 +1209,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			t := time.Now()
 
 			meshPart.forEachVisibleVertexIndex(func(vertIndex int) {
-				meshPart.Mesh.vertexLights[vertIndex].Set(0, 0, 0, 1)
+				mesh.vertexLights[vertIndex].Set(0, 0, 0, 1)
 			})
 
 			for _, light := range sceneLights {
@@ -1247,7 +1250,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				// triIndex := meshPart.sortingTriangles[t].ID
 				// tri := meshPart.Mesh.Triangles[triIndex]
 
-				clipped = camera.clipToScreen(meshPart.Mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight))
+				clipped := camera.clipToScreen(mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight))
 
 				// if visible {
 				// 	renderedAnything = trueForEachVertexIndex
@@ -1255,8 +1258,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				// meshPart.sortingTriangles[t].rendered = visible
 
-				colorVertexList[vertexListIndex].DstX = float32(clipped.X)
-				colorVertexList[vertexListIndex].DstY = float32(clipped.Y)
+				colorVertex.DstX = float32(clipped.X)
+				colorVertex.DstY = float32(clipped.Y)
 
 				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
 				uvU := float32(mesh.VertexUVs[vertIndex].X * srcW)
@@ -1264,41 +1267,42 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
 				uvV := float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
 
-				colorVertexList[vertexListIndex].SrcX = uvU
-				colorVertexList[vertexListIndex].SrcY = uvV
+				colorVertex.SrcX = uvU
+				colorVertex.SrcY = uvV
 
-				depthVertexList[vertexListIndex] = colorVertexList[vertexListIndex]
+				depthVertex = colorVertex
 
-				depthVertexList[vertexListIndex].ColorR = 1
-				depthVertexList[vertexListIndex].ColorG = 1
-				depthVertexList[vertexListIndex].ColorB = 1
-				depthVertexList[vertexListIndex].ColorA = 1
+				depthVertex.ColorR = 1
+				depthVertex.ColorG = 1
+				depthVertex.ColorB = 1
+				depthVertex.ColorA = 1
 
 				if camera.RenderNormals {
-					normalVertexList[vertexListIndex] = depthVertexList[vertexListIndex]
-					normalVertexList[vertexListIndex].ColorR = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
-					normalVertexList[vertexListIndex].ColorG = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
-					normalVertexList[vertexListIndex].ColorB = float32(meshPart.Mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
+					normalVertex = depthVertex
+					normalVertex.ColorR = float32(mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
+					normalVertex.ColorG = float32(mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
+					normalVertex.ColorB = float32(mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
+					normalVertexList[vertexListIndex] = normalVertex
 				}
 
 				// Vertex colors
 
 				if activeChannel := mesh.VertexActiveColorChannel[vertIndex]; activeChannel >= 0 {
-					colorVertexList[vertexListIndex].ColorR = mesh.VertexColors[vertIndex][activeChannel].R * mpColor.R
-					colorVertexList[vertexListIndex].ColorG = mesh.VertexColors[vertIndex][activeChannel].G * mpColor.G
-					colorVertexList[vertexListIndex].ColorB = mesh.VertexColors[vertIndex][activeChannel].B * mpColor.B
-					colorVertexList[vertexListIndex].ColorA = mesh.VertexColors[vertIndex][activeChannel].A * mpColor.A
+					colorVertex.ColorR = mesh.VertexColors[vertIndex][activeChannel].R * mpColor.R
+					colorVertex.ColorG = mesh.VertexColors[vertIndex][activeChannel].G * mpColor.G
+					colorVertex.ColorB = mesh.VertexColors[vertIndex][activeChannel].B * mpColor.B
+					colorVertex.ColorA = mesh.VertexColors[vertIndex][activeChannel].A * mpColor.A
 				} else {
-					colorVertexList[vertexListIndex].ColorR = mpColor.R
-					colorVertexList[vertexListIndex].ColorG = mpColor.G
-					colorVertexList[vertexListIndex].ColorB = mpColor.B
-					colorVertexList[vertexListIndex].ColorA = mpColor.A
+					colorVertex.ColorR = mpColor.R
+					colorVertex.ColorG = mpColor.G
+					colorVertex.ColorB = mpColor.B
+					colorVertex.ColorA = mpColor.A
 				}
 
 				if lighting {
-					colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights[vertIndex].R
-					colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights[vertIndex].G
-					colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights[vertIndex].B
+					colorVertex.ColorR *= mesh.vertexLights[vertIndex].R
+					colorVertex.ColorG *= mesh.vertexLights[vertIndex].G
+					colorVertex.ColorB *= mesh.vertexLights[vertIndex].B
 				}
 
 				if camera.RenderDepth {
@@ -1309,9 +1313,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					// fixed version is more stable
 					depth := 0.0
 					if model.skinned {
-						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / camSpread
 					} else {
-						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / camSpread
 					}
 
 					if depth < 0 {
@@ -1320,18 +1324,18 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 						depth = 1
 					}
 
-					depthVertexList[vertexListIndex].ColorR = float32(depth)
-					depthVertexList[vertexListIndex].ColorG = float32(depth)
-					depthVertexList[vertexListIndex].ColorB = float32(depth)
-					depthVertexList[vertexListIndex].ColorA = 1
+					depthVertex.ColorR = float32(depth)
+					depthVertex.ColorG = float32(depth)
+					depthVertex.ColorB = float32(depth)
+					depthVertex.ColorA = 1
 
 				} else if scene.World != nil && scene.World.FogOn {
 
 					depth := 0.0
 					if model.skinned {
-						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / camSpread
 					} else {
-						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / (farSq - nearSq)
+						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / camSpread
 					}
 
 					if depth < 0 {
@@ -1345,16 +1349,19 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					depth = float64(scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - float32(depth)))
 
 					if scene.World.FogMode == FogAdd {
-						colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * float32(depth)
-						colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * float32(depth)
-						colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * float32(depth)
+						colorVertex.ColorR += scene.World.FogColor.R * float32(depth)
+						colorVertex.ColorG += scene.World.FogColor.G * float32(depth)
+						colorVertex.ColorB += scene.World.FogColor.B * float32(depth)
 					} else if scene.World.FogMode == FogSub {
-						colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * float32(depth)
-						colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * float32(depth)
-						colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * float32(depth)
+						colorVertex.ColorR *= scene.World.FogColor.R * float32(depth)
+						colorVertex.ColorG *= scene.World.FogColor.G * float32(depth)
+						colorVertex.ColorB *= scene.World.FogColor.B * float32(depth)
 					}
 
 				}
+
+				colorVertexList[vertexListIndex] = colorVertex
+				depthVertexList[vertexListIndex] = depthVertex
 
 				vertexListIndex++
 
