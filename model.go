@@ -528,6 +528,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				t := time.Now()
 
 				vertPos, vertNormal := model.skinVertex(tri.VertexIndices[i])
+
 				if transformFunc != nil {
 					vertPos = transformFunc(vertPos, tri.VertexIndices[i])
 				}
@@ -548,6 +549,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 				mesh.vertexTransforms[tri.VertexIndices[i]] = mvp.MultVecW(v0)
 
+			}
+
+			if camera.VertexSnapping > 0 {
+				mesh.vertexTransforms[tri.VertexIndices[i]] = mesh.vertexTransforms[tri.VertexIndices[i]].Snap(camera.VertexSnapping)
 			}
 
 			if camera.RenderNormals {

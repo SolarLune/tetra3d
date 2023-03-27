@@ -348,6 +348,14 @@ func (vec Vector) Dot(other Vector) float64 {
 	return vec.X*other.X + vec.Y*other.Y + vec.Z*other.Z
 }
 
+// Snap snaps the Vector's components to the given space in world units, returning a clone (e.g. Vector{0.1, 1.27, 3.33}.Snap(0.25) will return Vector{0, 1.25, 3.25}).
+func (vec Vector) Snap(snapToUnits float64) Vector {
+	vec.X = round(vec.X/snapToUnits) * snapToUnits
+	vec.Y = round(vec.Y/snapToUnits) * snapToUnits
+	vec.Z = round(vec.Z/snapToUnits) * snapToUnits
+	return vec
+}
+
 // ModVector represents a reference to a Vector, made to facilitate easy method-chaining and modifications on that Vector (as you
 // don't need to re-assign the results of a chain of operations to the original variable to "save" the results).
 // Note that a ModVector is not meant to be used to chain methods on a vector to pass directly into a function; you can just
@@ -477,11 +485,22 @@ func (ip ModVector) Rotate(x, y, z, angle float64) ModVector {
 	return ip
 }
 
-// Invert returns a copy of the Vector with all components inverted (ignoring the Vector's W component).
+// Invert inverts all components of the calling Vector.
+// This function returns the calling ModVector for method chaining.
 func (ip ModVector) Invert() ModVector {
 	ip.X = -ip.X
 	ip.Y = -ip.Y
 	ip.Z = -ip.Z
+	return ip
+}
+
+// Snap snaps the Vector's components to the given space in world units, returning a clone (e.g. Vector{0.1, 1.27, 3.33}.Snap(0.25) will return Vector{0, 1.25, 3.25}).
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Snap(snapToUnits float64) ModVector {
+	snapped := (*ip.Vector).Snap(snapToUnits)
+	ip.X = snapped.X
+	ip.Y = snapped.Y
+	ip.Z = snapped.Z
 	return ip
 }
 

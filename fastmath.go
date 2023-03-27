@@ -236,3 +236,17 @@ func pow(value float64, power int) float64 {
 	}
 	return x
 }
+
+func round(value float64) float64 {
+
+	iv := float64(int(value))
+
+	if value > iv+0.5 {
+		return iv + 1
+	} else if value < iv-0.5 {
+		return iv - 1
+	}
+
+	return iv
+
+}
