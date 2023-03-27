@@ -65,7 +65,7 @@ type Camera struct {
 	fieldOfView float64 // Vertical field of view in degrees for a perspective projection camera
 	orthoScale  float64 // Scale of the view for an orthographic projection camera in units horizontally
 
-	VertexSnapping float64 // When set to a value > 0, it will snap all rendered models' vertices to a grid of the provided size (so VertexSnapping of 0.1 will snap all rendered positions to 0.1 intervals). Defaults to 0.002.
+	VertexSnapping float64 // When set to a value > 0, it will snap all rendered models' vertices to a grid of the provided size (so VertexSnapping of 0.1 will snap all rendered positions to 0.1 intervals). Defaults to 0 (off).
 
 	DebugInfo DebugInfo
 
@@ -104,8 +104,6 @@ func NewCamera(w, h int) *Camera {
 
 		SectorRendering:   false,
 		SectorRenderDepth: 1,
-
-		VertexSnapping: 0.002,
 	}
 
 	depthShaderText := []byte(
