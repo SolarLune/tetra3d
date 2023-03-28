@@ -338,7 +338,7 @@ func (model *Model) StaticMerge(models ...*Model) {
 
 				verts = append(verts, vertInfo)
 
-			})
+			}, false)
 
 			model.Mesh.AddVertices(verts...)
 
@@ -897,7 +897,7 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 
 		if light.IsOn() {
 			for _, mp := range model.Mesh.MeshParts {
-				light.Light(mp, model, targetColors)
+				light.Light(mp, model, targetColors, false)
 			}
 		}
 

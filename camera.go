@@ -1022,6 +1022,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	cameraPos := camera.WorldPosition()
 
+	camSpread := camera.far - camera.near
+
 	for _, model := range models {
 
 		if !model.visible {
@@ -1123,10 +1125,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	camWidth, camHeight := camera.resultColorTexture.Size()
 
-	farSq := camera.far * camera.far
-	nearSq := camera.near * camera.near
-	camSpread := farSq - nearSq
-
 	colorVertex := ebiten.Vertex{}
 	depthVertex := colorVertex
 	normalVertex := colorVertex
@@ -1155,10 +1153,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		}
 
 		camera.DebugInfo.TotalTris += meshPart.TriangleCount()
-
-		p, s, r := model.Transform().Inverted().Decompose()
-
-		invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 
 		if model.DynamicBatchOwner != nil {
 			camera.DebugInfo.BatchedParts++
@@ -1210,9 +1204,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			t := time.Now()
 
-			meshPart.forEachVisibleVertexIndex(func(vertIndex int) {
+			meshPart.ForEachVertexIndex(func(vertIndex int) {
 				mesh.vertexLights[vertIndex].Set(0, 0, 0, 1)
-			})
+			}, true)
 
 			for _, light := range sceneLights {
 
@@ -1229,7 +1223,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					}
 				}
 
-				light.Light(meshPart, model, mesh.vertexLights)
+				light.Light(meshPart, model, mesh.vertexLights, true)
 
 			}
 
@@ -1309,16 +1303,18 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				if camera.RenderDepth {
 
-					// We used to use the transformed vertex positions, but that made fog shift
-					// aggressively as you turned the camera (as points closer to the corners of
-					// the screen appear to be closer to the camera because of projection); this
-					// fixed version is more stable
-					depth := 0.0
-					if model.skinned {
-						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / camSpread
-					} else {
-						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / camSpread
-					}
+					// 3/28/23, TODO: We currently use the transformed vertex positions for rendering the depth texture. Note
+					// that this makes fog shift aggressively as you turn the camera, more noticeably in first-person games
+					// (as points closer to the corners of the screen are mathematically closer to the camera because of projection).
+					// In an attempt to fix this, I used the below, now commented-out depth function. This attempt did fix the fog,
+					// but it also made depth sorting buggier, which is unacceptable. For now, I've reverted this change to have
+					// better depth sorting. This is currently fine, though the fog issue should be resolved at some point in the future.
+
+					// See this Discord conversation for the visualization of the issue:
+					// https://discord.com/channels/842049801528016967/844522898126536725/1090223569247674488
+
+					// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
+					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
 
 					if depth < 0 {
 						depth = 0
@@ -1333,12 +1329,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				} else if scene.World != nil && scene.World.FogOn {
 
-					depth := 0.0
-					if model.skinned {
-						depth = (cameraPos.DistanceSquared(mesh.vertexSkinnedPositions[vertIndex]) - nearSq) / camSpread
-					} else {
-						depth = (invertedCameraPos.DistanceSquared(mesh.VertexPositions[vertIndex]) - nearSq) / camSpread
-					}
+					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
 
 					if depth < 0 {
 						depth = 0
@@ -1368,6 +1359,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				vertexListIndex++
 
 			},
+			false,
 		)
 
 		if vertexListIndex == 0 {

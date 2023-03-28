@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"fmt"
 	"image/color"
 	"math"
 	"math/rand"
@@ -158,6 +159,13 @@ func (color *Color) ConvertTosRGB() {
 		color.B = float32(1.055*math.Pow(float64(color.B), 1/2.4) - 0.055)
 	}
 
+}
+
+func (color *Color) String() string {
+	if ReadableReferences {
+		return fmt.Sprintf("<%0.2f, %0.2f, %0.2f, %0.2f>", color.R, color.G, color.B, color.A)
+	}
+	return fmt.Sprintf("%p", color)
 }
 
 // NewColorFromHSV returns a new color, using hue, saturation, and value numbers, each ranging from 0 to 1. A hue of

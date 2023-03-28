@@ -2,6 +2,7 @@ package tetra3d
 
 // ILight represents an interface that is fulfilled by an object that emits light, returning the color a vertex should be given that Vertex and its model matrix.
 type ILight interface {
+	INode
 	// beginRender is used to call any set-up code or to prepare math structures that are used when lighting the scene.
 	// It gets called once when first rendering a set of Nodes.
 	beginRender()
@@ -10,8 +11,8 @@ type ILight interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model)
 
-	Light(meshPart *MeshPart, model *Model, targetColors []*Color) // Light lights the triangles
-	// Light(triangles []sortingTriangle, model *Model, targetColors []*Color) // Light lights the triangles
+	Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) // Light lights the triangles in the MeshPart, storing the result in the targetColors
+	// color buffer. If onlyVisible is true, only the visible vertices will be lit; if it's false, they will all be lit.
 	IsOn() bool    // isOn is simply used tfo tell if a "generic" Light is on or not.
 	SetOn(on bool) // SetOn sets whether the light is on or not
 }
@@ -61,10 +62,10 @@ func (amb *AmbientLight) beginRender() {
 func (amb *AmbientLight) beginModel(model *Model) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
-	meshPart.forEachVisibleVertexIndex(func(vertIndex int) {
+func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) {
+	meshPart.ForEachVertexIndex(func(vertIndex int) {
 		targetColors[vertIndex].AddRGBA(amb.result[0], amb.result[1], amb.result[2], 0)
-	})
+	}, onlyVisible)
 }
 
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
@@ -174,13 +175,13 @@ func (point *PointLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
+func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) {
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-	meshPart.forEachVisibleVertexIndex(func(index int) {
+	meshPart.ForEachVertexIndex(func(index int) {
 
 		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
@@ -253,7 +254,7 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 
 		}
 
-	})
+	}, onlyVisible)
 
 }
 
@@ -348,9 +349,9 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
+func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) {
 
-	meshPart.forEachVisibleVertexIndex(func(index int) {
+	meshPart.ForEachVertexIndex(func(index int) {
 
 		var normal Vector
 		if model.skinned {
@@ -373,7 +374,7 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 			0,
 		)
 
-	})
+	}, onlyVisible)
 
 }
 
@@ -570,9 +571,9 @@ func (cube *CubeLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color) {
+func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) {
 
-	meshPart.forEachVisibleVertexIndex(func(index int) {
+	meshPart.ForEachVertexIndex(func(index int) {
 
 		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
@@ -659,7 +660,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 			0,
 		)
 
-	})
+	}, onlyVisible)
 
 }
 

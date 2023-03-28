@@ -1267,18 +1267,14 @@ func (part *MeshPart) ForEachTri(triFunc func(tri *Triangle)) {
 	}
 }
 
-func (part *MeshPart) ForEachVertexIndex(vertFunc func(vertIndex int)) {
-	for i := part.VertexIndexStart; i < part.VertexIndexEnd; i++ {
-		vertFunc(i)
-	}
-}
+func (part *MeshPart) ForEachVertexIndex(vertFunc func(vertIndex int), onlyVisible bool) {
 
-func (part *MeshPart) forEachVisibleVertexIndex(vertFunc func(vertIndex int)) {
 	for i := part.VertexIndexStart; i < part.VertexIndexEnd; i++ {
-		if part.Mesh.visibleVertices[i] {
+		if !onlyVisible || part.Mesh.visibleVertices[i] {
 			vertFunc(i)
 		}
 	}
+
 }
 
 func (part *MeshPart) VertexIndexCount() int {
