@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"fmt"
+	"image"
 	"math"
 	"sort"
 	"time"
@@ -42,10 +43,10 @@ const (
 type Camera struct {
 	*Node
 
-	RenderDepth       bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture() will hold the depth texture render results.
+	RenderDepth       bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture() will hold the depth texture render results. Defaults to true.
 	RenderNormals     bool // If the Camera should attempt to render a normal texture; if this is true, then NormalTexture() will hold the normal texture render results. Defaults to false.
-	SectorRendering   bool // If the Camera should render using sectors or not; if no sectors are present, then it won't attempt to render with them
-	SectorRenderDepth int  // How far out the Camera renders other sectors
+	SectorRendering   bool // If the Camera should render using sectors or not; if no sectors are present, then it won't attempt to render with them. Defaults to false.
+	SectorRenderDepth int  // How far out the Camera renders other sectors. Defaults to 1 (so the current sector and its immediate neighbors).
 	currentSector     *Sector
 
 	resultColorTexture    *ebiten.Image // ColorTexture holds the color results of rendering any models.
@@ -363,7 +364,7 @@ func (camera *Camera) Resize(w, h int) {
 
 	if camera.resultColorTexture != nil {
 
-		origW, origH := camera.resultColorTexture.Size()
+		origW, origH := camera.Size()
 		if w == origW && h == origH {
 			return
 		}
@@ -378,14 +379,18 @@ func (camera *Camera) Resize(w, h int) {
 		camera.clipAlphaIntermediate.Dispose()
 	}
 
-	camera.resultAccumulatedColorTexture = ebiten.NewImage(w, h)
-	camera.accumulatedBackBuffer = ebiten.NewImage(w, h)
-	camera.resultColorTexture = ebiten.NewImage(w, h)
-	camera.resultDepthTexture = ebiten.NewImage(w, h)
-	camera.resultNormalTexture = ebiten.NewImage(w, h)
-	camera.colorIntermediate = ebiten.NewImage(w, h)
-	camera.depthIntermediate = ebiten.NewImage(w, h)
-	camera.clipAlphaIntermediate = ebiten.NewImage(w, h)
+	bounds := image.Rect(0, 0, w, h)
+	opt := &ebiten.NewImageOptions{
+		Unmanaged: true,
+	}
+	camera.resultAccumulatedColorTexture = ebiten.NewImageWithOptions(bounds, opt)
+	camera.accumulatedBackBuffer = ebiten.NewImageWithOptions(bounds, opt)
+	camera.resultColorTexture = ebiten.NewImageWithOptions(bounds, opt)
+	camera.resultDepthTexture = ebiten.NewImageWithOptions(bounds, opt)
+	camera.resultNormalTexture = ebiten.NewImageWithOptions(bounds, opt)
+	camera.colorIntermediate = ebiten.NewImageWithOptions(bounds, opt)
+	camera.depthIntermediate = ebiten.NewImageWithOptions(bounds, opt)
+	camera.clipAlphaIntermediate = ebiten.NewImageWithOptions(bounds, opt)
 	camera.sphereFactorCalculated = false
 	camera.updateProjectionMatrix = true
 
@@ -394,7 +399,8 @@ func (camera *Camera) Resize(w, h int) {
 // Size returns the width and height of the camera's backing color texture. All of the Camera's textures are the same size, so these
 // same size values can also be used for the depth texture, the accumulation buffer, etc.
 func (camera *Camera) Size() (w, h int) {
-	return camera.resultColorTexture.Size()
+	size := camera.resultColorTexture.Bounds().Size()
+	return size.X, size.Y
 }
 
 // ViewMatrix returns the Camera's view matrix.
@@ -1313,7 +1319,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					// See this Discord conversation for the visualization of the issue:
 					// https://discord.com/channels/842049801528016967/844522898126536725/1090223569247674488
 
+					// p, s, r := model.Transform().Inverted().Decompose()
+					// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 					// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
+
 					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
 
 					if depth < 0 {
