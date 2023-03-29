@@ -246,6 +246,7 @@ type AnimationPlayer struct {
 	Animation              *Animation
 	Playhead               float64 // Playhead of the animation. Setting this to 0 restarts the animation.
 	prevPlayhead           float64
+	justLooped             bool
 	PlaySpeed              float64    // Playback speed in percentage - defaults to 1 (100%)
 	Playing                bool       // Whether the player is playing back or not.
 	FinishMode             FinishMode // What to do when the player finishes playback. Defaults to looping.
@@ -483,7 +484,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 		if ap.PlaySpeed != 0 {
 
 			for _, marker := range ap.Animation.Markers {
-				if (ap.PlaySpeed > 0 && ph >= marker.Time && ap.prevPlayhead <= marker.Time) || (ap.PlaySpeed < 0 && ph <= marker.Time && ap.prevPlayhead >= marker.Time) {
+				if (ap.PlaySpeed > 0 && ph >= marker.Time && (ap.prevPlayhead <= marker.Time || ap.justLooped)) || (ap.PlaySpeed < 0 && ph <= marker.Time && (ap.prevPlayhead >= marker.Time || ap.justLooped)) {
 					if ap.OnMarkerTouch != nil {
 						ap.OnMarkerTouch(marker, ap.Animation)
 					}
@@ -495,6 +496,8 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 		ap.prevPlayhead = ph
 
+		ap.justLooped = false
+
 		if ap.FinishMode == FinishModeLoop && (ph >= ap.Animation.Length || ph < 0) {
 
 			if ph > ap.Animation.Length {
@@ -504,6 +507,8 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 			if ph < 0 {
 				ap.Playhead += ap.Animation.Length
 			}
+
+			ap.justLooped = true
 
 			if ap.OnFinish != nil {
 				ap.OnFinish()
@@ -522,8 +527,11 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				finishedLoop = true
 			}
 
-			if finishedLoop && ap.OnFinish != nil {
-				ap.OnFinish()
+			if finishedLoop {
+				ap.justLooped = true
+				if ap.OnFinish != nil {
+					ap.OnFinish()
+				}
 			}
 			ap.finished = true
 
