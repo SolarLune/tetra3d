@@ -254,10 +254,11 @@ type AnimationPlayer struct {
 	finished               bool
 	OnMarkerTouch          func(marker Marker, animation *Animation) // Callback indicating when the AnimationPlayer has entered a marker
 	touchedMarkers         []Marker
-	AnimatedProperties     map[INode]*AnimationValues // The properties that have been animated
-	prevAnimatedProperties map[INode]*AnimationValues // The previous properties that have been animated from the previously Play()'d animation
-	BlendTime              float64                    // How much time in seconds to blend between two animations
-	blendStart             time.Time                  // The time that the blend started
+	AnimatedProperties     map[INode]AnimationValues // The properties that have been animated
+	currentProperties      map[INode]AnimationValues
+	prevAnimatedProperties map[INode]AnimationValues // The previous properties that have been animated from the previously Play()'d animation
+	BlendTime              float64                   // How much time in seconds to blend between two animations
+	blendStart             time.Time                 // The time that the blend started
 	// If the AnimationPlayer should play the last frame or not. For example, if you have an animation that starts on frame 1 and goes to frame 10,
 	// then if PlayLastFrame is on, it will play all frames, INCLUDING frame 10, and only then repeat (if it's set to repeat).
 	// Otherwise, it will only play frames 1 - 9, which can be good if your last frame is a repeat of the first to make a cyclical animation.
@@ -283,8 +284,9 @@ func NewAnimationPlayer(node INode) *AnimationPlayer {
 		RootNode:               node,
 		PlaySpeed:              1,
 		FinishMode:             FinishModeLoop,
-		AnimatedProperties:     map[INode]*AnimationValues{},
-		prevAnimatedProperties: map[INode]*AnimationValues{},
+		AnimatedProperties:     map[INode]AnimationValues{},
+		currentProperties:      map[INode]AnimationValues{},
+		prevAnimatedProperties: map[INode]AnimationValues{},
 		PlayLastFrame:          false,
 	}
 }
@@ -341,8 +343,8 @@ func (ap *AnimationPlayer) PlayAnim(animation *Animation) {
 	ap.ChannelsUpdated = false
 
 	if ap.BlendTime > 0 {
-		ap.prevAnimatedProperties = map[INode]*AnimationValues{}
-		for n, v := range ap.AnimatedProperties {
+		ap.prevAnimatedProperties = map[INode]AnimationValues{}
+		for n, v := range ap.currentProperties {
 			ap.prevAnimatedProperties[n] = v
 		}
 		ap.blendStart = time.Now()
@@ -373,7 +375,8 @@ func (ap *AnimationPlayer) assignChannels() {
 
 		if ap.Animation != nil {
 
-			ap.AnimatedProperties = map[INode]*AnimationValues{}
+			ap.AnimatedProperties = map[INode]AnimationValues{}
+			ap.currentProperties = map[INode]AnimationValues{}
 
 			ap.ChannelsToNodes = map[*AnimationChannel]INode{}
 
@@ -383,7 +386,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 				if ap.RootNode.Name() == channel.Name {
 					ap.ChannelsToNodes[channel] = ap.RootNode
-					ap.AnimatedProperties[ap.RootNode] = &AnimationValues{
+					ap.AnimatedProperties[ap.RootNode] = AnimationValues{
 						channel: channel,
 					}
 					continue
@@ -395,7 +398,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 					if n.Name() == channel.Name {
 						ap.ChannelsToNodes[channel] = n
-						ap.AnimatedProperties[n] = &AnimationValues{
+						ap.AnimatedProperties[n] = AnimationValues{
 							channel: channel,
 						}
 						found = true
@@ -408,7 +411,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 				if !found {
 					ap.ChannelsToNodes[channel] = ap.RootNode
-					ap.AnimatedProperties[ap.RootNode] = &AnimationValues{
+					ap.AnimatedProperties[ap.RootNode] = AnimationValues{
 						channel: channel,
 					}
 				}
@@ -437,11 +440,13 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				log.Println("Error: Cannot find matching node for channel " + channel.Name + " for root " + ap.RootNode.Name())
 			} else {
 
+				n := ap.AnimatedProperties[node]
+
 				if track, exists := channel.Tracks[TrackTypePosition]; exists {
 					// node.SetLocalPositionVecVec(track.ValueAsVector(ap.Playhead))
 					if vec, exists := track.ValueAsVector(ap.Playhead); exists {
-						ap.AnimatedProperties[node].Position = vec
-						ap.AnimatedProperties[node].PositionExists = true
+						n.Position = vec
+						n.PositionExists = true
 
 						// set the starting position for the animation; for relative motion, all
 						// movement is relative to this position
@@ -456,18 +461,20 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				if track, exists := channel.Tracks[TrackTypeScale]; exists {
 					// node.SetLocalScaleVec(track.ValueAsVector(ap.Playhead))
 					if vec, exists := track.ValueAsVector(ap.Playhead); exists {
-						ap.AnimatedProperties[node].Scale = vec
-						ap.AnimatedProperties[node].ScaleExists = true
+						n.Scale = vec
+						n.ScaleExists = true
 					}
 				}
 
 				if track, exists := channel.Tracks[TrackTypeRotation]; exists {
 					if quat, exists := track.ValueAsQuaternion(ap.Playhead); exists {
 						// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
-						ap.AnimatedProperties[node].Rotation = quat
-						ap.AnimatedProperties[node].RotationExists = true
+						n.Rotation = quat
+						n.RotationExists = true
 					}
 				}
+
+				ap.AnimatedProperties[node] = n
 
 			}
 
@@ -484,7 +491,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 		if ap.PlaySpeed != 0 {
 
 			for _, marker := range ap.Animation.Markers {
-				if (ap.PlaySpeed > 0 && ph >= marker.Time && (ap.prevPlayhead <= marker.Time || ap.justLooped)) || (ap.PlaySpeed < 0 && ph <= marker.Time && (ap.prevPlayhead >= marker.Time || ap.justLooped)) {
+				if (ap.PlaySpeed > 0 && ph >= marker.Time && (ap.prevPlayhead < marker.Time || ap.justLooped)) || (ap.PlaySpeed < 0 && ph <= marker.Time && (ap.prevPlayhead > marker.Time || ap.justLooped)) {
 					if ap.OnMarkerTouch != nil {
 						ap.OnMarkerTouch(marker, ap.Animation)
 					}
@@ -566,7 +573,7 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 	if !ap.Playing && !ap.blendStart.IsZero() {
 		ap.blendStart = time.Time{}
-		ap.prevAnimatedProperties = map[INode]*AnimationValues{}
+		ap.prevAnimatedProperties = map[INode]AnimationValues{}
 	}
 
 	if ap.Animation == nil || !ap.Playing {
@@ -596,7 +603,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 		var posSet bool
 		var targetScale Vector
 		var scaleSet bool
-		var targetRotation Matrix4
+		var targetRotation Quaternion
 		var rotSet bool
 
 		if !ap.blendStart.IsZero() && prevExists {
@@ -633,20 +640,19 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 			}
 
 			if start.RotationExists && props.RotationExists {
-				rot := start.Rotation.Lerp(props.Rotation, bp).Normalized()
-				targetRotation = rot.ToMatrix4()
+				targetRotation = start.Rotation.Lerp(props.Rotation, bp).Normalized()
 				rotSet = true
 			} else if props.RotationExists {
-				targetRotation = props.Rotation.ToMatrix4()
+				targetRotation = props.Rotation
 				rotSet = true
 			} else if start.RotationExists {
-				targetRotation = start.Rotation.ToMatrix4()
+				targetRotation = start.Rotation
 				rotSet = true
 			}
 
 			if bp == 1 {
 				ap.blendStart = time.Time{}
-				ap.prevAnimatedProperties = map[INode]*AnimationValues{}
+				ap.prevAnimatedProperties = map[INode]AnimationValues{}
 			}
 
 		} else {
@@ -660,9 +666,39 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 				scaleSet = true
 			}
 			if props.RotationExists {
-				targetRotation = props.Rotation.ToMatrix4()
+				targetRotation = props.Rotation
 				rotSet = true
 			}
+
+		}
+
+		// If we're blending, we need to keep track of the current status of the animation, as we could blend not just
+		// between two animations, but between a blending result and the next animation (i.e. you start animation A
+		// after playing animation B - this creates a blend. However, halfway through the blend, you start animation D,
+		// meaning we need to blend between this current state and animation D).
+		if ap.BlendTime > 0 {
+
+			if _, exists := ap.currentProperties[node]; !exists {
+				ap.currentProperties[node] = AnimationValues{}
+			}
+
+			n := ap.currentProperties[node]
+
+			n.channel = props.channel
+			n.PositionExists = posSet
+			if posSet {
+				n.Position = targetPosition
+			}
+			n.RotationExists = rotSet
+			if rotSet {
+				n.Rotation = targetRotation
+			}
+			n.ScaleExists = scaleSet
+			if scaleSet {
+				n.Scale = targetScale
+			}
+
+			ap.currentProperties[node] = n
 
 		}
 
@@ -684,9 +720,9 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 
 		if rotSet {
 			if ap.RelativeMotion {
-				node.SetLocalRotation(ap.startingRotation.Mult(targetRotation))
+				node.SetLocalRotation(ap.startingRotation.Mult(targetRotation.ToMatrix4()))
 			} else {
-				node.SetLocalRotation(targetRotation)
+				node.SetLocalRotation(targetRotation.ToMatrix4())
 			}
 		}
 
@@ -697,6 +733,11 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 // Finished returns whether the AnimationPlayer is finished playing its current animation.
 func (ap *AnimationPlayer) Finished() bool {
 	return ap.finished
+}
+
+// FinishedPlayingAnimation returns whether the AnimationPlayer just got finished playing an animation of the specified name.
+func (ap *AnimationPlayer) FinishedPlayingAnimation(animName string) bool {
+	return ap.Animation != nil && ap.Animation.Name == animName && ap.Finished()
 }
 
 // TouchedMarker returns if a marker with the specified name was touched this past frame - note that this relies on calling AnimationPlayer.Update().
