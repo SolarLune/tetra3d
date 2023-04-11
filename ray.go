@@ -113,8 +113,8 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 			rayCylinder.SetLocalScale(radius, (test.Height/2)-radius, radius)
 
 			if results := RayTest(from, to, rayCylinder); len(results) > 0 {
-				for _, r := range results {
-					r.Object = test
+				for i := range results {
+					results[i].Object = test
 				}
 				rays = append(rays, results...)
 			} else if result, ok := sphereRayTest(first, radius, from, to); ok {

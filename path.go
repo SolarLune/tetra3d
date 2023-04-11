@@ -49,13 +49,13 @@ func NewNavigator(path IPath) *Navigator {
 
 // AdvancePercentage advances the Navigator by a certain percentage of the path. This being a percentage, the larger the path, the further
 // in space a percentage advances the Navigator.
-func (navigator *Navigator) AdvancePercentage(percentage float64) {
+func (navigator *Navigator) AdvancePercentage(percentage float64) Vector {
 
 	navigator.finished = false
 
 	if !navigator.HasPath() || len(navigator.Path.Points()) <= 1 {
 		navigator.finished = true
-		return
+		return navigator.worldPos
 	}
 
 	navigator.Percentage += percentage * float64(navigator.Direction)
@@ -141,11 +141,13 @@ func (navigator *Navigator) AdvancePercentage(percentage float64) {
 
 	}
 
+	return navigator.worldPos
+
 }
 
 // AdvanceDistance advances the Navigator by a certain distance in absolute movement units on the path.
-func (navigator *Navigator) AdvanceDistance(distance float64) {
-	navigator.AdvancePercentage(distance / navigator.Path.Distance())
+func (navigator *Navigator) AdvanceDistance(distance float64) Vector {
+	return navigator.AdvancePercentage(distance / navigator.Path.Distance())
 }
 
 // WorldPosition returns the position of the Navigator in world space.
