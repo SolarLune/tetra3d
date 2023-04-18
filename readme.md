@@ -272,7 +272,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
 - [ ] -- Draw triangle in 3D space through a function (could be useful for 3D lines, for example)
 - [ ] -- Easy dynamic 3D Text (to make this simple, it might be best to allow the user to render the text as he wishes, and then make a function to map it (or any other *Image) to a plane of variable size).
-- [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
+- [X] -- Multitexturing / Per-triangle Materials
+- [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
+- [ ] -- Automatic triangle / mesh subdivision depending on distance
+- [ ] -- Automatic level of detail
+- [ ] -- Manual level of detail (ability to render a model using various meshes in stages); note that these stages should be accessible at runtime to allow cloning meshes, for example
 - [X] **Culling**
 - [X] -- Backface culling
 - [X] -- Frustum culling
@@ -285,9 +289,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Normal debug rendering
 - [X] **Materials**
 - [X] -- Basic Texturing
-- [X] -- Multitexturing / Per-triangle Materials
-- [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
-- [ ] -- Screen-coordinate instead of UV texturing (useful for repeating patterns)
+- [ ] -- Ability to use screen coordinates instead of just UV texturing (useful for repeating patterns)
 - [X] **Animations**
 - [X] -- Armature-based animations
 - [X] -- Object transform-based animations
@@ -327,6 +329,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Grid support (for pathfinding / linking 3D points together)
 - [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
 - [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values.
+- [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose?)
 - [X] **DAE model loading**
 - [X] -- Vertex colors loading
 - [X] -- UV map loading
@@ -347,6 +350,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] **Particles**
 - [X] -- Basic particle system support
 - [ ] -- Fix layering issue when rendering a particle system underneath another one (visible in the Particles example)
+- [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
 - [X] **Shaders**
 - [X] -- Custom fragment shaders
 - [X] -- Normal rendering (useful for, say, screen-space shaders)

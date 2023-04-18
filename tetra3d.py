@@ -69,6 +69,7 @@ gamePropTypes = [
     ("reference", "Object", "Object reference data type; converted to a string composed as follows on export - [SCENE NAME]:[OBJECT NAME]", 0, 4),
     ("color", "Color", "Color data type", 0, 5),
     ("vector3d", "3D Vector", "3D vector data type", 0, 6),
+    ("file", "Filepath", "Filepath", 0, 7),
 ]
 
 batchModes = [ 
@@ -90,6 +91,9 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueReferenceScene: bpy.props.PointerProperty(name = "", type=bpy.types.Scene, description="The scene to search for an object to reference; if this is blank, all objects from all scenes will appear in the object search field")
     valueColor: bpy.props.FloatVectorProperty(name = "", description="The color value of the property", subtype="COLOR", default=[1, 1, 1, 1], size=4, min=0, max=1)
     valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="XYZ")
+
+    valueFilepath: bpy.props.StringProperty(name = "", description="The filepath of the property", subtype="FILE_PATH")
+    # valueFilepathAbsolute
     # valueVector4D: bpy.props.FloatVectorProperty(name = "", description="The 4D vector value of the property")
 
 class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
@@ -599,6 +603,8 @@ def handleT3DProperty(index, box, prop, operatorType, enabled=True):
         setCur.index = index
         setCur.mode = operatorType
         setCur.buttonMode = "3D cursor"
+    elif prop.valueType == "file":
+        row.prop(prop, "valueFilepath")
         
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"

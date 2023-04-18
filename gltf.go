@@ -1157,7 +1157,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						if path == "" {
 							clone = findNode(cloneName).Clone()
 						} else {
-							path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
+							path = convertBlenderPath(path)
 							if gltfLoadOptions.DependentLibraryResolver == nil {
 								log.Printf("Warning: No dependent library resolver defined to resolve dependent library %s for object %s.\n", path, cloneName)
 							} else {
@@ -1500,8 +1500,18 @@ func handleGameProperties(p interface{}) (string, interface{}) {
 	} else if propType == 6 {
 		vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float64{0, 0, 0})
 		value = Vector{vecValues[0], vecValues[2], -vecValues[1], 0}
+	} else if propType == 7 {
+		value = getOrDefaultString(property, "valueFilepath", "")
+		if value != "" {
+			value = convertBlenderPath(value.(string))
+		}
 	}
 
 	return name, value
 
+}
+
+func convertBlenderPath(path string) string {
+	path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
+	return path
 }
