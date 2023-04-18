@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"image"
 	"log"
 	"math"
@@ -164,6 +165,12 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			if depth, exists := globalExporterSettings["t3dSectorRenderDepth__"]; exists {
 				sectorRenderDepth = int(depth.(float64))
+			}
+
+			if cats, exists := globalExporterSettings["t3dCategories__"]; exists {
+				for _, c := range cats.([]string) {
+					fmt.Println(c)
+				}
 			}
 
 		}
@@ -1500,6 +1507,8 @@ func handleGameProperties(p interface{}) (string, interface{}) {
 	} else if propType == 6 {
 		vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float64{0, 0, 0})
 		value = Vector{vecValues[0], vecValues[2], -vecValues[1], 0}
+	} else if propType == 7 {
+		ref := getIfExistingMap()
 	}
 
 	return name, value

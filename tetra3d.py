@@ -69,6 +69,7 @@ gamePropTypes = [
     ("reference", "Object", "Object reference data type; converted to a string composed as follows on export - [SCENE NAME]:[OBJECT NAME]", 0, 4),
     ("color", "Color", "Color data type", 0, 5),
     ("vector3d", "3D Vector", "3D vector data type", 0, 6),
+    ("category", "Category", "Category data type", 0, 7),
 ]
 
 batchModes = [ 
@@ -76,6 +77,12 @@ batchModes = [
     ("DYNAMIC", "Dynamic Batching", "Dynamic batching based off of one material (the first one)", 0, 1), 
     ("STATIC", "Static Merging", "Static merging; merged objects cannot move or deviate in any way. After automatic static merging, the merged models will be automatically set to invisible", 0, 2),
 ]
+
+class t3dEnum__(bpy.types.PropertyGroup):
+    pass
+
+class t3dCategory__(bpy.types.PropertyGroup):
+    Categories : bpy.types.CollectionProperty(type=t3dEnum__)
 
 class t3dGamePropertyItem__(bpy.types.PropertyGroup):
 
@@ -90,7 +97,94 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueReferenceScene: bpy.props.PointerProperty(name = "", type=bpy.types.Scene, description="The scene to search for an object to reference; if this is blank, all objects from all scenes will appear in the object search field")
     valueColor: bpy.props.FloatVectorProperty(name = "", description="The color value of the property", subtype="COLOR", default=[1, 1, 1, 1], size=4, min=0, max=1)
     valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="XYZ")
-    # valueVector4D: bpy.props.FloatVectorProperty(name = "", description="The 4D vector value of the property")
+    valueCategory : bpy.props.StringProperty(name = "", description="A category to reference")
+    # valueCategory : bpy.props.PointerProperty(name = "", description="A category to reference", type=t3dCategory__)
+
+class SCENE_OT_tetra3dAddCategory(bpy.types.Operator):
+    bl_idname = "scene.tetra3daddcategory"
+    bl_label = "Add Tetra3D Category"
+    bl_description= "Adds a category to the blend."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        context.scene.t3dCategories__.add()
+        return {'FINISHED'}
+
+class SCENE_OT_tetra3dDeleteCategory(bpy.types.Operator):
+    bl_idname = "scene.tetra3ddeletecategory"
+    bl_label = "Delete Tetra3D Category"
+    bl_description= "Deletes a category from the blend."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+
+    def execute(self, context):
+        context.scene.t3dCategories__.remove(self.index)
+        return {'FINISHED'}
+
+class SCENE_OT_tetra3dReorderCategory(bpy.types.Operator):
+    bl_idname = "scene.tetra3dreordercategory"
+    bl_label = "Re-order Tetra3D Category"
+    bl_description= "Moves a category up or down in the list"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+    moveUp : bpy.props.BoolProperty()
+
+    def execute(self, context):
+
+        if self.moveUp:
+            context.scene.t3dCategories__.move(self.index, self.index-1)
+        else:
+            context.scene.t3dCategories__.move(self.index, self.index+1)
+
+        return {'FINISHED'}
+
+
+class SCENE_OT_tetra3dAddEnum(bpy.types.Operator):
+    bl_idname = "scene.tetra3daddenum"
+    bl_label = "Add Tetra3D Enum"
+    bl_description= "Adds an enum to the category."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    categoryIndex : bpy.props.IntProperty()
+
+    def execute(self, context):
+        context.scene.t3dCategories__[self.categoryIndex].add()
+        return {'FINISHED'}
+
+class SCENE_OT_tetra3dDeleteEnum(bpy.types.Operator):
+    bl_idname = "scene.tetra3ddeleteenum"
+    bl_label = "Delete Tetra3D Enum"
+    bl_description= "Deletes an enum from the category."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    categoryIndex : bpy.props.IntProperty()
+    index : bpy.props.IntProperty()
+
+    def execute(self, context):
+        context.scene.t3dCategories__[self.categoryIndex].remove(self.index)
+        return {'FINISHED'}
+
+class SCENE_OT_tetra3dReorderEnum(bpy.types.Operator):
+    bl_idname = "scene.tetra3dreorderenum"
+    bl_label = "Re-order Tetra3D Enum"
+    bl_description= "Moves an enum up or down in the list"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    categoryIndex : bpy.props.IntProperty()
+    index : bpy.props.IntProperty()
+    moveUp : bpy.props.BoolProperty()
+
+    def execute(self, context):
+
+        if self.moveUp:
+            context.scene.t3dCategories__[self.categoryIndex].move(self.index, self.index-1)
+        else:
+            context.scene.t3dCategories__[self.categoryIndex].move(self.index, self.index+1)
+
+        return {'FINISHED'}
+
 
 class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
     bl_idname = "object.tetra3daddprop"
@@ -205,7 +299,7 @@ def copyProp(fromProp, toProp):
     toProp.valueReferenceScene = fromProp.valueReferenceScene
     toProp.valueColor = fromProp.valueColor
     toProp.valueVector3D = fromProp.valueVector3D
-
+    toProp.valueCategory = fromProp.valueCategory
 
 class OBJECT_OT_tetra3dOverrideProp(bpy.types.Operator):
     bl_idname = "object.tetra3doverrideprop"
@@ -447,7 +541,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                             row = box.row()
                             row.enabled = False
                             row.prop(prop, "name")
-                            handleT3DProperty(propIndex, box, prop, "object", False)
+                            handleT3DProperty(propIndex, box, prop, "object", context, False)
 
         row = self.layout.row()
         row.label(text="Game Properties")
@@ -485,7 +579,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                 deleteOptions.index = index
                 deleteOptions.mode = "object"
 
-                handleT3DProperty(index, box, prop, "object")
+                handleT3DProperty(index, box, prop, "object" , context)
 
             row = self.layout.row()
 
@@ -530,11 +624,42 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
             deleteOptions.index = index
             deleteOptions.mode = "scene"
 
-            handleT3DProperty(index, box, prop, "scene")
+            handleT3DProperty(index, box, prop, "scene", context)
         
         row = self.layout.row()
         clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
         clear.mode = "scene"
+
+        row = self.layout.row()
+        row = self.layout.row()
+        add = row.operator("scene.tetra3daddcategory", icon="PLUS")
+
+        # syncCategories(True)
+
+        for index, prop in enumerate(context.scene.t3dCategories__):
+            box = self.layout.box()
+            row = box.row()
+            row.prop(prop, "name")
+            
+            moveUpOptions = row.operator(SCENE_OT_tetra3dReorderCategory.bl_idname, text="", icon="TRIA_UP")
+            moveUpOptions.index = index
+            moveUpOptions.moveUp = True
+
+            moveDownOptions = row.operator(SCENE_OT_tetra3dReorderCategory.bl_idname, text="", icon="TRIA_DOWN")
+            moveDownOptions.index = index
+            moveDownOptions.moveUp = False
+
+            deleteOptions = row.operator(SCENE_OT_tetra3dDeleteCategory.bl_idname, text="", icon="TRASH")
+            deleteOptions.index = index
+
+            row = self.layout.row()
+            add = row.operator("scene.tetra3daddenum", icon="PLUS")
+
+            for catIndex, enum in enumerate(prop):
+
+                box = self.layout.box()
+                row = box.row()
+                row.prop(prop, "name")
 
 class CAMERA_PT_tetra3d(bpy.types.Panel):
     bl_idname = "CAMERA_PT_tetra3d"
@@ -561,7 +686,7 @@ class CAMERA_PT_tetra3d(bpy.types.Panel):
         row.prop(context.object.data, "clip_end")
 
 
-def handleT3DProperty(index, box, prop, operatorType, enabled=True):
+def handleT3DProperty(index, box, prop, operatorType, context, enabled=True):
 
     row = box.row()
     row.enabled = enabled
@@ -599,6 +724,9 @@ def handleT3DProperty(index, box, prop, operatorType, enabled=True):
         setCur.index = index
         setCur.mode = operatorType
         setCur.buttonMode = "3D cursor"
+    elif prop.valueType == "category":
+        row.prop_search(prop, "valueCategory", context.scene, "t3dCategories__")
+        # row.prop(prop, "valueCategory")
         
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"
@@ -656,7 +784,7 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
                 deleteOptions.index = index
                 deleteOptions.mode = "material"
 
-                handleT3DProperty(index, box, prop, "material")
+                handleT3DProperty(index, box, prop, "material", context)
 
             row = self.layout.row()
             clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
@@ -1186,8 +1314,10 @@ def export():
     return True
 
 @persistent
-def exportOnSave(dummy):
+def onSaveHandler(dummy):
     
+    # globalSet("t3dCategories__", t3dCategories)
+
     if globalGet("t3dExportOnSave__"):
         export()
 
@@ -1424,12 +1554,21 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
     bpy.utils.register_class(OBJECT_OT_tetra3dOverrideProp)
 
+    bpy.utils.register_class(SCENE_OT_tetra3dAddCategory)
+    bpy.utils.register_class(SCENE_OT_tetra3dDeleteCategory)
+    bpy.utils.register_class(SCENE_OT_tetra3dReorderCategory)
+    bpy.utils.register_class(SCENE_OT_tetra3dAddEnum)
+    bpy.utils.register_class(SCENE_OT_tetra3dDeleteEnum)
+    bpy.utils.register_class(SCENE_OT_tetra3dReorderEnum)
+
     bpy.utils.register_class(MATERIAL_OT_tetra3dMaterialCopyProps)
 
     bpy.utils.register_class(OBJECT_OT_tetra3dSetVector)
     
     bpy.utils.register_class(EXPORT_OT_tetra3d)
     
+    bpy.utils.register_class(t3dEnum__)
+    bpy.utils.register_class(t3dCategory__)
     bpy.utils.register_class(t3dGamePropertyItem__)
 
     for propName, prop in objectProps.items():
@@ -1477,6 +1616,8 @@ def register():
     bpy.types.Scene.t3dExpandGameProps__ = bpy.props.BoolProperty(name="Expand Game Properties", default=True)
     bpy.types.Scene.t3dExpandOverrideProps__ = bpy.props.BoolProperty(name="Expand Overridden Properties", default=True)
 
+    bpy.types.Scene.t3dCategories__ = bpy.props.CollectionProperty(type=t3dCategory__)
+
     bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
     bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
@@ -1494,8 +1635,11 @@ def register():
     bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
     bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
 
-    if not exportOnSave in bpy.app.handlers.save_post:
-        bpy.app.handlers.save_post.append(exportOnSave)
+    if not onSaveHandler in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.append(onSaveHandler)
+
+    # if not onLoadHandler in bpy.app.handlers.load_post:
+    #     bpy.app.handlers.load_post.append(onLoadHandler)
     
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
@@ -1514,6 +1658,15 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dOverrideProp)
 
+    bpy.utils.unregister_class(t3dEnum__)
+    bpy.utils.unregister_class(t3dCategory__)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dAddCategory)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dDeleteCategory)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dReorderCategory)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dAddEnum)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dDeleteEnum)
+    bpy.utils.unregister_class(SCENE_OT_tetra3dReorderEnum)
+
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetVector)
 
     bpy.utils.unregister_class(MATERIAL_OT_tetra3dMaterialCopyProps)
@@ -1521,7 +1674,6 @@ def unregister():
     bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
     bpy.utils.unregister_class(t3dGamePropertyItem__)
-    
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
 
@@ -1535,6 +1687,8 @@ def unregister():
     del bpy.types.Scene.t3dExportCameras__
     del bpy.types.Scene.t3dExportLights__
     del bpy.types.Scene.t3dPackTextures__
+
+    del bpy.types.Scene.t3dCategories__
 
     del bpy.types.Scene.t3dRenderResolutionW__
     del bpy.types.Scene.t3dRenderResolutionH__
@@ -1560,9 +1714,11 @@ def unregister():
 
     del bpy.types.Camera.t3dFOV__
 
-    if exportOnSave in bpy.app.handlers.save_post:
-        bpy.app.handlers.save_post.remove(exportOnSave)
-    
+    if onSaveHandler in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.remove(onSaveHandler)
+
+    # if onLoadHandler in bpy.app.handlers.load_post:
+    #     bpy.app.handlers.load_post.remove(onLoadHandler)
 
 if __name__ == "__main__":
     register()

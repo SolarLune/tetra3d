@@ -8,6 +8,7 @@ type Library struct {
 	Animations    map[string]*Animation // A Map of Animations to their names
 	Materials     map[string]*Material  // A Map of Materials to their names
 	Worlds        map[string]*World     // A Map of Worlds to their names
+	Categories    []string
 }
 
 // NewLibrary creates a new Library.
@@ -18,6 +19,7 @@ func NewLibrary() *Library {
 		Animations: map[string]*Animation{},
 		Materials:  map[string]*Material{},
 		Worlds:     map[string]*World{},
+		Categories: []string{},
 	}
 }
 
