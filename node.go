@@ -927,7 +927,7 @@ var ReadableReferences = true
 
 func (node *Node) String() string {
 	if ReadableReferences {
-		return "<" + node.name + ">"
+		return "<" + node.Path() + ">"
 	} else {
 		return fmt.Sprintf("%p", node)
 	}

@@ -891,18 +891,51 @@ func (projection projection) IsOverlapping(other projection) bool {
 	return !(projection.Min > other.Max || other.Min > projection.Max)
 }
 
-var sphereCheck = NewBoundingSphere("sphere check", 1)
+var sphereTestObject = NewBoundingSphere("sphere check", 1)
 
-// SphereCheck performs a quick bounding sphere check at the specified X, Y, and Z position with the radius given,
+// SphereTest performs a quick bounding sphere check at the specified X, Y, and Z position with the radius given,
 // against the bounding objects provided in "others".
-func SphereCheck(x, y, z, radius float64, settings CollisionTestSettings) []*Collision {
-	sphereCheck.SetLocalPosition(x, y, z)
-	sphereCheck.Radius = radius
-	return CommonCollisionTest(sphereCheck, settings)
+func SphereTest(x, y, z, radius float64, settings CollisionTestSettings) []*Collision {
+	sphereTestObject.SetLocalPosition(x, y, z)
+	sphereTestObject.Radius = radius
+	return CommonCollisionTest(sphereTestObject, settings)
 }
 
-// SphereCheck performs a quick bounding sphere check at the specified position with the radius given, against the
+// SphereTestVec performs a quick bounding sphere check at the specified position with the radius given, against the
 // bounding objects provided in "others".
-func SphereCheckVec(position Vector, radius float64, settings CollisionTestSettings) []*Collision {
-	return SphereCheck(position.X, position.Y, position.Z, radius, settings)
+func SphereTestVec(position Vector, radius float64, settings CollisionTestSettings) []*Collision {
+	return SphereTest(position.X, position.Y, position.Z, radius, settings)
+}
+
+var aabbTestObject = NewBoundingAABB("aabb check", 1, 1, 1)
+
+// AABBTest performs a quick bounding AABB check at the specified x, y, and z position using the collision settings
+// provided. The bounding AABB will have the provided width, height, and depth.
+// Note that AABB tests with BoundingTriangles are currently buggy.
+func AABBTest(x, y, z, width, height, depth float64, settings CollisionTestSettings) []*Collision {
+	aabbTestObject.SetLocalPosition(x, y, z)
+	aabbTestObject.SetDimensions(width, height, depth)
+	return CommonCollisionTest(aabbTestObject, settings)
+}
+
+// AABBTestVec places a bounding AABB at the position given with the specified size to perform a collision test.
+// Note that AABB tests with BoundingTriangles are currently buggy.
+func AABBTestVec(position, size Vector, settings CollisionTestSettings) []*Collision {
+	return AABBTest(position.X, position.Y, position.Z, size.X, size.Y, size.Z, settings)
+}
+
+var capsuleTestObject = NewBoundingCapsule("capsule check", 2, 1)
+
+// CapsuleTest performs a quick bounding capsule check at the specified x, y, and z position using the collision settings
+// provided. The bounding capsule will have the provided radius and height.
+func CapsuleTest(x, y, z, radius, height float64, settings CollisionTestSettings) []*Collision {
+	capsuleTestObject.SetLocalPosition(x, y, z)
+	capsuleTestObject.Radius = radius
+	capsuleTestObject.Height = height
+	return CommonCollisionTest(capsuleTestObject, settings)
+}
+
+// CapsuleTestVec places a bounding capsule at the position given with the specified radius and height to perform a collision test
+func CapsuleTestVec(position Vector, radius, height float64, settings CollisionTestSettings) []*Collision {
+	return CapsuleTest(position.X, position.Y, position.Z, radius, height, settings)
 }
