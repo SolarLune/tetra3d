@@ -96,7 +96,7 @@ func (g *Game) Init() {
 
 	// In this example, you will see it as a plane, floating above all the other Cubes before batching.
 
-	planeMesh := tetra3d.NewPlaneMesh()
+	planeMesh := tetra3d.NewPlaneMesh(2, 2)
 
 	// Load the character texture.
 	img, _, err = image.Decode(bytes.NewReader(character))
@@ -112,6 +112,8 @@ func (g *Game) Init() {
 	batched.Move(0, 4, 0)
 	batched.Rotate(1, 0, 0, tetra3d.ToRadians(90))
 	batched.Rotate(0, 1, 0, tetra3d.ToRadians(180))
+
+	batched.FrustumCulling = false // For now, disallow frustum culling
 
 	g.Cubes = []*tetra3d.Model{}
 
@@ -133,7 +135,7 @@ func (g *Game) Init() {
 
 	g.System = examples.NewBasicSystemHandler(g)
 
-	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMaximum)
+	ebiten.SetVsyncEnabled(false)
 
 }
 

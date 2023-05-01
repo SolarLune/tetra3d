@@ -117,6 +117,11 @@ func (dim Dimensions) Size() Vector {
 
 // NewDimensionsFromPoints creates a new Dimensions struct from the given series of positions.
 func NewDimensionsFromPoints(points ...Vector) Dimensions {
+
+	if len(points) == 0 {
+		panic("error: no points passed to NewDimensionsFromPoints()")
+	}
+
 	dim := NewEmptyDimensions()
 
 	for _, point := range points {
@@ -927,20 +932,54 @@ func NewIcosphereMesh(detailLevel int) *Mesh {
 	return mesh
 }
 
-// NewPlaneMesh creates a new plane Mesh and gives it a new material (suitably named "Plane").
-func NewPlaneMesh() *Mesh {
+// NewPlaneMesh creates a new plane Mesh with a new material (suitably named "Plane").
+// vertexCountX and vertexCountY indicate how many vertices should be on the plane in the X
+// and Z direction, respectively. The minimum number of vertices for either argument is 2.
+// Code for this is taken from https://answers.unity.com/questions/1850185/mesh-triangles-not-filling-whole-space-2.html.
+func NewPlaneMesh(vertexCountX, vertexCountZ int) *Mesh {
 
-	mesh := NewMesh("Plane",
-		NewVertex(1, 0, -1, 1, 0),
-		NewVertex(-1, 0, -1, 0, 0),
-		NewVertex(1, 0, 1, 1, 1),
-		NewVertex(-1, 0, 1, 0, 1),
-	)
+	if vertexCountX < 2 {
+		vertexCountX = 2
+	}
 
-	mesh.AddMeshPart(NewMaterial("Plane"),
-		0, 1, 2,
-		1, 3, 2,
-	)
+	if vertexCountZ < 2 {
+		vertexCountZ = 2
+	}
+
+	verts := []VertexInfo{}
+
+	for z := 0; z < vertexCountZ; z++ {
+
+		for x := 0; x < vertexCountX; x++ {
+
+			tx := float64(x) / float64(vertexCountX-1)
+			tz := float64(z) / float64(vertexCountZ-1)
+			verts = append(verts, NewVertex(-0.5+tx, 0, -0.5+tz, tx, -tz))
+
+		}
+
+	}
+
+	mesh := NewMesh("Plane", verts...)
+
+	indices := []int{}
+
+	for z := 0; z < vertexCountZ-1; z++ {
+
+		for x := 0; x < vertexCountX-1; x++ {
+
+			quad := z*vertexCountX + x
+
+			indices = append(indices,
+				quad+1, quad+vertexCountX, quad+vertexCountX+1,
+				quad, quad+vertexCountX, quad+1,
+			)
+
+		}
+
+	}
+
+	mesh.AddMeshPart(NewMaterial("Plane"), indices...)
 
 	mesh.UpdateBounds()
 	mesh.AutoNormal()
@@ -1267,6 +1306,9 @@ func (part *MeshPart) ForEachTri(triFunc func(tri *Triangle)) {
 	}
 }
 
+// ForEachVertexIndex calls the provided function for each vertex index that the MeshPart uses.
+// If onlyVisible is true, then only the visible vertices (vertices that are rendered; that aren't
+// backface culled or offscreen) will be used with the provided function.
 func (part *MeshPart) ForEachVertexIndex(vertFunc func(vertIndex int), onlyVisible bool) {
 
 	for i := part.VertexIndexStart; i < part.VertexIndexEnd; i++ {
@@ -1359,6 +1401,37 @@ func (part *MeshPart) ApplyMatrix(matrix Matrix4) {
 
 		},
 	)
+
+}
+
+// This is supposed to return the primary two dimensions of the points constructing the MeshPart.
+// TODO: Make this work regardless of orientation of the vertices?
+func (part *MeshPart) primaryDimensions() (float64, float64) {
+
+	points := make([]Vector, 0, len(part.Mesh.VertexPositions))
+
+	part.ForEachVertexIndex(func(vertIndex int) { points = append(points, part.Mesh.VertexPositions[vertIndex]) }, false)
+
+	dimensions := NewDimensionsFromPoints(points...)
+
+	x := dimensions.Width()
+	y := dimensions.Height()
+	z := dimensions.Depth()
+
+	w, h := 0.0, 0.0
+
+	if z < y && z < x {
+		w = x
+		h = y
+	} else if y < x && y < z {
+		w = x
+		h = z
+	} else {
+		w = z
+		h = y
+	}
+
+	return w, h
 
 }
 

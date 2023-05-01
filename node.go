@@ -31,6 +31,8 @@ const (
 	NodeTypePointLight       NodeType = "NodeLightPoint"       // NodeTypePointLight represents specifically a point light
 	NodeTypeDirectionalLight NodeType = "NodeLightDirectional" // NodeTypeDirectionalLight represents specifically a directional (sun) light
 	NodeTypeCubeLight        NodeType = "NodeLightCube"        // NodeTypeCubeLight represents, specifically, a cube light
+
+	NodeTypeText NodeType = "NodeModelText" // NodeTypeText represents specifically a Text object
 )
 
 // Is returns true if a NodeType satisfies another NodeType category. A specific node type can be said to
@@ -857,8 +859,8 @@ func (node *Node) HierarchyAsString() string {
 
 			nodeType := node.Type()
 
-			if nodeType.Is(NodeTypeModel) {
-				prefix = "MODEL"
+			if nodeType.Is(NodeTypeText) {
+				prefix = "TEXT"
 			} else if nodeType.Is(NodeTypeCamera) {
 				prefix = "CAM"
 			} else if nodeType.Is(NodeTypePath) {
@@ -883,6 +885,8 @@ func (node *Node) HierarchyAsString() string {
 				prefix = "CAP"
 			} else if nodeType.Is(NodeTypeBoundingTriangles) {
 				prefix = "TRI"
+			} else if nodeType.Is(NodeTypeModel) {
+				prefix = "MODEL"
 			} else {
 				prefix = "NODE"
 			}

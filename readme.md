@@ -271,7 +271,22 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
 - [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
 - [ ] -- Draw triangle in 3D space through a function (could be useful for 3D lines, for example)
-- [ ] -- Easy dynamic 3D Text (to make this simple, it might be best to allow the user to render the text as he wishes, and then make a function to map it (or any other *Image) to a plane of variable size).
+- [x] -- 3D Text (2D text, rendered on an appropriately-sized 3D plane)
+- [x] -- -- Typewriter effect
+- [x] -- -- Customizeable cursor
+- [x] -- -- Horizontal alignment
+- [ ] -- -- Vertical alignment
+- [ ] -- -- Replace style setting system with dedicated Style object, with a function to flush various style changes to batch and update the Text texture all at once?
+- [ ] -- -- Outlines
+- [ ] -- -- Gradients
+- [ ] -- -- -- Other patterns?
+- [ ] -- -- Parsing text for per-letter effects (this would probably require rendering the glyphs from a font to individual images to render; could also involve shaders)
+- [ ] -- -- -- Bold
+- [ ] -- -- -- Italics
+- [ ] -- -- -- Strikethrough
+- [ ] -- -- -- Letters fading in or out, flickering?
+- [ ] -- -- -- Letters changing to other glyphs randomly
+- [ ] -- -- Additional effects? (Wavy text, shaky text, etc.)
 - [X] -- Multitexturing / Per-triangle Materials
 - [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
 - [ ] -- Automatic triangle / mesh subdivision depending on distance
@@ -293,7 +308,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] **Animations**
 - [X] -- Armature-based animations
 - [X] -- Object transform-based animations
-- [ ] -- Blending between animations (this works, but can be a bit buggy and needs to be looked at)
+- [X] -- Blending between animations
 - [X] -- Linear keyframe interpolation
 - [X] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
@@ -302,9 +317,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Fog
 - [X] -- A node or scenegraph for parenting and simple visibility culling
 - [X] -- Ambient vertex coloring
-- [ ] -- Multiple vertex color channels
 - [X] **GLTF / GLB model loading**
 - [X] -- Vertex colors loading
+- [X] -- Multiple vertex color channels
 - [X] -- UV map loading
 - [X] -- Normal loading
 - [X] -- Transform / full scene loading
