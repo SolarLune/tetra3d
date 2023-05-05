@@ -77,12 +77,19 @@ func (g *Game) Init() {
 	// Create a new Text object to handle text display; we specify what Meshpart it should
 	// target, and how large to make the text rendering surface
 	g.Text = tetra3d.NewText(textPlane.Mesh.FindMeshPart("Text"), 256)
-	g.Text.SetFont(font).
-		SetText("This screen will slowly display text; you can press the Q key to reset the typewriter effect. Got it? I think you do.\n\n-------\n\nManual newlines also work here.").
-		SetFGColor(colors.SkyBlue()).
-		SetBGColor(colors.Blue().SubRGBA(0, 0, 0.8, 0)).
-		SetCursor("I").
-		SetHorizontalAlignment(tetra3d.TextAlignCenter)
+
+	g.Text.ApplyStyle(
+		tetra3d.TextStyle{
+			Font:                 font,
+			FGColor:              colors.SkyBlue(),
+			BGColor:              colors.Blue().SubRGBA(0, 0, 0.8, 0),
+			Cursor:               "I",
+			HorizontalAlignment:  tetra3d.TextAlignCenter,
+			LineHeightMultiplier: 1,
+		},
+	)
+
+	g.Text.SetText("This screen will slowly display text; you can press the Q key to reset the typewriter effect. Got it? I think you do.\n\n-------\n\nManual newlines also work here.")
 
 	// g.Text.HorizontalAlignment = tetra3d.TextAlignCenter
 

@@ -16,23 +16,36 @@ const (
 	TextAlignRight         // Right aligned text. The text hugs the right side of the texture.
 )
 
+type TextStyle struct {
+	Font                 font.Face // The font to use for rendering the text.
+	BGColor              *Color    // The Background color for the text. Defaults to black.
+	FGColor              *Color    // The foreground color for the text. Defaults to white.
+	Cursor               string    // A cursor string sequence is drawn at the end while typewriter-ing
+	LineHeightMultiplier float64   // The multiplier for line height changes
+	HorizontalAlignment  int       // How the text should be horizontally aligned in the Text texture
+}
+
+func NewDefaultTextStyle() TextStyle {
+	return TextStyle{
+		Font:                 basicfont.Face7x13,
+		LineHeightMultiplier: 1,
+		BGColor:              NewColor(0, 0, 0, 1),
+		FGColor:              NewColor(1, 1, 1, 1),
+	}
+}
+
 // Text represents a helper object that writes text for display as a texture on a Model's MeshPart.
 type Text struct {
-	meshPart            *MeshPart     // The MeshPart that the Text is operating on
-	Texture             *ebiten.Image // The texture used to render text
-	horizontalAlignment int           // Horizontal alignment of the text in the texture
+	meshPart *MeshPart     // The MeshPart that the Text is operating on
+	Texture  *ebiten.Image // The texture used to render text
 
-	bgColor *Color // The Background color for the text. Defaults to black. If you change this and don't alter the Text object otherwise, call Text.UpdateTexture() to force a change.
-	fgColor *Color // The foreground color for the text. Defaults to white. if you change this and don't alter the Text object otherwise, call Text.UpdateTexture() to force a change.
-	cursor  string // A cursor rune is drawn at the end while typewriter-ing
+	style TextStyle
 
-	font                 font.Face
-	setText              string
-	parsedText           []string
-	typewriterIndex      int
-	typewriterOn         bool
-	textureSize          int
-	lineHeightMultiplier float64
+	setText         string
+	parsedText      []string
+	typewriterIndex int
+	typewriterOn    bool
+	textureSize     int
 }
 
 // NewText creates a new Text rendering surface for typing out text and assigns the MeshPart provided
@@ -45,14 +58,10 @@ type Text struct {
 func NewText(meshPart *MeshPart, textureWidth int) *Text {
 
 	text := &Text{
-		meshPart:             meshPart,
-		font:                 basicfont.Face7x13,
-		textureSize:          textureWidth,
-		typewriterIndex:      0,
-		lineHeightMultiplier: 1,
-
-		bgColor: NewColor(0, 0, 0, 1),
-		fgColor: NewColor(1, 1, 1, 1),
+		meshPart:        meshPart,
+		textureSize:     textureWidth,
+		typewriterIndex: 0,
+		style:           NewDefaultTextStyle(),
 	}
 
 	// Calculate the width and height of the dimensions based off of the
@@ -92,33 +101,13 @@ func (text *Text) Clone() *Text {
 	newText := NewText(text.meshPart, text.textureSize)
 	newText.typewriterIndex = text.typewriterIndex
 	newText.typewriterOn = text.typewriterOn
-	newText.lineHeightMultiplier = text.lineHeightMultiplier
 	newText.setText = text.setText
 	newText.parsedText = append([]string{}, text.parsedText...)
-	newText.font = text.font
 	newText.Texture = ebiten.NewImageFromImage(text.Texture)
-	newText.bgColor = text.bgColor.Clone()
-	newText.fgColor = text.fgColor.Clone()
-	newText.cursor = text.cursor
 	newText.textureSize = text.textureSize
+	newText.style = text.style
 	return newText
 
-}
-
-// Font returns the currently used font face for the Text object.
-func (text *Text) Font() font.Face {
-	return text.font
-}
-
-// SetFont sets the font to be used for rendering the Text object.
-func (text *Text) SetFont(font font.Face) *Text {
-	if text.font != font {
-		text.font = font
-		txt := text.setText
-		text.setText = ""
-		text.SetText(txt) // Force a redo because we need to remeasure the lines
-	}
-	return text
 }
 
 // Text returns the current text that is being displayed for the Text object.
@@ -132,6 +121,11 @@ func splitWithSeparator(str string, seps string) []string {
 	start := 0
 
 	index := strings.IndexAny(str, seps)
+
+	if index < 0 {
+		return []string{str}
+	}
+
 	for index >= 0 {
 		end := start + index + 1
 		if end > len(str) {
@@ -174,12 +168,12 @@ func (textObj *Text) SetText(txt string) *Text {
 
 			// Some fonts have space characters that are basically empty somehow...?
 			spaceAdd := 0
-			if text.BoundString(textObj.font, " ").Dx() <= 0 {
-				spaceAdd = text.BoundString(textObj.font, "M").Dx()
+			if text.BoundString(textObj.style.Font, " ").Dx() <= 0 {
+				spaceAdd = text.BoundString(textObj.style.Font, "M").Dx()
 			}
 
 			for i, word := range split {
-				ws := text.BoundString(textObj.font, word)
+				ws := text.BoundString(textObj.style.Font, word)
 				// wordSpace := text.BoundString(textObj.font, word+".").Dx()
 				wordSpace := ws.Dx()
 
@@ -230,13 +224,13 @@ func (textObj *Text) UpdateTexture() {
 	typewriterIndex := textObj.typewriterIndex
 
 	textLineMargin := 2
-	lineHeight := int(float64(textObj.font.Metrics().Height.Ceil()+textLineMargin) * textObj.lineHeightMultiplier)
-	dip := textObj.font.Metrics().Ascent.Ceil()
+	lineHeight := int(float64(textObj.style.Font.Metrics().Height.Ceil()+textLineMargin) * textObj.style.LineHeightMultiplier)
+	dip := textObj.style.Font.Metrics().Ascent.Ceil()
 
 	typing := true
 
-	if textObj.bgColor != nil {
-		textObj.Texture.Fill(textObj.bgColor.ToRGBA64())
+	if textObj.style.BGColor != nil {
+		textObj.Texture.Fill(textObj.style.BGColor.ToRGBA64())
 	} else {
 		textObj.Texture.Clear()
 	}
@@ -245,7 +239,7 @@ func (textObj *Text) UpdateTexture() {
 
 	for lineIndex, line := range textObj.parsedText {
 
-		measure := text.BoundString(textObj.font, line)
+		measure := text.BoundString(textObj.style.Font, line)
 
 		if textObj.typewriterOn && typewriterIndex >= 0 {
 
@@ -256,7 +250,7 @@ func (textObj *Text) UpdateTexture() {
 			if typewriterIndex > len(line) {
 				typewriterIndex -= len(line)
 			} else if typing {
-				line = line[:typewriterIndex] + textObj.cursor
+				line = line[:typewriterIndex] + textObj.style.Cursor
 				typing = false
 			}
 
@@ -271,27 +265,27 @@ func (textObj *Text) UpdateTexture() {
 
 		y := d + (lineIndex * lineHeight)
 
-		if textObj.horizontalAlignment == TextAlignCenter {
+		if textObj.style.HorizontalAlignment == TextAlignCenter {
 			x = textureWidth/2 - measure.Dx()/2
-		} else if textObj.horizontalAlignment == TextAlignRight {
+		} else if textObj.style.HorizontalAlignment == TextAlignRight {
 			x = textureWidth - measure.Dx()
 		}
 
-		text.Draw(textObj.Texture, line, textObj.font, x, y, textObj.fgColor.ToRGBA64())
+		text.Draw(textObj.Texture, line, textObj.style.Font, x, y, textObj.style.FGColor.ToRGBA64())
 
 	}
 
-	// txt := textObj.parsedText
-	// if textObj.typewriterIndex >= 0 {
-	// 	txt = txt[:textObj.typewriterIndex]
-	// }
+}
 
-	// textObj.Texture.Clear()
+func (text *Text) CurrentStyle() TextStyle {
+	return text.style
+}
 
-	// measure := text.BoundString(textObj.font, txt)
-
-	// text.Draw(textObj.Texture, txt, textObj.font, -measure.Min.X, -measure.Min.Y, color.White)
-
+func (text *Text) ApplyStyle(style TextStyle) {
+	if text.style != style {
+		text.style = style
+		text.UpdateTexture()
+	}
 }
 
 // TypewriterIndex returns the typewriter index of the Text object.
@@ -345,75 +339,6 @@ func (text *Text) AdvanceTypewriterIndex(advanceBy int) bool {
 // TypewriterFinished returns if the typewriter effect is finished.
 func (text *Text) TypewriterFinished() bool {
 	return text.typewriterIndex >= len(text.setText)
-}
-
-// Cursor returns the current cursor character(s) used for the Text object.
-func (text *Text) Cursor() string {
-	return text.cursor
-}
-
-// SetCursor sets a string to be drawn in front of all text rendered.
-func (text *Text) SetCursor(cursorString string) *Text {
-	if text.cursor != cursorString {
-		text.cursor = cursorString
-		text.UpdateTexture()
-	}
-	return text
-}
-
-// FGColor returns the color used for the text.
-func (text *Text) FGColor() *Color {
-	return text.fgColor
-}
-
-// SetFGColor sets the foreground color of the Text display (the color of the text itself).
-func (text *Text) SetFGColor(color *Color) *Text {
-	if text.fgColor != color {
-		text.fgColor = color
-		text.UpdateTexture()
-	}
-	return text
-}
-
-// BGColor returns the color used for the background.
-func (text *Text) BGColor() *Color {
-	return text.bgColor
-}
-
-// SetBGColor sets the background color of the Text display.
-// Passing nil will make the background transparent (clearing the texture as necessary).
-func (text *Text) SetBGColor(color *Color) *Text {
-	if text.bgColor != color {
-		text.bgColor = color
-		text.UpdateTexture()
-	}
-	return text
-}
-
-func (text *Text) HorizontalAlignment() int {
-	return text.horizontalAlignment
-}
-
-func (text *Text) SetHorizontalAlignment(alignment int) *Text {
-	if text.horizontalAlignment != alignment {
-		text.horizontalAlignment = alignment
-		text.UpdateTexture()
-	}
-	return text
-}
-
-// LineHeightMultiplier returns the line height multiplier for the Text object.
-func (text *Text) LineHeightMultiplier() float64 {
-	return text.lineHeightMultiplier
-}
-
-// SetLineHeightMultiplier sets the line height multiplier for the Text object.
-func (text *Text) SetLineHeightMultiplier(multiplier float64) *Text {
-	if text.lineHeightMultiplier != multiplier {
-		text.lineHeightMultiplier = multiplier
-		text.UpdateTexture()
-	}
-	return text
 }
 
 // Dispose disposes of the text object's backing texture; this needs to be called to free VRAM, and should be called

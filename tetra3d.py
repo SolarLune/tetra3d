@@ -1,7 +1,11 @@
 # Add-on for Tetra3D > Blender exporting
 
-import bpy, os, bmesh, math
+import bpy, os, bmesh, math, aud
 from bpy.app.handlers import persistent
+
+currentlyPlayingAudioName = None
+currentlyPlayingAudioHandle = None
+audioPaused = False
 
 bl_info = {
     "name" : "Tetra3D Addon",                        # The name in the addon search menu
@@ -78,6 +82,21 @@ batchModes = [
     ("STATIC", "Static Merging", "Static merging; merged objects cannot move or deviate in any way. After automatic static merging, the merged models will be automatically set to invisible", 0, 2),
 ]
 
+def filepathSet(self, value):
+    global currentlyPlayingAudioHandle, currentlyPlayingAudioName, audioPaused
+    if "valueFilepath" in self and self["valueFilepath"] == currentlyPlayingAudioName and value != self["valueFilepath"]:
+        currentlyPlayingAudioHandle.stop()
+        currentlyPlayingAudioHandle = None
+        currentlyPlayingAudioName = ""
+        audioPaused = False
+    self["valueFilepath"] = value
+
+def filepathGet(self):
+    if "valueFilepath" in self:
+        return self["valueFilepath"]
+    return ""
+
+
 class t3dGamePropertyItem__(bpy.types.PropertyGroup):
 
     name: bpy.props.StringProperty(name="Name", default="New Property")
@@ -92,7 +111,7 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueColor: bpy.props.FloatVectorProperty(name = "", description="The color value of the property", subtype="COLOR", default=[1, 1, 1, 1], size=4, min=0, max=1)
     valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="XYZ")
 
-    valueFilepath: bpy.props.StringProperty(name = "", description="The filepath of the property", subtype="FILE_PATH")
+    valueFilepath: bpy.props.StringProperty(name = "", description="The filepath of the property", subtype="FILE_PATH", set=filepathSet, get=filepathGet)
     # valueFilepathAbsolute
     # valueVector4D: bpy.props.FloatVectorProperty(name = "", description="The 4D vector value of the property")
 
@@ -136,7 +155,16 @@ class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
         elif self.mode == "material":
             target = context.object.active_material
             
+        prop = target.t3dGameProperties__[self.index]
+
+        global currentlyPlayingAudioHandle, currentlyPlayingAudioName
+
+        if prop.valueType == "file" and prop.valueFilepath == currentlyPlayingAudioName and currentlyPlayingAudioHandle:
+            currentlyPlayingAudioHandle.stop()
+            currentlyPlayingAudioHandle = None
+
         target.t3dGameProperties__.remove(self.index)
+
         return {'FINISHED'}
 
 class OBJECT_OT_tetra3dReorderProps(bpy.types.Operator):
@@ -336,6 +364,58 @@ class OBJECT_OT_tetra3dClearProps(bpy.types.Operator):
 
         elif self.mode == "material" and context.object.active_material is not None:
             context.object.active_material.t3dGameProperties__.clear()
+
+        return {'FINISHED'}
+
+class OBJECT_OT_tetra3dPlaySample(bpy.types.Operator):
+
+    bl_idname = "object.t3dplaysound"
+    bl_label = "Preview Music File"
+    bl_description= "Previews music file"
+    bl_options = {'REGISTER'}
+
+    filepath : bpy.props.StringProperty()
+
+    def execute(self, context):
+        
+        global currentlyPlayingAudioHandle, currentlyPlayingAudioName, audioPaused
+
+        device = aud.Device()
+        
+        if currentlyPlayingAudioHandle:
+            if currentlyPlayingAudioName == self.filepath:
+                currentlyPlayingAudioHandle.resume()
+                audioPaused = False
+            else:
+                currentlyPlayingAudioHandle.stop()
+        
+        if not currentlyPlayingAudioHandle or currentlyPlayingAudioName != self.filepath:
+
+            sound = aud.Sound(bpy.path.abspath(self.filepath))
+
+            currentlyPlayingAudioHandle = device.play(sound)
+            currentlyPlayingAudioHandle.volume = 0.5
+            currentlyPlayingAudioHandle.loop_count = -1
+            currentlyPlayingAudioName = self.filepath
+
+        return {'FINISHED'}
+    
+class OBJECT_OT_tetra3dStopSample(bpy.types.Operator):
+
+    bl_idname = "object.t3dpausesound"
+    bl_label = "Pauses Previewing Music File"
+    bl_description= "Stops currently playing music file"
+    bl_options = {'REGISTER'}
+
+    filepath : bpy.props.StringProperty()
+
+    def execute(self, context):
+        
+        global currentlyPlayingAudioHandle, audioPaused
+
+        if currentlyPlayingAudioHandle:
+            currentlyPlayingAudioHandle.pause()
+            audioPaused = True
 
         return {'FINISHED'}
 
@@ -605,6 +685,16 @@ def handleT3DProperty(index, box, prop, operatorType, enabled=True):
         setCur.buttonMode = "3D cursor"
     elif prop.valueType == "file":
         row.prop(prop, "valueFilepath")
+        ext = os.path.splitext(prop.valueFilepath)[1]
+
+        if ext in bpy.path.extensions_audio:
+            global currentlyPlayingAudioHandle, audioPaused
+
+            if currentlyPlayingAudioHandle and not audioPaused:
+                playButton = row.operator("object.t3dpausesound", text="", icon="PAUSE")
+            else:
+                playButton = row.operator("object.t3dplaysound", text="", icon="PLAY")
+                playButton.filepath = prop.valueFilepath
         
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"
@@ -690,8 +780,10 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
 
             box.prop(context.world, "t3dFogCurve__")
 
-            if context.world.t3dFogMode__ != "TRANSPARENT":
+            if context.world.t3dFogMode__ != "TRANSPARENT" and not context.world.t3dSyncFogColor__:
                 box.prop(context.world, "t3dFogColor__")
+
+            box.prop(context.world, "t3dSyncFogColor__")
 
             box.prop(context.world, "t3dFogDithered__")            
             box.prop(context.world, "t3dFogRangeStart__", slider=True)
@@ -825,7 +917,10 @@ def export():
         if "t3dFogCurve__" in world:
             worldData["fog curve"] = world.t3dFogCurve__
         if "t3dFogColor__" in world:
-            worldData["fog color"] = world.t3dFogColor__
+            if "t3dSyncFogColor__" in world and world["t3dSyncFogColor__"] and "t3dClearColor__" in world:
+                worldData["fog color"] = world.t3dClearColor__
+            else:
+                worldData["fog color"] = world.t3dFogColor__
         if "t3dFogRangeStart__" in world:
             worldData["fog range start"] = world.t3dFogRangeStart__
         if "t3dFogRangeEnd__" in world:
@@ -1197,6 +1292,17 @@ def exportOnSave(dummy):
     if globalGet("t3dExportOnSave__"):
         export()
 
+@persistent
+def onLoad(dummy):
+
+    global currentlyPlayingAudioHandle, currentlyPlayingAudioName, audioPaused
+
+    if currentlyPlayingAudioHandle:
+        currentlyPlayingAudioHandle.stop()
+        currentlyPlayingAudioHandle = None
+        currentlyPlayingAudioName = ""
+        audioPaused = False
+
 
 class EXPORT_OT_tetra3d(bpy.types.Operator):
    bl_idname = "export.tetra3dgltf"
@@ -1435,6 +1541,9 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dSetVector)
     
     bpy.utils.register_class(EXPORT_OT_tetra3d)
+
+    bpy.utils.register_class(OBJECT_OT_tetra3dPlaySample)
+    bpy.utils.register_class(OBJECT_OT_tetra3dStopSample)
     
     bpy.utils.register_class(t3dGamePropertyItem__)
 
@@ -1492,7 +1601,8 @@ def register():
     bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
     
     bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
-    bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="Fog color", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="The color of fog for this world", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.World.t3dSyncFogColor__ = bpy.props.BoolProperty(name="Sync Fog Color to Clear Color", description="If the fog color should be a copy of the screen clear color")
     bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")
     bpy.types.World.t3dFogDithered__ = bpy.props.FloatProperty(name="Fog Dither Size", description="How large bayer matrix dithering is when using fog. If set to 0, dithering is disabled", default=0, min=0, step=1)
 
@@ -1502,6 +1612,8 @@ def register():
 
     if not exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.append(exportOnSave)
+    if not onLoad in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(onLoad)
     
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
@@ -1527,6 +1639,12 @@ def unregister():
     bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
     bpy.utils.unregister_class(t3dGamePropertyItem__)
+
+    if currentlyPlayingAudioHandle:
+        currentlyPlayingAudioHandle.stop()
+
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dPlaySample)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dStopSample)
     
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
@@ -1568,7 +1686,8 @@ def unregister():
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)
-    
+    if onLoad in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(onLoad)
 
 if __name__ == "__main__":
     register()
