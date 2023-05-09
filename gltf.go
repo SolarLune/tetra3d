@@ -759,7 +759,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			path := NewPath(node.Name, points...)
 
 			if nodeHasProp(node, "t3dPathCyclic__") {
-				path.Closed = extraMap["t3dPathCyclic__"].(float64) > 0
+				path.Closed = extraMap["t3dPathCyclic__"].(bool)
 			}
 
 			obj = path

@@ -232,17 +232,17 @@ func NewCamera(w, h int) *Camera {
 			if depth.a > 0 {
 				colorTex := imageSrc0UnsafeAt(texCoord)
 
-				var d float
-				
-				if FogCurve == 0 {
-					d = smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
-				} else if FogCurve == 1 {
-					d = smoothstep(FogRange[0], FogRange[1], OutCirc(decodeDepth(depth)))
-				} else if FogCurve == 2 {
-					d = smoothstep(FogRange[0], FogRange[1], InCirc(decodeDepth(depth)))
-				}
-
 				if Fogless == 0 {
+
+					var d float
+				
+					if FogCurve == 0 {
+						d = smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
+					} else if FogCurve == 1 {
+						d = smoothstep(FogRange[0], FogRange[1], OutCirc(decodeDepth(depth)))
+					} else if FogCurve == 2 {
+						d = smoothstep(FogRange[0], FogRange[1], InCirc(decodeDepth(depth)))
+					}
 
 					if DitherSize > 0 {
 
@@ -251,6 +251,7 @@ func NewCamera(w, h int) *Camera {
 
 						fogMult := step(0, d - BayerMatrix[(yc*4) + xc])
 
+						// Fog mode is 4th channel in Fog vector ([4]float32)
 						if Fog.a == 0 {
 							colorTex.rgb += Fog.rgb * fogMult * colorTex.a
 						} else if Fog.a == 1 {
