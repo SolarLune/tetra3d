@@ -312,7 +312,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Linear keyframe interpolation
 - [X] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
-- [ ] -- Morph (mesh-based) animations
+- [ ] -- Morph (mesh-based / shape key) animations
 - [X] **Scenes**
 - [X] -- Fog
 - [X] -- A node or scenegraph for parenting and simple visibility culling

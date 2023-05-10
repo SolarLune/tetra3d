@@ -507,6 +507,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		_, _, mvJustRForNormals = modelTransform.Mult(camera.ViewMatrix()).Decompose()
 	}
 
+	var skinnedTriCenter Vector
+
 	for ti := meshPart.TriangleStart; ti <= meshPart.TriangleEnd; ti++ {
 
 		tri := mesh.Triangles[ti]
@@ -520,6 +522,15 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		outOfBounds := true
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
+
+		// Skinned models transform vertices according to animations (and so the triangle center),
+		// so we have to keep track of the skinned center (which is done by averaging the vertex positions for the triangle),
+		// and then we can divide that by 3 to sort the triangles.
+		if model.skinned {
+			skinnedTriCenter.X = 0
+			skinnedTriCenter.Y = 0
+			skinnedTriCenter.Z = 0
+		}
 
 		for i := 0; i < 3; i++ {
 
@@ -538,6 +549,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				mesh.vertexTransforms[tri.VertexIndices[i]] = vpMatrix.MultVecW(vertPos)
 
 				camera.DebugInfo.animationTime += time.Since(t)
+
+				skinnedTriCenter = skinnedTriCenter.Add(vertPos)
 
 			} else {
 
@@ -664,7 +677,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		// I could substitute Z for W, but sorting by distance to the triangle center directly gives a better result overall, it seems.
 		if sortMode != TriangleSortModeNone {
-			meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamPos.DistanceSquared(tri.Center))
+			if model.skinned {
+				meshPart.sortingTriangles[sortingTriIndex].depth = float32(camPos.DistanceSquared(skinnedTriCenter.Divide(3)))
+			} else {
+				meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamPos.DistanceSquared(tri.Center))
+			}
 		}
 
 		mesh.visibleVertices[tri.VertexIndices[0]] = true
