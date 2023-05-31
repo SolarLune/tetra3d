@@ -147,7 +147,10 @@ func (nf NodeFilter) ByName(name string) NodeFilter {
 	return nf
 }
 
-// ByRegex allows you to filter a given selection of nodes by the given regex string.
+// ByRegex allows you to filter a given selection of nodes by their namers using the given regex string.
+// If you want to filter a selection of nodes in such a way that only nodes that have names that
+// >contain< the given text (i.e. strings.Contains()) are selected for filtering, you can just pass
+// that string into ByRegex directly.
 // If the regexp string is invalid or no matching Nodes are found, the node isn't
 // added to the filter results. See https://regexr.com/ for regex help / reference.
 func (nf NodeFilter) ByRegex(regexString string) NodeFilter {
@@ -189,7 +192,7 @@ func (nf NodeFilter) bySectors() NodeFilter {
 	return nf
 }
 
-// ForEach executes the provided function on each Node filtered out, without creating a slice of the nodes.
+// ForEach executes the provided function on each filtered Node, without allocating memory for a slice of the nodes.
 func (nf NodeFilter) ForEach(f func(node INode)) {
 	nf.executeFilters(nf.Start, f)
 }

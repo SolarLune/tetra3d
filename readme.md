@@ -297,7 +297,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Frustum culling
 - [X] -- Far triangle culling
 - [ ] -- Triangle clipping to view (this isn't implemented, but not having it doesn't seem to be too much of a problem for now)
-- [ ] -- Sectors - The general idea is that the camera can be set up to only render sectors that it's in / neighboring (up to a customizeable depth)
+- [x] -- Sectors - The general idea is that the camera can be set up to only render sectors that it's in / neighboring (up to a customizeable depth)
+- [ ] -- Occlusion culling - this should be possible using octrees to determine if an object is visible before rendering it; see: https://www.gamedeveloper.com/programming/occlusion-culling-algorithms
 - [X] **Debug**
 - [X] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
 - [X] -- Wireframe debug rendering
@@ -312,7 +313,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Linear keyframe interpolation
 - [X] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
-- [ ] -- Morph (mesh-based / shape key) animations
+- [ ] -- Morph (mesh-based / shape key) animations (See: https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_017_SimpleMorphTarget.md)
 - [X] **Scenes**
 - [X] -- Fog
 - [X] -- A node or scenegraph for parenting and simple visibility culling
@@ -343,8 +344,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Path / 3D Curve support
 - [X] -- Grid support (for pathfinding / linking 3D points together)
 - [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
-- [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values.
-- [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose?)
+- [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values. (5/22/23, SolarLune: should it be?)
+- [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose? It would be great if the models looked the way you'd expect)
 - [X] **DAE model loading**
 - [X] -- Vertex colors loading
 - [X] -- UV map loading
@@ -360,12 +361,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Ability to bake lighting to vertex colors
 - [X] -- Ability to bake ambient occlusion to vertex colors
 - [ ] -- Specular lighting (shininess)
+- [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
 - [X] **Particles**
 - [X] -- Basic particle system support
 - [ ] -- Fix layering issue when rendering a particle system underneath another one (visible in the Particles example)
-- [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
 - [X] **Shaders**
 - [X] -- Custom fragment shaders
 - [X] -- Normal rendering (useful for, say, screen-space shaders)
@@ -390,7 +391,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location?)
 - [ ] **Optimization**
-- [ ] -- It might be possible to not have to write depth manually
+- [ ] -- It might be possible to not have to write depth manually (5/22/23, SolarLune: Not sure what past me meant by this)
 - [X] -- Make NodeFilters work lazily, rather than gathering all nodes in the filter at once
 - [X] -- Reusing vertex indices for adjacent triangles
 - [ ] -- Multithreading (particularly for vertex transformations)
@@ -407,7 +408,6 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- -- We could use the broadphase system to find triangles that are in the raycast's general area, specifically
 - [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
 - [ ] -- Lighting speed improvements
-- [ ] -- Occlusion culling - this should be possible using octrees to determine if an object is visible before rendering it; see: https://www.gamedeveloper.com/programming/occlusion-culling-algorithms
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!

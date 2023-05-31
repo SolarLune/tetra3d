@@ -350,7 +350,8 @@ func (camera *Camera) Clone() INode {
 	clone.SectorRenderDepth = camera.SectorRenderDepth
 
 	clone.AccumulateColorMode = camera.AccumulateColorMode
-	clone.AccumulateDrawOptions = camera.AccumulateDrawOptions
+	newOptions := *camera.AccumulateDrawOptions
+	clone.AccumulateDrawOptions = &newOptions
 
 	clone.Node = camera.Node.Clone().(*Node)
 	for _, child := range camera.children {
