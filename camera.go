@@ -1131,7 +1131,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	}
 
-	camWidth, camHeight := camera.resultColorTexture.Size()
+	camWidth := camera.resultColorTexture.Bounds().Dx()
+	camHeight := camera.resultColorTexture.Bounds().Dy()
 
 	colorVertex := ebiten.Vertex{}
 	depthVertex := colorVertex
@@ -1219,16 +1220,16 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			for _, light := range sceneLights {
 
 				// Skip calculating lighting for objects that are too far away from light sources.
-				if point, ok := light.(*PointLight); ok && point.Distance > 0 {
-					dist := maxSpan + point.Distance
+				if point, ok := light.(*PointLight); ok && point.Range > 0 {
+					dist := maxSpan + point.Range
 					if modelPos.DistanceSquared(point.WorldPosition()) > dist*dist {
 						continue
 					}
-				} else if cube, ok := light.(*CubeLight); ok && cube.Distance > 0 {
-					dist := maxSpan + cube.Distance
-					if modelPos.DistanceSquared(cube.WorldPosition()) > dist*dist {
-						continue
-					}
+					// } else if cube, ok := light.(*CubeLight); ok && cube.Range > 0 {
+					// 	dist := maxSpan + cube.Range
+					// 	if modelPos.DistanceSquared(cube.WorldPosition()) > dist*dist {
+					// 		continue
+					// 	}
 				}
 
 				light.Light(meshPart, model, mesh.vertexLights, true)

@@ -83,14 +83,6 @@ func (g *Game) Update() error {
 		}
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyE) {
-		if cubeLight.Distance == 0 {
-			cubeLight.Distance = 25
-		} else {
-			cubeLight.Distance = 0
-		}
-	}
-
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
 		g.Scene.World.LightingOn = !g.Scene.World.LightingOn
 	}
@@ -120,11 +112,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `This example shows a Cube Light.
 Cube Lights are volumes that shine from the top down.
-If the light's distance is greater than 0, then the
-light will be brighter towards the top.
 Triangles that lie outside the (AABB)
 volume remain unlit.
-E Key: Toggle light distance
 Left / Right Arrow Key: Rotate Light
 Up / Down Arrow Key: Increase / Decrease Bleed
 2 Key: Toggle all lighting

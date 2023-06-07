@@ -46,7 +46,7 @@ func (g *Game) Init() {
 	g.System = examples.NewBasicSystemHandler(g)
 
 	light := tetra3d.NewPointLight("camera light", 1, 1, 1, 2)
-	light.Distance = 10
+	light.Range = 10
 	light.Move(0, 1, -2)
 	light.On = false
 	g.Camera.AddChildren(light)

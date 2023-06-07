@@ -112,9 +112,9 @@ func (amb *AmbientLight) Index() int {
 // PointLight represents a point light (naturally).
 type PointLight struct {
 	*Node
-	// Distance represents the distance after which the light fully attenuates. If this is 0 (the default),
+	// Range represents the distance after which the light fully attenuates. If this is 0 (the default),
 	// it falls off using something akin to the inverse square law.
-	Distance float64
+	Range float64
 	// Color is the color of the PointLight.
 	Color *Color
 	// Energy is the overall energy of the Light, with 1.0 being full brightness. Internally, technically there's no
@@ -124,7 +124,7 @@ type PointLight struct {
 	// If the light is on and contributing to the scene.
 	On bool
 
-	distanceSquared float64
+	rangeSquared    float64
 	workingPosition Vector
 }
 
@@ -143,7 +143,7 @@ func (point *PointLight) Clone() INode {
 
 	clone := NewPointLight(point.name, point.Color.R, point.Color.G, point.Color.B, point.Energy)
 	clone.On = point.On
-	clone.Distance = point.Distance
+	clone.Range = point.Range
 
 	clone.Node = point.Node.Clone().(*Node)
 	for _, child := range point.children {
@@ -155,7 +155,7 @@ func (point *PointLight) Clone() INode {
 }
 
 func (point *PointLight) beginRender() {
-	point.distanceSquared = point.Distance * point.Distance
+	point.rangeSquared = point.Range * point.Range
 }
 
 func (point *PointLight) beginModel(model *Model) {
@@ -185,8 +185,6 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 
 		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
-		distance := 0.0
-
 		var vertPos, vertNormal Vector
 
 		if model.skinned {
@@ -197,11 +195,11 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 			vertNormal = model.Mesh.VertexNormals[index]
 		}
 
-		distance = point.workingPosition.DistanceSquared(vertPos)
+		distance := point.workingPosition.DistanceSquared(vertPos)
 
-		if point.Distance > 0 {
+		if point.Range > 0 {
 
-			if distance > point.distanceSquared {
+			if distance > point.rangeSquared {
 				return
 			}
 
@@ -237,12 +235,11 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 
 		if diffuse > 0 {
 
-			diffuseFactor := 0.0
+			diffuseFactor := diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
 
-			if point.Distance == 0 {
-				diffuseFactor = diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
-			} else {
-				diffuseFactor = diffuse * clamp(1.0-(pow((distance/point.distanceSquared), 4)), 0, 1)
+			if point.Range > 0 {
+				distClamp := clamp((point.rangeSquared-distance)/distance, 0, 1)
+				diffuseFactor *= distClamp
 			}
 
 			targetColors[index].AddRGBA(
@@ -302,8 +299,8 @@ func (point *PointLight) Type() NodeType {
 // DirectionalLight represents a directional light of infinite distance.
 type DirectionalLight struct {
 	*Node
-	Color *Color // Color is the color of the PointLight.
-	// Energy is the overall energy of the Light. Internally, technically there's no difference between a brighter color and a
+	Color *Color // Color is the color of the light.
+	// Energy is the overall energy of the light. Internally, technically there's no difference between a brighter color and a
 	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
 	Energy float32
 	On     bool // If the light is on and contributing to the scene.
@@ -421,18 +418,16 @@ func (sun *DirectionalLight) Type() NodeType {
 type CubeLight struct {
 	*Node
 	Dimensions Dimensions // The overall dimensions of the CubeLight.
-	Distance   float64    // The distance of the CubeLight - at 0, all triangles within the CubeLight AABB volume are lit evenly. At any other value, the CubeLight lights from the top down to the distance value specified.
 	Energy     float32    // The overall energy of the CubeLight
 	Color      *Color     // The color of the CubeLight
 	On         bool       // If the CubeLight is on or not
 	// A value between 0 and 1 indicating how much opposite faces are still lit within the volume (i.e. at LightBleed = 0.0,
 	// faces away from the light are dark; at 1.0, faces away from the light are fully illuminated)
-	Bleed                  float64
-	LightingAngle          Vector // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
-	workingDimensions      Dimensions
-	workingPosition        Vector
-	workingAngle           Vector
-	workingDistanceSquared float64
+	Bleed             float64
+	LightingAngle     Vector // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
+	workingDimensions Dimensions
+	workingPosition   Vector
+	workingAngle      Vector
 }
 
 // NewCubeLight creates a new CubeLight with the given dimensions.
@@ -441,7 +436,6 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 		Node: NewNode(name),
 		// Dimensions:    Dimensions{{-w / 2, -h / 2, -d / 2}, {w / 2, h / 2, d / 2}},
 		Dimensions:    dimensions,
-		Distance:      0,
 		Energy:        1,
 		Color:         NewColor(1, 1, 1, 1),
 		On:            true,
@@ -456,13 +450,13 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 func NewCubeLightFromModel(name string, model *Model) *CubeLight {
 	cube := NewCubeLight(name, model.Mesh.Dimensions)
 	cube.SetWorldTransform(model.Transform())
+	cube.LightingAngle = model.WorldRotation().Up().Invert()
 	return cube
 }
 
 // Clone clones the CubeLight, returning a deep copy.
 func (cube *CubeLight) Clone() INode {
 	newCube := NewCubeLight(cube.name, cube.Dimensions)
-	newCube.Distance = cube.Distance
 	newCube.Energy = cube.Energy
 	newCube.Color = cube.Color.Clone()
 	newCube.On = cube.On
@@ -539,32 +533,37 @@ func (cube *CubeLight) TransformedDimensions() Dimensions {
 
 func (cube *CubeLight) beginRender() {
 	cube.workingAngle = cube.WorldRotation().MultVec(cube.LightingAngle.Invert())
-	cube.workingDistanceSquared = cube.Distance * cube.Distance
 }
 
 func (cube *CubeLight) beginModel(model *Model) {
 
 	p, s, r := model.Transform().Inverted().Decompose()
+	_, _, _ = p, s, r
 
 	// Rather than transforming all vertices of all triangles of a mesh, we can just transform the
 	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
 
-	lightStartPos := cube.WorldPosition().Add(cube.LightingAngle.Invert().Scale(cube.Dimensions.Height() / 2).Sub(cube.Dimensions.Center()))
+	lightStartPos := cube.WorldPosition().Add(cube.LightingAngle.Invert().Scale(cube.Dimensions.Height() / 2))
 
 	cube.workingDimensions = cube.TransformedDimensions()
 
 	if model.skinned {
 		cube.workingPosition = lightStartPos
 	} else {
-		// point.cameraPosition = r.MultVec(camera.WorldPosition()).Add(p)
-		cube.workingPosition = r.MultVec(lightStartPos).Add(p)
 
-		cube.workingDimensions.Min = r.MultVec(cube.workingDimensions.Min)
-		cube.workingDimensions.Max = r.MultVec(cube.workingDimensions.Max)
+		sDen := Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}
+		_ = sDen
 
-		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 0}))
-		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 0}))
+		cube.workingPosition = r.MultVec(lightStartPos).Add(p.Mult(sDen))
+
+		// point.workingPosition = r.MultVec(point.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
+
+		cube.workingDimensions.Min = r.MultVec(cube.workingDimensions.Min.Mult(s))
+		cube.workingDimensions.Max = r.MultVec(cube.workingDimensions.Max.Mult(s))
+
+		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(p)
+		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(p)
 
 	}
 
@@ -637,14 +636,10 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 			return
 		} else {
 
-			if cube.Distance == 0 {
-				diffuseFactor = diffuse
-			} else {
-				diffuseFactor = diffuse * ((cube.workingDistanceSquared - vertPos.DistanceSquared(cube.workingPosition)) / cube.workingDistanceSquared)
-			}
-
 			if !cube.workingDimensions.Inside(vertPos) {
 				diffuseFactor = 0
+			} else {
+				diffuseFactor = diffuse
 			}
 
 		}

@@ -737,7 +737,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			} else if lightData.Type == lightspuntual.TypePoint {
 				pointLight := NewPointLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/80) // Point lights have wattage energy
 				if !math.IsInf(float64(*lightData.Range), 0) {
-					pointLight.Distance = float64(*lightData.Range)
+					pointLight.Range = float64(*lightData.Range)
 				}
 				obj = pointLight
 			} else {
