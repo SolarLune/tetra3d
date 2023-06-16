@@ -112,9 +112,21 @@ type INode interface {
 	// scale, and rotation) are altered to keep the object in the same absolute location, even though the origin changes.
 	ClearLocalTransform()
 
-	// ResetTransform resets the local transform properties (position, scale, and rotation) for the Node to the original transform when
+	// ResetWorldTransform resets the local transform properties (position, scale, and rotation) for the Node to the original transform when
 	// the Node was first created / cloned / instantiated in the Scene.
-	ResetTransform()
+	ResetWorldTransform()
+
+	// ResetWorldPosition resets the Node's local position to the value the Node had when
+	// it was first instantiated in the Scene or cloned.
+	ResetWorldPosition()
+
+	// ResetWorldScale resets the Node's local scale to the value the Node had when
+	// it was first instantiated in the Scene or cloned.
+	ResetWorldScale()
+
+	// ResetWorldRotation resets the Node's local rotation to the value the Node had when
+	// it was first instantiated in the Scene or cloned.
+	ResetWorldRotation()
 
 	setOriginalTransform()
 
@@ -125,11 +137,16 @@ type INode interface {
 	LocalRotation() Matrix4
 	// SetLocalRotation sets the object's local rotation Matrix4 (relative to any parent).
 	SetLocalRotation(rotation Matrix4)
+
+	// LocalPosition returns the object's local position as a Vector.
 	LocalPosition() Vector
 	// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
-	// relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
+	// relative to world origin (0, 0, 0).
 	SetLocalPositionVec(position Vector)
+	// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
+	// relative to world origin (0, 0, 0).
 	SetLocalPosition(x, y, z float64)
+
 	// LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
 	LocalScale() Vector
 	// SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
@@ -477,10 +494,34 @@ func (node *Node) ClearLocalTransform() {
 	node.dirtyTransform()
 }
 
-// ResetTransform resets the Node's world transform properties (position, scale, and rotation) for the Node to the original
+// ResetWorldTransform resets the Node's world transform properties (position, scale, and rotation) for the Node to the original
 // values when the Node was first instantiated in the Scene or cloned.
-func (node *Node) ResetTransform() {
+func (node *Node) ResetWorldTransform() {
 	node.SetWorldTransform(node.originalTransform)
+	node.dirtyTransform()
+}
+
+// ResetWorldPosition resets the Node's local position to the value the Node had when
+// it was first instantiated in the Scene or cloned.
+func (node *Node) ResetWorldPosition() {
+	p, _, _ := node.originalTransform.Decompose()
+	node.SetWorldPositionVec(p)
+	node.dirtyTransform()
+}
+
+// ResetWorldScale resets the Node's local scale to the value the Node had when
+// it was first instantiated in the Scene or cloned.
+func (node *Node) ResetWorldScale() {
+	_, s, _ := node.originalTransform.Decompose()
+	node.SetWorldScaleVec(s)
+	node.dirtyTransform()
+}
+
+// ResetWorldRotation resets the Node's local rotation to the value the Node had when
+// it was first instantiated in the Scene or cloned.
+func (node *Node) ResetWorldRotation() {
+	_, _, r := node.originalTransform.Decompose()
+	node.SetWorldRotation(r)
 	node.dirtyTransform()
 }
 
