@@ -12,8 +12,10 @@ const (
 	TrackTypePosition = "Pos"
 	TrackTypeScale    = "Sca"
 	TrackTypeRotation = "Rot"
+)
 
-	InterpolationLinear = iota
+const (
+	InterpolationLinear int = iota
 	InterpolationConstant
 	InterpolationCubic // Unimplemented
 )
@@ -93,12 +95,14 @@ func (track *AnimationTrack) ValueAsVector(time float64) (Vector, bool) {
 	fd := first.Data.AsVector()
 	ld := last.Data.AsVector()
 
-	// Linear interpolation
-	t := (time - first.Time) / (last.Time - first.Time)
-
+	// Constant (stepped) interpolation
 	if track.Interpolation == InterpolationConstant {
 		return fd, true
 	}
+
+	// Linear interpolation
+
+	t := (time - first.Time) / (last.Time - first.Time)
 
 	// We still need to implement InterpolationCubic
 	// if track.Type == TrackTypePosition || track.Type == TrackTypeScale {
@@ -143,6 +147,10 @@ func (track *AnimationTrack) ValueAsQuaternion(time float64) (Quaternion, bool) 
 
 			fd := first.Data.AsQuaternion()
 			ld := last.Data.AsQuaternion()
+
+			if track.Interpolation == InterpolationConstant {
+				return fd, true
+			}
 
 			// Linear interpolation
 			t := (time - first.Time) / (last.Time - first.Time)
