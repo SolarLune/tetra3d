@@ -405,7 +405,7 @@ class OBJECT_OT_tetra3dStopSample(bpy.types.Operator):
     bl_idname = "object.t3dpausesound"
     bl_label = "Pauses Previewing Music File"
     bl_description= "Stops currently playing music file"
-    bl_options = {'REGISTER'}
+    bl_options = {'REGISTER', 'UNDO'}
 
     filepath : bpy.props.StringProperty()
 
@@ -416,6 +416,45 @@ class OBJECT_OT_tetra3dStopSample(bpy.types.Operator):
         if currentlyPlayingAudioHandle:
             currentlyPlayingAudioHandle.pause()
             audioPaused = True
+
+        return {'FINISHED'}
+
+class OBJECT_OT_tetra3dSetAnimationInterpolationAll(bpy.types.Operator):
+
+    bl_idname = "object.t3dsetanimationinterpolationall"
+    bl_label = "All Animations"
+    bl_description= "Sets interpolation for all keys in all animations in the blend file to the specified interpolation mode"
+    bl_options = {'REGISTER'}
+
+    interpolationType : bpy.props.StringProperty()
+
+    def execute(self, context):
+
+        for action in bpy.data.actions:
+            for curve in action.fcurves:
+                for point in curve.keyframe_points:
+                    point.interpolation = self.interpolationType
+
+        return {'FINISHED'}
+
+
+class OBJECT_OT_tetra3dSetAnimationInterpolation(bpy.types.Operator):
+
+    bl_idname = "object.t3dsetanimationinterpolation"
+    bl_label = "Current Animation"
+    bl_description= "Sets interpolation for all keys for the current animation on the object to the specified interpolation mode"
+    bl_options = {'REGISTER'}
+
+    interpolationType : bpy.props.StringProperty()
+    forAll : bpy.props.BoolProperty()
+
+    def execute(self, context):
+
+        if bpy.context.active_object and bpy.context.active_object.animation_data and bpy.context.active_object.animation_data.action:
+            action = bpy.context.active_object.animation_data.action
+            for curve in action.fcurves:
+                for point in curve.keyframe_points:
+                    point.interpolation = self.interpolationType
 
         return {'FINISHED'}
 
@@ -825,19 +864,34 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
 
+        row = self.layout.row()
+        row.prop(context.scene, "t3dRenderResolutionW__")
+        row.prop(context.scene, "t3dRenderResolutionH__")
+
         box = self.layout.box()
         box.prop(context.scene, "t3dSectorRendering__")
         row = box.row()
         row.enabled = context.scene.t3dSectorRendering__
         row.prop(context.scene, "t3dSectorRenderDepth__")
 
-        row = self.layout.row()
-        row.prop(context.scene, "t3dRenderResolutionW__")
-        row.prop(context.scene, "t3dRenderResolutionH__")
-        row = self.layout.row()
+        box = self.layout.box()
+        row = box.row()
         row.label(text="Animation Playback Framerate (in Blender):")
-        row = self.layout.row()
+        row = box.row()
         row.prop(context.scene, "t3dPlaybackFPS__")
+        row = box.row().separator()
+        row = box.row()
+        row.prop(context.scene, "t3dAnimationSampling__")
+        row = box.row()
+        row.label(text="Set interpolation for animations:")
+        row = box.row()
+        row.prop(context.scene, "t3dAnimationInterpolation__")
+        row = box.row()
+        op = row.operator(OBJECT_OT_tetra3dSetAnimationInterpolationAll.bl_idname)
+        op.interpolationType = context.scene.t3dAnimationInterpolation__
+        op = row.operator(OBJECT_OT_tetra3dSetAnimationInterpolation.bl_idname)
+        op.interpolationType = context.scene.t3dAnimationInterpolation__
+
 
 def export():
     scene = bpy.context.scene
@@ -1190,7 +1244,8 @@ def export():
         export_current_frame=False,
         export_nla_strips=True,
         export_animations=True,
-        export_frame_range = False,
+        export_frame_range=False,
+        export_force_sampling=scene.t3dAnimationSampling__, # When enabled, animations are sampled / baked. This is slow, but accurate. When disabled, only linear and constant keyframes are exported and interpolated for animation.
 
         export_extras=True,
         export_yup=True,
@@ -1469,6 +1524,24 @@ def setPackTextures(self, value):
     globalSet("t3dPackTextures__", value)
 
 
+def getAnimationSampling(self):
+    l = globalGet("t3dAnimationSampling__")
+    if l is None:
+        l = True
+    return l
+
+def setAnimationSampling(self, value):
+    globalSet("t3dAnimationSampling__", value)
+
+def getAnimationInterpolation(self):
+    l = globalGet("t3dAnimationInterpolation__")
+    if l is None:
+        l = True
+    return l
+
+def setAnimationInterpolation(self, value):
+    globalSet("t3dAnimationInterpolation__", value)
+
 def fogRangeStartSet(self, value):
     if value > bpy.context.world.t3dFogRangeEnd__:
         value = bpy.context.world.t3dFogRangeEnd__
@@ -1546,6 +1619,8 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dStopSample)
     
     bpy.utils.register_class(t3dGamePropertyItem__)
+    bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
+    bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
@@ -1588,6 +1663,31 @@ def register():
 
     bpy.types.Scene.t3dPlaybackFPS__ = bpy.props.IntProperty(name="Playback FPS", description="Animation Playback Framerate (in Blender)", default=60, min=0,
     get=getPlaybackFPS, set=setPlaybackFPS)
+
+    bpy.types.Scene.t3dAnimationSampling__ = bpy.props.BoolProperty(name="Sampled Animations", description="When enabled, animations are sampled (so you can use advanced techniques in your animations and then Blender will bake the results into your GLTF file). When disabled, only plain constant and linear animation keyframes (not cubic spline) will export. However, non-sampled animations export much more quickly than sampled animations, which means this option is useful when developing", default=True,
+    get=getAnimationSampling, set=setAnimationSampling)
+
+    bpy.types.Scene.t3dAnimationInterpolation__ = bpy.props.EnumProperty(
+        items=[
+            ("CONSTANT", "Constant", "Constant interpolation", 0, 0), 
+            ("LINEAR", "Linear", "Linear interpolation", 0, 1), 
+            ("BEZIER", "Bezier", "Bezier interpolation", 0, 2), 
+            ("SINE", "Sine", "Sine interpolation", 0, 3), 
+            ("QUAD", "Quad", "Quad interpolation", 0, 4), 
+            ("CUBIC", "Cubic", "Cubic interpolation", 0, 5), 
+            ("QUART", "Quart", "Quart interpolation", 0, 6), 
+            ("QUINT", "Quint", "Quint interpolation", 0, 7), 
+            ("EXPO", "Expo", "Exponential interpolation", 0, 8), 
+            ("CIRC", "Circ", "Circ interpolation", 0, 7), 
+            ("BACK", "Back", "Back interpolation", 0, 8), 
+            ("BOUNCE", "Bounce", "Bounce interpolation", 0, 9), 
+            ("ELASTIC", "Elastic", "Elastic interpolation", 0, 10),
+        ], 
+        name="Type", 
+        description="What type to use for applying interpolation", 
+        default="BEZIER",
+        get=getAnimationInterpolation,
+        set=setAnimationInterpolation)
 
     bpy.types.Scene.t3dExpandGameProps__ = bpy.props.BoolProperty(name="Expand Game Properties", default=True)
     bpy.types.Scene.t3dExpandOverrideProps__ = bpy.props.BoolProperty(name="Expand Overridden Properties", default=True)
@@ -1645,6 +1745,9 @@ def unregister():
 
     bpy.utils.unregister_class(OBJECT_OT_tetra3dPlaySample)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dStopSample)
+
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
     
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
@@ -1659,6 +1762,8 @@ def unregister():
     del bpy.types.Scene.t3dExportCameras__
     del bpy.types.Scene.t3dExportLights__
     del bpy.types.Scene.t3dPackTextures__
+    del bpy.types.Scene.t3dAnimationSampling__
+    del bpy.types.Scene.t3dAnimationInterpolation__
 
     del bpy.types.Scene.t3dRenderResolutionW__
     del bpy.types.Scene.t3dRenderResolutionH__
