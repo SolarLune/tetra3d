@@ -535,18 +535,13 @@ func (mesh *Mesh) AutoNormal() {
 
 // SelectVertices generates a new vertex selection for the current Mesh.
 func (mesh *Mesh) SelectVertices() *VertexSelection {
-	return NewVertexSelection(mesh)
+	return &VertexSelection{Indices: map[int]bool{}, Mesh: mesh}
 }
 
 // VertexSelection represents a selection of vertices on a Mesh.
 type VertexSelection struct {
 	Indices map[int]bool
 	Mesh    *Mesh
-}
-
-// NewVertexSelection creates a new VertexSelection instance for the specified Mesh.
-func NewVertexSelection(mesh *Mesh) *VertexSelection {
-	return &VertexSelection{Indices: map[int]bool{}, Mesh: mesh}
 }
 
 // SelectInChannel selects all vertices in the Mesh that have a non-pure black color in the color channel
