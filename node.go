@@ -233,6 +233,10 @@ type INode interface {
 	// DistanceTo returns the distance between the given Nodes' centers.
 	// Quick syntactic sugar for Node.WorldPosition().Distance(otherNode.WorldPosition()).
 	DistanceTo(otherNode INode) float64
+
+	// DistanceSquared returns the squared distance between the given Nodes' centers.
+	// Quick syntactic sugar for Node.WorldPosition().DistanceSquared(otherNode.WorldPosition()).
+	DistanceSquaredTo(otherNode INode) float64
 }
 
 var nodeID uint64 = 0
@@ -972,7 +976,7 @@ var ReadableReferences = true
 
 func (node *Node) String() string {
 	if ReadableReferences {
-		return "<" + node.Path() + ">"
+		return "< " + node.Path() + " : " + fmt.Sprintf("%d", node.id) + " >"
 	} else {
 		return fmt.Sprintf("%p", node)
 	}
@@ -1123,6 +1127,14 @@ func (node *Node) Sector() *Sector {
 
 }
 
+// DistanceTo returns the distance between the given Nodes' centers.
+// Quick syntactic sugar for Node.WorldPosition().Distance(otherNode.WorldPosition()).
 func (node *Node) DistanceTo(other INode) float64 {
 	return node.WorldPosition().Distance(other.WorldPosition())
+}
+
+// DistanceSquaredTo returns the squared distance between the given Nodes' centers.
+// Quick syntactic sugar for Node.WorldPosition().DistanceSquared(otherNode.WorldPosition()).
+func (node *Node) DistanceSquaredTo(other INode) float64 {
+	return node.WorldPosition().DistanceSquared(other.WorldPosition())
 }

@@ -78,9 +78,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Render the scene.
 	g.Camera.RenderScene(g.Scene)
 
-	// Draw depth texture if the debug option is enabled; draw color texture otherwise.
+	// Draw the resulting color texture.
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
+	// Draw the debug text if enabled, and that's basically it.
 	g.SystemHandler.Draw(screen, g.Camera)
 
 	if g.SystemHandler.DrawDebugText {

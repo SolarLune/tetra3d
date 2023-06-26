@@ -6,6 +6,8 @@ import (
 	"sort"
 )
 
+// TODO: Implement costs to pathfinding
+
 // GridPoint represents a point on a Grid, used for pathfinding or connecting points in space.
 // GridPoints are parented to a Grid and the connections are created seperate from their positions,
 // which means you can move GridPoints freely after creation. Note that GridPoints consider themselves
@@ -80,20 +82,27 @@ func (point *GridPoint) Disconnect(other *GridPoint) {
 		return
 	}
 
-	for i, c := range point.Connections {
-		if c == other {
+	for i := len(point.Connections) - 1; i >= 0; i-- {
+		if point.Connections[i] == other {
 			point.Connections[i] = nil
 			point.Connections = append(point.Connections[:i], point.Connections[i+1:]...)
 		}
 	}
 
-	for i, c := range other.Connections {
-		if c == point {
+	for i := len(other.Connections) - 1; i >= 0; i-- {
+		if other.Connections[i] == point {
 			other.Connections[i] = nil
 			other.Connections = append(other.Connections[:i], other.Connections[i+1:]...)
 		}
 	}
 
+}
+
+// DisconnectAll disconnects the GridPoint from all other GridPoints.
+func (point *GridPoint) DisconnectAll() {
+	for i := len(point.Connections) - 1; i >= 0; i-- {
+		point.Disconnect(point.Connections[i])
+	}
 }
 
 // PathTo creates a path going from the GridPoint to the given other GridPoint. This path is currently generated
@@ -246,6 +255,44 @@ func (grid *Grid) NearestGridPoint(position Vector) *GridPoint {
 	})
 
 	return points[0]
+
+}
+
+// DisconnectAllPoints disconnects all points from each other in the Grid.
+func (grid *Grid) DisconnectAllPoints() {
+	for _, point := range grid.Points() {
+		point.DisconnectAll()
+	}
+}
+
+// HopCount indicates an instances of how many hops it takes to get to the specified GridPoint from the starting GridPoint.
+type HopCount struct {
+	Start       *GridPoint // The start of the path
+	Destination *GridPoint // The end of the path
+	HopCount    int        // How many hops it takes to get there (i.e. length of the path between the two points minus one)
+}
+
+// HopCounts returns the number of hops from the starting position to all other provided positions on the grid.
+func (grid *Grid) HopCounts(from Vector, positions ...Vector) []HopCount {
+
+	start := grid.NearestGridPoint(from)
+
+	hopCounts := []HopCount{}
+
+	for _, point := range positions {
+		hc := HopCount{
+			Start:       start,
+			Destination: grid.NearestGridPoint(point),
+		}
+		hc.HopCount = len(start.PathTo(hc.Destination).GridPoints) - 1
+		hopCounts = append(hopCounts, hc)
+	}
+
+	sort.Slice(hopCounts, func(i, j int) bool {
+		return hopCounts[i].HopCount < hopCounts[j].HopCount
+	})
+
+	return hopCounts
 
 }
 

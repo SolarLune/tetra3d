@@ -47,8 +47,9 @@ materialCompositeModes = [
 
 materialBillboardModes = [
     ("NONE", "None", "No billboarding - the (unskinned) object with this material does not rotate to face the camera.", 0, 0),
-    ("XZ", "X/Z", "X/Z billboarding - the (unskinned) object with this material rotates to the face the camera only on the X and Z axes (not the Y axis).", 0, 1),
-    ("FULL", "Full", "Full billboarding - the (unskinned) object rotates fully to face the camera.", 0, 2),
+    ("FIXEDVERTICAL", "Fixed Vertical", "Fixed Vertical billboarding - the (unskinned) object with this material faces the camera, with up always pointing towards the camera's local up vector (+Y). Good for top-down games.", 0, 1),
+    ("HORIZONTAL", "Horizontal", "Horizontal billboarding - the (unskinned) object with this material rotates around to the face the camera only on the X and Z axes (not the Y axis).", 0, 2),
+    ("FULL", "Full", "Full billboarding - the (unskinned) object rotates fully to face the camera.", 0, 3),
 ]
 
 worldFogCompositeModes = [
@@ -810,7 +811,10 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
 
     def draw(self, context):
         row = self.layout.row()
+        row.prop(context.world, "t3dSyncClearColor__")
+        row = self.layout.row()
         row.prop(context.world, "t3dClearColor__")
+        row.enabled = not context.world.t3dSyncClearColor__
         box = self.layout.box()
         row = box.row()
         row.prop(context.world, "t3dFogMode__")
@@ -819,19 +823,22 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
 
             box.prop(context.world, "t3dFogCurve__")
 
-            if context.world.t3dFogMode__ != "TRANSPARENT" and not context.world.t3dSyncFogColor__:
-                box.prop(context.world, "t3dFogColor__")
-
             box.prop(context.world, "t3dSyncFogColor__")
+
+            row = box.row()
+            row.prop(context.world, "t3dFogColor__")
+            row.enabled = context.world.t3dFogMode__ != "TRANSPARENT" and not context.world.t3dSyncFogColor__
 
             box.prop(context.world, "t3dFogDithered__")            
             box.prop(context.world, "t3dFogRangeStart__", slider=True)
             box.prop(context.world, "t3dFogRangeEnd__", slider=True)
         
 # The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
-def globalGet(propName):
-    if propName in bpy.data.scenes[0]:
-        return bpy.data.scenes[0][propName]
+def globalGet(propName, default=None):
+    if propName not in bpy.data.scenes[0] and default is not None:
+        bpy.data.scenes[0][propName] = default
+        
+    return bpy.data.scenes[0][propName]
 
 def globalSet(propName, value):
     bpy.data.scenes[0][propName] = value
@@ -963,7 +970,10 @@ def export():
             worldData["ambient energy"] = 1
 
         if "t3dClearColor__" in world:
-            worldData["clear color"] = world.t3dClearColor__
+            if "t3dSyncClearColor__" in world and world["t3dSyncClearColor__"]:
+                worldData["clear color"] = worldData["ambient color"]
+            else:
+                worldData["clear color"] = world.t3dClearColor__
         if "t3dFogMode__" in world:
             worldData["fog mode"] = world.t3dFogMode__
         if "t3dFogDithered__" in world:
@@ -972,7 +982,7 @@ def export():
             worldData["fog curve"] = world.t3dFogCurve__
         if "t3dFogColor__" in world:
             if "t3dSyncFogColor__" in world and world["t3dSyncFogColor__"] and "t3dClearColor__" in world:
-                worldData["fog color"] = world.t3dClearColor__
+                worldData["fog color"] = worldData["clear color"]
             else:
                 worldData["fog color"] = world.t3dFogColor__
         if "t3dFogRangeStart__" in world:
@@ -987,6 +997,8 @@ def export():
     currentFrame = {}
 
     autoSubdivides = {}
+
+    ogVertexColorNames = {}
 
     for scene in bpy.data.scenes:
 
@@ -1022,6 +1034,10 @@ def export():
                             vertexColors = [layer.name for layer in obj.data.color_attributes]
                             obj.data["t3dVertexColorNames__"] = vertexColors
                             obj.data["t3dActiveVertexColorIndex__"] = obj.data.color_attributes.render_color_index
+                            ogVertexColorNames[obj.data] = list(layer.name for layer in obj.data.color_attributes)
+                            
+                            for layer in obj.data.color_attributes:
+                                layer.name = "_"+layer.name # because the GLTF exporter now only exports color attributes if their layer names start with "_" for whatever reason~~~
 
                         if obj.t3dObjectType__ == 'GRID':
                             gridConnections = {}
@@ -1060,7 +1076,7 @@ def export():
                         obj["t3dPathPoints__"] = points
                         obj["t3dPathCyclic__"] = spline.use_cyclic_u or spline.use_cyclic_v
 
-                    if obj.instance_type == "COLLECTION":
+                    if obj.instance_type == "COLLECTION" and obj.instance_collection is not None:
                         obj["t3dInstanceCollection__"] = obj.instance_collection.name
                         ogCollections[obj] = obj.instance_collection
                         # We don't want to export a linked collection directly, as that 1) will duplicate mesh data from externally linked blend files to put into the GLTF file, and
@@ -1224,7 +1240,7 @@ def export():
         for marker in action.pose_markers:
             markerInfo = {
                 "name": marker.name,
-                "time": marker.frame / globalGet("t3dPlaybackFPS__"),
+                "time": marker.frame / globalGet("t3dPlaybackFPS__", 60), # If the playback FPS isn't specifically set, default to 60
             }
             markers.append(markerInfo)
         if len(markers) > 0:
@@ -1239,6 +1255,8 @@ def export():
         export_cameras=scene.t3dExportCameras__, 
         export_lights=scene.t3dExportLights__, 
         export_keep_originals=not scene.t3dPackTextures__,
+        
+        export_colors=True,
         export_attributes=True,
         
         export_current_frame=False,
@@ -1314,6 +1332,8 @@ def export():
                             del(obj.data["t3dVertexColorNames__"])
                         if "t3dActiveVertexColorIndex__" in obj.data:
                             del(obj.data["t3dActiveVertexColorIndex__"])
+                        for i, layer in enumerate(obj.data.color_attributes):
+                            layer.name = ogVertexColorNames[obj.data][i]
                         if obj.t3dObjectType__ == 'GRID':
                             del(obj.data["t3dGrid__"])
                             del(obj["t3dGridConnections__"])
@@ -1395,20 +1415,14 @@ objectProps = {
 
 
 def getSectorRendering(self):
-    s = globalGet("t3dSectorRendering__")
-    if s is None:
-        s = False
-    return s
+    return globalGet("t3dSectorRendering__", False)
 
 def setSectorRendering(self, value):
     globalSet("t3dSectorRendering__", value)
 
 
 def getSectorRenderDepth(self):
-    s = globalGet("t3dSectorRenderDepth__")
-    if s is None:
-        s = False
-    return s
+    return globalGet("t3dSectorRenderDepth__", 0)
 
 def setSectorRenderDepth(self, value):
     globalSet("t3dSectorRenderDepth__", value)
@@ -1416,9 +1430,7 @@ def setSectorRenderDepth(self, value):
 #####
 
 def getRenderResolutionW(self):
-    s = globalGet("t3dRenderResolutionW__")
-    if s is None:
-        s = 640
+    s = globalGet("t3dRenderResolutionW__", 640)
     bpy.context.scene.render.resolution_x = s
     return s
 
@@ -1429,9 +1441,7 @@ def setRenderResolutionW(self, value):
 #####
 
 def getRenderResolutionH(self):
-    s = globalGet("t3dRenderResolutionH__")
-    if s is None:
-        s = 360
+    s = globalGet("t3dRenderResolutionH__", 360)
     bpy.context.scene.render.resolution_y = s
     return s
 
@@ -1442,9 +1452,7 @@ def setRenderResolutionH(self, value):
 ######
 
 def getPlaybackFPS(self):
-    s = globalGet("t3dPlaybackFPS__")
-    if s is None:
-        s = 60
+    s = globalGet("t3dPlaybackFPS__", 60)
     bpy.context.scene.render.fps = s
     return s
 
@@ -1461,10 +1469,7 @@ def setPlaybackFPS(self, value):
 # row.prop(context.scene.render, "fps")
 
 def getExportOnSave(self):
-    s = globalGet("t3dExportOnSave__")
-    if s is None:
-        s = False
-    return s
+    return globalGet("t3dExportOnSave__", False)
 
 def setExportOnSave(self, value):
     globalSet("t3dExportOnSave__", value)
@@ -1472,10 +1477,7 @@ def setExportOnSave(self, value):
 
 
 def getExportFilepath(self):
-    fp = globalGet("t3dExportFilepath__")
-    if fp is None:
-        fp = ""
-    return fp
+    return globalGet("t3dExportFilepath__", "")
 
 def setExportFilepath(self, value):
     globalSet("t3dExportFilepath__", value)
@@ -1483,10 +1485,7 @@ def setExportFilepath(self, value):
 
 
 def getExportFormat(self):
-    f = globalGet("t3dExportFormat__")
-    if f is None:
-        f = 0
-    return f
+    return globalGet("t3dExportFormat__", 0)
 
 def setExportFormat(self, value):
     globalSet("t3dExportFormat__", value)
@@ -1494,10 +1493,7 @@ def setExportFormat(self, value):
 
 
 def getExportCameras(self):
-    c = globalGet("t3dExportCameras__")
-    if c is None:
-        c = True
-    return c
+    return globalGet("t3dExportCameras__", True)
 
 def setExportCameras(self, value):
     globalSet("t3dExportCameras__", value)
@@ -1505,39 +1501,27 @@ def setExportCameras(self, value):
 
 
 def getExportLights(self):
-    l = globalGet("t3dExportLights__")
-    if l is None:
-        l = True
-    return l
+    return globalGet("t3dExportLights__", True)
 
 def setExportLights(self, value):
     globalSet("t3dExportLights__", value)
 
 
 def getPackTextures(self):
-    l = globalGet("t3dPackTextures__")
-    if l is None:
-        l = False
-    return l
+    return globalGet("t3dPackTextures__", False)
 
 def setPackTextures(self, value):
     globalSet("t3dPackTextures__", value)
 
 
 def getAnimationSampling(self):
-    l = globalGet("t3dAnimationSampling__")
-    if l is None:
-        l = True
-    return l
+    return globalGet("t3dAnimationSampling__", True)
 
 def setAnimationSampling(self, value):
     globalSet("t3dAnimationSampling__", value)
 
 def getAnimationInterpolation(self):
-    l = globalGet("t3dAnimationInterpolation__")
-    if l is None:
-        l = True
-    return l
+    return globalGet("t3dAnimationInterpolation__", True)
 
 def setAnimationInterpolation(self, value):
     globalSet("t3dAnimationInterpolation__", value)
@@ -1697,10 +1681,11 @@ def register():
     bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
     bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
-    
+        
     bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
     
     bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.World.t3dSyncClearColor__ = bpy.props.BoolProperty(name="Sync Clear Color to World Color", description="If the clear color should be a copy of the world's color")
     bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="The color of fog for this world", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dSyncFogColor__ = bpy.props.BoolProperty(name="Sync Fog Color to Clear Color", description="If the fog color should be a copy of the screen clear color")
     bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")

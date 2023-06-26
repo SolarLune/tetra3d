@@ -138,7 +138,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			if et, exists := globalExporterSettings["t3dPackTextures__"]; exists {
 				t3dExport = true
-				exportedTextures = et.(float64) > 0
+				exportedTextures = et.(bool)
 			}
 
 			if col, exists := globalExporterSettings["t3dCollections__"]; exists {
@@ -159,7 +159,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			}
 
 			if on, exists := globalExporterSettings["t3dSectorRendering__"]; exists {
-				sectorRendering = on.(float64) > 0
+				sectorRendering = on.(bool)
 			}
 
 			if depth, exists := globalExporterSettings["t3dSectorRenderDepth__"]; exists {
@@ -246,8 +246,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					case 0:
 						newMat.BillboardMode = BillboardModeNone
 					case 1:
-						newMat.BillboardMode = BillboardModeXZ
+						newMat.BillboardMode = BillboardModeFixedVertical
 					case 2:
+						newMat.BillboardMode = BillboardModeHorizontal
+					case 3:
 						newMat.BillboardMode = BillboardModeAll
 					}
 

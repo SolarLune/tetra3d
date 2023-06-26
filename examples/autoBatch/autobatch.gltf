@@ -1,1429 +1,1439 @@
 {
-    "asset" : {
-        "generator" : "Khronos glTF Blender I/O v3.5.13",
-        "version" : "2.0"
-    },
-    "extensionsUsed" : [
-        "KHR_lights_punctual"
-    ],
-    "extensionsRequired" : [
-        "KHR_lights_punctual"
-    ],
-    "extensions" : {
-        "KHR_lights_punctual" : {
-            "lights" : [
-                {
-                    "color" : [
-                        1,
-                        1,
-                        1
-                    ],
-                    "intensity" : 159.15494309189535,
-                    "type" : "point",
-                    "name" : "Point"
-                }
-            ]
-        }
-    },
-    "scene" : 0,
-    "scenes" : [
-        {
-            "extras" : {
-                "t3dPackTextures__" : 1,
-                "t3dExportFormat__" : 2,
-                "t3dExportOnSave__" : 1,
-                "t3dCameraResolution__" : [
-                    1920,
-                    1080
-                ],
-                "t3dCollections__" : {
-                    "Collection" : {
-                        "objects" : [
-                            "Cube",
-                            "Point",
-                            "Plane",
-                            "Cube.001",
-                            "Cube.002",
-                            "Cube.003",
-                            "Cube.004",
-                            "Cube.005",
-                            "Cube.006",
-                            "Cube.007",
-                            "Cube.008",
-                            "Cube.009",
-                            "Cube.010",
-                            "Cube.011",
-                            "Cube.012",
-                            "Cube.013",
-                            "Cube.014",
-                            "Cube.015",
-                            "Cube.016",
-                            "Cube.017",
-                            "Cube.018",
-                            "Cube.019",
-                            "Cube.020",
-                            "Cube.021",
-                            "Cube.022",
-                            "Cube.023",
-                            "Cube.024",
-                            "Cube.025",
-                            "Cube.026",
-                            "Cube.027",
-                            "Cube.028",
-                            "Cube.029",
-                            "Cube.030",
-                            "Cube.031",
-                            "Cube.032",
-                            "Cube.033",
-                            "Cube.034",
-                            "Cube.035",
-                            "Cube.036",
-                            "Cube.037",
-                            "Cube.038",
-                            "Cube.039",
-                            "Cube.040",
-                            "Cube.041",
-                            "Cube.042",
-                            "Cube.043",
-                            "Cube.044",
-                            "Cube.045",
-                            "Cube.046",
-                            "Cube.047",
-                            "Cube.048",
-                            "Cube.049",
-                            "Cube.050",
-                            "Cube.051",
-                            "Cube.052",
-                            "Cube.053"
-                        ],
-                        "offset" : [
-                            0.0,
-                            0.0,
-                            0.0
-                        ]
-                    }
-                },
-                "t3dWorlds__" : {
-                    "World" : {
-                        "ambient color" : [
-                            0.05087608844041824,
-                            0.05087608844041824,
-                            0.05087608844041824,
-                            1.0
-                        ],
-                        "ambient energy" : 1.0
-                    }
-                },
-                "t3dCurrentWorld__" : "World"
-            },
-            "name" : "Scene",
-            "nodes" : [
-                0,
-                1,
-                2,
-                3,
-                4,
-                5,
-                6,
-                7,
-                8,
-                9,
-                10,
-                11,
-                12,
-                13,
-                14,
-                15,
-                16,
-                17,
-                18,
-                19,
-                20,
-                21,
-                22,
-                23,
-                24,
-                25,
-                26,
-                27,
-                28,
-                29,
-                30,
-                31,
-                32,
-                33,
-                34,
-                35,
-                36,
-                37,
-                38,
-                39,
-                40,
-                41,
-                42,
-                43,
-                44,
-                45,
-                46,
-                47,
-                48,
-                49,
-                50,
-                51,
-                52,
-                53,
-                54,
-                55
-            ]
-        }
-    ],
-    "nodes" : [
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube",
-            "translation" : [
-                -3,
-                0,
-                0
-            ]
-        },
-        {
-            "extensions" : {
-                "KHR_lights_punctual" : {
-                    "light" : 0
-                }
-            },
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    0.0,
-                    0.0,
-                    6.0
-                ]
-            },
-            "name" : "Point",
-            "rotation" : [
-                -0.7071068286895752,
-                0,
-                0,
-                0.7071068286895752
-            ],
-            "translation" : [
-                0,
-                6,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 0,
-                "t3dOriginalLocalPosition__" : [
-                    0.0,
-                    0.0,
-                    -1.0
-                ]
-            },
-            "mesh" : 1,
-            "name" : "Plane",
-            "translation" : [
-                0,
-                -1,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.001",
-            "translation" : [
-                -6,
-                0,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.002",
-            "translation" : [
-                -9,
-                0,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.003",
-            "translation" : [
-                -9,
-                0,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.004",
-            "translation" : [
-                -6,
-                0,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.005",
-            "translation" : [
-                -3,
-                0,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    -3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.006",
-            "translation" : [
-                -3,
-                0,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    -3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.007",
-            "translation" : [
-                -6,
-                0,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    -3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.008",
-            "translation" : [
-                -9,
-                0,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.009",
-            "translation" : [
-                3,
-                0,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.010",
-            "translation" : [
-                6,
-                0,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.011",
-            "translation" : [
-                9,
-                0,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.012",
-            "translation" : [
-                3,
-                0,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.013",
-            "translation" : [
-                6,
-                0,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    0.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.014",
-            "translation" : [
-                9,
-                0,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    -3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.015",
-            "translation" : [
-                3,
-                0,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    -3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.016",
-            "translation" : [
-                6,
-                0,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    -3.0,
-                    0.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.017",
-            "translation" : [
-                9,
-                0,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    0.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.018",
-            "translation" : [
-                -3,
-                3,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    0.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.019",
-            "translation" : [
-                -6,
-                3,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    0.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.020",
-            "translation" : [
-                -9,
-                3,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.021",
-            "translation" : [
-                -9,
-                3,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.022",
-            "translation" : [
-                -6,
-                3,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.023",
-            "translation" : [
-                -3,
-                3,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    -3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.024",
-            "translation" : [
-                -3,
-                3,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    -3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.025",
-            "translation" : [
-                -6,
-                3,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    -3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.026",
-            "translation" : [
-                -9,
-                3,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    0.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.027",
-            "translation" : [
-                -3,
-                6,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    0.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.028",
-            "translation" : [
-                -6,
-                6,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    0.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.029",
-            "translation" : [
-                -9,
-                6,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.030",
-            "translation" : [
-                -9,
-                6,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.031",
-            "translation" : [
-                -6,
-                6,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.032",
-            "translation" : [
-                -3,
-                6,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -3.0,
-                    -3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.033",
-            "translation" : [
-                -3,
-                6,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -6.0,
-                    -3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.034",
-            "translation" : [
-                -6,
-                6,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 1,
-                "t3dOriginalLocalPosition__" : [
-                    -9.0,
-                    -3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 0,
-            "name" : "Cube.035",
-            "translation" : [
-                -9,
-                6,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.036",
-            "translation" : [
-                3,
-                3,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.037",
-            "translation" : [
-                6,
-                3,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.038",
-            "translation" : [
-                9,
-                3,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    0.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.039",
-            "translation" : [
-                3,
-                3,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    0.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.040",
-            "translation" : [
-                6,
-                3,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    0.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.041",
-            "translation" : [
-                9,
-                3,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    -3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.042",
-            "translation" : [
-                3,
-                3,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    -3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.043",
-            "translation" : [
-                6,
-                3,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    -3.0,
-                    3.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.044",
-            "translation" : [
-                9,
-                3,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.045",
-            "translation" : [
-                3,
-                6,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.046",
-            "translation" : [
-                6,
-                6,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.047",
-            "translation" : [
-                9,
-                6,
-                -3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    0.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.048",
-            "translation" : [
-                3,
-                6,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    0.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.049",
-            "translation" : [
-                6,
-                6,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    0.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.050",
-            "translation" : [
-                9,
-                6,
-                0
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    3.0,
-                    -3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.051",
-            "translation" : [
-                3,
-                6,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    6.0,
-                    -3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.052",
-            "translation" : [
-                6,
-                6,
-                3
-            ]
-        },
-        {
-            "extras" : {
-                "t3dAutoBatch__" : 2,
-                "t3dOriginalLocalPosition__" : [
-                    9.0,
-                    -3.0,
-                    6.0
-                ]
-            },
-            "mesh" : 2,
-            "name" : "Cube.053",
-            "translation" : [
-                9,
-                6,
-                3
-            ]
-        }
-    ],
-    "materials" : [
-        {
-            "name" : "Vertex Color",
-            "pbrMetallicRoughness" : {
-                "metallicFactor" : 0,
-                "roughnessFactor" : 0.5
-            }
-        }
-    ],
-    "meshes" : [
-        {
-            "extras" : {
-                "t3dVertexColorNames__" : [
-                    "Col"
-                ],
-                "t3dActiveVertexColorIndex__" : 0
-            },
-            "name" : "Cube.001",
-            "primitives" : [
-                {
-                    "attributes" : {
-                        "COLOR_0" : 0,
-                        "POSITION" : 1,
-                        "TEXCOORD_0" : 2,
-                        "NORMAL" : 3
-                    },
-                    "indices" : 4,
-                    "material" : 0
-                }
-            ]
-        },
-        {
-            "extras" : {
-                "t3dVertexColorNames__" : [
-                    "Col"
-                ],
-                "t3dActiveVertexColorIndex__" : 0
-            },
-            "name" : "Plane",
-            "primitives" : [
-                {
-                    "attributes" : {
-                        "COLOR_0" : 5,
-                        "POSITION" : 6,
-                        "TEXCOORD_0" : 7,
-                        "NORMAL" : 8
-                    },
-                    "indices" : 9,
-                    "material" : 0
-                }
-            ]
-        },
-        {
-            "extras" : {
-                "t3dVertexColorNames__" : [
-                    "Col"
-                ],
-                "t3dActiveVertexColorIndex__" : 0
-            },
-            "name" : "Cube.002",
-            "primitives" : [
-                {
-                    "attributes" : {
-                        "COLOR_0" : 10,
-                        "POSITION" : 11,
-                        "TEXCOORD_0" : 12,
-                        "NORMAL" : 13
-                    },
-                    "indices" : 4,
-                    "material" : 0
-                }
-            ]
-        }
-    ],
-    "accessors" : [
-        {
-            "bufferView" : 0,
-            "componentType" : 5123,
-            "count" : 24,
-            "normalized" : true,
-            "type" : "VEC4"
-        },
-        {
-            "bufferView" : 1,
-            "componentType" : 5126,
-            "count" : 24,
-            "max" : [
-                1,
-                1,
-                1
-            ],
-            "min" : [
-                -1,
-                -1,
-                -1
-            ],
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 2,
-            "componentType" : 5126,
-            "count" : 24,
-            "type" : "VEC2"
-        },
-        {
-            "bufferView" : 3,
-            "componentType" : 5126,
-            "count" : 24,
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 4,
-            "componentType" : 5123,
-            "count" : 36,
-            "type" : "SCALAR"
-        },
-        {
-            "bufferView" : 5,
-            "componentType" : 5123,
-            "count" : 25,
-            "normalized" : true,
-            "type" : "VEC4"
-        },
-        {
-            "bufferView" : 6,
-            "componentType" : 5126,
-            "count" : 25,
-            "max" : [
-                10.112089157104492,
-                0,
-                10.112089157104492
-            ],
-            "min" : [
-                -10.112089157104492,
-                0,
-                -10.112089157104492
-            ],
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 7,
-            "componentType" : 5126,
-            "count" : 25,
-            "type" : "VEC2"
-        },
-        {
-            "bufferView" : 8,
-            "componentType" : 5126,
-            "count" : 25,
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 9,
-            "componentType" : 5123,
-            "count" : 96,
-            "type" : "SCALAR"
-        },
-        {
-            "bufferView" : 10,
-            "componentType" : 5123,
-            "count" : 24,
-            "normalized" : true,
-            "type" : "VEC4"
-        },
-        {
-            "bufferView" : 11,
-            "componentType" : 5126,
-            "count" : 24,
-            "max" : [
-                1,
-                1,
-                1
-            ],
-            "min" : [
-                -1,
-                -1,
-                -1
-            ],
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 12,
-            "componentType" : 5126,
-            "count" : 24,
-            "type" : "VEC2"
-        },
-        {
-            "bufferView" : 13,
-            "componentType" : 5126,
-            "count" : 24,
-            "type" : "VEC3"
-        }
-    ],
-    "bufferViews" : [
-        {
-            "buffer" : 0,
-            "byteLength" : 192,
-            "byteOffset" : 0,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 288,
-            "byteOffset" : 192,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 192,
-            "byteOffset" : 480,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 288,
-            "byteOffset" : 672,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 72,
-            "byteOffset" : 960,
-            "target" : 34963
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 200,
-            "byteOffset" : 1032,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 300,
-            "byteOffset" : 1232,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 200,
-            "byteOffset" : 1532,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 300,
-            "byteOffset" : 1732,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 192,
-            "byteOffset" : 2032,
-            "target" : 34963
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 192,
-            "byteOffset" : 2224,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 288,
-            "byteOffset" : 2416,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 192,
-            "byteOffset" : 2704,
-            "target" : 34962
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 288,
-            "byteOffset" : 2896,
-            "target" : 34962
-        }
-    ],
-    "buffers" : [
-        {
-            "byteLength" : 3184,
-            "uri" : "data:application/octet-stream;base64,AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AAAAPgAAgD4AAMA+AAAAAAAAwD4AAIA/AAAgPwAAAAAAACA/AACAPwAAYD8AAIA+AAAAPgAAAD8AAMA+AABAPwAAwD4AAEA/AAAgPwAAQD8AACA/AABAPwAAYD8AAAA/AADAPgAAgD4AAMA+AACAPgAAwD4AAIA+AAAgPwAAgD4AACA/AACAPgAAID8AAIA+AADAPgAAAD8AAMA+AAAAPwAAwD4AAAA/AAAgPwAAAD8AACA/AAAAPwAAID8AAAA/AAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAvwAAAAAAAACAAAAAAAAAAAAAAIA/AACAvwAAAAAAAACAAAAAAAAAgD8AAACAAAAAAAAAgL8AAACAAACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAACAAACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAACAAACAPwAAAAAAAACAAgAEAAkAAgAJAAcACAAKABUACAAVABMAFAAXABEAFAARAA4ADQAPAAMADQADAAEABgASAAwABgAMAAAAFgALAAUAFgAFABAA//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8eyyHBAAAAAB7LIUEeyyFBAAAAAB7LIUEeyyHBAAAAAB7LIcEeyyFBAAAAAB7LIcEeyyHBAAAAAAAAAIAAAAAAAAAAAB7LIUEeyyFBAAAAAAAAAIAAAAAAAAAAAB7LIcEAAAAAAAAAAAAAAIAeyyHBAAAAAB7LoUAey6FAAAAAAB7LIUEeyyFBAAAAAB7LocAey6HAAAAAAB7LIcEeyyHBAAAAAB7LocAey6HAAAAAAB7LIUEeyyFBAAAAAB7LoUAey6FAAAAAAB7LIcEAAAAAAAAAAB7LocAAAAAAAAAAAB7LoUAey6HAAAAAAAAAAIAey6FAAAAAAAAAAIAey6FAAAAAAB7LoUAey6HAAAAAAB7LoUAey6HAAAAAAB7LocAey6FAAAAAAB7LocAAAAAAAACAPwAAgD8AAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAAA/AAAAPwAAgD8AAIA/AAAAPwAAAD8AAAAAAAAAPwAAAD8AAAAAAABAPwAAQD8AAIA/AACAPwAAgD4AAIA+AAAAAAAAAAAAAIA+AACAPgAAgD8AAIA/AABAPwAAQD8AAAAAAAAAPwAAgD4AAAA/AABAPwAAgD4AAAA/AABAPwAAAD8AAEA/AABAPwAAgD4AAEA/AACAPgAAgD4AAEA/AACAPgAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgBgACwADABgAAwAQABcAEQAHABcABwAMABYAEgAIABYACAATABUADwAGABUABgAUABIAFQAUABIAFAAIAAUACgAVAAUAFQASAAoAAQAPAAoADwAVAAkAFgATAAkAEwAEAAAADgAWAAAAFgAJAA4ABQASAA4AEgAWAA0AFwAMAA0ADAACAAQAEwAXAAQAFwANABMACAARABMAEQAXABEAGAAQABEAEAAHAAgAFAAYAAgAGAARABQABgALABQACwAYAP//iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD//wAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAAD4AAIA+AADAPgAAAAAAAMA+AACAPwAAID8AAAAAAAAgPwAAgD8AAGA/AACAPgAAAD4AAAA/AADAPgAAQD8AAMA+AABAPwAAID8AAEA/AAAgPwAAQD8AAGA/AAAAPwAAwD4AAIA+AADAPgAAgD4AAMA+AACAPgAAID8AAIA+AAAgPwAAgD4AACA/AACAPgAAwD4AAAA/AADAPgAAAD8AAMA+AAAAPwAAID8AAAA/AAAgPwAAAD8AACA/AAAAPwAAAAAAAIC/AAAAgAAAAAAAAAAAAACAPwAAgL8AAAAAAAAAgAAAAAAAAAAAAACAPwAAgL8AAAAAAAAAgAAAAAAAAIA/AAAAgAAAAAAAAIC/AAAAgAAAgL8AAAAAAAAAgAAAAAAAAAAAAACAvwAAgL8AAAAAAAAAgAAAAAAAAAAAAACAvwAAAAAAAIA/AAAAgAAAAAAAAIC/AAAAgAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAgAAAAAAAAAAAAACAPwAAAAAAAIA/AAAAgAAAgD8AAAAAAAAAgAAAAAAAAIC/AAAAgAAAAAAAAAAAAACAvwAAgD8AAAAAAAAAgAAAAAAAAAAAAACAvwAAAAAAAIA/AAAAgAAAgD8AAAAAAAAAgA=="
-        }
-    ]
+	"asset":{
+		"generator":"Khronos glTF Blender I/O v3.5.30",
+		"version":"2.0"
+	},
+	"extensionsUsed":[
+		"KHR_lights_punctual"
+	],
+	"extensionsRequired":[
+		"KHR_lights_punctual"
+	],
+	"extensions":{
+		"KHR_lights_punctual":{
+			"lights":[
+				{
+					"color":[
+						1,
+						1,
+						1
+					],
+					"intensity":159.15494309189535,
+					"type":"point",
+					"name":"Point"
+				}
+			]
+		}
+	},
+	"scene":0,
+	"scenes":[
+		{
+			"extras":{
+				"t3dPackTextures__":true,
+				"t3dExportFormat__":2,
+				"t3dExportOnSave__":true,
+				"t3dCameraResolution__":[
+					1920,
+					1080
+				],
+				"t3dExportFilepath__":"",
+				"t3dExportCameras__":true,
+				"t3dExportLights__":true,
+				"t3dRenderResolutionW__":640,
+				"t3dRenderResolutionH__":360,
+				"t3dSectorRendering__":false,
+				"t3dSectorRenderDepth__":0,
+				"t3dPlaybackFPS__":60,
+				"t3dAnimationSampling__":true,
+				"t3dAnimationInterpolation__":true,
+				"t3dCollections__":{
+					"Collection":{
+						"objects":[
+							"Cube",
+							"Point",
+							"Plane",
+							"Cube.001",
+							"Cube.002",
+							"Cube.003",
+							"Cube.004",
+							"Cube.005",
+							"Cube.006",
+							"Cube.007",
+							"Cube.008",
+							"Cube.009",
+							"Cube.010",
+							"Cube.011",
+							"Cube.012",
+							"Cube.013",
+							"Cube.014",
+							"Cube.015",
+							"Cube.016",
+							"Cube.017",
+							"Cube.018",
+							"Cube.019",
+							"Cube.020",
+							"Cube.021",
+							"Cube.022",
+							"Cube.023",
+							"Cube.024",
+							"Cube.025",
+							"Cube.026",
+							"Cube.027",
+							"Cube.028",
+							"Cube.029",
+							"Cube.030",
+							"Cube.031",
+							"Cube.032",
+							"Cube.033",
+							"Cube.034",
+							"Cube.035",
+							"Cube.036",
+							"Cube.037",
+							"Cube.038",
+							"Cube.039",
+							"Cube.040",
+							"Cube.041",
+							"Cube.042",
+							"Cube.043",
+							"Cube.044",
+							"Cube.045",
+							"Cube.046",
+							"Cube.047",
+							"Cube.048",
+							"Cube.049",
+							"Cube.050",
+							"Cube.051",
+							"Cube.052",
+							"Cube.053"
+						],
+						"offset":[
+							0.0,
+							0.0,
+							0.0
+						]
+					}
+				},
+				"t3dWorlds__":{
+					"World":{
+						"ambient color":[
+							0.05087608844041824,
+							0.05087608844041824,
+							0.05087608844041824,
+							1.0
+						],
+						"ambient energy":1.0
+					}
+				},
+				"t3dCurrentWorld__":"World"
+			},
+			"name":"Scene",
+			"nodes":[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24,
+				25,
+				26,
+				27,
+				28,
+				29,
+				30,
+				31,
+				32,
+				33,
+				34,
+				35,
+				36,
+				37,
+				38,
+				39,
+				40,
+				41,
+				42,
+				43,
+				44,
+				45,
+				46,
+				47,
+				48,
+				49,
+				50,
+				51,
+				52,
+				53,
+				54,
+				55
+			]
+		}
+	],
+	"nodes":[
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					0.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube",
+			"translation":[
+				-3,
+				0,
+				0
+			]
+		},
+		{
+			"extensions":{
+				"KHR_lights_punctual":{
+					"light":0
+				}
+			},
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					0.0,
+					0.0,
+					6.0
+				]
+			},
+			"name":"Point",
+			"rotation":[
+				-0.7071068286895752,
+				0,
+				0,
+				0.7071068286895752
+			],
+			"translation":[
+				0,
+				6,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":0,
+				"t3dOriginalLocalPosition__":[
+					0.0,
+					0.0,
+					-1.0
+				]
+			},
+			"mesh":1,
+			"name":"Plane",
+			"translation":[
+				0,
+				-1,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					0.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.001",
+			"translation":[
+				-6,
+				0,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					0.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.002",
+			"translation":[
+				-9,
+				0,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					3.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.003",
+			"translation":[
+				-9,
+				0,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					3.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.004",
+			"translation":[
+				-6,
+				0,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					3.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.005",
+			"translation":[
+				-3,
+				0,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					-3.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.006",
+			"translation":[
+				-3,
+				0,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					-3.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.007",
+			"translation":[
+				-6,
+				0,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					-3.0,
+					0.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.008",
+			"translation":[
+				-9,
+				0,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					3.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.009",
+			"translation":[
+				3,
+				0,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					3.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.010",
+			"translation":[
+				6,
+				0,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					3.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.011",
+			"translation":[
+				9,
+				0,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					0.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.012",
+			"translation":[
+				3,
+				0,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					0.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.013",
+			"translation":[
+				6,
+				0,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					0.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.014",
+			"translation":[
+				9,
+				0,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					-3.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.015",
+			"translation":[
+				3,
+				0,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					-3.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.016",
+			"translation":[
+				6,
+				0,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					-3.0,
+					0.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.017",
+			"translation":[
+				9,
+				0,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					0.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.018",
+			"translation":[
+				-3,
+				3,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					0.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.019",
+			"translation":[
+				-6,
+				3,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					0.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.020",
+			"translation":[
+				-9,
+				3,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					3.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.021",
+			"translation":[
+				-9,
+				3,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					3.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.022",
+			"translation":[
+				-6,
+				3,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					3.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.023",
+			"translation":[
+				-3,
+				3,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					-3.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.024",
+			"translation":[
+				-3,
+				3,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					-3.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.025",
+			"translation":[
+				-6,
+				3,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					-3.0,
+					3.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.026",
+			"translation":[
+				-9,
+				3,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					0.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.027",
+			"translation":[
+				-3,
+				6,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					0.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.028",
+			"translation":[
+				-6,
+				6,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					0.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.029",
+			"translation":[
+				-9,
+				6,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					3.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.030",
+			"translation":[
+				-9,
+				6,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					3.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.031",
+			"translation":[
+				-6,
+				6,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					3.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.032",
+			"translation":[
+				-3,
+				6,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-3.0,
+					-3.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.033",
+			"translation":[
+				-3,
+				6,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-6.0,
+					-3.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.034",
+			"translation":[
+				-6,
+				6,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":1,
+				"t3dOriginalLocalPosition__":[
+					-9.0,
+					-3.0,
+					6.0
+				]
+			},
+			"mesh":0,
+			"name":"Cube.035",
+			"translation":[
+				-9,
+				6,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					3.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.036",
+			"translation":[
+				3,
+				3,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					3.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.037",
+			"translation":[
+				6,
+				3,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					3.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.038",
+			"translation":[
+				9,
+				3,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					0.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.039",
+			"translation":[
+				3,
+				3,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					0.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.040",
+			"translation":[
+				6,
+				3,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					0.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.041",
+			"translation":[
+				9,
+				3,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					-3.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.042",
+			"translation":[
+				3,
+				3,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					-3.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.043",
+			"translation":[
+				6,
+				3,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					-3.0,
+					3.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.044",
+			"translation":[
+				9,
+				3,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					3.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.045",
+			"translation":[
+				3,
+				6,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					3.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.046",
+			"translation":[
+				6,
+				6,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					3.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.047",
+			"translation":[
+				9,
+				6,
+				-3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					0.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.048",
+			"translation":[
+				3,
+				6,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					0.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.049",
+			"translation":[
+				6,
+				6,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					0.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.050",
+			"translation":[
+				9,
+				6,
+				0
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					3.0,
+					-3.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.051",
+			"translation":[
+				3,
+				6,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					6.0,
+					-3.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.052",
+			"translation":[
+				6,
+				6,
+				3
+			]
+		},
+		{
+			"extras":{
+				"t3dAutoBatch__":2,
+				"t3dOriginalLocalPosition__":[
+					9.0,
+					-3.0,
+					6.0
+				]
+			},
+			"mesh":2,
+			"name":"Cube.053",
+			"translation":[
+				9,
+				6,
+				3
+			]
+		}
+	],
+	"materials":[
+		{
+			"name":"Vertex Color",
+			"pbrMetallicRoughness":{
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
+		}
+	],
+	"meshes":[
+		{
+			"extras":{
+				"t3dVertexColorNames__":[
+					"Col"
+				],
+				"t3dActiveVertexColorIndex__":0
+			},
+			"name":"Cube.001",
+			"primitives":[
+				{
+					"attributes":{
+						"COLOR_0":0,
+						"POSITION":1,
+						"TEXCOORD_0":2,
+						"NORMAL":3
+					},
+					"indices":4,
+					"material":0
+				}
+			]
+		},
+		{
+			"extras":{
+				"t3dVertexColorNames__":[
+					"Col"
+				],
+				"t3dActiveVertexColorIndex__":0
+			},
+			"name":"Plane",
+			"primitives":[
+				{
+					"attributes":{
+						"COLOR_0":5,
+						"POSITION":6,
+						"TEXCOORD_0":7,
+						"NORMAL":8
+					},
+					"indices":9,
+					"material":0
+				}
+			]
+		},
+		{
+			"extras":{
+				"t3dVertexColorNames__":[
+					"Col"
+				],
+				"t3dActiveVertexColorIndex__":0
+			},
+			"name":"Cube.002",
+			"primitives":[
+				{
+					"attributes":{
+						"COLOR_0":10,
+						"POSITION":11,
+						"TEXCOORD_0":12,
+						"NORMAL":13
+					},
+					"indices":4,
+					"material":0
+				}
+			]
+		}
+	],
+	"accessors":[
+		{
+			"bufferView":0,
+			"componentType":5123,
+			"count":24,
+			"normalized":true,
+			"type":"VEC4"
+		},
+		{
+			"bufferView":1,
+			"componentType":5126,
+			"count":24,
+			"max":[
+				1,
+				1,
+				1
+			],
+			"min":[
+				-1,
+				-1,
+				-1
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":2,
+			"componentType":5126,
+			"count":24,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":3,
+			"componentType":5126,
+			"count":24,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":4,
+			"componentType":5123,
+			"count":36,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":5,
+			"componentType":5123,
+			"count":25,
+			"normalized":true,
+			"type":"VEC4"
+		},
+		{
+			"bufferView":6,
+			"componentType":5126,
+			"count":25,
+			"max":[
+				10.112089157104492,
+				0,
+				10.112089157104492
+			],
+			"min":[
+				-10.112089157104492,
+				0,
+				-10.112089157104492
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":7,
+			"componentType":5126,
+			"count":25,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":8,
+			"componentType":5126,
+			"count":25,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":9,
+			"componentType":5123,
+			"count":96,
+			"type":"SCALAR"
+		},
+		{
+			"bufferView":10,
+			"componentType":5123,
+			"count":24,
+			"normalized":true,
+			"type":"VEC4"
+		},
+		{
+			"bufferView":11,
+			"componentType":5126,
+			"count":24,
+			"max":[
+				1,
+				1,
+				1
+			],
+			"min":[
+				-1,
+				-1,
+				-1
+			],
+			"type":"VEC3"
+		},
+		{
+			"bufferView":12,
+			"componentType":5126,
+			"count":24,
+			"type":"VEC2"
+		},
+		{
+			"bufferView":13,
+			"componentType":5126,
+			"count":24,
+			"type":"VEC3"
+		}
+	],
+	"bufferViews":[
+		{
+			"buffer":0,
+			"byteLength":192,
+			"byteOffset":0,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":288,
+			"byteOffset":192,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":192,
+			"byteOffset":480,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":288,
+			"byteOffset":672,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":72,
+			"byteOffset":960,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":200,
+			"byteOffset":1032,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":300,
+			"byteOffset":1232,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":200,
+			"byteOffset":1532,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":300,
+			"byteOffset":1732,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":192,
+			"byteOffset":2032,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":192,
+			"byteOffset":2224,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":288,
+			"byteOffset":2416,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":192,
+			"byteOffset":2704,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":288,
+			"byteOffset":2896,
+			"target":34962
+		}
+	],
+	"buffers":[
+		{
+			"byteLength":3184,
+			"uri":"data:application/octet-stream;base64,AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACuD/////8AAK4P/////wAArg//////AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AAAAPgAAgD4AAMA+AAAAAAAAwD4AAIA/AAAgPwAAAAAAACA/AACAPwAAYD8AAIA+AAAAPgAAAD8AAMA+AABAPwAAwD4AAEA/AAAgPwAAQD8AACA/AABAPwAAYD8AAAA/AADAPgAAgD4AAMA+AACAPgAAwD4AAIA+AAAgPwAAgD4AACA/AACAPgAAID8AAIA+AADAPgAAAD8AAMA+AAAAPwAAwD4AAAA/AAAgPwAAAD8AACA/AAAAPwAAID8AAAA/AAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAvwAAAAAAAACAAAAAAAAAAAAAAIA/AACAvwAAAAAAAACAAAAAAAAAgD8AAACAAAAAAAAAgL8AAACAAACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AACAvwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIA/AACAPwAAAAAAAACAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAACAAACAPwAAAAAAAACAAAAAAAAAgL8AAACAAAAAAAAAAAAAAIC/AACAPwAAAAAAAACAAAAAAAAAAAAAAIC/AAAAAAAAgD8AAACAAACAPwAAAAAAAACAAgAEAAkAAgAJAAcACAAKABUACAAVABMAFAAXABEAFAARAA4ADQAPAAMADQADAAEABgASAAwABgAMAAAAFgALAAUAFgAFABAA//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8eyyHBAAAAAB7LIUEeyyFBAAAAAB7LIUEeyyHBAAAAAB7LIcEeyyFBAAAAAB7LIcEeyyHBAAAAAAAAAIAAAAAAAAAAAB7LIUEeyyFBAAAAAAAAAIAAAAAAAAAAAB7LIcEAAAAAAAAAAAAAAIAeyyHBAAAAAB7LoUAey6FAAAAAAB7LIUEeyyFBAAAAAB7LocAey6HAAAAAAB7LIcEeyyHBAAAAAB7LocAey6HAAAAAAB7LIUEeyyFBAAAAAB7LoUAey6FAAAAAAB7LIcEAAAAAAAAAAB7LocAAAAAAAAAAAB7LoUAey6HAAAAAAAAAAIAey6FAAAAAAAAAAIAey6FAAAAAAB7LoUAey6HAAAAAAB7LoUAey6HAAAAAAB7LocAey6FAAAAAAB7LocAAAAAAAACAPwAAgD8AAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAAA/AAAAPwAAgD8AAIA/AAAAPwAAAD8AAAAAAAAAPwAAAD8AAAAAAABAPwAAQD8AAIA/AACAPwAAgD4AAIA+AAAAAAAAAAAAAIA+AACAPgAAgD8AAIA/AABAPwAAQD8AAAAAAAAAPwAAgD4AAAA/AABAPwAAgD4AAAA/AABAPwAAAD8AAEA/AABAPwAAgD4AAEA/AACAPgAAgD4AAEA/AACAPgAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgAAAAAAAAIA/AAAAgBgACwADABgAAwAQABcAEQAHABcABwAMABYAEgAIABYACAATABUADwAGABUABgAUABIAFQAUABIAFAAIAAUACgAVAAUAFQASAAoAAQAPAAoADwAVAAkAFgATAAkAEwAEAAAADgAWAAAAFgAJAA4ABQASAA4AEgAWAA0AFwAMAA0ADAACAAQAEwAXAAQAFwANABMACAARABMAEQAXABEAGAAQABEAEAAHAAgAFAAYAAgAGAARABQABgALABQACwAYAP//iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD/////iwAAAP////+LAAAA/////4sAAAD//wAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIC/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIA/AACAPwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIC/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIC/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIC/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAgD8AAIA/AACAvwAAAD4AAIA+AADAPgAAAAAAAMA+AACAPwAAID8AAAAAAAAgPwAAgD8AAGA/AACAPgAAAD4AAAA/AADAPgAAQD8AAMA+AABAPwAAID8AAEA/AAAgPwAAQD8AAGA/AAAAPwAAwD4AAIA+AADAPgAAgD4AAMA+AACAPgAAID8AAIA+AAAgPwAAgD4AACA/AACAPgAAwD4AAAA/AADAPgAAAD8AAMA+AAAAPwAAID8AAAA/AAAgPwAAAD8AACA/AAAAPwAAAAAAAIC/AAAAgAAAAAAAAAAAAACAPwAAgL8AAAAAAAAAgAAAAAAAAAAAAACAPwAAgL8AAAAAAAAAgAAAAAAAAIA/AAAAgAAAAAAAAIC/AAAAgAAAgL8AAAAAAAAAgAAAAAAAAAAAAACAvwAAgL8AAAAAAAAAgAAAAAAAAAAAAACAvwAAAAAAAIA/AAAAgAAAAAAAAIC/AAAAgAAAAAAAAAAAAACAPwAAgD8AAAAAAAAAgAAAAAAAAAAAAACAPwAAAAAAAIA/AAAAgAAAgD8AAAAAAAAAgAAAAAAAAIC/AAAAgAAAAAAAAAAAAACAvwAAgD8AAAAAAAAAgAAAAAAAAAAAAACAvwAAAAAAAIA/AAAAgAAAgD8AAAAAAAAAgA=="
+		}
+	]
 }

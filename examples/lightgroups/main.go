@@ -56,14 +56,6 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	armature := g.Scene.Root.Get("Armature")
-
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		armature.Move(-0.1, 0, 0)
-	} else if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		armature.Move(0.1, 0, 0)
-	}
-
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		green := g.Scene.Root.Get("OnlyGreen").(*tetra3d.Model)
 		green.LightGroup.Active = !green.LightGroup.Active

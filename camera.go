@@ -971,6 +971,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	}
 
+	originalSceneLights := sceneLights
+
 	camera.DebugInfo.LightCount = len(lights)
 
 	// if scene.World == nil || scene.World.LightingOn {
@@ -1239,6 +1241,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			camera.DebugInfo.lightTime += time.Since(t)
 
 		}
+
+		sceneLights = originalSceneLights
 
 		// TODO: Implement PS1-style automatic tesselation
 

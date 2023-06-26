@@ -477,20 +477,32 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	if mat != nil && mat.BillboardMode != BillboardModeNone {
 
-		lookat := NewLookAtMatrix(model.WorldPosition(), camPos, WorldUp)
+		var lookat Matrix4
 
-		if mat.BillboardMode == BillboardModeXZ {
-			lookat.SetRow(1, Vector{0, 1, 0, 0})
-			x := lookat.Row(0)
-			x.Y = 0
-			lookat.SetRow(0, x.Unit())
+		if mat.BillboardMode == BillboardModeFixedVertical {
 
-			z := lookat.Row(2)
-			z.Y = 0
-			lookat.SetRow(2, z.Unit())
+			out := camera.cameraForward.Invert()
+			lookat = NewLookAtMatrix(model.WorldPosition(), model.WorldPosition().Add(out), camera.cameraUp)
+
+		} else if mat.BillboardMode != BillboardModeNone {
+
+			lookat = NewLookAtMatrix(model.WorldPosition(), camPos, WorldUp)
+
+			if mat.BillboardMode == BillboardModeHorizontal {
+				lookat.SetRow(1, Vector{0, 1, 0, 0})
+				x := lookat.Row(0)
+				x.Y = 0
+				lookat.SetRow(0, x.Unit())
+
+				z := lookat.Row(2)
+				z.Y = 0
+				lookat.SetRow(2, z.Unit())
+			}
+
+			// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
+
 		}
 
-		// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
 		p, s, r := base.Decompose()
 		base = r.Mult(lookat).Mult(NewMatrix4Scale(s.X, s.Y, s.Z))
 		base.SetRow(3, Vector{p.X, p.Y, p.Z, 1})

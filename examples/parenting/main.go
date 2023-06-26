@@ -110,7 +110,7 @@ func (g *Game) Update() error {
 		parent.SetVisible(!parent.Visible(), true)
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyO) {
 
 		if child.Parent() == parent {
 			transform := child.Transform()
@@ -143,7 +143,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	if g.System.DrawDebugText {
-		txt := "Arrow Keys:Move parent\nP: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent and child"
+		txt := "Arrow Keys:Move parent\nO: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent and child"
 		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 

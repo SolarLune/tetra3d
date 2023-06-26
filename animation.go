@@ -235,6 +235,16 @@ func (animation *Animation) String() string {
 	}
 }
 
+// FindMarker returns a marker, found by name, and a boolean value indicating if a marker by the specified name was found or not.
+func (animation *Animation) FindMarker(markerName string) (Marker, bool) {
+	for _, m := range animation.Markers {
+		if m.Name == markerName {
+			return m, true
+		}
+	}
+	return Marker{}, false
+}
+
 // AnimationValues indicate the current position, scale, and rotation for a Node.
 type AnimationValues struct {
 	Position       Vector

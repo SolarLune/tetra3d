@@ -27,9 +27,10 @@ const (
 )
 
 const (
-	BillboardModeNone = iota
-	BillboardModeXZ   // Billboards on just X and Z (so the tilt stays the same)
-	BillboardModeAll  // Billboards on all axes
+	BillboardModeNone          = iota // No billboarding
+	BillboardModeFixedVertical        // Billboard to face forward relative to the camera / screen under all circumstances; up is screen up / up relative to the camera, locally (local +Y)
+	BillboardModeHorizontal           // Billboard to face towards the camera, but skews as you go above / below the object)
+	BillboardModeAll                  // Billboard on all axes
 )
 
 type Material struct {

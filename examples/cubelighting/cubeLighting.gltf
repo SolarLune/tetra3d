@@ -29,13 +29,23 @@
 	"scenes":[
 		{
 			"extras":{
-				"t3dExportOnSave__":1,
+				"t3dExportOnSave__":true,
 				"t3dExportFormat__":2,
-				"t3dPackTextures__":1,
+				"t3dPackTextures__":true,
 				"t3dCameraResolution__":[
 					1920,
 					1080
 				],
+				"t3dExportFilepath__":"",
+				"t3dExportCameras__":true,
+				"t3dExportLights__":true,
+				"t3dRenderResolutionW__":640,
+				"t3dRenderResolutionH__":360,
+				"t3dSectorRendering__":false,
+				"t3dSectorRenderDepth__":0,
+				"t3dPlaybackFPS__":60,
+				"t3dAnimationSampling__":true,
+				"t3dAnimationInterpolation__":true,
 				"t3dCollections__":{
 					"Collection":{
 						"objects":[

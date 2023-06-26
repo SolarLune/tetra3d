@@ -2,6 +2,15 @@ package tetra3d
 
 import (
 	"regexp"
+	"sort"
+)
+
+const (
+	nfSortModeNone = iota
+	nfSortModeAxisX
+	nfSortModeAxisY
+	nfSortModeAxisZ
+	nfSortModeDistance
 )
 
 // NodeFilter represents a chain of node filters, executed in sequence to collect the desired nodes
@@ -14,6 +23,10 @@ type NodeFilter struct {
 	StopOnFiltered bool               // If the filter should continue through to a node's children if the node itself doesn't pass the filter
 	MaxDepth       int                // How deep the node filter should search in the starting node's hierarchy; a value that is less than zero means the entire tree will be traversed.
 	depth          int
+
+	sortMode    int
+	reverseSort bool
+	sortTo      Vector
 }
 
 func newNodeFilter(startingNode INode) *NodeFilter {
@@ -51,7 +64,49 @@ func (nf *NodeFilter) execute(node INode) []INode {
 		}
 
 	}
+
 	nf.depth--
+
+	// If the depth is at -1, then this should be the end
+	if nf.depth == -1 && nf.sortMode != nfSortModeNone {
+
+		switch nf.sortMode {
+		case nfSortModeAxisX:
+			sort.SliceStable(out, func(i, j int) bool {
+				if nf.reverseSort {
+					return out[i].WorldPosition().X > out[j].WorldPosition().X
+				}
+				return out[i].WorldPosition().X < out[j].WorldPosition().X
+			})
+		case nfSortModeAxisY:
+			sort.SliceStable(out, func(i, j int) bool {
+				if nf.reverseSort {
+					return out[i].WorldPosition().Y > out[j].WorldPosition().Y
+				}
+				return out[i].WorldPosition().Y < out[j].WorldPosition().Y
+			})
+		case nfSortModeAxisZ:
+			sort.SliceStable(out, func(i, j int) bool {
+				if nf.reverseSort {
+					return out[i].WorldPosition().Z > out[j].WorldPosition().Z
+				}
+				return out[i].WorldPosition().Z < out[j].WorldPosition().Z
+			})
+		case nfSortModeDistance:
+			sort.SliceStable(out, func(i, j int) bool {
+				if nf.reverseSort {
+					return out[i].WorldPosition().DistanceSquared(nf.sortTo) > out[j].WorldPosition().DistanceSquared(nf.sortTo)
+				}
+				return out[i].WorldPosition().DistanceSquared(nf.sortTo) < out[j].WorldPosition().DistanceSquared(nf.sortTo)
+			})
+		}
+
+		nf.sortMode = nfSortModeNone
+		nf.sortTo = Vector{}
+		nf.reverseSort = false
+
+	}
+
 	return out
 }
 
@@ -276,4 +331,39 @@ func (nf NodeFilter) Grids() []*Grid {
 		}
 	}
 	return grids
+}
+
+// SortByX applies an X-axis sort on the results of the NodeFilter.
+// Sorts do not combine.
+func (nf NodeFilter) SortByX() NodeFilter {
+	nf.sortMode = nfSortModeAxisX
+	return nf
+}
+
+// SortByY applies an Y-axis sort on the results of the NodeFilter.
+// Sorts do not combine.
+func (nf NodeFilter) SortByY() NodeFilter {
+	nf.sortMode = nfSortModeAxisX
+	return nf
+}
+
+// SortByZ applies an Z-axis sort on the results of the NodeFilter.
+// Sorts do not combine.
+func (nf NodeFilter) SortByZ() NodeFilter {
+	nf.sortMode = nfSortModeAxisZ
+	return nf
+}
+
+// SortByDistance sorts the results of the NodeFilter by their distances to the specified INode.
+// Sorts do not combine.
+func (nf NodeFilter) SortByDistance(to Vector) NodeFilter {
+	nf.sortMode = nfSortModeDistance
+	nf.sortTo = to
+	return nf
+}
+
+// SortReverse reverses any sorting performed on the NodeFilter.
+func (nf NodeFilter) SortReverse() NodeFilter {
+	nf.reverseSort = true
+	return nf
 }

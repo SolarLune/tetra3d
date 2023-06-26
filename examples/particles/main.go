@@ -158,13 +158,6 @@ func (g *Game) Init() {
 	g.Camera.Move(0, 5, 5)
 	g.System = examples.NewBasicSystemHandler(g)
 
-	g.Scene.Root.SearchTree().
-		ByType(tetra3d.NodeTypeModel).
-		Not(g.Scene.Root.Get("Fire")).
-		ForEach(func(node tetra3d.INode) {
-			node.Move(0, 10, 0)
-		})
-
 }
 
 func (g *Game) Update() error {
