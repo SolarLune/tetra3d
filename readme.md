@@ -343,7 +343,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Option to pack textures or leave them as a path
 - [X] -- Path / 3D Curve support
 - [X] -- Grid support (for pathfinding / linking 3D points together)
-- [ ] -- -- Adding costs to pathfinding (should be as simple as adding a cost and currentcost to each GridPoint, then sorting the points to check by cost when pathfinding, then reduce all costs greater than 1 by 1 )
+- [ ] -- -- Adding costs to pathfinding (should be as simple as adding a cost and currentcost to each GridPoint, then sorting the points to check by cost when pathfinding, then reduce all costs greater than 1 by 1 ) (7/5/23, SolarLune: This works currently, but the pathfinding is still a bit wonky, so it should be looked at again)
 - [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
 - [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values. (5/22/23, SolarLune: should it be?)
 - [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose? It would be great if the models looked the way you'd expect)
