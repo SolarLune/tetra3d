@@ -17,10 +17,10 @@ import (
 var cubeMesh = tetra3d.NewCubeMesh()
 
 type CubeElement struct {
-	Model     *tetra3d.Model
-	Root      *tetra3d.Node
-	Target    *tetra3d.GridPoint
-	Navigator *tetra3d.Navigator
+	Model       *tetra3d.Model
+	Root        *tetra3d.Node
+	Target      *tetra3d.GridPoint
+	PathStepper *tetra3d.PathStepper
 }
 
 func newCubeElement(root tetra3d.INode) *CubeElement {
@@ -28,12 +28,12 @@ func newCubeElement(root tetra3d.INode) *CubeElement {
 	grid := root.Get("Network").(*tetra3d.Grid)
 
 	element := &CubeElement{
-		Model:     tetra3d.NewModel(cubeMesh, "Cube Element"),
-		Root:      root.(*tetra3d.Node),
-		Navigator: tetra3d.NewNavigator(nil),
+		Model:       tetra3d.NewModel(cubeMesh, "Cube Element"),
+		Root:        root.(*tetra3d.Node),
+		PathStepper: tetra3d.NewPathStepper(nil),
 	}
 
-	element.Navigator.FinishMode = tetra3d.FinishModeStop
+	// element.Navigator.FinishMode = tetra3d.FinishModeStop
 	element.Model.Color.Set(0.8+rand.Float32()*0.2, rand.Float32()*0.5, rand.Float32()*0.5, 1)
 	element.Model.SetWorldScale(0.1, 0.1, 0.1)
 	element.Model.SetWorldPositionVec(grid.RandomPoint().WorldPosition())
@@ -45,14 +45,20 @@ func newCubeElement(root tetra3d.INode) *CubeElement {
 
 func (cube *CubeElement) Update() {
 
-	if cube.Navigator.HasPath() {
-		cube.Navigator.AdvanceDistance(0.05)
-		cube.Model.SetWorldPositionVec(cube.Navigator.WorldPosition())
-		if cube.Navigator.Finished() {
-			cube.Navigator.SetPath(nil)
+	moveSpd := 0.05
+
+	currentPos := cube.PathStepper.CurrentWorldPosition()
+	diff := currentPos.Sub(cube.Model.WorldPosition()).ClampMagnitude(moveSpd)
+	cube.Model.MoveVec(diff)
+
+	if currentPos.Equals(cube.Model.WorldPosition()) {
+
+		if cube.PathStepper.AtEnd() {
+			cube.ChooseNewTarget()
+		} else {
+			cube.PathStepper.Next()
 		}
-	} else {
-		cube.ChooseNewTarget()
+
 	}
 
 }
@@ -60,7 +66,7 @@ func (cube *CubeElement) Update() {
 func (cube *CubeElement) ChooseNewTarget() {
 	grid := cube.Root.Get("Network").(*tetra3d.Grid)
 	closest := grid.NearestGridPoint(cube.Model.WorldPosition())
-	cube.Navigator.SetPath(closest.PathTo(grid.RandomPoint()))
+	cube.PathStepper.SetPath(closest.PathTo(grid.RandomPoint()))
 }
 
 type Game struct {
@@ -141,6 +147,7 @@ Currently, navigation is calculated using
 number of hops, rather than overall
 distance to navigate.`
 		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.White())
+
 	}
 
 }

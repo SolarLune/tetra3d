@@ -1268,7 +1268,7 @@ def export():
         export_extras=True,
         export_yup=True,
         export_apply=True,
-        convert_lighting_mode="COMPAT", # We want to use the compatible lighting model, not the "realistic" / real-world-accurate one
+        export_import_convert_lighting_mode="COMPAT", # We want to use the compatible lighting model, not the "realistic" / real-world-accurate one
     )
     
     # Undo changes that we've made after export

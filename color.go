@@ -279,7 +279,7 @@ func (color *Color) HSV() (float64, float64, float64) {
 		s = C / v
 	}
 
-	h := 0.0 // We use 0 instead of undefined as in wp.
+	h := 0.0
 	if min != v {
 		if v == r {
 			h = math.Mod((g-b)/C, 6.0)

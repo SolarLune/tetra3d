@@ -608,6 +608,14 @@ func (camera *Camera) ScreenToWorld(x, y int, depth float64) Vector {
 
 }
 
+// WorldUnitToViewRangePercentage converts a unit of world space into a percentage of the view range.
+// Basically, let's say a camera's far range is 100 and its near range is 0.
+// If you called camera.WorldUnitToViewRangePercentage(50), it would return 0.5.
+// This function is primarily useful for custom depth functions operating on Materials.
+func (camera *Camera) WorldUnitToViewRangePercentage(unit float64) float64 {
+	return unit / (camera.far - camera.near)
+}
+
 // int glhUnProjectf(float winx, float winy, float winz, float *modelview, float *projection, int *viewport, float *objectCoordinate)
 // {
 // 	// Transformation matrices
@@ -1331,6 +1339,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
 
 					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
+					if mat != nil && mat.CustomDepthFunction != nil {
+						depth = mat.CustomDepthFunction(depth)
+					}
 
 					if depth < 0 {
 						depth = 0
@@ -1346,6 +1357,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				} else if scene.World != nil && scene.World.FogOn {
 
 					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
+					if mat != nil && mat.CustomDepthFunction != nil {
+						depth = mat.CustomDepthFunction(depth)
+					}
 
 					if depth < 0 {
 						depth = 0
@@ -1738,7 +1752,7 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
 
 	debugText := fmt.Sprintf(
-		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d",
+		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d",
 		ebiten.ActualTPS(),
 		ebiten.ActualFPS(),
 		ft,
@@ -1821,12 +1835,14 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 		} else if grid, isGrid := m.(*Grid); isGrid {
 
 			for _, point := range grid.Points() {
+
 				p1 := camera.WorldToScreen(point.WorldPosition())
-				ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.ToRGBA64())
+				ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.Clone().Mix(NewColor(1, 0, 0, 1), float32(point.Cost)/100).ToRGBA64())
 				for _, connection := range point.Connections {
 					p2 := camera.WorldToScreen(connection.WorldPosition())
 					ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
 				}
+
 			}
 
 		}

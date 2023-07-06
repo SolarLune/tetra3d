@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 
 	_ "embed"
@@ -21,17 +20,14 @@ type Game struct {
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
 
-	PathFollower *tetra3d.Navigator
-	AutoAdvance  bool
+	PathStepper *tetra3d.PathStepper
 }
 
 //go:embed paths.gltf
 var libraryData []byte
 
 func NewGame() *Game {
-	game := &Game{
-		AutoAdvance: true,
-	}
+	game := &Game{}
 
 	game.Init()
 
@@ -55,30 +51,33 @@ func (g *Game) Init() {
 
 	g.System = examples.NewBasicSystemHandler(g)
 
-	g.PathFollower = tetra3d.NewNavigator(g.Scene.Root.Get("Path").(*tetra3d.Path))
-
-	fmt.Println(g.Scene.Root.HierarchyAsString())
+	g.PathStepper = tetra3d.NewPathStepper(g.Scene.Root.Get("Path").(*tetra3d.Path))
 
 }
 
 func (g *Game) Update() error {
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
-		g.PathFollower.AdvanceDistance(1)
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
-		g.PathFollower.AdvanceDistance(-1)
-	}
-
-	if g.AutoAdvance {
-		g.PathFollower.AdvancePercentage(0.01) // Advance one percent of the path per-frame
-	}
-
 	cube := g.Scene.Root.Get("Cube")
-	cube.SetWorldPositionVec(g.PathFollower.WorldPosition())
+	cubePos := cube.WorldPosition()
+	pathNodePos := g.PathStepper.CurrentWorldPosition()
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.AutoAdvance = !g.AutoAdvance
+	// Advance the stepper if you reach the target node...
+	if cubePos.Equals(pathNodePos) {
+		g.PathStepper.Next()
 	}
+
+	// ... Or if you press right or left.
+	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
+		g.PathStepper.Next()
+	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
+		g.PathStepper.Prev()
+	}
+
+	g.Scene.Root.Get("PointMarker").SetLocalPositionVec(pathNodePos)
+
+	diff := pathNodePos.Sub(cubePos).ClampMagnitude(0.1)
+
+	cube.MoveVec(diff)
 
 	g.Camera.Update()
 	return g.System.Update()
@@ -108,6 +107,8 @@ back through the path`
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)
+
+	g.Camera.DrawDebugWireframe(screen, g.Scene.Root.Get("Path"), colors.White())
 
 }
 

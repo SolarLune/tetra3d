@@ -63,6 +63,13 @@ type Material struct {
 	// Objects with transparent materials don't render to the depth texture and are sorted and rendered back-to-front, AFTER
 	// all non-transparent materials.
 	TransparencyMode int
+
+	// CustomDepthFunction is a customizeable function that takes the depth value of each vertex of a rendered MeshPart and
+	// transforms it, returning a different value.
+	// A good use for this would be to render sprites on billboarded planes with a higher depth, thereby fixing them
+	// "cutting" into geometry that's further back.
+	// The default value for CustomDepthFunction is nil.
+	CustomDepthFunction func(originalDepth float64) float64
 }
 
 // NewMaterial creates a new Material with the name given.

@@ -1,9 +1,14 @@
 package tetra3d
 
 import (
+	"log"
+	"math/rand"
 	"regexp"
 	"sort"
+	"time"
 )
+
+var localRandom = rand.New(rand.NewSource(time.Now().Unix()))
 
 const (
 	nfSortModeNone = iota
@@ -11,6 +16,7 @@ const (
 	nfSortModeAxisY
 	nfSortModeAxisZ
 	nfSortModeDistance
+	nfSortModeRandom
 )
 
 // NodeFilter represents a chain of node filters, executed in sequence to collect the desired nodes
@@ -99,6 +105,8 @@ func (nf *NodeFilter) execute(node INode) []INode {
 				}
 				return out[i].WorldPosition().DistanceSquared(nf.sortTo) < out[j].WorldPosition().DistanceSquared(nf.sortTo)
 			})
+		case nfSortModeRandom:
+			localRandom.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
 		}
 
 		nf.sortMode = nfSortModeNone
@@ -110,7 +118,12 @@ func (nf *NodeFilter) execute(node INode) []INode {
 	return out
 }
 
-func (nf *NodeFilter) executeFilters(node INode, execute func(INode)) {
+func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool) bool {
+
+	if nf.depth < 0 && nf.sortMode != nfSortModeNone {
+		log.Printf("Warning: NodeFilter executing on Node < %s > has sorting on it, but ForEach() cannot be used with sorting.\n", nf.Start.Path())
+	}
+
 	nf.depth++
 
 	successfulFilter := true
@@ -123,21 +136,29 @@ func (nf *NodeFilter) executeFilters(node INode, execute func(INode)) {
 			}
 		}
 		if ok {
-			execute(node)
+			if !execute(node) {
+				nf.depth--
+				return false
+			}
 		}
 	}
+
 	if nf.MaxDepth < 0 || nf.depth <= nf.MaxDepth {
 
 		if !nf.StopOnFiltered || successfulFilter {
 
 			for _, child := range node.Children() {
-				nf.executeFilters(child, execute)
+				if !nf.executeFilters(child, execute) {
+					nf.depth--
+					return false
+				}
 			}
 
 		}
 
 	}
 	nf.depth--
+	return true
 }
 
 // First returns the first Node in the NodeFilter; if the NodeFilter is empty, this function returns nil.
@@ -248,7 +269,10 @@ func (nf NodeFilter) bySectors() NodeFilter {
 }
 
 // ForEach executes the provided function on each filtered Node, without allocating memory for a slice of the nodes.
-func (nf NodeFilter) ForEach(f func(node INode)) {
+// The function must return a boolean indicating whether to continue running on each node in the tree that fulfills the
+// filter set (true) or not (false).
+// ForEach does not work with any sorting, and will log a warning if you use sorting and ForEach on the same filter.
+func (nf NodeFilter) ForEach(f func(node INode) bool) {
 	nf.executeFilters(nf.Start, f)
 }
 
@@ -365,5 +389,10 @@ func (nf NodeFilter) SortByDistance(to Vector) NodeFilter {
 // SortReverse reverses any sorting performed on the NodeFilter.
 func (nf NodeFilter) SortReverse() NodeFilter {
 	nf.reverseSort = true
+	return nf
+}
+
+func (nf NodeFilter) SortRandom() NodeFilter {
+	nf.sortMode = nfSortModeRandom
 	return nf
 }

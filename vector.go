@@ -145,6 +145,7 @@ func (vec Vector) MagnitudeSquared() float64 {
 }
 
 // ClampMagnitude clamps the overall magnitude of the Vector to the maximum magnitude specified, returning a copy with the result.
+// If the magnitude is less than that maximum magnitude, the vector is unmodified.
 func (vec Vector) ClampMagnitude(maxMag float64) Vector {
 	if vec.Magnitude() > maxMag {
 		vec = vec.Unit().Scale(maxMag)

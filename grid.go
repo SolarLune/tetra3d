@@ -4,9 +4,10 @@ import (
 	"math"
 	"math/rand"
 	"sort"
-)
 
-// TODO: Implement costs to pathfinding
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+)
 
 // GridPoint represents a point on a Grid, used for pathfinding or connecting points in space.
 // GridPoints are parented to a Grid and the connections are created seperate from their positions,
@@ -17,6 +18,7 @@ type GridPoint struct {
 	*Node
 	Connections []*GridPoint
 	prevLink    *GridPoint
+	Cost        int
 }
 
 // NewGridPoint creates a new GridPoint.
@@ -108,25 +110,26 @@ func (point *GridPoint) DisconnectAll() {
 // PathTo creates a path going from the GridPoint to the given other GridPoint. This path is currently generated
 // using the best-case metric of smallest number of hops, not necessarily the smallest distance (so Grids should generally
 // be composed of evenly spaced points if the purpose is for shortest-distance pathfinding).
-func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
+// If a path is not possible from the starting point to the end point, then PathTo will return nil.
+func (point *GridPoint) PathTo(goal *GridPoint) *GridPath {
 	path := &GridPath{
 		GridPoints: []Vector{},
 	}
 
-	if !point.IsOnSameGrid(other) {
+	if !point.IsOnSameGrid(goal) {
 		return nil
 	}
 
-	if point == other {
+	if point == goal {
 		return &GridPath{
 			GridPoints: []Vector{point.WorldPosition()},
 		}
 	}
 
-	toCheck := []*GridPoint{other}
+	toCheck := []*GridPoint{goal}
 	checked := map[*GridPoint]bool{}
 
-	other.prevLink = nil
+	goal.prevLink = nil
 	point.prevLink = nil
 
 	var next *GridPoint
@@ -137,15 +140,32 @@ func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
 			break
 		}
 
+		// No more nodes to check; the two points are on the same grid, but are inaccessible to each other
+		if len(toCheck) == 0 {
+			return nil
+		}
+
 		next = toCheck[0]
 
 		toCheck = toCheck[1:]
 		checked[next] = true
 
 		for _, c := range next.Connections {
+			// Hasn't been checked yet
 			if _, exists := checked[c]; !exists {
 				c.prevLink = next
-				toCheck = append(toCheck, c)
+
+				// A neighbor has a connection to the goal; let's go with it
+				if c == point {
+					next = c
+					break
+				}
+
+				if len(toCheck) > 0 && c.Cost < toCheck[0].Cost {
+					toCheck = append(append(make([]*GridPoint, 0, len(toCheck)+1), c), toCheck...)
+				} else {
+					toCheck = append(toCheck, c)
+				}
 			}
 		}
 
@@ -156,7 +176,7 @@ func (point *GridPoint) PathTo(other *GridPoint) *GridPath {
 		next = next.prevLink
 	}
 
-	path.GridPoints = append(path.GridPoints, other.WorldPosition())
+	path.GridPoints = append(path.GridPoints, goal.WorldPosition())
 
 	return path
 
@@ -245,17 +265,13 @@ func (grid *Grid) Points() []*GridPoint {
 	return points
 }
 
-// NearestGridPoint returns the nearest grid point to the given world position.
-func (grid *Grid) NearestGridPoint(position Vector) *GridPoint {
-
-	points := grid.Points()
-
-	sort.Slice(points, func(i, j int) bool {
-		return points[i].WorldPosition().Sub(position).MagnitudeSquared() < points[j].WorldPosition().Sub(position).MagnitudeSquared()
-	})
-
-	return points[0]
-
+// ForEachPoint returns a slice of the children nodes that constitute this Grid's GridPoints.
+func (grid *Grid) ForEachPoint(forEach func(gridPoint *GridPoint)) {
+	for _, n := range grid.children {
+		if gp, ok := n.(*GridPoint); ok {
+			forEach(gp)
+		}
+	}
 }
 
 // DisconnectAllPoints disconnects all points from each other in the Grid.
@@ -332,6 +348,19 @@ func (grid *Grid) NearestPositionOnGrid(position Vector) Vector {
 	}
 
 	return endPos
+
+}
+
+// NearestGridPoint returns the nearest grid point to the given world position.
+func (grid *Grid) NearestGridPoint(position Vector) *GridPoint {
+
+	points := grid.Points()
+
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].WorldPosition().Sub(position).MagnitudeSquared() < points[j].WorldPosition().Sub(position).MagnitudeSquared()
+	})
+
+	return points[0]
 
 }
 
@@ -476,9 +505,11 @@ func (grid *Grid) Type() NodeType {
 // GridPath represents a sequence of grid points, used to traverse a path.
 type GridPath struct {
 	GridPoints []Vector
+	Index      int
 }
 
-func (gp *GridPath) Distance() float64 {
+// Length returns the length of the overall path.
+func (gp *GridPath) Length() float64 {
 
 	dist := 0.0
 
@@ -498,6 +529,7 @@ func (gp *GridPath) Distance() float64 {
 
 }
 
+// Points returns the points of the GridPath in a slice.
 func (gp *GridPath) Points() []Vector {
 	points := append(make([]Vector, 0, len(gp.GridPoints)), gp.GridPoints...)
 	return points
@@ -505,4 +537,19 @@ func (gp *GridPath) Points() []Vector {
 
 func (gp *GridPath) isClosed() bool {
 	return false
+}
+
+func (gp *GridPath) DebugDraw(screen *ebiten.Image, camera *Camera, color *Color) {
+
+	points := gp.Points()
+	for i := 0; i < len(points)-1; i++ {
+		p1 := camera.WorldToScreen(points[i])
+		p2 := camera.WorldToScreen(points[i+1])
+		ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
+		ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.ToRGBA64())
+		if i == len(points)-2 {
+			ebitenutil.DrawCircle(screen, p2.X, p2.Y, 8, color.ToRGBA64())
+		}
+	}
+
 }
