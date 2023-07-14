@@ -64,6 +64,10 @@ type Material struct {
 	// all non-transparent materials.
 	TransparencyMode int
 
+	CustomDepthOffsetOn     bool    // Whether custom depth offset is on or not.
+	CustomDepthOffsetValue  float64 // How many world units to offset the depth of the material by.
+	NormalsAlwaysFaceLights bool    // Whether normals should always face light sources for lighting or not.
+
 	// CustomDepthFunction is a customizeable function that takes the depth value of each vertex of a rendered MeshPart and
 	// transforms it, returning a different value.
 	// A good use for this would be to render sprites on billboarded planes with a higher depth, thereby fixing them

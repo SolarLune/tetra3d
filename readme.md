@@ -409,6 +409,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- -- We could use the broadphase system to find triangles that are in the raycast's general area, specifically
 - [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
 - [ ] -- Lighting speed improvements
+- [ ] -- Resource tracking system to ease cloning elements (i.e. rather than live-cloning Meshes, it would be faster to re-use "dead" Meshes)
+- -- [ ] Model
+- -- [ ] Mesh
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 
 Again, it's incomplete and jank. However, it's also pretty cool!

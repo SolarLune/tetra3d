@@ -615,6 +615,43 @@ func (vs *VertexSelection) SetNormal(normal Vector) {
 
 }
 
+// MoveUVs moves the UV values by the values specified.
+func (vs *VertexSelection) MoveUVs(dx, dy float64) {
+
+	for index := range vs.Indices {
+		vs.Mesh.VertexUVs[index].X += dx
+		vs.Mesh.VertexUVs[index].Y += dy
+	}
+
+}
+
+// MoveUVsVec moves the UV values by the Vector values specified.
+func (vs *VertexSelection) MoveUVsVec(delta Vector) {
+
+	for index := range vs.Indices {
+		vs.Mesh.VertexUVs[index].X += delta.X
+		vs.Mesh.VertexUVs[index].Y += delta.Y
+	}
+
+}
+
+// RotateUVs rotates the UV values around the center of the UV values for the mesh in radians
+func (vs *VertexSelection) RotateUVs(rotation float64) {
+	center := Vector{}
+
+	for index := range vs.Indices {
+		center = center.Add(vs.Mesh.VertexUVs[index])
+	}
+
+	center = center.Divide(float64(len(vs.Indices)))
+
+	for index := range vs.Indices {
+		diff := vs.Mesh.VertexUVs[index].Sub(center)
+		vs.Mesh.VertexUVs[index] = center.Add(diff.Rotate(0, 0, 1, rotation))
+	}
+
+}
+
 // SetActiveColorChannel sets the active color channel in all vertices contained within the VertexSelection to the channel with the
 // specified index.
 func (vs *VertexSelection) SetActiveColorChannel(channelIndex int) {

@@ -765,6 +765,16 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.prop(context.material, "t3dBillboardMode__")
 
+
+        box = self.layout.box()
+        row = box.row()
+        row.prop(context.material, "t3dCustomDepthOn__")
+        row = box.row()
+        row.enabled = context.material.t3dCustomDepthOn__
+        row.prop(context.material, "t3dCustomDepthValue__")
+        row = box.row()
+        row.prop(context.material, "t3dNormalFacesLights__")
+
         if context.object.active_material != None:
 
             row = self.layout.row()
@@ -1681,6 +1691,9 @@ def register():
     bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
     bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
+    bpy.types.Material.t3dCustomDepthOn__ = bpy.props.BoolProperty(name="Custom Depth", description="Whether custom depth offsetting should be enabled", default=False)
+    bpy.types.Material.t3dCustomDepthValue__ = bpy.props.FloatProperty(name="Depth Offset Value", description="How far in world units the material should offset when rendering (negative values are closer to the camera, positive values are further)")
+    bpy.types.Material.t3dNormalFacesLights__ = bpy.props.BoolProperty(name="Normals Always Face Lights", description="Whether normals that use this material should always face light sources or not; particularly useful for billboarded 2D sprites", default=False)
         
     bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
     
@@ -1762,6 +1775,10 @@ def unregister():
     del bpy.types.Material.t3dMaterialFogless__
     del bpy.types.Material.t3dCompositeMode__
     del bpy.types.Material.t3dBillboardMode__
+
+    del bpy.types.Material.t3dCustomDepthOn__
+    del bpy.types.Material.t3dCustomDepthValue__
+    del bpy.types.Material.t3dNormalFacesLights__
     del bpy.types.Material.t3dGameProperties__
 
     del bpy.types.World.t3dClearColor__

@@ -255,6 +255,16 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				}
 
+				if s, exists := dataMap["t3dCustomDepthOn__"]; exists {
+					newMat.CustomDepthOffsetOn = s.(float64) > 0
+				}
+				if s, exists := dataMap["t3dCustomDepthValue__"]; exists {
+					newMat.CustomDepthOffsetValue = s.(float64)
+				}
+				if s, exists := dataMap["t3dNormalFacesLights__"]; exists {
+					newMat.NormalsAlwaysFaceLights = s.(float64) > 0
+				}
+
 				// At this point, parenting should be set up.
 
 				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {

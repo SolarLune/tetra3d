@@ -1187,6 +1187,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			srcH = float64(mat.Texture.Bounds().Dy())
 		}
 
+		depthOffsetValue := 0.0
+		if mat != nil && mat.CustomDepthOffsetOn {
+			depthOffsetValue = camera.WorldUnitToViewRangePercentage(mat.CustomDepthOffsetValue)
+		}
+
 		if lighting {
 
 			t := time.Now()
@@ -1339,8 +1344,13 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
 
 					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
-					if mat != nil && mat.CustomDepthFunction != nil {
-						depth = mat.CustomDepthFunction(depth)
+					if mat != nil {
+						if mat.CustomDepthOffsetOn {
+							depth += depthOffsetValue
+						}
+						if mat.CustomDepthFunction != nil {
+							depth = mat.CustomDepthFunction(depth)
+						}
 					}
 
 					if depth < 0 {
@@ -1357,8 +1367,13 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				} else if scene.World != nil && scene.World.FogOn {
 
 					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
-					if mat != nil && mat.CustomDepthFunction != nil {
-						depth = mat.CustomDepthFunction(depth)
+					if mat != nil {
+						if mat.CustomDepthOffsetOn {
+							depth += depthOffsetValue
+						}
+						if mat.CustomDepthFunction != nil {
+							depth = mat.CustomDepthFunction(depth)
+						}
 					}
 
 					if depth < 0 {

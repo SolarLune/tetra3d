@@ -233,6 +233,10 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 		lightVec := point.workingPosition.Sub(vertPos).Unit()
 		diffuse := vertNormal.Dot(lightVec)
 
+		if mat := meshPart.Material; mat != nil && mat.NormalsAlwaysFaceLights {
+			vertNormal = lightVec
+		}
+
 		if diffuse > 0 {
 
 			diffuseFactor := diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
@@ -356,6 +360,10 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 			normal = model.Mesh.vertexSkinnedNormals[index]
 		} else {
 			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[index])
+		}
+
+		if mat := meshPart.Material; mat != nil && mat.NormalsAlwaysFaceLights {
+			normal = sun.workingForward
 		}
 
 		diffuseFactor := normal.Dot(sun.workingForward)
@@ -614,6 +622,10 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 		}
 
 		var diffuse, diffuseFactor float64
+
+		if mat := meshPart.Material; mat != nil && mat.NormalsAlwaysFaceLights {
+			vertNormal = cube.workingAngle
+		}
 
 		diffuse = vertNormal.Dot(cube.workingAngle)
 
