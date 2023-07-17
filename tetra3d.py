@@ -926,6 +926,8 @@ def export():
 
     if blendPath == "":
         return False
+
+    blendPath = bpy.path.abspath(blendPath)
     
     if scene.t3dExportFormat__ == "GLB":
         ending = ".glb"

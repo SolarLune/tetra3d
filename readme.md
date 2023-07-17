@@ -347,6 +347,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
 - [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values. (5/22/23, SolarLune: should it be?)
 - [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose? It would be great if the models looked the way you'd expect)
+- [ ] -- Components (This would also require meta-programming; it'd be nice if components could have elements that were adjustable in Blender. Maybe a "game object" can have a dynamically-written "Components" struct, with space for one of each kind of component, for simplicity (i.e. one physics controller, one gameplay controller, one animation component, etc). There doesn't need to be ways to add or remove components from an object, and components can have any of OnInit, OnAdd, OnRemove, or Update functions to be considered components).
 - [X] **DAE model loading**
 - [X] -- Vertex colors loading
 - [X] -- UV map loading

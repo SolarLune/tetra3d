@@ -231,11 +231,11 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 		// }
 
 		lightVec := point.workingPosition.Sub(vertPos).Unit()
-		diffuse := vertNormal.Dot(lightVec)
-
 		if mat := meshPart.Material; mat != nil && mat.NormalsAlwaysFaceLights {
 			vertNormal = lightVec
 		}
+
+		diffuse := vertNormal.Dot(lightVec)
 
 		if diffuse > 0 {
 

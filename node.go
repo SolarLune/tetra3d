@@ -208,6 +208,9 @@ type INode interface {
 	// trims the extra spaces from the beginning and end of Node Names, so avoid using spaces at the beginning or end of your Nodes' names.
 	Get(path string) INode
 
+	// FindNode searches a node's hierarchy using a string to find the specified Node.
+	FindNode(nodeName string) INode
+
 	// HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.
 	// This is a useful function to debug the layout of a node tree, for example.
 	HierarchyAsString() string
@@ -859,6 +862,12 @@ func (node *Node) Children() []INode {
 // SearchTree returns a NodeFilter to search through and filter a Node's hierarchy.
 func (node *Node) SearchTree() *NodeFilter {
 	return newNodeFilter(node)
+}
+
+// FindNode searches through a Node's tree for the node by name. This is mostly syntactic sugar for
+// Node.SearchTree().ByName(nodeName).First().
+func (node *Node) FindNode(nodeName string) INode {
+	return node.SearchTree().ByName(nodeName).First()
 }
 
 // Visible returns whether the Object is visible.

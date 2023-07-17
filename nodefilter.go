@@ -163,11 +163,9 @@ func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool) bool 
 
 // First returns the first Node in the NodeFilter; if the NodeFilter is empty, this function returns nil.
 func (nf NodeFilter) First() INode {
-	out := nf.execute(nf.Start)
-	if len(out) == 0 {
-		return nil
-	}
-	return out[0]
+	var result INode
+	nf.ForEach(func(node INode) bool { result = node; return false })
+	return result
 }
 
 // First returns the last Node in the NodeFilter; if the NodeFilter is empty, this function returns nil.
