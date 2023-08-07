@@ -346,6 +346,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					}
 				}
 
+				if unique, exists := dataMap["t3dUniqueMesh__"]; exists {
+					newMesh.Unique = unique.(float64) > 0
+				}
+
 				// Non-Tetra3D custom data
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {

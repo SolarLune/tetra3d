@@ -274,6 +274,16 @@ func (nf NodeFilter) ForEach(f func(node INode) bool) {
 	nf.executeFilters(nf.Start, f)
 }
 
+// Count returns the number of Nodes that fit the filter set.
+func (nf NodeFilter) Count() int {
+	count := 0
+	nf.executeFilters(nf.Start, func(i INode) bool {
+		count++
+		return true
+	})
+	return count
+}
+
 // Contains returns if the provided Node is contained in the NodeFilter.
 func (nf NodeFilter) Contains(node INode) bool {
 	return nf.Index(node) > 0

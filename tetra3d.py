@@ -468,6 +468,18 @@ def objectNodePath(object):
 
     return p
 
+class MESH_PT_tetra3d(bpy.types.Panel):
+    bl_idname = "MESH_PT_tetra3d"
+    bl_label = "Tetra3d Mesh Properties"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "data"
+
+    def draw(self, context): 
+
+        row = self.layout.row()
+        row.prop(context.object.data, "t3dUniqueMesh__")
+
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
     bl_label = "Tetra3d Object Properties"
@@ -1590,6 +1602,7 @@ def setFOV(self, value):
 def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
+    bpy.utils.register_class(MESH_PT_tetra3d)
     bpy.utils.register_class(RENDER_PT_tetra3d)
     bpy.utils.register_class(CAMERA_PT_tetra3d)
     bpy.utils.register_class(MATERIAL_PT_tetra3d)
@@ -1698,6 +1711,8 @@ def register():
     bpy.types.Material.t3dNormalFacesLights__ = bpy.props.BoolProperty(name="Normals Always Face Lights", description="Whether normals that use this material should always face light sources or not; particularly useful for billboarded 2D sprites", default=False)
         
     bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
+
+    bpy.types.Mesh.t3dUniqueMesh__ = bpy.props.BoolProperty(name="Unique Mesh", description="Whether each Model that uses this Mesh will have a unique clone of it (true) or if they will share them (false)")
     
     bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dSyncClearColor__ = bpy.props.BoolProperty(name="Sync Clear Color to World Color", description="If the clear color should be a copy of the world's color")
@@ -1717,6 +1732,7 @@ def register():
     
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
+    bpy.utils.unregister_class(MESH_PT_tetra3d)
     bpy.utils.unregister_class(RENDER_PT_tetra3d)
     bpy.utils.unregister_class(CAMERA_PT_tetra3d)
     bpy.utils.unregister_class(MATERIAL_PT_tetra3d)
@@ -1790,6 +1806,8 @@ def unregister():
     del bpy.types.World.t3dFogRangeEnd__
     del bpy.types.World.t3dFogDithered__
     del bpy.types.World.t3dFogCurve__
+
+    del bpy.types.Mesh.t3dUniqueMesh__
 
     del bpy.types.Camera.t3dFOV__
 

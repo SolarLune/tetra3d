@@ -158,7 +158,8 @@ func NewDimensionsFromPoints(points ...Vector) Dimensions {
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one
 // manually if you want to construct a Mesh via code).
 type Mesh struct {
-	Name    string
+	Name    string   // The name of the Mesh resource
+	Unique  bool     // If true, whenever a Mesh is used for a Model and the Model is cloned, the Mesh is cloned with it. Useful for things like sprites.
 	library *Library // A reference to the Library this Mesh came from.
 
 	MeshParts []*MeshPart // The various mesh parts (collections of triangles, rendered with a single material).
@@ -167,7 +168,7 @@ type Mesh struct {
 
 	// Vertices are stored as a struct-of-arrays for simplified and faster rendering.
 	// Each vertex property (position, normal, UV, colors, weights, bones, etc) is stored
-	// here and indexed in order of index.
+	// here and indexed in order of vertex index.
 	vertexTransforms         []Vector
 	VertexPositions          []Vector
 	VertexNormals            []Vector
@@ -315,6 +316,8 @@ func (mesh *Mesh) Clone() *Mesh {
 	}
 
 	newMesh.Dimensions = mesh.Dimensions
+
+	newMesh.Unique = mesh.Unique
 
 	return newMesh
 }

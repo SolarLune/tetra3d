@@ -383,6 +383,16 @@ func (grid *Grid) RandomPoint() *GridPoint {
 	return gridPoints[rand.Intn(len(gridPoints))]
 }
 
+// FirstPoint returns the first point out of the Grid's GridPoints.
+// If the Grid has no GridPoints, then it will return nil.
+func (grid *Grid) FirstPoint() *GridPoint {
+	gridPoints := grid.Points()
+	if len(gridPoints) == 0 {
+		return nil
+	}
+	return gridPoints[0]
+}
+
 // LastPoint returns the last point out of the Grid's GridPoints.
 // If the Grid has no GridPoints, then it will return nil.
 func (grid *Grid) LastPoint() *GridPoint {
@@ -393,20 +403,10 @@ func (grid *Grid) LastPoint() *GridPoint {
 	return gridPoints[len(gridPoints)-1]
 }
 
-// LastPoint returns the first point out of the Grid's GridPoints.
-// If the Grid has no GridPoints, then it will return nil.
-func (grid *Grid) FirstPoint() *GridPoint {
-	gridPoints := grid.Points()
-	if len(gridPoints) == 0 {
-		return nil
-	}
-	return gridPoints[0]
-}
-
 // Combine combines the Grid with the other Grids provided. This reparents the other' Grid's GridPoints (and other children)
 // to be under the calling Grid's. If two GridPoints share the same position, they will be merged together.
-// After combining a Grid with others, the other Grids will automatically be unparented (as their GridPoints will
-// have been absorbed).
+// After combining a Grid with others, the other Grids will automatically be unparented from the scene nodegraph tree
+// (as their GridPoints will have been absorbed).
 func (grid *Grid) Combine(others ...*Grid) {
 
 	for _, other := range others {

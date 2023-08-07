@@ -85,7 +85,13 @@ func NewModel(mesh *Mesh, name string) *Model {
 
 // Clone creates a clone of the Model.
 func (model *Model) Clone() INode {
-	newModel := NewModel(model.Mesh, model.name)
+
+	mesh := model.Mesh
+	if mesh != nil && mesh.Unique {
+		mesh = mesh.Clone()
+	}
+
+	newModel := NewModel(mesh, model.name)
 	newModel.BoundingSphere = model.BoundingSphere.Clone().(*BoundingSphere)
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.visible = model.visible
@@ -482,7 +488,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		if mat.BillboardMode == BillboardModeFixedVertical {
 
 			out := camera.cameraForward.Invert()
-			lookat = NewLookAtMatrix(model.WorldPosition(), model.WorldPosition().Add(out), camera.cameraUp)
+			lookat = NewLookAtMatrix(Vector{}, out, camera.cameraUp)
 
 		} else if mat.BillboardMode != BillboardModeNone {
 
@@ -504,7 +510,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		}
 
 		p, s, r := base.Decompose()
-		base = r.Mult(lookat).Mult(NewMatrix4Scale(s.X, s.Y, s.Z))
+		base = r.Mult(NewMatrix4Scale(s.X, s.Y, s.Z)).Mult(lookat)
 		base.SetRow(3, Vector{p.X, p.Y, p.Z, 1})
 
 	}
