@@ -110,7 +110,7 @@ func (material *Material) Clone() *Material {
 	newMat.CompositeMode = material.CompositeMode
 
 	newMat.BillboardMode = material.BillboardMode
-	newMat.SetShader(material.fragmentSrc)
+	newMat.SetShaderText(material.fragmentSrc)
 	newMat.FragmentShaderOn = material.FragmentShaderOn
 
 	newMat.FragmentShaderOptions.CompositeMode = material.FragmentShaderOptions.CompositeMode
@@ -125,12 +125,12 @@ func (material *Material) Clone() *Material {
 	return newMat
 }
 
-// SetShader creates a new custom Kage fragment shader for the Material if provided the shader's source code, provided as a []byte.
+// SetShaderText creates a new custom Kage fragment shader for the Material if provided the shader's source code as a []byte.
 // This custom shader would be used to render the mesh utilizing the material after rendering to the depth texture, but before
 // compositing the finished render to the screen after fog. If the shader is nil, the Material will render using the default Tetra3D
 // render setup (e.g. texture, UV values, vertex colors, and vertex lighting).
 // SetShader will return the Shader, and an error if the Shader failed to compile.
-func (material *Material) SetShader(src []byte) (*ebiten.Shader, error) {
+func (material *Material) SetShaderText(src []byte) (*ebiten.Shader, error) {
 
 	if src == nil {
 		material.fragmentShader = nil
@@ -148,6 +148,14 @@ func (material *Material) SetShader(src []byte) (*ebiten.Shader, error) {
 
 	return material.fragmentShader, nil
 
+}
+
+// SetShader sets an already-compiled Kage shader to the Material.
+func (material *Material) SetShader(shader *ebiten.Shader) {
+	if material.fragmentShader != shader {
+		material.fragmentShader = shader
+		material.fragmentSrc = nil
+	}
 }
 
 // Shader returns the custom Kage fragment shader for the Material.

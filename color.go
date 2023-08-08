@@ -118,6 +118,11 @@ func (color *Color) ToFloat64s() (float64, float64, float64, float64) {
 	return float64(color.R), float64(color.G), float64(color.B), float64(color.A)
 }
 
+// toFloat32Array returns a [4]float32 array for each channel in the Color in the order of R, G, B, and A.
+func (color *Color) toFloat32Array() [4]float32 {
+	return [4]float32{float32(color.R), float32(color.G), float32(color.B), float32(color.A)}
+}
+
 // ToRGBA64 converts a color to a color.RGBA64 instance.
 func (c *Color) ToRGBA64() color.RGBA64 {
 	return color.RGBA64{

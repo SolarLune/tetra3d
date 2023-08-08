@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"image/color"
 	"math"
 	"strings"
 
@@ -8,21 +9,38 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
+
+	_ "embed"
 )
 
+type TextAlignment int
+
 const (
-	TextAlignLeft   = iota // Left aligned text. The text hugs the left side of the texture.
-	TextAlignCenter        // Center aligned text. All text lines are centered horizontally in the texture's width.
-	TextAlignRight         // Right aligned text. The text hugs the right side of the texture.
+	TextAlignLeft   TextAlignment = iota // Left aligned text. The text hugs the left side of the texture.
+	TextAlignCenter                      // Center aligned text. All text lines are centered horizontally in the texture's width.
+	TextAlignRight                       // Right aligned text. The text hugs the right side of the texture.
 )
 
 type TextStyle struct {
-	Font                 font.Face // The font to use for rendering the text.
-	BGColor              *Color    // The Background color for the text. Defaults to black.
-	FGColor              *Color    // The foreground color for the text. Defaults to white.
-	Cursor               string    // A cursor string sequence is drawn at the end while typewriter-ing
-	LineHeightMultiplier float64   // The multiplier for line height changes
-	HorizontalAlignment  int       // How the text should be horizontally aligned in the Text texture
+	Font                 font.Face     // The font to use for rendering the text.
+	Cursor               string        // A cursor string sequence is drawn at the end while typewriter-ing; defaults to a blank string ("").
+	LineHeightMultiplier float64       // The multiplier for line height changes.
+	AlignmentHorizontal  TextAlignment // How the text should be horizontally aligned in the Text texture.
+
+	BGColor *Color // The Background color for the text. Defaults to black (0, 0, 0, 1).
+	FGColor *Color // The Foreground color for the text. Defaults to white (1, 1, 1, 1).
+
+	ShadowDirection Vector // A vector indicating direction of the shadow's heading. Defaults to down-right ( {1, 1, 0}, normalized ).
+	ShadowLength    int    // The length of the shadow in pixels. Defaults to 0 (no shadow).
+	ShadowColorNear *Color // The color of the shadow near the letters. Defaults to black (0, 0, 0, 1).
+	ShadowColorFar  *Color // The color of the shadow towards the end of the letters. Defaults to black (0, 0, 0, 1).
+
+	OutlineThickness int    // Overall thickness of the outline in pixels. Defaults to 0 (no outline).
+	OutlineRounded   bool   // If the outline is rounded or not. Defaults to false (square outlines).
+	OutlineColor     *Color // Color of the outline. Defaults to black (0, 0, 0, 1).
+
+	// Margin (in pixels) of space to leave around the frame of the texture (left or right, depending on HorizontalAlignment, and from the top). Defaults to 0.
+	MarginHorizontal, MarginVertical int
 }
 
 func NewDefaultTextStyle() TextStyle {
@@ -31,10 +49,17 @@ func NewDefaultTextStyle() TextStyle {
 		LineHeightMultiplier: 1,
 		BGColor:              NewColor(0, 0, 0, 1),
 		FGColor:              NewColor(1, 1, 1, 1),
+
+		OutlineColor: NewColor(0, 0, 0, 1),
+
+		ShadowDirection: Vector{1, 1, 0, 0}.Unit(),
+		ShadowColorNear: NewColor(0, 0, 0, 1),
+		ShadowColorFar:  NewColor(0, 0, 0, 1),
 	}
 }
 
 // Text represents a helper object that writes text for display as a texture on a Model's MeshPart.
+// Text objects use a pre-made shader to render.
 type Text struct {
 	meshPart *MeshPart     // The MeshPart that the Text is operating on
 	Texture  *ebiten.Image // The texture used to render text
@@ -48,13 +73,19 @@ type Text struct {
 	textureSize     int
 }
 
-// NewText creates a new Text rendering surface for typing out text and assigns the MeshPart provided
-// to use that surface as a texture, on a brand new material.
+//go:embed shaders/text.kage
+var textShaderSrc []byte
+
+// NewText creates a new Text rendering surface for typing out text and assigns the MeshPart provided to use that surface as a texture.
+// If the MeshPart has no Material, then a new one will be created with sane default settings.
+// NewText sets the transparency mode of the material to be transparent, as clip alpha doesn't work properly.
 // textureWidth is how wide (in pixels) the backing texture should be for displaying the text; the height is determined by the
-// aspect ratio of the dimensions of the meshpart given. Note that for this to work ideally, the mesh cannot be rotated (i.e. the
-// mesh's faces should not be at an angle).
+// aspect ratio of the dimensions of the meshpart given.
+// Text objects create their own special materials to render properly, and use a shader as well. If you want to tweak the rendering further,
+// do so on the provided MeshPart after calling NewText().
 // All changes to the Text require that the Text object updates its texture, which can be costly as this means redrawing the text as
 // necessary; this is handled automatically.
+// Note that for this to work ideally, the mesh cannot be rotated (i.e. the mesh's faces should not be at an angle).
 func NewText(meshPart *MeshPart, textureWidth int) *Text {
 
 	text := &Text{
@@ -72,11 +103,21 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 
 	text.Texture = ebiten.NewImage(textureWidth, int(float64(textureWidth)*asr))
 
-	meshPart.Material = NewMaterial("text material")
-	meshPart.Material.TransparencyMode = TransparencyModeTransparent
+	if meshPart.Material == nil {
+		// If no material is present, then we can create a new one with sane defaults
+		meshPart.Material = NewMaterial("text material")
+		meshPart.Material.Texture = text.Texture
+		meshPart.Material.BackfaceCulling = true
+		meshPart.Material.Shadeless = true
+	}
+
+	meshPart.Material.FragmentShaderOn = true
 	meshPart.Material.Texture = text.Texture
-	meshPart.Material.BackfaceCulling = true
-	meshPart.Material.Shadeless = true
+
+	// We set this because Alpha Clip doesn't work with shadows / outlines, as just the text itself writes depth values
+	meshPart.Material.TransparencyMode = TransparencyModeTransparent
+
+	meshPart.Material.SetShaderText(textShaderSrc)
 
 	return text
 }
@@ -84,6 +125,7 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 // NewTextAutoSize creates a new Text rendering surface for typing out text,
 // with the backing texture's size calculated from an orthographic Camera's render scale.
 // This is generally useful for UI Text objects.
+// Note that for this to work ideally, the mesh cannot be rotated (i.e. the mesh's faces should not be at an angle).
 // All changes to the Text require that the Text object updates its texture, which can be costly as this means redrawing the text as
 // necessary; this is handled automatically.
 func NewTextAutoSize(meshPart *MeshPart, camera *Camera) *Text {
@@ -144,8 +186,10 @@ func splitWithSeparator(str string, seps string) []string {
 }
 
 // SetText sets the text to be displayed for the Text object.
+// Text objects handle automatically splitting newlines based on length to the owning plane mesh's size.
 // Setting the text to be blank effectively clears the text, though
 // Text.ClearText() also exists, and is just syntactic sugar for this purpose.
+// SetText accounts for the margin set in the Text object's active TextStyle, but if it is applied prior to calling SetText().
 func (textObj *Text) SetText(txt string) *Text {
 
 	if textObj.setText != txt {
@@ -155,7 +199,7 @@ func (textObj *Text) SetText(txt string) *Text {
 		textureWidth := textObj.Texture.Bounds().Dx()
 
 		// If a word gets too close to the texture's right side, we loop
-		safetyMargin := int(float64(textureWidth) * 0.1)
+		safetyMargin := int(float64(textureWidth)*0.1) + textObj.style.MarginHorizontal
 
 		parsedText := []string{}
 
@@ -229,11 +273,11 @@ func (textObj *Text) UpdateTexture() {
 
 	typing := true
 
-	if textObj.style.BGColor != nil {
-		textObj.Texture.Fill(textObj.style.BGColor.ToRGBA64())
-	} else {
-		textObj.Texture.Clear()
-	}
+	// if textObj.style.BGColor != nil {
+	// 	textObj.Texture.Fill(textObj.style.BGColor.ToRGBA64())
+	// } else {
+	textObj.Texture.Clear()
+	// }
 
 	textureWidth := textObj.Texture.Bounds().Dx()
 
@@ -258,20 +302,24 @@ func (textObj *Text) UpdateTexture() {
 
 		x := -measure.Min.X
 
-		d := -measure.Min.Y
+		d := -measure.Min.Y + textObj.style.MarginVertical
 		if dip > d {
 			d = dip
 		}
 
 		y := d + (lineIndex * lineHeight)
 
-		if textObj.style.HorizontalAlignment == TextAlignCenter {
+		if textObj.style.AlignmentHorizontal == TextAlignCenter {
 			x = textureWidth/2 - measure.Dx()/2
-		} else if textObj.style.HorizontalAlignment == TextAlignRight {
+		} else if textObj.style.AlignmentHorizontal == TextAlignRight {
 			x = textureWidth - measure.Dx()
+			x -= textObj.style.MarginHorizontal
+		} else {
+			x += textObj.style.MarginHorizontal
 		}
 
-		text.Draw(textObj.Texture, line, textObj.style.Font, x, y, textObj.style.FGColor.ToRGBA64())
+		text.Draw(textObj.Texture, line, textObj.style.Font, x, y, color.RGBA{255, 255, 255, 255})
+		// text.Draw(textObj.Texture, line, textObj.style.Font, x, y, textObj.style.FGColor.ToRGBA64())
 
 	}
 
@@ -284,6 +332,49 @@ func (text *Text) CurrentStyle() TextStyle {
 func (text *Text) ApplyStyle(style TextStyle) {
 	if text.style != style {
 		text.style = style
+
+		rounded := float32(0)
+		if style.OutlineRounded {
+			rounded = 1
+		}
+
+		shadowVec := style.ShadowDirection.Unit().Invert()
+
+		uniformMap := map[string]interface{}{
+			"OutlineThickness": float32(style.OutlineThickness),
+			"OutlineRounded":   rounded,
+			"ShadowVector":     [2]float32{float32(shadowVec.X), float32(shadowVec.Y)},
+			"ShadowLength":     float32(style.ShadowLength),
+		}
+
+		if style.BGColor != nil {
+			uniformMap["BGColor"] = style.BGColor.toFloat32Array()
+		}
+
+		if style.FGColor != nil {
+			uniformMap["FGColor"] = style.FGColor.toFloat32Array()
+		}
+
+		if style.OutlineColor != nil {
+			uniformMap["OutlineColor"] = style.OutlineColor.toFloat32Array()
+		}
+
+		if style.ShadowColorNear != nil {
+			uniformMap["ShadowColorNear"] = style.ShadowColorNear.toFloat32Array()
+		}
+
+		if style.ShadowColorFar != nil {
+			uniformMap["ShadowColorFar"] = style.ShadowColorFar.toFloat32Array()
+			uniformMap["ShadowColorFarSet"] = 1.0
+		}
+
+		text.meshPart.Material.FragmentShaderOptions = &ebiten.DrawTrianglesShaderOptions{
+			Images: [4]*ebiten.Image{
+				text.Texture,
+			},
+			Uniforms: uniformMap,
+		}
+
 		text.UpdateTexture()
 	}
 }
@@ -314,6 +405,7 @@ func (text *Text) SetTypewriterIndex(typewriterIndex int) {
 	}
 }
 
+// FinishTypewriter finishes the typewriter effect, so that the entire message is visible.
 func (text *Text) FinishTypewriter() {
 	text.SetTypewriterIndex(len(text.setText))
 }

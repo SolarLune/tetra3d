@@ -277,10 +277,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- -- Horizontal alignment
 - [ ] -- -- Vertical alignment
 - [ ] -- -- Replace style setting system with dedicated Style object, with a function to flush various style changes to batch and update the Text texture all at once?
-- [ ] -- -- Outlines
+- [x] -- -- Outlines
+- [x] -- -- Shadows
 - [ ] -- -- Gradients
 - [ ] -- -- -- Other patterns?
-- [ ] -- -- Parsing text for per-letter effects (this would probably require rendering the glyphs from a font to individual images to render; could also involve shaders)
+- [ ] -- -- Parsing text for per-letter effects (this would probably require rendering the glyphs from a font to individual images to render; could also involve shaders?)
+- [ ] -- -- -- Per-letter colors
 - [ ] -- -- -- Bold
 - [ ] -- -- -- Italics
 - [ ] -- -- -- Strikethrough
@@ -411,9 +413,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
 - [ ] -- Lighting speed improvements
 - [ ] -- Resource tracking system to ease cloning elements (i.e. rather than live-cloning Meshes, it would be faster to re-use "dead" Meshes)
-- -- [ ] Model
-- -- [ ] Mesh
+- [ ] -- -- Model
+- [ ] -- -- Mesh
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
+- [ ] -- Replace *Color with just the plain Color struct (this would be a breaking change)
+- [ ] -- Update to use Generics where possible; we're already on Go 1.18.
 
 Again, it's incomplete and jank. However, it's also pretty cool!
 

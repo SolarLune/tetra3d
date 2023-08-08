@@ -1,0 +1,133 @@
+package main
+
+var BGColor vec4
+var FGColor vec4
+
+var ShadowVector vec2
+var ShadowLength float
+var ShadowColorNear vec4
+var ShadowColorFar vec4
+var ShadowColorFarSet float
+
+var OutlineThickness float
+var OutlineRounded float
+var OutlineColor vec4
+
+func Fragment(pos vec4, tex vec2, col vec4) vec4 {
+    res := imageSrc0UnsafeAt(tex)
+    imageSize := imageSrcTextureSize()
+    color := FGColor
+    transparency := res.a
+    colorSet := false
+    shadowSet := false
+
+    // Shadows
+
+    if ShadowLength > 0.0 && (ShadowVector.x != 0 || ShadowVector.y != 0) && res.a < 0.5 {
+        shadowSet = true
+
+        shadowV := vec2(ShadowVector.x / imageSize.x, ShadowVector.y / imageSize.y)
+        check := tex
+
+        for i := 1.0; i < 16.0; i++ {
+
+            if i > ShadowLength {
+                break
+            }
+
+            shaded := false
+            
+            check.x += shadowV.x
+
+            if imageSrc0At(check).a > 0.5 {
+                shaded = true
+            }
+
+            check.y += shadowV.y
+
+            if imageSrc0At(check).a > 0.5 {
+                shaded = true
+            }
+
+            if shaded {
+                color = ShadowColorNear
+                if ShadowColorFarSet > 0 {
+                    color = mix(ShadowColorNear, ShadowColorFar, (distance(check * imageSize, tex * imageSize)-1) / ShadowLength)
+                }
+                transparency = 1.0
+                colorSet = true
+                break
+            }
+
+        }
+
+    }
+
+    // Outlines
+
+    if !colorSet && OutlineThickness > 0.0 && res.a < 0.5 {
+
+        found := false
+
+        for shadowI := 0.0; shadowI < 16.0; shadowI++ {
+
+            if (!shadowSet && shadowI > 0) || shadowI > ShadowLength {
+                break
+            }
+
+            for x := -16.0; x < 16.0; x++ {
+
+                for y := -16.0; y < 16.0; y++ {
+                    
+                    if x >= -OutlineThickness && x <= OutlineThickness && y >= -OutlineThickness && y <= OutlineThickness {
+
+                        srcTexels := vec2(tex.x + ((x + 0.01) / imageSize.x), tex.y + ((y + 0.01) / imageSize.y))
+                        if shadowSet {
+                            srcTexels += (ShadowVector / imageSize) * shadowI
+                        }
+
+                        if imageSrc0At(srcTexels).a > 0.5 {
+
+                            if OutlineRounded < 1 || (distance((tex*imageSize) + vec2(x,y), tex*imageSize) <= OutlineThickness) {
+
+                                color = OutlineColor
+                                transparency = 1.0
+                                found = true
+
+                            }
+
+                        }
+
+                    }
+
+                    if found {
+                        break
+                    }
+
+                }
+
+                if found {
+                    break
+                }
+                
+            }
+
+        }
+
+    }
+
+    return mix(BGColor.rgba * col, color * col, transparency)
+    // return vec4(0.5, 0.0, 0.0, 1.0)
+}
+
+// func Fragment(pos vec4, tex vec2, col vec4) vec4 {
+
+//     v := 1
+
+//     if v > 0 {
+
+//     }
+
+//     return vec4(1, 0, 0, 1)
+
+// }

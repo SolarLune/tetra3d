@@ -84,7 +84,7 @@ func (g *Game) Init() {
 			FGColor:              colors.SkyBlue(),
 			BGColor:              colors.Blue().SubRGBA(0, 0, 0.8, 0),
 			Cursor:               "I",
-			HorizontalAlignment:  tetra3d.TextAlignCenter,
+			AlignmentHorizontal:  tetra3d.TextAlignCenter,
 			LineHeightMultiplier: 1,
 		},
 	)
