@@ -51,15 +51,15 @@ func (g *Game) Update() error {
 
 	if ebiten.IsKeyPressed(ebiten.Key1) {
 		g.Scene.World.FogOn = true
-		g.Scene.World.FogColor.Set(1, 0, 0, 1)
+		g.Scene.World.FogColor = tetra3d.NewColor(1, 0, 0, 1)
 		g.Scene.World.FogMode = tetra3d.FogAdd
 	} else if ebiten.IsKeyPressed(ebiten.Key2) {
 		g.Scene.World.FogOn = true
-		g.Scene.World.FogColor.Set(1, 1, 1, 1)
+		g.Scene.World.FogColor = tetra3d.NewColor(1, 1, 1, 1)
 		g.Scene.World.FogMode = tetra3d.FogSub
 	} else if ebiten.IsKeyPressed(ebiten.Key3) {
 		g.Scene.World.FogOn = true
-		g.Scene.World.FogColor.Set(0, 0, 0, 1)
+		g.Scene.World.FogColor = tetra3d.NewColor(0, 0, 0, 1)
 		g.Scene.World.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key4) {
 		g.Scene.World.FogOn = true

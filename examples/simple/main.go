@@ -44,10 +44,10 @@ func (g *Game) Init() {
 
 	// Create a cube, set the color, add it to the scene.
 	cube := tetra3d.NewModel(tetra3d.NewCubeMesh(), "Cube")
-	cube.Color.Set(0, 0.5, 1, 1)
+	cube.Color = tetra3d.NewColor(0, 0.5, 1, 1)
 	g.Scene.Root.AddChildren(cube)
 
-	// Create a camera, move it back.
+	// Create a camera, move it back on the Z axis (depth). The camera automatically looks forward.
 	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
 	g.Camera.Move(0, 0, 5)
 

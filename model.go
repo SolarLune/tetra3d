@@ -20,7 +20,7 @@ type Model struct {
 	*Node
 	Mesh              *Mesh
 	FrustumCulling    bool                                                 // Whether the Model is culled when it leaves the frustum.
-	Color             *Color                                               // The overall multiplicative color of the Model.
+	Color             Color                                                // The overall multiplicative color of the Model.
 	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM // A user-customizeable blending function used to color the Model.
 	BoundingSphere    *BoundingSphere
 
@@ -95,7 +95,7 @@ func (model *Model) Clone() INode {
 	newModel.BoundingSphere = model.BoundingSphere.Clone().(*BoundingSphere)
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.visible = model.visible
-	newModel.Color = model.Color.Clone()
+	newModel.Color = model.Color
 	newModel.AutoBatchMode = model.AutoBatchMode
 
 	for k := range model.DynamicBatchModels {
@@ -729,7 +729,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 type AOBakeOptions struct {
 	TargetChannel  int     // The target vertex color channel to bake the ambient occlusion to.
 	OcclusionAngle float64 // How severe the angle must be (in radians) for the occlusion effect to show up.
-	Color          *Color  // The color for the ambient occlusion.
+	Color          Color   // The color for the ambient occlusion.
 
 	// A slice indicating other models that influence AO when baking. If this is empty, the AO will
 	// just take effect for triangles within the Model, rather than also taking effect for objects that
@@ -815,7 +815,8 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 		}
 
 		for i := 0; i < 3; i++ {
-			model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel].Mix(bakeOptions.Color, ao[i])
+			color := model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel]
+			model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.Color, ao[i])
 		}
 
 	}
@@ -883,7 +884,8 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 			}
 
 			for i := 0; i < 3; i++ {
-				model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel].Mix(bakeOptions.Color, ao[i])
+				color := model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel]
+				model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.Color, ao[i])
 			}
 
 		}
@@ -922,7 +924,7 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 	// TODO: Switch Mesh.VertexColors around so instead of [vertex index][channel] it's [channel][vertex index]; this way we could directly pass
 	// a vertex channel into Light.Light().
 
-	targetColors := make([]*Color, len(model.Mesh.VertexColors))
+	targetColors := make([]Color, len(model.Mesh.VertexColors))
 
 	for i := 0; i < len(targetColors); i++ {
 		targetColors[i] = NewColor(0, 0, 0, 1)
@@ -939,7 +941,7 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 	}
 
 	for i := 0; i < len(model.Mesh.VertexColors); i++ {
-		model.Mesh.VertexColors[i][targetChannel].Set(targetColors[i].ToFloat32s())
+		model.Mesh.VertexColors[i][targetChannel] = targetColors[i]
 	}
 
 }

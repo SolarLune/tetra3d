@@ -539,7 +539,7 @@ func (gp *GridPath) isClosed() bool {
 	return false
 }
 
-func (gp *GridPath) DebugDraw(screen *ebiten.Image, camera *Camera, color *Color) {
+func (gp *GridPath) DebugDraw(screen *ebiten.Image, camera *Camera, color Color) {
 
 	points := gp.Points()
 	for i := 0; i < len(points)-1; i++ {

@@ -34,7 +34,7 @@ func newCubeElement(root tetra3d.INode) *CubeElement {
 	}
 
 	// element.Navigator.FinishMode = tetra3d.FinishModeStop
-	element.Model.Color.Set(0.8+rand.Float32()*0.2, rand.Float32()*0.5, rand.Float32()*0.5, 1)
+	element.Model.Color = tetra3d.NewColor(0.8+rand.Float32()*0.2, rand.Float32()*0.5, rand.Float32()*0.5, 1)
 	element.Model.SetWorldScale(0.1, 0.1, 0.1)
 	element.Model.SetWorldPositionVec(grid.RandomPoint().WorldPosition())
 

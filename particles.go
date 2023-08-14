@@ -126,7 +126,7 @@ func (part *Particle) Update(dt float64) {
 		part.ParticleSystem.Remove(part)
 	}
 
-	if curve := part.ParticleSystem.Settings.ColorCurve; curve != nil && len(curve.Points) > 0 {
+	if curve := part.ParticleSystem.Settings.ColorCurve; len(curve.Points) > 0 {
 		part.Model.Color = curve.Color(part.Life / part.Lifetime)
 	}
 
@@ -157,7 +157,7 @@ type ParticleSystemSettings struct {
 	// is called additively to the other movement settings.
 	MovementFunction func(particle *Particle)
 
-	ColorCurve *ColorCurve // ColorCurve is a curve indicating how the spawned particles should change color as they live.
+	ColorCurve ColorCurve // ColorCurve is a curve indicating how the spawned particles should change color as they live.
 }
 
 // NewParticleSystemSettings creates a new particle system settings.

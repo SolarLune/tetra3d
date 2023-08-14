@@ -455,8 +455,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 								float32(colorData[1])/math.MaxUint16,
 								float32(colorData[2])/math.MaxUint16,
 								float32(colorData[3])/math.MaxUint16,
-							)
-							color.ConvertTosRGB()
+							).ConvertTosRGB()
 							vertexData[i].Colors = append(vertexData[i].Colors, color)
 							vertexData[i].ActiveColorChannel = activeChannelIndex
 
@@ -1234,9 +1233,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				if wc, exists := props["ambient color"]; exists {
 					wcc := wc.([]interface{})
-					worldColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1)
-					worldColor.ConvertTosRGB()
-					world.AmbientLight.Color.Set(worldColor.R, worldColor.G, worldColor.B, 1)
+					worldColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1).ConvertTosRGB()
+					world.AmbientLight.Color = worldColor
 				}
 
 				if wc, exists := props["ambient energy"]; exists {
@@ -1245,8 +1243,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				if cc, exists := props["clear color"]; exists {
 					wcc := cc.([]interface{})
-					clearColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64)))
-					clearColor.ConvertTosRGB()
+					clearColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64))).ConvertTosRGB()
 					world.ClearColor = clearColor
 				}
 
@@ -1285,8 +1282,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				if v, exists := props["fog color"]; exists {
 					wcc := v.([]interface{})
-					fogColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64)))
-					fogColor.ConvertTosRGB()
+					fogColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64))).ConvertTosRGB()
 					world.FogColor = fogColor
 				}
 
@@ -1510,8 +1506,7 @@ func handleGameProperties(p interface{}) (string, interface{}) {
 		}
 	} else if propType == 5 {
 		colorValues := getOrDefaultFloatArray(property, "valueColor", []float64{1, 1, 1, 1})
-		color := NewColor(float32(colorValues[0]), float32(colorValues[1]), float32(colorValues[2]), float32(colorValues[3]))
-		color.ConvertTosRGB()
+		color := NewColor(float32(colorValues[0]), float32(colorValues[1]), float32(colorValues[2]), float32(colorValues[3])).ConvertTosRGB()
 		value = color
 	} else if propType == 6 {
 		vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float64{0, 0, 0})

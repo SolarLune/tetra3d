@@ -115,16 +115,16 @@ func (prop *Property) AsInt() int {
 
 // IsColor returns true if the Property is a color.
 func (prop *Property) IsColor() bool {
-	if _, ok := prop.Value.(*Color); ok {
+	if _, ok := prop.Value.(Color); ok {
 		return true
 	}
 	return false
 }
 
-// AsColor returns the value associated with the Property as a *Color clone.
+// AsColor returns the value associated with the Property as a Color clone.
 // Note that this does not sanity check to ensure the Property is a Color first.
-func (prop *Property) AsColor() *Color {
-	return prop.Value.(*Color).Clone()
+func (prop *Property) AsColor() Color {
+	return prop.Value.(Color)
 }
 
 // IsVector returns true if the Property is a vector.

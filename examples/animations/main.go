@@ -106,9 +106,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		txt := `1 Key: Play [SmoothRoll] Animation On Table
 2 Key: Play [StepRoll] Animation on Table
-Note the animations can blend.
+Note that models can blend between two different
+animations (as shown on the table).
 F Key: Play Animation on Skinned Mesh
-Note that the nodes move as well`
+Note that the nodes move as well (as can be
+seen in the debug mode).`
 		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 

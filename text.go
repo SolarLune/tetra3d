@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"fmt"
 	"image/color"
 	"math"
 	"strings"
@@ -27,17 +28,17 @@ type TextStyle struct {
 	LineHeightMultiplier float64       // The multiplier for line height changes.
 	AlignmentHorizontal  TextAlignment // How the text should be horizontally aligned in the Text texture.
 
-	BGColor *Color // The Background color for the text. Defaults to black (0, 0, 0, 1).
-	FGColor *Color // The Foreground color for the text. Defaults to white (1, 1, 1, 1).
+	BGColor Color // The Background color for the text. Defaults to black (0, 0, 0, 1).
+	FGColor Color // The Foreground color for the text. Defaults to white (1, 1, 1, 1).
 
 	ShadowDirection Vector // A vector indicating direction of the shadow's heading. Defaults to down-right ( {1, 1, 0}, normalized ).
 	ShadowLength    int    // The length of the shadow in pixels. Defaults to 0 (no shadow).
-	ShadowColorNear *Color // The color of the shadow near the letters. Defaults to black (0, 0, 0, 1).
-	ShadowColorFar  *Color // The color of the shadow towards the end of the letters. Defaults to black (0, 0, 0, 1).
+	ShadowColorNear Color  // The color of the shadow near the letters. Defaults to black (0, 0, 0, 1).
+	ShadowColorFar  Color  // The color of the shadow towards the end of the letters. Defaults to black (0, 0, 0, 1).
 
-	OutlineThickness int    // Overall thickness of the outline in pixels. Defaults to 0 (no outline).
-	OutlineRounded   bool   // If the outline is rounded or not. Defaults to false (square outlines).
-	OutlineColor     *Color // Color of the outline. Defaults to black (0, 0, 0, 1).
+	OutlineThickness int   // Overall thickness of the outline in pixels. Defaults to 0 (no outline).
+	OutlineRounded   bool  // If the outline is rounded or not. Defaults to false (square outlines).
+	OutlineColor     Color // Color of the outline. Defaults to black (0, 0, 0, 1).
 
 	// Margin (in pixels) of space to leave around the frame of the texture (left or right, depending on HorizontalAlignment, and from the top). Defaults to 0.
 	MarginHorizontal, MarginVertical int
@@ -117,7 +118,10 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 	// We set this because Alpha Clip doesn't work with shadows / outlines, as just the text itself writes depth values
 	meshPart.Material.TransparencyMode = TransparencyModeTransparent
 
-	meshPart.Material.SetShaderText(textShaderSrc)
+	_, err := meshPart.Material.SetShaderText(textShaderSrc)
+	if err != nil {
+		panic(err)
+	}
 
 	return text
 }
@@ -186,11 +190,15 @@ func splitWithSeparator(str string, seps string) []string {
 }
 
 // SetText sets the text to be displayed for the Text object.
+// arguments can be variables to be displayed in the text string, formatted using fmt.Sprintf()'s formatting rules.
 // Text objects handle automatically splitting newlines based on length to the owning plane mesh's size.
-// Setting the text to be blank effectively clears the text, though
-// Text.ClearText() also exists, and is just syntactic sugar for this purpose.
+// Setting the text to be blank clears the text, though Text.ClearText() also exists, and is just syntactic sugar for this purpose.
 // SetText accounts for the margin set in the Text object's active TextStyle, but if it is applied prior to calling SetText().
-func (textObj *Text) SetText(txt string) *Text {
+func (textObj *Text) SetText(txt string, arguments ...interface{}) *Text {
+
+	if len(arguments) > 0 {
+		txt = fmt.Sprintf(txt, arguments...)
+	}
 
 	if textObj.setText != txt {
 
@@ -347,26 +355,15 @@ func (text *Text) ApplyStyle(style TextStyle) {
 			"ShadowLength":     float32(style.ShadowLength),
 		}
 
-		if style.BGColor != nil {
-			uniformMap["BGColor"] = style.BGColor.toFloat32Array()
-		}
+		uniformMap["BGColor"] = style.BGColor.toFloat32Array()
+		uniformMap["FGColor"] = style.FGColor.toFloat32Array()
 
-		if style.FGColor != nil {
-			uniformMap["FGColor"] = style.FGColor.toFloat32Array()
-		}
+		uniformMap["OutlineColor"] = style.OutlineColor.toFloat32Array()
 
-		if style.OutlineColor != nil {
-			uniformMap["OutlineColor"] = style.OutlineColor.toFloat32Array()
-		}
+		uniformMap["ShadowColorNear"] = style.ShadowColorNear.toFloat32Array()
 
-		if style.ShadowColorNear != nil {
-			uniformMap["ShadowColorNear"] = style.ShadowColorNear.toFloat32Array()
-		}
-
-		if style.ShadowColorFar != nil {
-			uniformMap["ShadowColorFar"] = style.ShadowColorFar.toFloat32Array()
-			uniformMap["ShadowColorFarSet"] = 1.0
-		}
+		uniformMap["ShadowColorFar"] = style.ShadowColorFar.toFloat32Array()
+		uniformMap["ShadowColorFarSet"] = 1.0
 
 		text.meshPart.Material.FragmentShaderOptions = &ebiten.DrawTrianglesShaderOptions{
 			Images: [4]*ebiten.Image{

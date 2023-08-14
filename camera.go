@@ -1126,7 +1126,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				// depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
 			}
 
-			camera.DebugInfo.TotalParts++
+			if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
+				camera.DebugInfo.TotalParts++
+			}
 
 		}
 
@@ -1218,10 +1220,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		// Here we do all vertex transforms first because of data locality (it's faster to access all vertex transformations, then go back and do all UV values, etc)
 
-		mpColor := model.Color.Clone()
+		mpColor := model.Color
 
 		if meshPart.Material != nil {
-			mpColor.MultiplyRGBA(meshPart.Material.Color.ToFloat32s())
+			mpColor = mpColor.MultiplyRGBA(meshPart.Material.Color.ToFloat32s())
 		}
 
 		if lighting && len(sortingTris) > 0 {
@@ -1229,7 +1231,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			t := time.Now()
 
 			meshPart.ForEachVertexIndex(func(vertIndex int) {
-				mesh.vertexLights[vertIndex].Set(0, 0, 0, 1)
+				mesh.vertexLights[vertIndex] = Color{0, 0, 0, 1}
 			}, true)
 
 			for _, light := range sceneLights {
@@ -1755,7 +1757,7 @@ func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...Spri
 // Note that the frame-time mentioned here is purely the time that Tetra3D spends sending render commands to the command queue.
 // Any additional time that Ebitengine takes to flush that queue is not included in this average frame-time value, and is not
 // visible outside of debugging and profiling, like with pprof.
-func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float64, color *Color) {
+func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float64, color Color) {
 
 	m := camera.DebugInfo.AvgFrameTime.Round(time.Microsecond).Microseconds()
 	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
@@ -1787,13 +1789,13 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 
 // DrawDebugWireframe draws the wireframe triangles of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
-func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, color *Color) {
+func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, color Color) {
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
-	camWidth, camHeight := camera.resultColorTexture.Size()
+	camWidth, camHeight := camera.Size()
 
 	for _, m := range allModels {
 
@@ -1852,7 +1854,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 			for _, point := range grid.Points() {
 
 				p1 := camera.WorldToScreen(point.WorldPosition())
-				ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.Clone().Mix(NewColor(1, 0, 0, 1), float32(point.Cost)/100).ToRGBA64())
+				ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.Mix(NewColor(1, 0, 0, 1), float32(point.Cost)/100).ToRGBA64())
 				for _, connection := range point.Connections {
 					p2 := camera.WorldToScreen(connection.WorldPosition())
 					ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
@@ -1868,7 +1870,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 // DrawDebugDrawOrder draws the drawing order of all triangles of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
-func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, textScale float64, color *Color) {
+func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, textScale float64, color Color) {
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
@@ -1909,7 +1911,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 // DrawDebugDrawCallCount draws the draw call count of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
-func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float64, color *Color) {
+func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float64, color Color) {
 
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
@@ -1938,7 +1940,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 // DrawDebugNormals draws the normals of visible models underneath the rootNode given to the screen. NormalLength is the length of the normal lines
 // in units. Color is the color to draw the normals.
-func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float64, color *Color) {
+func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float64, color Color) {
 
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
@@ -1970,7 +1972,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 }
 
 // DrawDebugCenters draws the center positions of nodes under the rootNode using the color given to the screen image provided.
-func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color *Color) {
+func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color Color) {
 
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
@@ -1996,7 +1998,7 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 }
 
-func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, posY, textScale float64, color *Color) {
+func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, posY, textScale float64, color Color) {
 
 	size := text.BoundString(basicfont.Face7x13, txtStr).Size()
 
@@ -2073,10 +2075,25 @@ func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
 	return camera.resultAccumulatedColorTexture
 }
 
+type DrawDebugBoundsColoredSettings struct {
+	RenderAABBs         bool
+	AABBColor           Color
+	RenderSpheres       bool
+	SphereColor         Color
+	RenderCapsules      bool
+	CapsuleColor        Color
+	RenderTriangles     bool
+	TrianglesColor      Color
+	RenderTrianglesAABB bool
+	TrianglesAABBColor  Color
+	RenderBroadphase    bool
+	BroadphaseColor     Color
+}
+
 // DrawDebugBoundsColored will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
 // be drawn in the color provided for each kind of bounding object to the screen image provided. If the passed color is nil, that kind of shape
 // won't be debug-rendered.
-func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, aabbColor, sphereColor, capsuleColor, trianglesColor, trianglesAABBColor, trianglesBroadphaseColor *Color) {
+func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, options DrawDebugBoundsColoredSettings) {
 
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
@@ -2088,13 +2105,13 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 			case *BoundingSphere:
 
-				if sphereColor != nil {
-					camera.drawSphere(screen, bounds, sphereColor)
+				if options.RenderSpheres {
+					camera.drawSphere(screen, bounds, options.SphereColor)
 				}
 
 			case *BoundingCapsule:
 
-				if capsuleColor != nil {
+				if options.RenderCapsules {
 
 					pos := bounds.WorldPosition()
 					radius := bounds.WorldRadius()
@@ -2133,7 +2150,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
-						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, capsuleColor.ToRGBA64())
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, options.CapsuleColor.ToRGBA64())
 
 					}
 
@@ -2141,7 +2158,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 			case *BoundingAABB:
 
-				if aabbColor != nil {
+				if options.RenderAABBs {
 
 					pos := bounds.WorldPosition()
 					size := bounds.Dimensions.Size().Scale(0.5)
@@ -2170,7 +2187,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
-						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, aabbColor.ToRGBA64())
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, options.AABBColor.ToRGBA64())
 
 					}
 
@@ -2178,17 +2195,20 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 			case *BoundingTriangles:
 
-				if trianglesBroadphaseColor != nil {
+				if options.RenderBroadphase {
 
 					for _, b := range bounds.Broadphase.allAABBPositions() {
-						camera.DrawDebugBoundsColored(screen, b, trianglesBroadphaseColor, nil, nil, nil, nil, nil)
+						camera.DrawDebugBoundsColored(screen, b, DrawDebugBoundsColoredSettings{
+							RenderAABBs: true,
+							AABBColor:   options.AABBColor,
+						})
 					}
 
 				}
 
-				if trianglesColor != nil {
+				if options.RenderTriangles {
 
-					camWidth, camHeight := camera.resultColorTexture.Size()
+					camWidth, camHeight := camera.Size()
 
 					lines := []Vector{}
 
@@ -2213,7 +2233,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 					}
 
-					triColor := trianglesColor.ToRGBA64()
+					triColor := options.TrianglesColor.ToRGBA64()
 
 					for i := 0; i < len(lines); i += 3 {
 
@@ -2237,8 +2257,11 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 				}
 
-				if trianglesAABBColor != nil {
-					camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, trianglesAABBColor, nil, nil, nil, nil, nil)
+				if options.RenderTriangles {
+					camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, DrawDebugBoundsColoredSettings{
+						RenderTrianglesAABB: true,
+						TrianglesAABBColor:  options.TrianglesAABBColor,
+					})
 				}
 
 			}
@@ -2249,32 +2272,28 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 }
 
-var defaultAABBColor = NewColor(0, 0.25, 1, 1)
-var defaultSphereColor = NewColor(0.5, 0.25, 1.0, 1)
-var defaultCapsuleColor = NewColor(0.25, 1, 0, 1)
-var defaultTrianglesColor = NewColor(0, 0, 0, 0.5)
-var defaultTrianglesBroadphaseColor = NewColor(1, 0, 0, 0.25)
+// DefaultDrawDebugBoundsSettings returns the default settings for drawing the debug bounds for a nodegraph.
+func DefaultDrawDebugBoundsSettings() DrawDebugBoundsColoredSettings {
+	return DrawDebugBoundsColoredSettings{
+		RenderAABBs:         true,
+		RenderSpheres:       true,
+		RenderCapsules:      true,
+		RenderTriangles:     true,
+		RenderTrianglesAABB: true,
+		RenderBroadphase:    true,
 
-// DrawDebugBounds will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
-// be drawn using default colors to the screen image provided. renderBroadphaseCells indicates whether the broadphase cells for triangle
-// objects should be rendered; similarly, renderTriangleAABB handles whether AABB bounding shapes for triangles should be rendered.
-func (camera *Camera) DrawDebugBounds(screen *ebiten.Image, rootNode INode, renderBroadphaseCells, renderTriangleAABB bool) {
-	var broadphaseColor *Color
-	var trianglesAABBColor *Color
-
-	if renderBroadphaseCells {
-		broadphaseColor = defaultTrianglesBroadphaseColor
+		AABBColor:          NewColor(0, 0.25, 1, 1),
+		SphereColor:        NewColor(0.5, 0.25, 1.0, 1),
+		CapsuleColor:       NewColor(0.25, 1, 0, 1),
+		TrianglesColor:     NewColor(0, 0, 0, 0.5),
+		TrianglesAABBColor: NewColor(1, 0.5, 0, 0.25),
+		BroadphaseColor:    NewColor(1, 0, 0, 0.25),
 	}
-	if renderTriangleAABB {
-		trianglesAABBColor = defaultAABBColor
-	}
-
-	camera.DrawDebugBoundsColored(screen, rootNode, defaultAABBColor, defaultSphereColor, defaultCapsuleColor, defaultTrianglesColor, trianglesAABBColor, broadphaseColor)
 }
 
 // DrawDebugFrustums will draw shapes approximating the frustum spheres for objects underneath the rootNode.
 // The shapes will be drawn in the color provided to the screen image provided.
-func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, color *Color) {
+func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, color Color) {
 
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
@@ -2294,7 +2313,7 @@ func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, co
 var debugIcosphereMesh = NewIcosphereMesh(1)
 var debugIcosphere = NewModel(debugIcosphereMesh, "debug icosphere")
 
-func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color *Color) {
+func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color Color) {
 
 	debugIcosphere.SetLocalPositionVec(sphere.WorldPosition())
 	s := sphere.WorldRadius()

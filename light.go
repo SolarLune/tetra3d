@@ -11,7 +11,7 @@ type ILight interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model)
 
-	Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) // Light lights the triangles in the MeshPart, storing the result in the targetColors
+	Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) // Light lights the triangles in the MeshPart, storing the result in the targetColors
 	// color buffer. If onlyVisible is true, only the visible vertices will be lit; if it's false, they will all be lit.
 	IsOn() bool    // isOn is simply used tfo tell if a "generic" Light is on or not.
 	SetOn(on bool) // SetOn sets whether the light is on or not
@@ -22,7 +22,7 @@ type ILight interface {
 // AmbientLight represents an ambient light that colors the entire Scene.
 type AmbientLight struct {
 	*Node
-	Color *Color // Color is the color of the PointLight.
+	Color Color // Color is the color of the PointLight.
 	// Energy is the overall energy of the Light. Internally, technically there's no difference between a brighter color and a
 	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
 	Energy float32
@@ -62,9 +62,9 @@ func (amb *AmbientLight) beginRender() {
 func (amb *AmbientLight) beginModel(model *Model) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) {
+func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
 	meshPart.ForEachVertexIndex(func(vertIndex int) {
-		targetColors[vertIndex].AddRGBA(amb.result[0], amb.result[1], amb.result[2], 0)
+		targetColors[vertIndex] = targetColors[vertIndex].AddRGBA(amb.result[0], amb.result[1], amb.result[2], 0)
 	}, onlyVisible)
 }
 
@@ -116,7 +116,7 @@ type PointLight struct {
 	// it falls off using something akin to the inverse square law.
 	Range float64
 	// Color is the color of the PointLight.
-	Color *Color
+	Color Color
 	// Energy is the overall energy of the Light, with 1.0 being full brightness. Internally, technically there's no
 	// difference between a brighter color and a higher energy, but this is here for convenience / adherance to the
 	// GLTF spec and 3D modelers.
@@ -175,7 +175,7 @@ func (point *PointLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) {
+func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
@@ -246,7 +246,7 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 				diffuseFactor *= distClamp
 			}
 
-			targetColors[index].AddRGBA(
+			targetColors[index] = targetColors[index].AddRGBA(
 				point.Color.R*float32(diffuseFactor)*point.Energy,
 				point.Color.G*float32(diffuseFactor)*point.Energy,
 				point.Color.B*float32(diffuseFactor)*point.Energy,
@@ -303,7 +303,7 @@ func (point *PointLight) Type() NodeType {
 // DirectionalLight represents a directional light of infinite distance.
 type DirectionalLight struct {
 	*Node
-	Color *Color // Color is the color of the light.
+	Color Color // Color is the color of the light.
 	// Energy is the overall energy of the light. Internally, technically there's no difference between a brighter color and a
 	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
 	Energy float32
@@ -350,7 +350,7 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) {
+func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
 
 	meshPart.ForEachVertexIndex(func(index int) {
 
@@ -372,7 +372,7 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 			return
 		}
 
-		targetColors[index].AddRGBA(
+		targetColors[index] = targetColors[index].AddRGBA(
 			sun.Color.R*float32(diffuseFactor)*sun.Energy,
 			sun.Color.G*float32(diffuseFactor)*sun.Energy,
 			sun.Color.B*float32(diffuseFactor)*sun.Energy,
@@ -427,7 +427,7 @@ type CubeLight struct {
 	*Node
 	Dimensions Dimensions // The overall dimensions of the CubeLight.
 	Energy     float32    // The overall energy of the CubeLight
-	Color      *Color     // The color of the CubeLight
+	Color      Color      // The color of the CubeLight
 	On         bool       // If the CubeLight is on or not
 	// A value between 0 and 1 indicating how much opposite faces are still lit within the volume (i.e. at LightBleed = 0.0,
 	// faces away from the light are dark; at 1.0, faces away from the light are fully illuminated)
@@ -466,7 +466,7 @@ func NewCubeLightFromModel(name string, model *Model) *CubeLight {
 func (cube *CubeLight) Clone() INode {
 	newCube := NewCubeLight(cube.name, cube.Dimensions)
 	newCube.Energy = cube.Energy
-	newCube.Color = cube.Color.Clone()
+	newCube.Color = cube.Color
 	newCube.On = cube.On
 	newCube.Bleed = cube.Bleed
 	newCube.LightingAngle = cube.LightingAngle
@@ -578,7 +578,7 @@ func (cube *CubeLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*Color, onlyVisible bool) {
+func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
 
 	meshPart.ForEachVertexIndex(func(index int) {
 
@@ -660,7 +660,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []*C
 			return
 		}
 
-		targetColors[index].AddRGBA(
+		targetColors[index] = targetColors[index].AddRGBA(
 			cube.Color.R*float32(diffuseFactor)*cube.Energy,
 			cube.Color.G*float32(diffuseFactor)*cube.Energy,
 			cube.Color.B*float32(diffuseFactor)*cube.Energy,

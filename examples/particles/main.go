@@ -113,7 +113,7 @@ func (g *Game) Init() {
 	}
 
 	particleColor := tetra3d.NewColor(0.25, 0.75, 1, 1)
-	settings.ColorCurve.Add(particleColor.Clone().SetAlpha(0), 0)
+	settings.ColorCurve.Add(particleColor.SetAlpha(0), 0)
 	settings.ColorCurve.Add(particleColor, 0.1)
 	settings.ColorCurve.Add(colors.White(), 0.9)
 	settings.ColorCurve.Add(colors.White().SetAlpha(0), 1)
@@ -146,7 +146,7 @@ func (g *Game) Init() {
 	settings.Lifetime.Set(0.5, 1)
 
 	partColor := colors.White()
-	settings.ColorCurve.Add(partColor.Clone().SetAlpha(0), 0)
+	settings.ColorCurve.Add(partColor.SetAlpha(0), 0)
 	settings.ColorCurve.Add(partColor, 0.1)
 	settings.ColorCurve.Add(colors.SkyBlue(), 0.5)
 	settings.ColorCurve.Add(colors.Blue(), 0.8)

@@ -46,7 +46,7 @@ func (g *Game) Init() {
 
 	g.Library = library
 
-	// We clone the scene so we have an original to work from
+	// We clone the scene as it's best practice not to mess with the original.
 	g.Scene = library.ExportedScene.Clone()
 
 	g.Cube = g.Scene.Root.Get("Cube").(*tetra3d.Model)

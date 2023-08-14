@@ -117,8 +117,16 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.System.Draw(screen, g.Camera.Camera)
 
 	if g.System.DrawDebugText {
-		txt := "This demo shows how animated textures and billboarding work.\nThere are several lava planes, but they all share\nthe same mesh, which is animated by the\nTexturePlayer.\n\nThe character faces the camera because his\nmaterial has its BillboardMode set to X/Z (so\nit faces the camera, but doesn't tilt horizontally).\n1 key: Toggle playback"
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		txt := `This demo shows how animated textures and billboarding work.
+There are several lava planes, but they all share
+the same mesh, which is animated by the
+TexturePlayer.
+
+The character faces the camera because his
+material has its BillboardMode set (so that
+it faces the camera, but doesn't tilt horizontally).
+1 key: Toggle playback`
+		g.Camera.DebugDrawText(screen, txt, 0, 204, 1, colors.LightGray())
 	}
 
 }

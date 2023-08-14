@@ -176,17 +176,17 @@ type Mesh struct {
 	vertexSkinnedPositions   []Vector
 	vertexTransformedNormals []Vector
 	VertexUVs                []Vector
-	VertexColors             [][]*Color
-	VertexActiveColorChannel []int
+	VertexColors             [][]Color
+	VertexActiveColorChannel []int       // VertexActiveColorChannel is the active vertex color used for coloring the vertex in the index given.
 	VertexWeights            [][]float32 // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
 	VertexBones              [][]uint16  // TODO: Replace this with [][8]uint16 (or however many the maximum number of bones affecting a single vertex is for GLTF)
 	visibleVertices          []bool
 
-	vertexLights  []*Color
+	vertexLights  []Color
 	vertsAddStart int
 	vertsAddEnd   int
 
-	VertexColorChannelNames map[string]int
+	VertexColorChannelNames map[string]int // VertexColorChannelNames is a map allowing you to get the index of a mesh's vertex color channel by its name.
 	Dimensions              Dimensions
 	Properties              *Properties
 }
@@ -209,9 +209,9 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 		vertexSkinnedNormals:     []Vector{},
 		vertexSkinnedPositions:   []Vector{},
 		vertexTransformedNormals: []Vector{},
-		vertexLights:             []*Color{},
+		vertexLights:             []Color{},
 		VertexUVs:                []Vector{},
-		VertexColors:             [][]*Color{},
+		VertexColors:             [][]Color{},
 		VertexActiveColorChannel: []int{},
 		VertexBones:              [][]uint16{},
 		VertexWeights:            [][]float32{},
@@ -244,7 +244,7 @@ func (mesh *Mesh) Clone() *Mesh {
 	}
 
 	for i := range mesh.vertexLights {
-		newMesh.vertexLights = append(newMesh.vertexLights, mesh.vertexLights[i].Clone())
+		newMesh.vertexLights = append(newMesh.vertexLights, mesh.vertexLights[i])
 	}
 
 	for i := range mesh.VertexUVs {
@@ -252,9 +252,9 @@ func (mesh *Mesh) Clone() *Mesh {
 	}
 
 	for i := range mesh.VertexColors {
-		newMesh.VertexColors = append(newMesh.VertexColors, make([]*Color, len(mesh.VertexColors[i])))
+		newMesh.VertexColors = append(newMesh.VertexColors, make([]Color, len(mesh.VertexColors[i])))
 		for channelIndex := range mesh.VertexColors[i] {
-			newMesh.VertexColors[i][channelIndex] = mesh.VertexColors[i][channelIndex].Clone()
+			newMesh.VertexColors[i][channelIndex] = mesh.VertexColors[i][channelIndex]
 		}
 	}
 
@@ -337,11 +337,11 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 
 	mesh.VertexNormals = append(make([]Vector, 0, vertexCount), mesh.VertexNormals...)
 
-	mesh.vertexLights = append(make([]*Color, 0, vertexCount), mesh.vertexLights...)
+	mesh.vertexLights = append(make([]Color, 0, vertexCount), mesh.vertexLights...)
 
 	mesh.VertexUVs = append(make([]Vector, 0, vertexCount), mesh.VertexUVs...)
 
-	mesh.VertexColors = append(make([][]*Color, 0, vertexCount), mesh.VertexColors...)
+	mesh.VertexColors = append(make([][]Color, 0, vertexCount), mesh.VertexColors...)
 
 	mesh.VertexActiveColorChannel = append(make([]int, 0, vertexCount), mesh.VertexActiveColorChannel...)
 
@@ -380,12 +380,10 @@ func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, so
 
 	for i := range mesh.VertexColors {
 
-		var base *Color
+		base := NewColor(0, 0, 0, 1)
 
 		if multiplicative {
 			base = NewColor(1, 1, 1, 1)
-		} else {
-			base = NewColor(0, 0, 0, 1)
 		}
 
 		for _, c := range sourceChannels {
@@ -395,9 +393,9 @@ func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, so
 			}
 
 			if multiplicative {
-				base.Multiply(mesh.VertexColors[i][c])
+				base = base.Multiply(mesh.VertexColors[i][c])
 			} else {
-				base.Add(mesh.VertexColors[i][c])
+				base = base.Add(mesh.VertexColors[i][c])
 			}
 
 		}
@@ -411,7 +409,7 @@ func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, so
 }
 
 // SetVertexColor sets the specified vertex color for all vertices in the mesh for the target color channel.
-func (mesh *Mesh) SetVertexColor(targetChannel int, color *Color) {
+func (mesh *Mesh) SetVertexColor(targetChannel int, color Color) {
 	mesh.SelectVertices().SelectAll().SetColor(targetChannel, color)
 }
 
@@ -597,12 +595,12 @@ func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
 }
 
 // SetColor sets the color of the specified channel in all vertices contained within the VertexSelection to the provided Color.
-func (vs *VertexSelection) SetColor(channelIndex int, color *Color) {
+func (vs *VertexSelection) SetColor(channelIndex int, color Color) {
 
 	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
 	for i := range vs.Indices {
-		vs.Mesh.VertexColors[i][channelIndex].Set(color.ToFloat32s())
+		vs.Mesh.VertexColors[i][channelIndex] = NewColor(color.ToFloat32s())
 	}
 
 }
@@ -629,11 +627,11 @@ func (vs *VertexSelection) MoveUVs(dx, dy float64) {
 }
 
 // MoveUVsVec moves the UV values by the Vector values specified.
-func (vs *VertexSelection) MoveUVsVec(delta Vector) {
+func (vs *VertexSelection) MoveUVsVec(vec Vector) {
 
 	for index := range vs.Indices {
-		vs.Mesh.VertexUVs[index].X += delta.X
-		vs.Mesh.VertexUVs[index].Y += delta.Y
+		vs.Mesh.VertexUVs[index].X += vec.X
+		vs.Mesh.VertexUVs[index].Y += vec.Y
 	}
 
 }
@@ -1476,7 +1474,7 @@ type VertexInfo struct {
 	U, V                      float64
 	NormalX, NormalY, NormalZ float64
 	Weights                   []float32
-	Colors                    []*Color
+	Colors                    []Color
 	ActiveColorChannel        int
 	Bones                     []uint16
 }
@@ -1515,7 +1513,7 @@ func NewVertex(x, y, z, u, v float64) VertexInfo {
 		U:                  u,
 		V:                  v,
 		Weights:            []float32{},
-		Colors:             make([]*Color, 0, 8),
+		Colors:             make([]Color, 0, 8),
 		ActiveColorChannel: -1,
 		Bones:              []uint16{},
 	}

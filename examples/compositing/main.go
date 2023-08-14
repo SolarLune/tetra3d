@@ -97,7 +97,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 The blue plane is opaque.
 The red one is additive.
 The green one is transparent.
-The closest plane cuts out all objects to show the background.`,
+The white square cuts out all objects to show the background.`,
 			0, 200, 1, colors.LightGray(),
 		)
 	}

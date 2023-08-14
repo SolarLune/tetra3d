@@ -36,7 +36,7 @@ const (
 type Material struct {
 	library           *Library             // library is a reference to the Library that this Material came from.
 	Name              string               // Name is the name of the Material.
-	Color             *Color               // The overall color of the Material.
+	Color             Color                // The overall color of the Material.
 	Texture           *ebiten.Image        // The texture applied to the Material.
 	TexturePath       string               // The path to the texture, if it was not packed into the exporter.
 	TextureFilterMode ebiten.Filter        // Texture filtering mode
@@ -97,7 +97,7 @@ func NewMaterial(name string) *Material {
 func (material *Material) Clone() *Material {
 	newMat := NewMaterial(material.Name)
 	newMat.library = material.library
-	newMat.Color = material.Color.Clone()
+	newMat.Color = material.Color
 	newMat.Texture = material.Texture
 	newMat.properties = material.properties.Clone()
 	newMat.BackfaceCulling = material.BackfaceCulling
