@@ -12,6 +12,7 @@ type Scene struct {
 	Root  INode
 	World *World
 	props *Properties
+	data  interface{}
 
 	updateAutobatch     bool
 	autobatchDynamicMap map[*Material]*Model
@@ -61,8 +62,20 @@ func (scene *Scene) Clone() *Scene {
 		n.sector.UpdateNeighbors(models...)
 	}
 
+	newScene.data = scene.data
+
 	return newScene
 
+}
+
+// Data returns the Scene's user-customizeable data.
+func (scene *Scene) Data() interface{} {
+	return scene.data
+}
+
+// SetData sets the Scene's user-customizeable data pointer to whatever you specify (i.e. a backing "Level" instance or something, for example).
+func (scene *Scene) SetData(data interface{}) {
+	scene.data = data
 }
 
 // Library returns the Library from which this Scene was loaded. If it was created through code and not associated with a Library, this function will return nil.
