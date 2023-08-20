@@ -242,7 +242,7 @@ def copyProp(fromProp, toProp):
 
 class OBJECT_OT_tetra3dOverrideProp(bpy.types.Operator):
     bl_idname = "object.tetra3doverrideprop"
-    bl_label = "Apply Game Property"
+    bl_label = "Override Game Property"
     bl_description= "Copies a game property to the collection instance for overriding."
     bl_options = {'REGISTER', 'UNDO'}
 

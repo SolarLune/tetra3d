@@ -133,16 +133,16 @@ func (part *Particle) Update(dt float64) {
 }
 
 type ParticleSystemSettings struct {
-	Rate     *FloatRange // SpawnRate is how often a particle is spawned in seconds
-	Count    *IntRange   // SpawnCount is how many particles are spawned at a time when a particle is spawned
-	Lifetime *FloatRange // Lifetime is how long a particle lives in seconds
+	Rate     FloatRange // SpawnRate is how often a particle is spawned in seconds
+	Count    IntRange   // SpawnCount is how many particles are spawned at a time when a particle is spawned
+	Lifetime FloatRange // Lifetime is how long a particle lives in seconds
 
-	Velocity           *VectorRange
-	Acceleration       *VectorRange
-	SpawnOffset        *VectorRange
-	Scale              *VectorRange
-	Growth             *VectorRange
-	Rotation           *VectorRange
+	Velocity           VectorRange
+	Acceleration       VectorRange
+	SpawnOffset        VectorRange
+	Scale              VectorRange
+	Growth             VectorRange
+	Rotation           VectorRange
 	Friction           float64 // Friction to apply to velocity
 	AllowNegativeScale bool    // If negative scale should be allowed for particles. By default, this is false.
 
@@ -199,17 +199,17 @@ func (pss *ParticleSystemSettings) Clone() *ParticleSystemSettings {
 	newPS := &ParticleSystemSettings{
 		Rate:     pss.Rate,
 		Count:    pss.Count,
-		Lifetime: pss.Lifetime.Clone(),
+		Lifetime: pss.Lifetime,
 
-		Velocity:     pss.Velocity.Clone(),
-		Acceleration: pss.Acceleration.Clone(),
-		Scale:        pss.Scale.Clone(),
-		Growth:       pss.Growth.Clone(),
-		SpawnOffset:  pss.SpawnOffset.Clone(),
-		Rotation:     pss.Rotation.Clone(),
+		Velocity:     pss.Velocity,
+		Acceleration: pss.Acceleration,
+		Scale:        pss.Scale,
+		Growth:       pss.Growth,
+		SpawnOffset:  pss.SpawnOffset,
+		Rotation:     pss.Rotation,
 		Friction:     pss.Friction,
 
-		ColorCurve:      pss.ColorCurve.Clone(),
+		ColorCurve:      pss.ColorCurve,
 		VertexSpawnMode: pss.VertexSpawnMode,
 
 		MovementFunction:    pss.MovementFunction,
@@ -401,15 +401,8 @@ type FloatRange struct {
 	Min, Max float64
 }
 
-func NewFloatRange() *FloatRange {
-	return &FloatRange{}
-}
-
-func (ran *FloatRange) Clone() *FloatRange {
-	return &FloatRange{
-		Min: ran.Min,
-		Max: ran.Max,
-	}
+func NewFloatRange() FloatRange {
+	return FloatRange{}
 }
 
 func (ran *FloatRange) Set(min, max float64) {
@@ -417,7 +410,7 @@ func (ran *FloatRange) Set(min, max float64) {
 	ran.Max = max
 }
 
-func (ran *FloatRange) Value() float64 {
+func (ran FloatRange) Value() float64 {
 	random := rand.Float64()
 	return ran.Min + ((ran.Max - ran.Min) * random)
 }
@@ -426,15 +419,8 @@ type IntRange struct {
 	Min, Max int
 }
 
-func NewIntRange() *IntRange {
-	return &IntRange{}
-}
-
-func (ran *IntRange) Clone() *IntRange {
-	return &IntRange{
-		Min: ran.Min,
-		Max: ran.Max,
-	}
+func NewIntRange() IntRange {
+	return IntRange{}
 }
 
 func (ran *IntRange) Set(min, max int) {
@@ -442,7 +428,7 @@ func (ran *IntRange) Set(min, max int) {
 	ran.Max = max
 }
 
-func (ran *IntRange) Value() int {
+func (ran IntRange) Value() int {
 	if ran.Min >= ran.Max {
 		return ran.Min
 	}
@@ -458,20 +444,8 @@ type VectorRange struct {
 }
 
 // NewVectorRange returns a new instance of a 3D NumberRange struct.
-func NewVectorRange() *VectorRange {
-	return &VectorRange{
-		Min: Vector{0, 0, 0, 0},
-		Max: Vector{0, 0, 0, 0},
-	}
-}
-
-// Clone returns a clone of the NumberRange.
-func (ran *VectorRange) Clone() *VectorRange {
-	new := NewVectorRange()
-	new.Uniform = ran.Uniform
-	new.Min = ran.Min
-	new.Max = ran.Max
-	return new
+func NewVectorRange() VectorRange {
+	return VectorRange{}
 }
 
 // SetAll sets the minimum and maximum values of all components of the number range at the same time to the value
@@ -530,7 +504,7 @@ func (ran *VectorRange) SetRangeZ(min, max float64) {
 }
 
 // Value returns a random value from within the bounds of the NumberRange.
-func (ran *VectorRange) Value() Vector {
+func (ran VectorRange) Value() Vector {
 
 	var vec Vector
 
