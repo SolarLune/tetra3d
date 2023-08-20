@@ -39,7 +39,7 @@ func (props *Properties) Has(propNames ...string) bool {
 }
 
 // Get returns the value associated with the specified property name. If a property with the
-// passed name (propName) doesn't exist, Get will return nil.
+// passed name (propName) doesn't exist, Get will return a new property.
 func (props *Properties) Get(propName string) *Property {
 	if _, ok := props.props[propName]; !ok {
 		props.props[propName] = &Property{}
