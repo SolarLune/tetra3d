@@ -11,7 +11,7 @@ type Scene struct {
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
 	Root  INode
 	World *World
-	props *Properties
+	props Properties
 	data  interface{}
 
 	updateAutobatch     bool
@@ -83,7 +83,7 @@ func (scene *Scene) Library() *Library {
 	return scene.library
 }
 
-func (scene *Scene) Properties() *Properties {
+func (scene *Scene) Properties() Properties {
 	return scene.props
 }
 

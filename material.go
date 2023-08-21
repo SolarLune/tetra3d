@@ -41,7 +41,7 @@ type Material struct {
 	TexturePath       string               // The path to the texture, if it was not packed into the exporter.
 	TextureFilterMode ebiten.Filter        // Texture filtering mode
 	TextureWrapMode   ebiten.Address       // Texture wrapping mode
-	properties        *Properties          // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
+	properties        Properties           // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
 	BackfaceCulling   bool                 // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
 	TriangleSortMode  int                  // TriangleSortMode influences how triangles with this Material are sorted.
 	Shadeless         bool                 // If the material should be shadeless (unlit) or not
@@ -186,6 +186,6 @@ func (material *Material) String() string {
 }
 
 // Properties returns this Material's game Properties struct.
-func (material *Material) Properties() *Properties {
+func (material *Material) Properties() Properties {
 	return material.properties
 }

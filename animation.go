@@ -264,6 +264,7 @@ type AnimationPlayer struct {
 	Animation              *Animation
 	Playhead               float64 // Playhead of the animation. Setting this to 0 restarts the animation.
 	prevPlayhead           float64
+	prevFinishedAnimation  string
 	justLooped             bool
 	PlaySpeed              float64    // Playback speed in percentage - defaults to 1 (100%)
 	Playing                bool       // Whether the player is playing back or not.
@@ -525,7 +526,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 
 		if ap.FinishMode == FinishModeLoop && (ph >= ap.Animation.Length || ph < 0) {
 
-			if ph > ap.Animation.Length {
+			if ph >= ap.Animation.Length {
 				ap.Playhead -= ap.Animation.Length
 			}
 
@@ -539,10 +540,11 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				ap.OnFinish()
 			}
 			ap.finished = true
+			ap.prevFinishedAnimation = ap.Animation.Name
 
-		} else if ap.FinishMode == FinishModePingPong && (ph > ap.Animation.Length || ph < 0) {
+		} else if ap.FinishMode == FinishModePingPong && (ph >= ap.Animation.Length || ph < 0) {
 
-			if ph > ap.Animation.Length {
+			if ph >= ap.Animation.Length {
 				ap.Playhead -= ph - ap.Animation.Length
 			}
 
@@ -559,14 +561,15 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				}
 			}
 			ap.finished = true
+			ap.prevFinishedAnimation = ap.Animation.Name
 
 			ap.PlaySpeed *= -1
 
-		} else if ap.FinishMode == FinishModeStop && ((ph > ap.Animation.Length && ap.PlaySpeed > 0) || (ph < 0 && ap.PlaySpeed < 0)) {
+		} else if ap.FinishMode == FinishModeStop && ((ph >= ap.Animation.Length && ap.PlaySpeed > 0) || (ph <= 0 && ap.PlaySpeed < 0)) {
 
-			if ph > ap.Animation.Length {
+			if ph >= ap.Animation.Length {
 				ap.Playhead = ap.Animation.Length
-			} else if ph < 0 {
+			} else if ph <= 0 {
 				ap.Playhead = 0
 			}
 
@@ -574,6 +577,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 				ap.OnFinish()
 			}
 			ap.finished = true
+			ap.prevFinishedAnimation = ap.Animation.Name
 
 			ap.Playing = false
 
@@ -755,7 +759,7 @@ func (ap *AnimationPlayer) Finished() bool {
 
 // FinishedPlayingAnimation returns whether the AnimationPlayer just got finished playing an animation of the specified name.
 func (ap *AnimationPlayer) FinishedPlayingAnimation(animName string) bool {
-	return ap.Animation != nil && ap.Animation.Name == animName && ap.Finished()
+	return ap.prevFinishedAnimation == animName && ap.Finished()
 }
 
 // TouchedMarker returns if a marker with the specified name was touched this past frame - note that this relies on calling AnimationPlayer.Update().

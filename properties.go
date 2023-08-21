@@ -1,50 +1,59 @@
 package tetra3d
 
-// Properties is an unordered set of property names to values, representing a means of identifying Nodes or carrying data on Nodes.
-type Properties struct {
-	props map[string]*Property
-}
+// Properties is an unordered map of property names to values, representing a means of identifying Nodes or carrying data on Nodes.
+type Properties map[string]*Property
 
 // NewProperties returns a new Properties object.
-func NewProperties() *Properties {
-	return &Properties{map[string]*Property{}}
+func NewProperties() Properties {
+	return Properties{}
 }
 
-func (props *Properties) Clone() *Properties {
+func (props Properties) Clone() Properties {
 	newTags := NewProperties()
-	for k, v := range props.props {
-		newTags.Get(k).Set(v.Value)
+	for k, v := range props {
+		newTags.Add(k).Set(v.Value)
 	}
 	return newTags
 }
 
 // Clear clears the Properties object of all game properties.
-func (props *Properties) Clear() {
-	props.props = map[string]*Property{}
+func (props Properties) Clear() {
+	for k := range props {
+		delete(props, k)
+	}
 }
 
 // Remove removes the tag specified from the Properties object.
-func (props *Properties) Remove(tag string) {
-	delete(props.props, tag)
+func (props Properties) Remove(tag string) {
+	delete(props, tag)
 }
 
 // Has returns true if the Properties object has properties by all of the names specified, and false otherwise.
-func (props *Properties) Has(propNames ...string) bool {
-	for _, t := range propNames {
-		if _, exists := props.props[t]; !exists {
+func (props Properties) Has(propNames ...string) bool {
+	for _, propName := range propNames {
+		if props.Get(propName) == nil {
 			return false
 		}
 	}
 	return true
 }
 
-// Get returns the value associated with the specified property name. If a property with the
-// passed name (propName) doesn't exist, Get will return a new property.
-func (props *Properties) Get(propName string) *Property {
-	if _, ok := props.props[propName]; !ok {
-		props.props[propName] = &Property{}
+// Add adds a property to the Properties map using the given name.
+// If a property of the specified name already exists, it will return that property instead.
+func (props Properties) Add(propName string) *Property {
+	if _, ok := props[propName]; !ok {
+		props[propName] = &Property{}
 	}
-	return props.props[propName]
+	return props[propName]
+}
+
+// Get returns the value associated with the specified property name. If a property with the
+// passed name (propName) doesn't exist, Get will return nil.
+func (props Properties) Get(propName string) *Property {
+	if _, ok := props[propName]; ok {
+		return props[propName]
+	}
+	return nil
 }
 
 // Property represents a game property on a Node or other resource.

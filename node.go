@@ -220,7 +220,7 @@ type INode interface {
 	Path() string
 
 	// Properties returns this object's game Properties struct.
-	Properties() *Properties
+	Properties() Properties
 
 	// IsBone returns if the Node is a "bone" (a node that was a part of an armature and so can play animations back to influence a skinned mesh).
 	IsBone() bool
@@ -260,7 +260,7 @@ type Node struct {
 	parent            INode
 	cachedTransform   Matrix4
 	isTransformDirty  bool
-	props             *Properties // Properties is an unordered set of properties, representing a means of identifying and setting game properties on Nodes.
+	props             Properties // Properties is an unordered set of properties, representing a means of identifying and setting game properties on Nodes.
 	animationPlayer   *AnimationPlayer
 	inverseBindMatrix Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 	isBone            bool
@@ -886,7 +886,7 @@ func (node *Node) SetVisible(visible bool, recursive bool) {
 }
 
 // Properties represents an unordered set of game properties that can be used to identify this object.
-func (node *Node) Properties() *Properties {
+func (node *Node) Properties() Properties {
 	return node.props
 }
 

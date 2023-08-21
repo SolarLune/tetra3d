@@ -188,7 +188,7 @@ type Mesh struct {
 
 	VertexColorChannelNames map[string]int // VertexColorChannelNames is a map allowing you to get the index of a mesh's vertex color channel by its name.
 	Dimensions              Dimensions
-	Properties              *Properties
+	Properties              Properties
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,

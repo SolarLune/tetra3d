@@ -978,7 +978,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				// Non-Tetra3D custom data
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-						obj.Properties().Get(tagName).Set(data)
+						obj.Properties().Add(tagName).Set(data)
 					}
 				}
 			}
@@ -1122,7 +1122,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 						name, value := handleGameProperties(p)
 
-						obj.Properties().Get(name).Set(value)
+						obj.Properties().Add(name).Set(value)
 
 					}
 				}
@@ -1199,8 +1199,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 							n.collectionObjects = append(n.collectionObjects, clone)
 
 							// Share properties to top-level clones
-							for k, v := range obj.Properties().props {
-								clone.Properties().Get(k).Set(v.Value)
+							for k, v := range obj.Properties() {
+								clone.Properties().Add(k).Set(v.Value)
 							}
 
 						} else {
@@ -1327,7 +1327,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 					name, value := handleGameProperties(p)
 
-					scene.Properties().Get(name).Set(value)
+					scene.Properties().Add(name).Set(value)
 
 				}
 			}
@@ -1335,7 +1335,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			// Non-Tetra3D custom data
 			for tagName, data := range extras {
 				if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-					scene.Properties().Get(tagName).Set(data)
+					scene.Properties().Add(tagName).Set(data)
 				}
 			}
 

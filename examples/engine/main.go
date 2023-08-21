@@ -13,6 +13,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
+// The goal of this example is to show how a simple engine object-oriented game engine flow could be approximated in Tetra3D.
+
 type Game struct {
 	Library *tetra3d.Library
 	Scene   *tetra3d.Scene
