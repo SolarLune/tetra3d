@@ -459,6 +459,22 @@ class OBJECT_OT_tetra3dSetAnimationInterpolation(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class RENDER_OT_tetra3dQuickSetRenderResolution(bpy.types.Operator):
+
+    bl_idname = "render.t3dquicksetrenderresolution"
+    bl_label = "Set render resolution"
+    bl_description= "Sets the render resolution for cameras in this blend file to quick-values"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    resolutionHeight : bpy.props.IntProperty()
+
+    def execute(self, context):
+
+        asr = 16/9
+        context.scene.t3dRenderResolutionW__ = int(self.resolutionHeight * asr)
+        context.scene.t3dRenderResolutionH__ = int(self.resolutionHeight)
+        return {'FINISHED'}
+
 def objectNodePath(object):
 
     p = object.name
@@ -893,9 +909,33 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
 
+        box = self.layout.box()
+
+        row = box.row()
+        row.label(text="Quick set render resolution:")
+
         row = self.layout.row()
         row.prop(context.scene, "t3dRenderResolutionW__")
         row.prop(context.scene, "t3dRenderResolutionH__")
+
+        row = box.row()
+        row.label(text="PS1-like:")
+        op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="224p")
+        op.resolutionHeight = 224
+
+        op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="480p")
+        op.resolutionHeight = 480
+
+        row = box.row()
+        row.label(text="Other:")
+
+        op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="720p")
+        op.resolutionHeight = 720
+
+        op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="1080p")
+        op.resolutionHeight = 1080
+
+
 
         box = self.layout.box()
         box.prop(context.scene, "t3dSectorRendering__")
@@ -993,22 +1033,23 @@ def export():
             worldData["ambient color"] = list(world.color)
             worldData["ambient energy"] = 1
 
-        if "t3dClearColor__" in world:
-            if "t3dSyncClearColor__" in world and world["t3dSyncClearColor__"]:
-                worldData["clear color"] = worldData["ambient color"]
-            else:
-                worldData["clear color"] = world.t3dClearColor__
+        if "t3dSyncClearColor__" in world and world["t3dSyncClearColor__"]:
+            worldData["clear color"] = worldData["ambient color"]
+        elif "t3dClearColor__" in world:
+            worldData["clear color"] = world.t3dClearColor__
+
         if "t3dFogMode__" in world:
             worldData["fog mode"] = world.t3dFogMode__
         if "t3dFogDithered__" in world:
             worldData["dithered transparency"] = world.t3dFogDithered__
         if "t3dFogCurve__" in world:
             worldData["fog curve"] = world.t3dFogCurve__
-        if "t3dFogColor__" in world:
-            if "t3dSyncFogColor__" in world and world["t3dSyncFogColor__"] and "t3dClearColor__" in world:
-                worldData["fog color"] = worldData["clear color"]
-            else:
-                worldData["fog color"] = world.t3dFogColor__
+
+        if "t3dSyncFogColor__" in world and world["t3dSyncFogColor__"] and "clear color" in worldData:
+            worldData["fog color"] = worldData["clear color"]
+        elif "t3dFogColor__" in world:
+            worldData["fog color"] = world.t3dFogColor__
+
         if "t3dFogRangeStart__" in world:
             worldData["fog range start"] = world.t3dFogRangeStart__
         if "t3dFogRangeEnd__" in world:
@@ -1623,6 +1664,7 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dSetVector)
     
     bpy.utils.register_class(EXPORT_OT_tetra3d)
+    bpy.utils.register_class(RENDER_OT_tetra3dQuickSetRenderResolution)
 
     bpy.utils.register_class(OBJECT_OT_tetra3dPlaySample)
     bpy.utils.register_class(OBJECT_OT_tetra3dStopSample)
@@ -1664,10 +1706,10 @@ def register():
     bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(name="Pack Textures", description="Whether Blender should pack textures into the GLTF file on export", default=False,
     get=getPackTextures, set=setPackTextures)
 
-    bpy.types.Scene.t3dRenderResolutionW__ = bpy.props.IntProperty(name="Render Resolution Width", description="How wide to render the game scene", default=640, min=0,
+    bpy.types.Scene.t3dRenderResolutionW__ = bpy.props.IntProperty(name="Render Width", description="How wide to render the game scene in pixels", default=640, min=0,
     get=getRenderResolutionW, set=setRenderResolutionW)
 
-    bpy.types.Scene.t3dRenderResolutionH__ = bpy.props.IntProperty(name="Render Resolution Height", description="How wide to render the game scene", default=360, min=0,
+    bpy.types.Scene.t3dRenderResolutionH__ = bpy.props.IntProperty(name="Render Height", description="How tall to render the game scene in pixels", default=360, min=0,
     get=getRenderResolutionH, set=setRenderResolutionH)
 
     bpy.types.Scene.t3dPlaybackFPS__ = bpy.props.IntProperty(name="Playback FPS", description="Animation Playback Framerate (in Blender)", default=60, min=0,
@@ -1754,6 +1796,8 @@ def unregister():
 
     bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
+    bpy.utils.unregister_class(RENDER_OT_tetra3dQuickSetRenderResolution)
+
     bpy.utils.unregister_class(t3dGamePropertyItem__)
 
     if currentlyPlayingAudioHandle:

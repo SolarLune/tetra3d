@@ -82,7 +82,7 @@ var textShaderSrc []byte
 // NewText sets the transparency mode of the material to be transparent, as clip alpha doesn't work properly.
 // textureWidth is how wide (in pixels) the backing texture should be for displaying the text; the height is determined by the
 // aspect ratio of the dimensions of the meshpart given.
-// Text objects create their own special materials to render properly, and use a shader as well. If you want to tweak the rendering further,
+// Text objects update the mesh's material to point to an internal texture, and use a shader as well. If you want to tweak the rendering further,
 // do so on the provided MeshPart after calling NewText().
 // All changes to the Text require that the Text object updates its texture, which can be costly as this means redrawing the text as
 // necessary; this is handled automatically.

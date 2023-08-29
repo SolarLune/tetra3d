@@ -34,7 +34,7 @@ type GLTFLoadOptions struct {
 	// function to use the path to load the library on demand. You could then store the loaded result as necessary if multiple levels use this assets Library.
 	DependentLibraryResolver func(blendPath string) *Library
 
-	//If top-level objects in collections should be renamed according to their instance objects.
+	// If top-level objects in collections should be renamed according to their instance objects.
 	RenameCollectionObjects bool
 }
 
@@ -45,7 +45,6 @@ func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 		CameraHeight:              -1,
 		CameraDepth:               true,
 		DefaultToAutoTransparency: true,
-		RenameCollectionObjects:   true,
 	}
 }
 
@@ -1345,17 +1344,18 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			Below, we handle collection instances specially, as objects in the collection should be instantiated
 			instead in the same relative locations, rather than parenting them to their collection instance objects.
 			Otherwise, there would be nodes in the middle - the collection instance. For example, a collection composed
-			of a chair mesh parented to a collision box would become a hierarchy like this:
+			of a chair mesh parented to a collision box would become a hierarchy like this when placed as a collection
+			instance in a Blender scene:
 
 			* Root
-				|- * Chair (Collection Instance, named "Chair.001")
+				|- * Chair (Collection Instance, named, say, "Chair.001")
 					|- * Chair Collision Box (named "ChairCol")
 						|- * Chair Mesh
 
 			Instead, we can substitute the chair collision box in the collection instance's location:
 
 			* Root
-				|- * Chair Collision Box (now optionally named "Chair.001")
+				|- * Chair Collision Box (named "ChairCol", or optionally, after the collection instance object, "Chair.001")
 					|- * Chair Mesh
 
 		*/

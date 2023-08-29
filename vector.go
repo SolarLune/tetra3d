@@ -153,7 +153,7 @@ func (vec Vector) ClampMagnitude(maxMag float64) Vector {
 	return vec
 }
 
-// SubMagnitude subtacts the given magnitude from the Vector's. If the vector's magnitude is less than the given magnitude to subtract,
+// SubMagnitude returns a copy of the Vector with the given magnitude subtracted from it. If the vector's magnitude is less than the given magnitude to subtract,
 // a zero-length Vector will be returned.
 func (vec Vector) SubMagnitude(mag float64) Vector {
 	if vec.Magnitude() > mag {

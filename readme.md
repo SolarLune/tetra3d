@@ -418,6 +418,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 - [ ] -- Replace *Color with just the plain Color struct (this would be a breaking change)
 - [ ] -- Update to use Generics where possible; we're already on Go 1.18.
+- [ ] -- Move utility objects (quaternion, vector, color, text, matrix, treewatcher, etc) to utility package.
 
 Again, it's incomplete and jank. However, it's also pretty cool!
 

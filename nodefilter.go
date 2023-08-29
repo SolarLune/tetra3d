@@ -194,11 +194,23 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 	return nf
 }
 
-// ByProps allows you to filter a given selection of nodes by the provided set of property names.
+// ByPropNames allows you to filter a given selection of nodes by the provided set of property names.
+// If the Nodes in the filter have properties by the given name, they pass the filter and are included.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByProps(propNames ...string) NodeFilter {
+func (nf NodeFilter) ByPropNames(propNames ...string) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		return node.Properties().Has(propNames...)
+	})
+	return nf
+}
+
+// ByProp allows you to filter a given selection of nodes by a property value check - if the nodes filtered
+// have a property with the given value, they are included.
+// If no matching Nodes are found, an empty NodeFilter is returned.
+func (nf NodeFilter) ByProp(propName string, propValue any) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		value := node.Properties().Get(propName)
+		return value != nil && value.Value == propValue
 	})
 	return nf
 }
