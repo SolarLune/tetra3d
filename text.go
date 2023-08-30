@@ -93,7 +93,6 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 		meshPart:        meshPart,
 		textureSize:     textureWidth,
 		typewriterIndex: 0,
-		style:           NewDefaultTextStyle(),
 	}
 
 	// Calculate the width and height of the dimensions based off of the
@@ -122,6 +121,13 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 	if err != nil {
 		panic(err)
 	}
+
+	// We set the default text here so that something appears, and we
+	// apply a style using the function because otherwise, the text would be invisible.
+	text.setText = "Default text"
+	text.parsedText = []string{"Default text"}
+
+	text.ApplyStyle(NewDefaultTextStyle()) // The texture will update when we apply the style.
 
 	return text
 }

@@ -985,7 +985,11 @@ var ReadableReferences = true
 
 func (node *Node) String() string {
 	if ReadableReferences {
-		return "< " + node.Path() + " : " + fmt.Sprintf("%d", node.id) + " >"
+		path := node.Path()
+		if path == "" {
+			path = "{ no path }"
+		}
+		return "< " + node.Name() + " : " + path + " : " + fmt.Sprintf("%d", node.id) + " >"
 	} else {
 		return fmt.Sprintf("%p", node)
 	}
@@ -1047,6 +1051,7 @@ func (node *Node) Get(path string) INode {
 
 // Path returns a string indicating the hierarchical path to get this Node from the root. The path returned will be absolute, such that
 // passing it to Get() called on the scene root node will return this node. The path returned will not contain the root node's name ("Root").
+// If the Node is not in a scene tree (i.e. does not have a path to a root node), Path() will return a blank string.
 func (node *Node) Path() string {
 
 	root := node.Root()
