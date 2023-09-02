@@ -160,3 +160,20 @@ func (scene *Scene) HandleAutobatch() {
 	}
 
 }
+
+// Get searches a node's hierarchy using a string to find a specified node. The path is in the format of names of nodes, separated by forward
+// slashes ('/'), and is relative to the node you use to call Get. As an example of Get, if you had a cup parented to a desk, which was
+// parented to a room, that was finally parented to the root of the scene, it would be found at "Room/Desk/Cup". Note also that you can use "../" to
+// "go up one" in the hierarchy (so cup.Get("../") would return the Desk node).
+// Since Get uses forward slashes as path separation, it would be good to avoid using forward slashes in your Node names. Also note that Get()
+// trims the extra spaces from the beginning and end of Node Names, so avoid using spaces at the beginning or end of your Nodes' names.
+// Syntactic sugar for Scene.Root.Get().
+func (scene *Scene) Get(nodePath string) INode {
+	return scene.Root.Get(nodePath)
+}
+
+// FindNode searches through a Node's tree for the node by name. This is mostly syntactic sugar for
+// Node.SearchTree().ByName(nodeName).First().
+func (scene *Scene) FindNode(nodeName string) INode {
+	return scene.Root.SearchTree().ByName(nodeName).First()
+}

@@ -536,12 +536,12 @@ func (mesh *Mesh) AutoNormal() {
 
 // SelectVertices generates a new vertex selection for the current Mesh.
 func (mesh *Mesh) SelectVertices() *VertexSelection {
-	return &VertexSelection{Indices: map[int]bool{}, Mesh: mesh}
+	return &VertexSelection{Indices: map[int]any{}, Mesh: mesh}
 }
 
 // VertexSelection represents a selection of vertices on a Mesh.
 type VertexSelection struct {
-	Indices map[int]bool
+	Indices map[int]any
 	Mesh    *Mesh
 }
 
@@ -557,7 +557,7 @@ func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
 		color := vs.Mesh.VertexColors[vertexIndex][channelIndex]
 
 		if color.R > 0.01 || color.G > 0.01 || color.B > 0.01 {
-			vs.Indices[vertexIndex] = true
+			vs.Indices[vertexIndex] = struct{}{}
 		}
 
 	}
@@ -570,7 +570,7 @@ func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
 func (vs *VertexSelection) SelectAll() *VertexSelection {
 
 	for i := 0; i < len(vs.Mesh.VertexPositions); i++ {
-		vs.Indices[i] = true
+		vs.Indices[i] = struct{}{}
 	}
 
 	return vs
@@ -584,7 +584,7 @@ func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
 		func(tri *Triangle) {
 
 			for _, index := range tri.VertexIndices {
-				vs.Indices[int(index)] = true
+				vs.Indices[int(index)] = struct{}{}
 			}
 
 		},
@@ -592,6 +592,14 @@ func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
 
 	return vs
 
+}
+
+// SelectIndices selects the passed indices in the Mesh belonging to the specified MeshPart.
+func (vs *VertexSelection) SelectIndices(indices ...int) *VertexSelection {
+	for _, i := range indices {
+		vs.Indices[i] = struct{}{}
+	}
+	return vs
 }
 
 // SetColor sets the color of the specified channel in all vertices contained within the VertexSelection to the provided Color.
@@ -698,6 +706,13 @@ func (vs *VertexSelection) MoveVec(vec Vector) {
 
 	}
 
+}
+
+// ForEachIndex calls the provided function for each index selected in the VertexSelection.
+func (vs *VertexSelection) ForEachIndex(forEach func(index int)) {
+	for index := range vs.Indices {
+		forEach(index)
+	}
 }
 
 // NewCubeMesh creates a new Cube Mesh and gives it a new material (suitably named "Cube").
