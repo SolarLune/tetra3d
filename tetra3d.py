@@ -1,6 +1,6 @@
 # Add-on for Tetra3D > Blender exporting
 
-import bpy, os, bmesh, math, aud
+import bpy, os, bmesh, math, aud, mathutils
 from bpy.app.handlers import persistent
 
 currentlyPlayingAudioName = None
@@ -495,6 +495,162 @@ class MESH_PT_tetra3d(bpy.types.Panel):
 
         row = self.layout.row()
         row.prop(context.object.data, "t3dUniqueMesh__")
+        row = self.layout.row()
+        box = row.box()
+        box.operator(MESH_OT_tetra3dBakeAO.bl_idname)
+        box.operator(MESH_OT_tetra3dClearAO.bl_idname)
+        row = box.row()
+        row.prop(context.scene, "t3dBakeAOFG__")
+        row.prop(context.scene, "t3dBakeAOBG__")
+        row = box.row()
+        row.prop(context.scene, "t3dBakeAODistance__")
+        row = box.row()
+        row.prop(context.scene, "t3dBakeAOIgnore__")
+
+class MESH_OT_tetra3dBakeAO(bpy.types.Operator):
+
+    bl_idname = "mesh.ot_tetra3d_bake_ao"
+    # bl_idname = "MESH.OT_tetra3dBakeAO"
+    bl_label = "Bake AO"
+    bl_description= "Bake ambient occlusion to the active vertex colors (active color attribute) of the mesh"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+
+        if bpy.context.active_object is None:
+            return {"FINISHED"}
+
+        mesh = context.active_object.data
+    
+        prevMode = bpy.context.mode
+        if prevMode != "OBJECT" and prevMode != "PAINT_VERTEX":
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+        if len(mesh.color_attributes) == 0:
+            bpy.ops.geometry.color_attribute_add()
+        
+        activeColor = mesh.color_attributes.active_color
+
+        if activeColor.domain != 'POINT' or activeColor.data_type != 'FLOAT_COLOR':
+            bpy.ops.geometry.color_attribute_convert(domain='POINT', data_type='FLOAT_COLOR')
+
+        colorAttributes = mesh.color_attributes.active_color.data
+
+        invertedModelMatrix = context.object.matrix_world.inverted()
+        print(invertedModelMatrix)
+
+        depsgraph = context.evaluated_depsgraph_get()
+
+        gameProperties = []
+
+        for s in context.scene.t3dBakeAOIgnore__.split(";"):
+            gameProperties.append(s)
+
+        # Global axes
+        searches = [
+            mathutils.Vector([1, 0, 0]) @ invertedModelMatrix,
+            mathutils.Vector([-1, 0, 0]) @ invertedModelMatrix,
+            mathutils.Vector([0, 1, 0]) @ invertedModelMatrix,
+            mathutils.Vector([0, -1, 0]) @ invertedModelMatrix,
+            mathutils.Vector([0, 0, 1]) @ invertedModelMatrix,
+            mathutils.Vector([0, 0, -1]) @ invertedModelMatrix,
+        ]
+
+        aoFGColor = context.scene.t3dBakeAOFG__
+        aoBGColor = context.scene.t3dBakeAOBG__
+        aoDistance = context.scene.t3dBakeAODistance__
+
+        for vertex in mesh.vertices:
+            colorAttributes[vertex.index].color[0] = aoBGColor.r
+            colorAttributes[vertex.index].color[1] = aoBGColor.g
+            colorAttributes[vertex.index].color[2] = aoBGColor.b
+            colorAttributes[vertex.index].color[3] = 1
+
+        for poly in mesh.polygons:
+            normal = poly.normal
+
+            for vertexIndex in poly.vertices:
+
+                vertex = mesh.vertices[vertexIndex]
+                
+                pos = vertex.co.copy()
+                start = (pos + (normal * aoDistance)).copy()
+                start = invertedModelMatrix @ start
+
+                print(start)
+
+                # context.view_layer.update
+
+                strike = False
+                for direction in searches:
+                    # TODO: cast again from the desired point if it hit an object that is to be ignored
+                    check = context.scene.ray_cast(depsgraph = depsgraph, origin = start, direction=direction, distance=aoDistance)
+                    if check[0]:
+                        print("STRIKE:",start, direction*aoDistance, check[1])
+                        strike = True
+                        object = check[4]
+
+                        skip = False
+
+                        for prop in object.t3dGameProperties__:
+                            for s in gameProperties:
+                                if prop.name == s:
+                                    skip = True
+                                    break
+
+                            if skip:
+                                break
+                        
+                        if skip:
+                            strike = False
+                        else:
+                            break
+
+                if strike:
+                    colorAttributes[vertexIndex].color[0] = aoFGColor.r
+                    colorAttributes[vertexIndex].color[1] = aoFGColor.g
+                    colorAttributes[vertexIndex].color[2] = aoFGColor.b
+
+        if prevMode == "PAINT_VERTEX":
+            prevMode = "VERTEX_PAINT"
+                            
+        bpy.ops.object.mode_set(mode=prevMode)
+
+        return {'FINISHED'}
+
+class MESH_OT_tetra3dClearAO(bpy.types.Operator):
+
+    bl_idname = "mesh.ot_tetra3d_clear_ao"
+    # bl_idname = "MESH.OT_tetra3dClearAO"
+    bl_label = "Clear AO"
+    bl_description= "Clears ambient occlusion of the active vertex color (color attribute) channel"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+
+        mesh = context.active_object.data
+    
+        if len(mesh.color_attributes) == 0:
+            bpy.ops.geometry.color_attribute_add()
+        
+        activeColor = mesh.color_attributes.active_color
+
+        if activeColor.domain != 'POINT' or activeColor.data_type != 'FLOAT_COLOR':
+            bpy.ops.geometry.color_attribute_convert(domain='POINT', data_type='FLOAT_COLOR')
+
+        colorAttributes = mesh.color_attributes.active_color.data
+
+        aoBGColor = context.scene.t3dBakeAOBG__
+
+        for vertex in mesh.vertices:
+            vertexIndex = vertex.index
+            colorAttributes[vertexIndex].color[0] = aoBGColor.r
+            colorAttributes[vertexIndex].color[1] = aoBGColor.g
+            colorAttributes[vertexIndex].color[2] = aoBGColor.b
+            colorAttributes[vertexIndex].color[3] = 1 
+                
+        return {'FINISHED'}
+
 
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
@@ -1611,6 +1767,30 @@ def fogRangeEndGet(self):
         return self["t3dFogRangeEnd__"]
     return 1
 
+def aoColorFGSet(self, value):
+    globalSet("t3dAOColorFG__", value)
+
+def aoColorFGGet(self):
+    return globalGet("t3dAOColorFG__", mathutils.Color([0, 0, 0]) )
+
+def aoColorBGSet(self, value):
+    globalSet("t3dAOColorBG__", value)
+
+def aoColorBGGet(self):
+    return globalGet("t3dAOColorBG__", mathutils.Color([1, 1, 1]) )
+
+def aoDistanceSet(self, value):
+    globalSet("t3dAODistance__", value)
+
+def aoDistanceGet(self):
+    return globalGet("t3dAODistance__", 0.25)
+
+def aoIgnoreSet(self, value):
+    globalSet("t3dBakeAOIgnore__", value)
+
+def aoIgnoreGet(self):
+    return globalGet("t3dBakeAOIgnore__", "")
+
 ####
 
 # We don't need to actually store a FOV value, but rather modify the Blender camera's usual FOV variable
@@ -1672,6 +1852,9 @@ def register():
     bpy.utils.register_class(t3dGamePropertyItem__)
     bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
     bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
+
+    bpy.utils.register_class(MESH_OT_tetra3dBakeAO)
+    bpy.utils.register_class(MESH_OT_tetra3dClearAO)
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
@@ -1755,6 +1938,10 @@ def register():
     bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
 
     bpy.types.Mesh.t3dUniqueMesh__ = bpy.props.BoolProperty(name="Unique Mesh", description="Whether each Model that uses this Mesh will have a unique clone of it (true) or if they will share them (false)")
+    bpy.types.Scene.t3dBakeAOFG__ = bpy.props.FloatVectorProperty(name="AO Color", description="Ambient Occlusion color", default=[0,0,0], subtype="COLOR", size=3, step=1, min=0, max=1, get=aoColorFGGet, set=aoColorFGSet)
+    bpy.types.Scene.t3dBakeAOBG__ = bpy.props.FloatVectorProperty(name="BG Color", description="Ambient Occlusion background color", default=[1,1,1], subtype="COLOR", size=3, step=1, min=0, max=1, get=aoColorBGGet, set=aoColorBGSet)
+    bpy.types.Scene.t3dBakeAODistance__ = bpy.props.FloatProperty(name="AO Distance", description="Ambient Occlusion distance", get=aoDistanceGet, set=aoDistanceSet)
+    bpy.types.Scene.t3dBakeAOIgnore__ = bpy.props.StringProperty(name="Ignore AO Game Properties", description="What game properties to ignore, split by semi-colons", get=aoIgnoreGet, set=aoIgnoreSet)
     
     bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dSyncClearColor__ = bpy.props.BoolProperty(name="Sync Clear Color to World Color", description="If the clear color should be a copy of the world's color")
@@ -1808,6 +1995,8 @@ def unregister():
 
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
+    bpy.utils.unregister_class(MESH_OT_tetra3dBakeAO)
+    bpy.utils.unregister_class(MESH_OT_tetra3dClearAO)
     
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
@@ -1831,6 +2020,11 @@ def unregister():
 
     del bpy.types.Scene.t3dExpandGameProps__
     del bpy.types.Scene.t3dExpandOverrideProps__
+    
+    del bpy.types.Scene.t3dBakeAOFG__
+    del bpy.types.Scene.t3dBakeAOBG__
+    del bpy.types.Scene.t3dBakeAODistance__
+    del bpy.types.Scene.t3dBakeAOIgnore__
 
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__
@@ -1852,7 +2046,7 @@ def unregister():
     del bpy.types.World.t3dFogCurve__
 
     del bpy.types.Mesh.t3dUniqueMesh__
-
+    
     del bpy.types.Camera.t3dFOV__
 
     if exportOnSave in bpy.app.handlers.save_post:
