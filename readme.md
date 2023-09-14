@@ -366,6 +366,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Ability to bake ambient occlusion to vertex colors
 - [ ] -- Specular lighting (shininess)
 - [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
+- [ ] -- Lightmaps - might be possible with being able to use multiple textures at the same time now?
+- [ ] -- Baking AO and lighting into vertex colors? from Blender? It's possible to do already using Cycles, but not very easy or simple.
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
 - [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
 - [X] **Particles**

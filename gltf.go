@@ -272,7 +272,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 						name, value := handleGameProperties(p)
 
-						newMat.properties.Get(name).Set(value)
+						newMat.Properties().Add(name).Set(value)
 
 					}
 				}
@@ -280,7 +280,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				// Non-Tetra3D custom data
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-						newMat.properties.Get(tagName).Set(data)
+						newMat.Properties().Add(tagName).Set(data)
 					}
 				}
 			}
@@ -352,7 +352,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				// Non-Tetra3D custom data
 				for tagName, data := range dataMap {
 					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-						newMesh.Properties.Get(tagName).Set(data)
+						newMesh.properties.Add(tagName).Set(data)
 					}
 				}
 

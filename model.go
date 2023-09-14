@@ -778,16 +778,11 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 		for _, other := range model.Mesh.Triangles {
 
-			if tri == other || tri.Normal.Equals(other.Normal) {
+			if tri == other {
 				continue
 			}
 
-			span := tri.MaxSpan
-			if other.MaxSpan > span {
-				span = other.MaxSpan
-			}
-
-			span *= 0.66
+			span := max(tri.MaxSpan, other.MaxSpan) * 0.66
 
 			if tri.Center.DistanceSquared(other.Center) > span*span {
 				continue
@@ -798,18 +793,22 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 				continue
 			}
 
-			if shared := tri.SharesVertexPositions(other); shared != nil {
+			if sharedA, sharedB, sharedC := tri.SharesVertexPositions(other); sharedA >= 0 || sharedB >= 0 || sharedC >= 0 {
 
-				if shared[0] >= 0 {
+				if sharedA >= 0 {
 					ao[0] = 1
 				}
-				if shared[1] >= 0 {
+				if sharedB >= 0 {
 					ao[1] = 1
 				}
-				if shared[2] >= 0 {
+				if sharedC >= 0 {
 					ao[2] = 1
 				}
 
+			}
+
+			if ao[0] == 1 && ao[1] == 1 && ao[2] == 1 {
+				break
 			}
 
 		}

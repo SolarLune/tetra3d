@@ -172,7 +172,7 @@ func (scene *Scene) Get(nodePath string) INode {
 	return scene.Root.Get(nodePath)
 }
 
-// FindNode searches through a Node's tree for the node by name. This is mostly syntactic sugar for
+// FindNode searches through a Node's tree for the node by name exactly. This is mostly syntactic sugar for
 // Node.SearchTree().ByName(nodeName).First().
 func (scene *Scene) FindNode(nodeName string) INode {
 	return scene.Root.SearchTree().ByName(nodeName).First()

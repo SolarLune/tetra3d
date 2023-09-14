@@ -188,7 +188,7 @@ type Mesh struct {
 
 	VertexColorChannelNames map[string]int // VertexColorChannelNames is a map allowing you to get the index of a mesh's vertex color channel by its name.
 	Dimensions              Dimensions
-	Properties              Properties
+	properties              Properties
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,
@@ -200,7 +200,7 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 		MeshParts:               []*MeshPart{},
 		Dimensions:              Dimensions{Vector{0, 0, 0, 0}, Vector{0, 0, 0, 0}},
 		VertexColorChannelNames: map[string]int{},
-		Properties:              NewProperties(),
+		properties:              NewProperties(),
 
 		vertexTransforms:         []Vector{},
 		VertexPositions:          []Vector{},
@@ -229,7 +229,7 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 func (mesh *Mesh) Clone() *Mesh {
 	newMesh := NewMesh(mesh.Name)
 	newMesh.library = mesh.library
-	newMesh.Properties = mesh.Properties.Clone()
+	newMesh.properties = mesh.properties.Clone()
 	newMesh.triIndex = mesh.triIndex
 
 	newMesh.allocateVertexBuffers(len(mesh.VertexPositions))
@@ -537,6 +537,11 @@ func (mesh *Mesh) AutoNormal() {
 // SelectVertices generates a new vertex selection for the current Mesh.
 func (mesh *Mesh) SelectVertices() *VertexSelection {
 	return &VertexSelection{Indices: map[int]any{}, Mesh: mesh}
+}
+
+// Properties returns this Mesh object's game Properties struct.
+func (mesh *Mesh) Properties() Properties {
+	return mesh.properties
 }
 
 // VertexSelection represents a selection of vertices on a Mesh.
@@ -1236,7 +1241,9 @@ func (tri *Triangle) RecalculateNormal() {
 	tri.Normal = calculateNormal(verts[tri.VertexIndices[0]], verts[tri.VertexIndices[1]], verts[tri.VertexIndices[2]])
 }
 
-func (tri *Triangle) SharesVertexPositions(other *Triangle) []int {
+// SharesVertexPosition returns 3 ints representing which indices the triangles have in common for the first, second, and third vertices
+// of the calling tri. If no vertices are shared, the indices are all -1.
+func (tri *Triangle) SharesVertexPositions(other *Triangle) (int, int, int) {
 
 	triIndices := tri.VertexIndices
 	otherIndices := other.VertexIndices
@@ -1244,22 +1251,27 @@ func (tri *Triangle) SharesVertexPositions(other *Triangle) []int {
 	mesh := tri.MeshPart.Mesh
 	otherMesh := other.MeshPart.Mesh
 
-	shareCount := []int{-1, -1, -1}
+	shareA := -1
+	shareB := -1
+	shareC := -1
 
 	for i, index := range triIndices {
 		for j, otherIndex := range otherIndices {
 			if mesh.VertexPositions[index].Equals(otherMesh.VertexPositions[otherIndex]) {
-				shareCount[i] = j
+				switch i {
+				case 0:
+					shareA = j
+				case 1:
+					shareB = j
+				case 2:
+					shareC = j
+				}
 				break
 			}
 		}
 	}
 
-	if shareCount[0] == -1 && shareCount[1] == -1 && shareCount[2] == -1 {
-		return nil
-	}
-
-	return shareCount
+	return shareA, shareB, shareC
 
 }
 

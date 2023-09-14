@@ -96,27 +96,39 @@ func BenchmarkMathInternalVector(b *testing.B) {
 
 // Benchmark function for previous iteration of vectors, which were type definitions that just pointed to [4]float32.
 
-// func BenchmarkMathArrayF64(b *testing.B) {
+type testVectorFloat [4]float64
 
-// 	b.StopTimer()
+func BenchmarkMathArrayF64(b *testing.B) {
 
-// 	maxSize := 1200
+	b.StopTimer()
 
-// 	vecs := make([]VectorFloat, 0, maxSize)
+	maxSize := 1200
 
-// 	for i := 0; i < maxSize; i++ {
-// 		vecs = append(vecs, VectorFloat{rand.Float32(), rand.Float32(), rand.Float32()})
-// 	}
+	vecs := make([]testVectorFloat, 0, maxSize)
 
-// 	b.ReportAllocs()
-// 	b.StartTimer()
+	for i := 0; i < maxSize; i++ {
+		vecs = append(vecs, testVectorFloat{rand.Float64(), rand.Float64(), rand.Float64()})
+	}
 
-// 	// Main point of benchmarking
-// 	for z := 0; z < b.N; z++ {
-// 		for i := 0; i < maxSize-1; i++ {
-// 			vecs[i].Add(&vecs[i+1])
-// 			vecs[i].Cross(&vecs[i+1])
-// 		}
-// 	}
+	b.ReportAllocs()
+	b.StartTimer()
 
-// }
+	// Main point of benchmarking
+	for z := 0; z < b.N; z++ {
+		for i := 0; i < maxSize-1; i++ {
+			// Add
+			vecs[i][0] += vecs[i+1][0]
+			vecs[i][1] += vecs[i+1][1]
+			vecs[i][2] += vecs[i+1][2]
+
+			// Cross
+			ogVecY := vecs[i][1]
+			ogVecZ := vecs[i][2]
+
+			vecs[i][2] = vecs[i][0]*vecs[i+1][1] - vecs[i+1][0]*vecs[i][1]
+			vecs[i][1] = ogVecZ*vecs[i+1][1] - vecs[i+1][2]*vecs[i][0]
+			vecs[i][0] = ogVecY*vecs[i+1][2] - vecs[i+1][1]*ogVecZ
+		}
+	}
+
+}
