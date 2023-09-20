@@ -30,7 +30,7 @@ func (watch *TreeWatcher) Update() {
 		watch.elements = make([]INode, 0, cap(watch.prevElements))
 
 		watch.rootNode.SearchTree().ForEach(func(node INode) bool {
-			if watch.WatchFilter != nil && watch.WatchFilter(node) {
+			if watch.WatchFilter == nil || watch.WatchFilter(node) {
 				watch.elements = append(watch.elements, node)
 			}
 			return true
@@ -74,4 +74,9 @@ func (watch *TreeWatcher) Update() {
 
 	}
 
+}
+
+// SetRoot sets the root Node to be watched for the TreeWatcher.
+func (watch *TreeWatcher) SetRoot(rootNode INode) {
+	watch.rootNode = rootNode
 }
