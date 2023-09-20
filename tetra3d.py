@@ -1033,27 +1033,22 @@ def export():
             worldData["ambient color"] = list(world.color)
             worldData["ambient energy"] = 1
 
-        if "t3dSyncClearColor__" in world and world["t3dSyncClearColor__"]:
+        if world["t3dSyncClearColor__"]:
             worldData["clear color"] = worldData["ambient color"]
-        elif "t3dClearColor__" in world:
+        else:
             worldData["clear color"] = world.t3dClearColor__
 
-        if "t3dFogMode__" in world:
-            worldData["fog mode"] = world.t3dFogMode__
-        if "t3dFogDithered__" in world:
-            worldData["dithered transparency"] = world.t3dFogDithered__
-        if "t3dFogCurve__" in world:
-            worldData["fog curve"] = world.t3dFogCurve__
+        worldData["fog mode"] = world.t3dFogMode__
+        worldData["dithered transparency"] = world.t3dFogDithered__
+        worldData["fog curve"] = world.t3dFogCurve__
 
-        if "t3dSyncFogColor__" in world and world["t3dSyncFogColor__"] and "clear color" in worldData:
+        if world["t3dSyncFogColor__"]:
             worldData["fog color"] = worldData["clear color"]
-        elif "t3dFogColor__" in world:
+        else:
             worldData["fog color"] = world.t3dFogColor__
 
-        if "t3dFogRangeStart__" in world:
-            worldData["fog range start"] = world.t3dFogRangeStart__
-        if "t3dFogRangeEnd__" in world:
-            worldData["fog range end"] = world.t3dFogRangeEnd__
+        worldData["fog range start"] = world.t3dFogRangeStart__
+        worldData["fog range end"] = world.t3dFogRangeEnd__
 
         worlds[world.name] = worldData
 
