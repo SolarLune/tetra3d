@@ -1033,7 +1033,7 @@ def export():
             worldData["ambient color"] = list(world.color)
             worldData["ambient energy"] = 1
 
-        if world["t3dSyncClearColor__"]:
+        if world.t3dSyncClearColor__:
             worldData["clear color"] = worldData["ambient color"]
         else:
             worldData["clear color"] = world.t3dClearColor__
@@ -1042,7 +1042,7 @@ def export():
         worldData["dithered transparency"] = world.t3dFogDithered__
         worldData["fog curve"] = world.t3dFogCurve__
 
-        if world["t3dSyncFogColor__"]:
+        if world.t3dSyncFogColor__:
             worldData["fog color"] = worldData["clear color"]
         else:
             worldData["fog color"] = world.t3dFogColor__
