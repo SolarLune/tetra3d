@@ -525,13 +525,15 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		_, _, mvJustRForNormals = modelTransform.Mult(camera.ViewMatrix()).Decompose()
 	}
 
+	farSquared := (camera.far * camera.far) + (mesh.maxTriangleSpan * mesh.maxTriangleSpan)
+
 	var skinnedTriCenter Vector
 
 	for ti := meshPart.TriangleStart; ti <= meshPart.TriangleEnd; ti++ {
 
 		tri := mesh.Triangles[ti]
 
-		meshPart.sortingTriangles[sortingTriIndex].Triangle = mesh.Triangles[ti]
+		meshPart.sortingTriangles[sortingTriIndex].Triangle = tri
 
 		// if invertedCamPos.DistanceSquared(tri.Center) > pow(camera.far+tri.MaxSpan, 2) {
 		// 	continue
@@ -571,6 +573,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				skinnedTriCenter = skinnedTriCenter.Add(vertPos)
 
 			} else {
+
+				if invertedCamPos.DistanceSquared(tri.Center) > farSquared {
+					continue
+				}
 
 				v0 := mesh.VertexPositions[tri.VertexIndices[i]]
 

@@ -181,6 +181,7 @@ type Mesh struct {
 	VertexWeights            [][]float32 // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
 	VertexBones              [][]uint16  // TODO: Replace this with [][8]uint16 (or however many the maximum number of bones affecting a single vertex is for GLTF)
 	visibleVertices          []bool
+	maxTriangleSpan          float64
 
 	vertexLights  []Color
 	vertsAddStart int
@@ -318,6 +319,8 @@ func (mesh *Mesh) Clone() *Mesh {
 	newMesh.Dimensions = mesh.Dimensions
 
 	newMesh.Unique = mesh.Unique
+
+	newMesh.maxTriangleSpan = mesh.maxTriangleSpan
 
 	return newMesh
 }
@@ -1429,7 +1432,9 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 		})
 		mesh.Triangles = append(mesh.Triangles, newTri)
 		mesh.triIndex++
-
+		if mesh.maxTriangleSpan < newTri.MaxSpan {
+			mesh.maxTriangleSpan = newTri.MaxSpan
+		}
 	}
 
 	if part.TriangleCount() >= MaxTriangleCount {
