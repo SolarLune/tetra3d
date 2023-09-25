@@ -106,6 +106,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	sectorRendering := false
 	sectorRenderDepth := 0
+	sectorDetection := SectorDetectionTypeVertices
 
 	if gltfLoadOptions.CameraWidth <= 0 && gltfLoadOptions.CameraHeight <= 0 {
 		camWidth = 640
@@ -163,6 +164,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			if depth, exists := globalExporterSettings["t3dSectorRenderDepth__"]; exists {
 				sectorRenderDepth = int(depth.(float64))
+			}
+
+			if value, exists := globalExporterSettings["t3dSectorDetectionType__"]; exists {
+				switch value.(string) {
+				case "AABB":
+					sectorDetection = SectorDetectionTypeAABB
+					// case "VERTICES":
+					// 	sectorDetection = SectorDetectionTypeVertices
+				}
 			}
 
 		}
@@ -1008,7 +1018,9 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		}
 
 		if value := nodeGetProp(node, "t3dSector__"); value != nil && value.(float64) > 0 {
-			obj.(*Model).sector = NewSector(obj.(*Model))
+			sec := NewSector(obj.(*Model))
+			sec.SectorDetectionType = SectorDetectionType(sectorDetection)
+			obj.(*Model).sector = sec
 		}
 
 		objects = append(objects, obj)

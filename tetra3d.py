@@ -38,6 +38,11 @@ gltfExportTypes = [
     ("GLTF_EMBEDDED", ".gltf", "Exports a single file, with all data packed in JSON. Less efficient than binary, but easier to edit later", 0, 2),
 ]
 
+sectorDetectionType = [
+    ("VERTICES", "Vertices", "Sector neighborhood is determined by sectors sharing vertex positions. Accurate, but slower.", 0, 0),
+    ("AABB", "AABB", "Sector neighborhood is determined by AABB intersection. Fast, but inaccurate.", 0, 1),
+]
+
 materialCompositeModes = [
     ("DEFAULT", "Default", "Blends the destination by the material's color modulated by the material's alpha value. The default alpha-blending composite mode. Also known as CompositeModeSourceOver", 0, 0),
     ("ADDITIVE", "Additive", "Adds the material's color to the destination. Also known as CompositeModeLighter", 0, 1),
@@ -942,6 +947,10 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         row = box.row()
         row.enabled = context.scene.t3dSectorRendering__
         row.prop(context.scene, "t3dSectorRenderDepth__")
+        row = box.row()
+        row.label(text="Sector detection type:")
+        row = box.row()
+        row.prop(context.scene, "t3dSectorDetectionType__", expand=True)
 
         box = self.layout.box()
         row = box.row()
@@ -1487,6 +1496,13 @@ def getSectorRenderDepth(self):
 def setSectorRenderDepth(self, value):
     globalSet("t3dSectorRenderDepth__", value)
 
+
+def getSectorDetectionType(self):
+    return globalGet("t3dSectorDetection__", "VERTICES")
+
+def setSectorDetectionType(self, value):
+    globalSet("t3dSectorDetection__", value)
+
 #####
 
 def getRenderResolutionW(self):
@@ -1683,6 +1699,9 @@ def register():
     bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=1, min=0,
     get=getSectorRenderDepth, set=setSectorRenderDepth)
 
+    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined", default="VERTICES", 
+    get=getSectorDetectionType, set=setSectorDetectionType)
+
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
     get=getExportOnSave, set=setExportOnSave)
     
@@ -1811,6 +1830,7 @@ def unregister():
 
     del bpy.types.Scene.t3dSectorRendering__
     del bpy.types.Scene.t3dSectorRenderDepth__
+    del bpy.types.Scene.t3dSectorDetectionType__
     del bpy.types.Scene.t3dExportOnSave__
     del bpy.types.Scene.t3dExportFilepath__
     del bpy.types.Scene.t3dExportFormat__

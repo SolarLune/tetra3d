@@ -10,7 +10,7 @@ import (
 type BoundingAABB struct {
 	*Node
 	internalSize Vector
-	Dimensions   Dimensions
+	Dimensions   Dimensions // Dimensions represents the size of the AABB after transformation.
 }
 
 // NewBoundingAABB returns a new BoundingAABB Node.
@@ -184,6 +184,20 @@ func (box *BoundingAABB) normalFromContactPoint(contactPoint Vector) Vector {
 // Colliding returns true if the BoundingAABB collides with another IBoundingObject.
 func (box *BoundingAABB) Colliding(other IBoundingObject) bool {
 	return box.Collision(other) != nil
+}
+
+// ContainsAABB returns if the calling BoundingAABB contains the provided other BoundingAABB.
+func (box *BoundingAABB) ContainsAABB(other *BoundingAABB) bool {
+
+	mePos := box.WorldPosition()
+	meMin := mePos.Sub(box.Dimensions.Center())
+	meMax := mePos.Add(box.Dimensions.Center())
+
+	otherPos := other.WorldPosition()
+	otherMin := otherPos.Sub(other.Dimensions.Center())
+	otherMax := otherPos.Add(other.Dimensions.Center())
+
+	return otherMin.X > meMin.X && otherMin.Y > meMin.Y && otherMin.Z > meMin.Z && otherMax.X < meMax.X && otherMax.Y < meMax.Y && otherMax.Z < meMax.Z
 }
 
 // Collision returns the Collision between the BoundingAABB and the other IBoundingObject. If

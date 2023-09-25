@@ -28,18 +28,27 @@ func (np neighborSet) Clear() {
 	}
 }
 
+type SectorDetectionType int
+
+const (
+	SectorDetectionTypeVertices = iota // If sector neighbors are detected by sharing vertex positions
+	SectorDetectionTypeAABB            // If sector neighbors are detected by AABB
+)
+
 // Sector represents an area in a game (a sector), and is used for sector-based rendering.
 // When a camera renders a scene with sector-based rendering enabled, the Camera will render
 // only the objects within the current sector and any neighboring sectors, up to a customizeable
 // depth.
-// A Sector is logically an AABB, which sits next to other Sectors (AABBs).
+// A Sector is, spatially, an AABB, which sits next to or within other Sectors (AABBs).
 type Sector struct {
-	Model         *Model
-	AABB          *BoundingAABB
-	Neighbors     neighborSet
-	sectorVisible bool
+	Model               *Model              // The owning Model that forms the Sector
+	AABB                *BoundingAABB       // The AABB used to search for neighbors if the SectorDetectionType is set to SectorDetectionTypeAABB
+	Neighbors           neighborSet         // The Sector's neighbors
+	SectorDetectionType SectorDetectionType // How the Sector is detected
+	sectorVisible       bool
 }
 
+// NewSector creates a new Sector for the provided Model.
 func NewSector(model *Model) *Sector {
 
 	mesh := model.Mesh
@@ -75,15 +84,55 @@ func (sector *Sector) Clone() *Sector {
 // by this process (so clear the Sector's NeighborSet first if you need to do so).
 func (sector *Sector) UpdateNeighbors(otherModels ...*Model) {
 
+	sector.AABB.updateSize()
+
 	for _, otherModel := range otherModels {
 
-		if otherModel == sector.Model {
+		if otherModel == sector.Model || otherModel.sector == nil || sector.Neighbors.Contains(otherModel.sector) {
 			continue
 		}
 
-		if otherModel.sector != nil && sector.AABB.Colliding(otherModel.sector.AABB) {
-			sector.Neighbors[otherModel.sector] = true
-			otherModel.sector.Neighbors[sector] = true
+		otherModel.sector.AABB.updateSize()
+
+		switch sector.SectorDetectionType {
+
+		case SectorDetectionTypeVertices:
+
+			modelMatrix := sector.Model.Transform()
+			otherMatrix := otherModel.Transform()
+
+		exit:
+
+			for _, v := range sector.Model.Mesh.VertexPositions {
+
+				transformedV := modelMatrix.MultVec(v)
+
+				for _, v2 := range otherModel.Mesh.VertexPositions {
+
+					transformedV2 := otherMatrix.MultVec(v2)
+
+					if transformedV.Equals(transformedV2) {
+
+						sector.Neighbors[otherModel.sector] = true
+						otherModel.sector.Neighbors[sector] = true
+						break exit
+
+					}
+				}
+
+			}
+
+			// sector.Model.Mesh.SelectVertices().SelectAll().ForEachIndex(func(index int) {
+
+			// })
+
+		case SectorDetectionTypeAABB:
+
+			if sector.AABB.Colliding(otherModel.sector.AABB) {
+				sector.Neighbors[otherModel.sector] = true
+				otherModel.sector.Neighbors[sector] = true
+			}
+
 		}
 
 	}
