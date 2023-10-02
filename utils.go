@@ -34,7 +34,7 @@ func max(a, b float64) float64 {
 	return b
 }
 
-func clamp(value, min, max float64) float64 {
+func clamp[V float64 | int](value, min, max V) V {
 	if value < min {
 		return min
 	} else if value > max {

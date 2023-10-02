@@ -602,6 +602,19 @@ func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
 
 }
 
+// SelectMaterialByName selects all vertices in the Mesh belonging to the specified material.
+func (vs *VertexSelection) SelectMaterialByName(materialNames ...string) *VertexSelection {
+
+	for _, matName := range materialNames {
+		if mp := vs.Mesh.FindMeshPart(matName); mp != nil {
+			vs.SelectMeshPart(mp)
+		}
+	}
+
+	return vs
+
+}
+
 // SelectIndices selects the passed indices in the Mesh belonging to the specified MeshPart.
 func (vs *VertexSelection) SelectIndices(indices ...int) *VertexSelection {
 	for _, i := range indices {

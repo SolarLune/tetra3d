@@ -270,7 +270,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
 - [x] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
 - [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
-- [ ] -- Draw triangle in 3D space through a function (could be useful for 3D lines, for example)
+- [ ] -- Draw ~~triangles~~ shapes in 3D space through a function (could be useful for 3D lines, for example)
 - [x] -- 3D Text (2D text, rendered on an appropriately-sized 3D plane)
 - [x] -- -- Typewriter effect
 - [x] -- -- Customizeable cursor
@@ -332,6 +332,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Separate .bin loading
 - [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
 - [X] **Blender Add-on**
+- [X] -- Export 3D view camera to Scenes for quick iteration
+- [ ] -- Object-level color checkbox
+- [ ] -- Object-level shadeless checkbox?
 - [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices
 - [X] -- Export GLTF on save / on command via button
 - [X] -- Bounds node creation
@@ -419,8 +422,10 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- Mesh
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
 - [ ] -- Replace *Color with just the plain Color struct (this would be a breaking change)
+- [ ] -- Replace color usage with HTML or W3C colors? : https://www.computerhope.com/htmcolor.htm#gray / https://www.computerhope.com/jargon/w/w3c-color-names.htm
 - [ ] -- Update to use Generics where possible; we're already on Go 1.18.
 - [ ] -- Move utility objects (quaternion, vector, color, text, matrix, treewatcher, etc) to utility package.
+- [ ] -- Optimize getting an object by path; maybe this could be done with some kind of string serialization, rather than text parsing?
 
 Again, it's incomplete and jank. However, it's also pretty cool!
 

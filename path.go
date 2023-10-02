@@ -136,6 +136,7 @@ type IPath interface {
 	Length() float64
 	// Points returns the points of the IPath in a slice.
 	Points() []Vector
+	HopCount() int // HopCount returns the number of hops in the path.
 	isClosed() bool
 }
 
@@ -415,18 +416,19 @@ func (path *Path) Points() []Vector {
 	for _, c := range path.children {
 		points = append(points, c.WorldPosition())
 	}
-	// if path.Closed {
-	// 	points = append(points, path.children[0].WorldPosition())
-	// }
-	// fmt.Println("points:", points)
 	return points
+}
+
+// HopCount returns the number of hops in the path (i.e. number of nodes - 1).
+func (path *Path) HopCount() int {
+	return len(path.Children()) - 1
 }
 
 func (path *Path) isClosed() bool {
 	return path.Closed
 }
 
-// Next returns the next point in the Grid Path as an iterator - if the boolean value is true, you have reached the end of the path.
+// Next returns the next point in the path as an iterator - if the boolean value is true, you have reached the end of the path.
 // Useful if you don't want to use a Navigator to navigate through it.
 func (path *Path) Next() (Vector, bool) {
 	points := path.Points()

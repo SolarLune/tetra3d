@@ -105,7 +105,7 @@ func (system *BasicSystemHandler) Draw(screen *ebiten.Image, camera *tetra3d.Cam
 		var txt string
 		if system.UsingBasicFreeCam {
 			txt = `WASD: Move, Mouse: Look, Shift: move fast
-Left Click to Lock / Unlock Mouse Cursor
+Right Click to Lock / Unlock Mouse Cursor
 F1: Toggle help text - F2: Toggle depth debug,
 F3: Wireframe debug - F4: fullscreen - F5: node center debug
 ESC: Quit`
@@ -192,7 +192,7 @@ func (cc *BasicFreeCam) Update() {
 
 	cc.Node.SetLocalPositionVec(pos)
 
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		cc.Locked = !cc.Locked
 		if cc.Locked {
 			ebiten.SetCursorMode(ebiten.CursorModeCaptured)

@@ -318,7 +318,7 @@ func (camera *Camera) MouseRayTest(depth float64, testAgainst ...IBoundingObject
 		my = camera.ColorTexture().Bounds().Dy() / 2
 	}
 
-	to := camera.ScreenToWorld(mx, my, depth)
+	to := camera.ScreenToWorldPixels(mx, my, depth)
 
 	return RayTest(from, to, testAgainst...)
 

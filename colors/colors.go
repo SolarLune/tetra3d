@@ -44,6 +44,11 @@ func Red() tetra3d.Color {
 	return tetra3d.NewColor(1, 0, 0, 1)
 }
 
+// PaleRed generates a tetra3d.Color instance of the provided name.
+func PaleRed() tetra3d.Color {
+	return tetra3d.NewColor(0.678, 0.172, 0.384, 1)
+}
+
 // Orange generates a tetra3d.Color instance of the provided name.
 func Orange() tetra3d.Color {
 	return tetra3d.NewColor(1, 0.5, 0, 1)

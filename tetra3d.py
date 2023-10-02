@@ -1,6 +1,6 @@
 # Add-on for Tetra3D > Blender exporting
 
-import bpy, os, bmesh, math, aud
+import bpy, os, bmesh, math, aud, bpy_extras
 from bpy.app.handlers import persistent
 
 currentlyPlayingAudioName = None
@@ -945,12 +945,15 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box = self.layout.box()
         box.prop(context.scene, "t3dSectorRendering__")
         row = box.row()
-        row.enabled = context.scene.t3dSectorRendering__
+        sectorRenderingOn = context.scene.t3dSectorRendering__
+        row.enabled = sectorRenderingOn
         row.prop(context.scene, "t3dSectorRenderDepth__")
         row = box.row()
+        row.enabled = sectorRenderingOn
         row.label(text="Sector detection type:")
         row = box.row()
         row.prop(context.scene, "t3dSectorDetectionType__", expand=True)
+        row.enabled = sectorRenderingOn
 
         box = self.layout.box()
         row = box.row()
@@ -1315,6 +1318,40 @@ def export():
         if len(markers) > 0:
             action["t3dMarkers__"] = markers
 
+    view3DCameraData = []
+
+    renderResolutionH = getRenderResolutionH(None)
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+
+    for area in bpy.context.screen.areas:
+
+        for space in area.spaces:
+
+            if space.type == "VIEW_3D":
+
+                # HUGE thanks to ryan halliday's blog for mentioning bpy_extras' axis conversion: https://blog.ryanhalliday.com/2023/04/three-blender-co-ordinates.html
+                conversion = bpy_extras.io_utils.axis_conversion(from_forward="-Y", from_up="Z", to_forward="Z", to_up="Y")
+
+                decomposed = space.region_3d.view_matrix.inverted().decompose()
+
+                loc = conversion @ decomposed[0]
+                rot = conversion @ (decomposed[1].to_matrix())
+
+                camData = {
+                    "clip_start" : space.clip_start,
+                    "clip_end" : space.clip_end,
+                    "location": loc,
+                    "rotation" : rot,
+                    "fovY" : math.degrees(2 * math.atan(36 / (space.lens * 2))), # 36 is the default blender camera sensor width
+                    "perspective": space.region_3d.is_perspective,
+                    # "ortho_zoom" : space.region_3d.view_distance, # This isn't correct; the lens also impacts the zoom
+                }
+
+                view3DCameraData.append(camData)
+
+    globalSet("t3dView3DCameraData__", view3DCameraData)
+
     # We force on exporting of Extra values because otherwise, values from Blender would not be able to be exported.
     # export_apply=True to ensure modifiers are applied.
     bpy.ops.export_scene.gltf(
@@ -1414,6 +1451,7 @@ def export():
         if "t3dMarkers__" in action:
             del(action["t3dMarkers__"])
 
+    globalDel("t3dView3DCameraData__")
     globalDel("t3dCollections__")
     globalDel("t3dWorlds__")
 
@@ -1498,7 +1536,7 @@ def setSectorRenderDepth(self, value):
 
 
 def getSectorDetectionType(self):
-    return globalGet("t3dSectorDetection__", "VERTICES")
+    return globalGet("t3dSectorDetection__", 0)
 
 def setSectorDetectionType(self, value):
     globalSet("t3dSectorDetection__", value)
@@ -1699,7 +1737,7 @@ def register():
     bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=1, min=0,
     get=getSectorRenderDepth, set=setSectorRenderDepth)
 
-    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined", default="VERTICES", 
+    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined", default='VERTICES', 
     get=getSectorDetectionType, set=setSectorDetectionType)
 
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 

@@ -103,6 +103,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	camWidth := gltfLoadOptions.CameraWidth
 	camHeight := gltfLoadOptions.CameraHeight
 	camDefaultSize := false
+	exportedCameras := []*Camera{}
 
 	sectorRendering := false
 	sectorRenderDepth := 0
@@ -154,6 +155,45 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 				if err != nil {
 					panic(err)
+				}
+
+			}
+
+			if cameras, exists := globalExporterSettings["t3dView3DCameraData__"]; exists {
+
+				for _, cameraEntry := range cameras.([]interface{}) {
+
+					ce := cameraEntry.(map[string]interface{})
+
+					clipStart := ce["clip_start"].(float64)
+					clipEnd := ce["clip_end"].(float64)
+					fovY := ce["fovY"].(float64)
+					perspective := ce["perspective"].(bool)
+
+					rotation := ce["rotation"].([]interface{})
+					location := ce["location"].([]interface{})
+					rotationMatrix := NewMatrix4()
+
+					for i := 0; i < 3; i++ {
+						rotRow := rotation[i].([]interface{})
+						rotationMatrix.SetColumn(i, NewVector(rotRow[0].(float64), rotRow[1].(float64), rotRow[2].(float64)))
+					}
+
+					locVec := NewVector(location[0].(float64), location[1].(float64), location[2].(float64))
+
+					newCam := NewCamera(camWidth, camHeight)
+
+					newCam.SetLocalPositionVec(locVec)
+					newCam.SetLocalRotation(rotationMatrix)
+
+					newCam.near = clipStart
+					newCam.far = clipEnd
+					newCam.SetFieldOfView(fovY)
+					newCam.SetPerspective(perspective)
+
+					// newCam.SetOrthoScale(orthoZoom) // Ortho scale isn't implemented yet
+
+					exportedCameras = append(exportedCameras, newCam)
 				}
 
 			}
@@ -1402,6 +1442,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				model.sector.UpdateNeighbors(models...)
 			}
 
+		}
+
+		for _, cam := range exportedCameras {
+			scene.View3DCameras = append(scene.View3DCameras, cam.Clone().(*Camera))
 		}
 
 	}

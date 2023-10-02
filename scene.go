@@ -9,10 +9,11 @@ type Scene struct {
 	// scene graph by simply adding them into the tree via parenting anywhere under the Root. For them to be removed from rendering,
 	// they simply need to be removed from the tree.
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
-	Root  INode
-	World *World
-	props Properties
-	data  interface{}
+	Root          INode
+	World         *World
+	props         Properties
+	data          interface{}
+	View3DCameras []*Camera // Any 3D view cameras that were exported from Blender
 
 	updateAutobatch     bool
 	autobatchDynamicMap map[*Material]*Model
@@ -60,6 +61,10 @@ func (scene *Scene) Clone() *Scene {
 
 	for _, n := range models {
 		n.sector.UpdateNeighbors(models...)
+	}
+
+	for _, cam := range scene.View3DCameras {
+		newScene.View3DCameras = append(newScene.View3DCameras, cam.Clone().(*Camera))
 	}
 
 	newScene.data = scene.data

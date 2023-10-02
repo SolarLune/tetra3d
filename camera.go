@@ -88,6 +88,12 @@ type Camera struct {
 	cachedProjectionMatrix Matrix4
 
 	debugTextTexture *ebiten.Image
+
+	// DepthMargin is a margin in percentage on both the near and far plane to leave some
+	// distance remaining in the depth buffer for triangle comparison.
+	// This ensures that objects that are, for example, close to or far from the camera
+	// don't begin Z-fighting unnecessarily. It defaults to 4% (on both ends).
+	DepthMargin float64
 }
 
 // NewCamera creates a new Camera with the specified width and height.
@@ -98,6 +104,8 @@ func NewCamera(w, h int) *Camera {
 		RenderDepth: true,
 		near:        0.1,
 		far:         100,
+
+		DepthMargin: 0.04,
 
 		AccumulateDrawOptions: &ebiten.DrawImageOptions{},
 
@@ -567,31 +575,36 @@ func (camera *Camera) WorldToScreen(vert Vector) Vector {
 	return camera.ClipToScreen(v.MultVecW(NewVectorZero()))
 }
 
-// ScreenToWorld converts an x and y pixel position on screen to a 3D point right in front of the camera.
+// ScreenToWorldPixels converts an x and y pixel position on screen to a 3D point in front of the camera.
 // The depth argument changes how deep the returned Vector is in 3D world units.
-func (camera *Camera) ScreenToWorld(x, y int, depth float64) Vector {
-
-	projection := camera.ViewMatrix().Mult(camera.Projection()).Inverted()
+func (camera *Camera) ScreenToWorldPixels(x, y int, depth float64) Vector {
 
 	w := camera.ColorTexture().Bounds().Dx()
 	h := camera.ColorTexture().Bounds().Dy()
 
-	if x < 0 {
-		x = 0
-	} else if x > w {
-		x = w
-	}
-
-	if y < 0 {
-		y = 0
-	} else if y > w {
-		y = w
-	}
-
-	// vec := Vector{float64(x)/float64(w) - 0.5, -(float64(y)/float64(h) - 0.5), (depth * 2) - 1, 1}
+	x = clamp(x, 0, w)
+	y = clamp(y, 0, h)
 
 	// For whatever reason, the depth isn't being properly transformed, so I do it manually sorta below
 	vec := Vector{float64(x)/float64(w) - 0.5, -(float64(y)/float64(h) - 0.5), -1, 1}
+
+	return camera.screenToWorldTransform(vec, depth)
+
+}
+
+// ScreenToWorld converts an x and y position on screen to a 3D point in front of the camera.
+// x and y are values ranging between -0.5 and 0.5 for both the horizontal and vertical axes.
+// The depth argument changes how deep the returned Vector is in 3D world units.
+func (camera *Camera) ScreenToWorld(x, y, depth float64) Vector {
+	// x = clamp(x, -0.5, 0.5)
+	// y = clamp(y, -0.5, 0.5)
+	vec := Vector{x, y, -1, 1}
+	return camera.screenToWorldTransform(vec, depth)
+}
+
+func (camera *Camera) screenToWorldTransform(vec Vector, depth float64) Vector {
+
+	projection := camera.ViewMatrix().Mult(camera.Projection()).Inverted()
 
 	vecOut := projection.MultVecW(vec)
 
@@ -1040,7 +1053,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	cameraPos := camera.WorldPosition()
 
-	camSpread := camera.far - camera.near
+	depthMarginPercentage := (camera.far - camera.near) * camera.DepthMargin
+
+	camSpread := camera.far - camera.near + (depthMarginPercentage * 2)
 
 	for _, model := range models {
 
@@ -1167,9 +1182,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		lighting := false
 		if scene.World != nil {
 			if mat != nil {
-				lighting = scene.World.LightingOn && !mat.Shadeless
+				lighting = scene.World.LightingOn && !mat.Shadeless && !model.Shadeless
 			} else {
-				lighting = scene.World.LightingOn
+				lighting = scene.World.LightingOn && !model.Shadeless
 			}
 		}
 
@@ -1345,7 +1360,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 					// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
 
-					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
+					depth := (mesh.vertexTransforms[vertIndex].Z + depthMarginPercentage) / camSpread
 					if mat != nil {
 						if mat.CustomDepthOffsetOn {
 							depth += depthOffsetValue
@@ -1368,7 +1383,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				} else if scene.World != nil && scene.World.FogOn {
 
-					depth := mesh.vertexTransforms[vertIndex].Z / camSpread
+					depth := (mesh.vertexTransforms[vertIndex].Z + depthMarginPercentage) / camSpread
 					if mat != nil {
 						if mat.CustomDepthOffsetOn {
 							depth += depthOffsetValue
@@ -1713,6 +1728,8 @@ func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...Spri
 
 	// TODO: Replace this with a more performant alternative, where we minimize shader / texture switches.
 
+	depthMarginPercentage := (camera.far - camera.near) * camera.DepthMargin
+
 	for _, rs := range renderSettings {
 
 		camera.colorIntermediate.Clear()
@@ -1721,7 +1738,7 @@ func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...Spri
 
 		out := camera.ViewMatrix().Mult(camera.Projection()).MultVec(rs.WorldPosition)
 
-		depth := float32(out.Z / camera.far)
+		depth := float32((out.Z + depthMarginPercentage) / (camera.far - camera.near + (depthMarginPercentage * 2)))
 
 		if depth < 0 {
 			depth = 0
@@ -1854,9 +1871,9 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 			for _, point := range grid.Points() {
 
 				p1 := camera.WorldToScreen(point.WorldPosition())
-				ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.Mix(NewColor(1, 0, 0, 1), float32(point.Cost)/100).ToRGBA64())
+				ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, image.White)
 				for _, connection := range point.Connections {
-					p2 := camera.WorldToScreen(connection.WorldPosition())
+					p2 := camera.WorldToScreen(connection.To.WorldPosition())
 					ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
 				}
 

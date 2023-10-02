@@ -64,8 +64,9 @@ func (matrix *Matrix4) Set(other Matrix4) {
 // BlenderToTetra returns a Matrix with the rows altered such that Blender's +Z is now Tetra's +Y and Blender's +Y is now Tetra's -Z.
 func (matrix Matrix4) BlenderToTetra() Matrix4 {
 	newMat := matrix.Clone()
+	prevRow := newMat.Row(1)
 	newMat.SetRow(1, matrix.Row(2).Invert())
-	newMat.SetRow(2, matrix.Row(1))
+	newMat.SetRow(2, prevRow)
 	return newMat
 }
 
@@ -170,7 +171,7 @@ func (matrix Matrix4) Forward() Vector {
 	}.Unit()
 }
 
-// Decompose decomposes the Matrix4 and returns three components - the position (a 3D Vector), scale (another 3D Vector), and rotation (an AxisAngle)
+// Decompose decomposes the Matrix4 and returns three components - the position (a 3D Vector), scale (another 3D Vector), and rotation (a Matrix4)
 // indicated by the Matrix4. Note that this is mainly used when loading a mesh from a 3D modeler - this being the case, it may not be the most precise, and negative
 // scales are not supported.
 func (matrix Matrix4) Decompose() (Vector, Vector, Matrix4) {
@@ -470,7 +471,7 @@ func (matrix Matrix4) Column(columnIndex int) Vector {
 	return vec
 }
 
-// SetRow returns a clone of the Matrix4 with the row in rowIndex set to the 4D vector passed.
+// SetRow sets the Matrix4 with the row in rowIndex set to the 4D vector passed.
 func (matrix *Matrix4) SetRow(rowIndex int, vec Vector) {
 	matrix[rowIndex][0] = vec.X
 	matrix[rowIndex][1] = vec.Y
@@ -478,7 +479,7 @@ func (matrix *Matrix4) SetRow(rowIndex int, vec Vector) {
 	matrix[rowIndex][3] = vec.W
 }
 
-// SetColumn returns a clone of the Matrix4 with the column in columnIndex set to the 4D vector passed.
+// SetColumn sets the Matrix4 with the column in columnIndex set to the 4D vector passed.
 func (matrix *Matrix4) SetColumn(columnIndex int, vec Vector) {
 	matrix[0][columnIndex] = vec.X
 	matrix[1][columnIndex] = vec.Y

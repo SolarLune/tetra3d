@@ -349,11 +349,30 @@ func (vec Vector) Dot(other Vector) float64 {
 	return vec.X*other.X + vec.Y*other.Y + vec.Z*other.Z
 }
 
-// Snap snaps the Vector's components to the given space in world units, returning a clone (e.g. Vector{0.1, 1.27, 3.33}.Snap(0.25) will return Vector{0, 1.25, 3.25}).
-func (vec Vector) Snap(snapToUnits float64) Vector {
-	vec.X = round(vec.X/snapToUnits) * snapToUnits
-	vec.Y = round(vec.Y/snapToUnits) * snapToUnits
-	vec.Z = round(vec.Z/snapToUnits) * snapToUnits
+// Round rounds the Vector's components off to the given space in world units, returning a new Vector.
+// For example, Vector{0.1, 1.27, 3.33}.Round(0.25) will return Vector{0, 1.25, 3.25}.
+func (vec Vector) Round(roundToUnits float64) Vector {
+	vec.X = round(vec.X/roundToUnits) * roundToUnits
+	vec.Y = round(vec.Y/roundToUnits) * roundToUnits
+	vec.Z = round(vec.Z/roundToUnits) * roundToUnits
+	return vec
+}
+
+// Floor floors the Vector's components off, returning a new Vector.
+// For example, Vector{0.1, 1.27, 3.33}.Floor() will return Vector{0, 1, 3}.
+func (vec Vector) Floor() Vector {
+	vec.X = math.Floor(vec.X)
+	vec.Y = math.Floor(vec.Y)
+	vec.Z = math.Floor(vec.Z)
+	return vec
+}
+
+// Ceil ceils the Vector's components off, returning a new Vector.
+// For example, Vector{0.1, 1.27, 3.33}.Ceil() will return Vector{1, 2, 4}.
+func (vec Vector) Ceil() Vector {
+	vec.X = math.Ceil(vec.X)
+	vec.Y = math.Ceil(vec.Y)
+	vec.Z = math.Ceil(vec.Z)
 	return vec
 }
 
@@ -465,7 +484,7 @@ func (ip ModVector) Cross(other Vector) ModVector {
 	return ip
 }
 
-// RotateVec rotates the calling Vector by the axis Vector and angle provided (in radians).
+// RotateVec rotates the calling ModVector by the axis Vector and angle provided (in radians).
 // This function returns the calling ModVector for method chaining.
 func (ip ModVector) RotateVec(axis Vector, angle float64) ModVector {
 	rot := (*ip.Vector).RotateVec(axis, angle)
@@ -475,7 +494,7 @@ func (ip ModVector) RotateVec(axis Vector, angle float64) ModVector {
 	return ip
 }
 
-// RotateVec rotates the calling Vector by an axis Vector composed of the x, y, and z components provided,
+// RotateVec rotates the calling ModVector by an axis Vector composed of the x, y, and z components provided,
 // by the angle provided (in radians).
 // This function returns the calling ModVector for method chaining.
 func (ip ModVector) Rotate(x, y, z, angle float64) ModVector {
@@ -486,7 +505,7 @@ func (ip ModVector) Rotate(x, y, z, angle float64) ModVector {
 	return ip
 }
 
-// Invert inverts all components of the calling Vector.
+// Invert inverts all components of the calling ModVector.
 // This function returns the calling ModVector for method chaining.
 func (ip ModVector) Invert() ModVector {
 	ip.X = -ip.X
@@ -495,10 +514,33 @@ func (ip ModVector) Invert() ModVector {
 	return ip
 }
 
-// Snap snaps the Vector's components to the given space in world units, returning a clone (e.g. Vector{0.1, 1.27, 3.33}.Snap(0.25) will return Vector{0, 1.25, 3.25}).
+// Round rounds off the ModVector's components to the given space in world units.
+// For example, Vector{0.1, 1.27, 3.33}.Modify().Round(0.25) will return Vector{0, 1.25, 3.25}.
 // This function returns the calling ModVector for method chaining.
-func (ip ModVector) Snap(snapToUnits float64) ModVector {
-	snapped := (*ip.Vector).Snap(snapToUnits)
+func (ip ModVector) Round(roundToUnits float64) ModVector {
+	snapped := (*ip.Vector).Round(roundToUnits)
+	ip.X = snapped.X
+	ip.Y = snapped.Y
+	ip.Z = snapped.Z
+	return ip
+}
+
+// Floor floors the ModVector's components off, returning a new Vector.
+// For example, Vector{0.1, 1.27, 3.33}.Modify().Floor() will return Vector{0, 1, 3}.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Floor() ModVector {
+	snapped := (*ip.Vector).Floor()
+	ip.X = snapped.X
+	ip.Y = snapped.Y
+	ip.Z = snapped.Z
+	return ip
+}
+
+// Ceil ceils the ModVector's components off, returning a new Vector.
+// For example, Vector{0.1, 1.27, 3.33}.Modify().Ceil() will return Vector{1, 2, 4}.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Ceil() ModVector {
+	snapped := (*ip.Vector).Ceil()
 	ip.X = snapped.X
 	ip.Y = snapped.Y
 	ip.Z = snapped.Z

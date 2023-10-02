@@ -21,6 +21,7 @@ type Model struct {
 	Mesh              *Mesh
 	FrustumCulling    bool                                                 // Whether the Model is culled when it leaves the frustum.
 	Color             Color                                                // The overall multiplicative color of the Model.
+	Shadeless         bool                                                 // Indicates if a Model is shadeless.
 	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM // A user-customizeable blending function used to color the Model.
 	BoundingSphere    *BoundingSphere
 
@@ -96,6 +97,7 @@ func (model *Model) Clone() INode {
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.visible = model.visible
 	newModel.Color = model.Color
+	newModel.Shadeless = model.Shadeless
 	newModel.AutoBatchMode = model.AutoBatchMode
 
 	for k := range model.DynamicBatchModels {
@@ -456,6 +458,11 @@ func (model *Model) refreshVertexVisibility() {
 // matrix, a camera, and the MeshPart being rendered.
 func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, scene *Scene) []sortingTriangle {
 
+	if (model.Color.A == 0 && model.isTransparent(meshPart)) || !model.visible {
+		meshPart.sortingTriangles = meshPart.sortingTriangles[:0]
+		return meshPart.sortingTriangles
+	}
+
 	var transformFunc func(vertPos Vector, index int) Vector
 
 	if model.VertexTransformFunction != nil {
@@ -589,7 +596,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			}
 
 			if camera.VertexSnapping > 0 {
-				mesh.vertexTransforms[tri.VertexIndices[i]] = mesh.vertexTransforms[tri.VertexIndices[i]].Snap(camera.VertexSnapping)
+				mesh.vertexTransforms[tri.VertexIndices[i]] = mesh.vertexTransforms[tri.VertexIndices[i]].Round(camera.VertexSnapping)
 			}
 
 			if camera.RenderNormals {
@@ -956,7 +963,9 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 // MeshParts into either transparent or opaque buckets for rendering.
 func (model *Model) isTransparent(meshPart *MeshPart) bool {
 	mat := meshPart.Material
-	return mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || mat.CompositeMode != ebiten.CompositeModeSourceOver || (mat.TransparencyMode == TransparencyModeAuto && (mat.Color.A < 0.99 || model.Color.A < 0.99)))
+	matTransparent := mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || mat.CompositeMode != ebiten.CompositeModeSourceOver || (mat.TransparencyMode == TransparencyModeAuto && mat.Color.A < 0.99))
+	modelTransparent := model.Color.A < 0.99
+	return matTransparent || modelTransparent
 }
 
 ////////
