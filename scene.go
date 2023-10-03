@@ -115,7 +115,7 @@ func (scene *Scene) HandleAutobatch() {
 						if _, exists := scene.autobatchDynamicMap[mat]; !exists {
 							mesh := NewMesh("auto dynamic batch")
 							mesh.AddMeshPart(mat)
-							m := NewModel(mesh, "auto dynamic batch")
+							m := NewModel("auto dynamic batch", mesh)
 							m.FrustumCulling = false
 							m.dynamicBatcher = true
 							scene.autobatchDynamicMap[mat] = m
@@ -126,7 +126,7 @@ func (scene *Scene) HandleAutobatch() {
 					} else if model.AutoBatchMode == AutoBatchStatic {
 
 						if _, exists := scene.autobatchStaticMap[mat]; !exists {
-							m := NewModel(NewMesh("auto static merge"), "auto static merge")
+							m := NewModel("auto static merge", NewMesh("auto static merge"))
 							scene.autobatchStaticMap[mat] = m
 							scene.Root.AddChildren(scene.autobatchStaticMap[mat])
 						}

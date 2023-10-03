@@ -28,7 +28,7 @@ func newCubeElement(root tetra3d.INode) *CubeElement {
 	grid := root.Get("Network").(*tetra3d.Grid)
 
 	element := &CubeElement{
-		Model:       tetra3d.NewModel(cubeMesh, "Cube Element"),
+		Model:       tetra3d.NewModel("Cube Element", cubeMesh),
 		Root:        root.(*tetra3d.Node),
 		PathStepper: tetra3d.NewPathStepper(nil),
 	}

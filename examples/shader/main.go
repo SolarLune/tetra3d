@@ -49,7 +49,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	model := tetra3d.NewModel(mesh, "fragmentcube")
+	model := tetra3d.NewModel("fragmentcube", mesh)
 	model.Move(-2, 0, 0)
 	g.Scene.Root.AddChildren(model)
 
@@ -57,7 +57,7 @@ func (g *Game) Init() {
 	mat := vertCube.MeshParts[0].Material
 	mat.Shadeless = true
 
-	model = tetra3d.NewModel(vertCube, "vertexcube")
+	model = tetra3d.NewModel("vertexcube", vertCube)
 	model.Move(2, 0, 0)
 	g.Scene.Root.AddChildren(model)
 

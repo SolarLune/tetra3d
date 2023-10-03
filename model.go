@@ -61,7 +61,7 @@ type Model struct {
 }
 
 // NewModel creates a new Model (or instance) of the Mesh and Name provided. A Model represents a singular visual instantiation of a Mesh.
-func NewModel(mesh *Mesh, name string) *Model {
+func NewModel(name string, mesh *Mesh) *Model {
 
 	model := &Model{
 		Node:               NewNode(name),
@@ -92,7 +92,7 @@ func (model *Model) Clone() INode {
 		mesh = mesh.Clone()
 	}
 
-	newModel := NewModel(mesh, model.name)
+	newModel := NewModel(model.name, mesh)
 	newModel.BoundingSphere = model.BoundingSphere.Clone().(*BoundingSphere)
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.visible = model.visible

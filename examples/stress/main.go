@@ -42,7 +42,7 @@ func (g *Game) Init() {
 	g.Scene = tetra3d.NewScene("Test Scene")
 
 	// When creating a new mesh with NewMesh, it has no MeshParts (which is what renders).
-	merged := tetra3d.NewModel(tetra3d.NewMesh("merged cubes"), "merged cubes")
+	merged := tetra3d.NewModel("merged cubes", tetra3d.NewMesh("merged cubes"))
 
 	// Here, we'll store all of the cubes we'll merge together.
 	cubes := []*tetra3d.Model{}
@@ -58,7 +58,7 @@ func (g *Game) Init() {
 	for x := 0; x < 10; x++ {
 		for z := 0; z < 10; z++ {
 			for y := 0; y < 10; y++ {
-				cubes = append(cubes, tetra3d.NewModel(cubeMesh, "Cube"))
+				cubes = append(cubes, tetra3d.NewModel("Cube", cubeMesh))
 			}
 		}
 	}

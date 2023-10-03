@@ -758,7 +758,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		}
 
 		if mesh != nil {
-			obj = NewModel(mesh, node.Name)
+			obj = NewModel(node.Name, mesh)
 
 			if node.Extras != nil && nodeHasProp(node, "t3dAutoBatch__") {
 				s := node.Extras.(map[string]interface{})["t3dAutoBatch__"].(float64)

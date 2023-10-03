@@ -108,7 +108,7 @@ func (g *Game) Init() {
 	mat.Shadeless = true
 	mat.Texture = ebiten.NewImageFromImage(img)
 
-	batched := tetra3d.NewModel(planeMesh, "DynamicBatching")
+	batched := tetra3d.NewModel("DynamicBatching", planeMesh)
 	batched.Move(0, 4, 0)
 	batched.Rotate(1, 0, 0, tetra3d.ToRadians(90))
 	batched.Rotate(0, 1, 0, tetra3d.ToRadians(180))
@@ -120,7 +120,7 @@ func (g *Game) Init() {
 	for i := 0; i < 21; i++ {
 		for j := 0; j < 21; j++ {
 			// Create a new Cube, position it, add it to the scene, and add it to the cubes slice.
-			cube := tetra3d.NewModel(cubeMesh, "Cube")
+			cube := tetra3d.NewModel("Cube", cubeMesh)
 			cube.SetLocalPosition(float64(i)*1.5, 0, float64(-j*3))
 			g.Scene.Root.AddChildren(cube)
 			g.Cubes = append(g.Cubes, cube)

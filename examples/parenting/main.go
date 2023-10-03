@@ -56,10 +56,10 @@ func (g *Game) Init() {
 	mat.Shadeless = true
 	mat.Texture = loadImage(testImageData)
 
-	parent := tetra3d.NewModel(cubeMesh, "parent")
+	parent := tetra3d.NewModel("parent", cubeMesh)
 	parent.SetLocalPositionVec(tetra3d.NewVector(0, -3, 0))
 
-	child := tetra3d.NewModel(cubeMesh, "child")
+	child := tetra3d.NewModel("child", cubeMesh)
 	child.SetLocalPositionVec(tetra3d.NewVector(10, 2, 0))
 
 	g.Scene.Root.AddChildren(parent, child)

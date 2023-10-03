@@ -43,7 +43,7 @@ func (g *Game) Init() {
 	g.SystemHandler = examples.NewBasicSystemHandler(g)
 
 	// Create a cube, set the color, add it to the scene.
-	cube := tetra3d.NewModel(tetra3d.NewCubeMesh(), "Cube")
+	cube := tetra3d.NewModel("Cube", tetra3d.NewCubeMesh())
 	cube.Color = tetra3d.NewColor(0, 0.5, 1, 1)
 	g.Scene.Root.AddChildren(cube)
 

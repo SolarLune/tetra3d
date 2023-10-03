@@ -367,7 +367,7 @@ func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 		var model INode
 
 		if mesh != nil {
-			model = NewModel(mesh, node.Name)
+			model = NewModel(node.Name, mesh)
 		} else {
 			model = NewNode(node.Name)
 		}

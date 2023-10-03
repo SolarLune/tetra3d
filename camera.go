@@ -2328,7 +2328,7 @@ func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, co
 }
 
 var debugIcosphereMesh = NewIcosphereMesh(1)
-var debugIcosphere = NewModel(debugIcosphereMesh, "debug icosphere")
+var debugIcosphere = NewModel("debug icosphere", debugIcosphereMesh)
 
 func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color Color) {
 
