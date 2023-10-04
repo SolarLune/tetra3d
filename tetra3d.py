@@ -1,6 +1,6 @@
 # Add-on for Tetra3D > Blender exporting
 
-import bpy, os, bmesh, math, aud, bpy_extras
+import bpy, os, bmesh, math, mathutils, aud, bpy_extras
 from bpy.app.handlers import persistent
 
 currentlyPlayingAudioName = None
@@ -798,6 +798,16 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.prop(context.material, "t3dBillboardMode__")
 
+        box = self.layout.box()
+        row = box.row()
+        row.prop(context.material, "t3dAutoUV__")
+        row = box.row()
+        row.enabled = context.material.t3dAutoUV__
+        row.prop(context.material, "t3dAutoUVUnitSize__")
+        row.prop(context.material, "t3dAutoUVRotation__")
+        row = box.row()
+        row.enabled = context.material.t3dAutoUV__
+        row.prop(context.material, "t3dAutoUVOffset__")
 
         box = self.layout.box()
         row = box.row()
@@ -1471,7 +1481,7 @@ def export():
 @persistent
 def exportOnSave(dummy):
     
-    if globalGet("t3dExportOnSave__"):
+    if globalGet("t3dExportOnSave__", False):
         export()
 
 @persistent
@@ -1485,6 +1495,105 @@ def onLoad(dummy):
         currentlyPlayingAudioName = ""
         audioPaused = False
 
+    bpy.msgbus.subscribe_rna(
+        key=(bpy.types.Object, 'mode'),
+        owner="tetra3d",
+        args=tuple(),
+        notify=onModeChange,
+    )
+
+class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
+
+    bl_idname = "material.t3dautouv"
+    bl_label = "Apply Auto UV"
+    bl_description = "Perform automatic UV mapping"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        
+        obj = bpy.context.object
+        ogMode = bpy.context.object.mode
+        
+        prevActiveMaterialIndex = obj.active_material_index
+
+        # We need to be in Object mode to get vertex / edge / polygon selection data
+        bpy.ops.object.mode_set(mode='OBJECT')
+        selectedVertices = [v.index for v in obj.data.vertices if v.select]
+        selectedEdges = [e.index for e in obj.data.edges if e.select]
+        selectedPolygons = [p.index for p in obj.data.polygons if p.select]
+
+        for matIndex, mat in enumerate(obj.data.materials):
+
+            if mat.t3dAutoUV__:
+
+                bpy.ops.object.mode_set(mode='EDIT')
+
+                bpy.ops.mesh.select_all(action='DESELECT')
+
+                obj.active_material_index = matIndex
+                bpy.ops.object.material_slot_select()
+
+                bpy.ops.uv.cube_project(cube_size=mat.t3dAutoUVUnitSize__)
+
+                bpy.ops.mesh.select_all(action='DESELECT')
+
+                # Return to object mode to alter the UV map
+                bpy.ops.object.mode_set(mode='OBJECT')
+
+                uvMap = obj.data.uv_layers.active.uv
+
+                for poly in obj.data.polygons:
+                    if poly.material_index == matIndex:
+                        for loopIndex in poly.loop_indices:
+                            vec = uvMap[loopIndex].vector
+                            vec.x -= 0.5
+                            vec.y -= 0.5
+                            vec.rotate(mathutils.Matrix.Rotation(math.radians(mat.t3dAutoUVRotation__), 2))
+                            vec.x += 0.5
+                            vec.y += 0.5
+
+                            vec.x -= mat.t3dAutoUVOffset__[0]
+                            vec.y -= mat.t3dAutoUVOffset__[1]
+
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # Restore selection
+        for v in obj.data.vertices:
+            v.select = False
+            if v.index in selectedVertices:
+                v.select = True
+
+        for e in obj.data.edges:
+            e.select = False
+            if e.index in selectedEdges:
+                e.select = True
+
+        for p in obj.data.polygons:
+            p.select = False
+            if p.index in selectedPolygons:
+                p.select = True
+
+        obj.active_material_index = prevActiveMaterialIndex
+
+        bpy.ops.object.mode_set(mode=ogMode)
+
+        return {'FINISHED'}
+
+def onModeChange():
+    obj = bpy.context.object
+    if obj and obj.data and obj.type == 'MESH':
+        for mat in obj.data.materials:
+            if mat.t3dAutoUV__:
+                bpy.ops.material.t3dautouv()
+                break
+
+def autoUVChange(self, context):
+    obj = context.object
+    if obj and obj.data and obj.type == 'MESH':
+        for mat in obj.data.materials:
+            if mat.t3dAutoUV__:
+                bpy.ops.material.t3dautouv()
+                break
 
 class EXPORT_OT_tetra3d(bpy.types.Operator):
    bl_idname = "export.tetra3dgltf"
@@ -1709,6 +1818,7 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dOverrideProp)
 
     bpy.utils.register_class(MATERIAL_OT_tetra3dMaterialCopyProps)
+    bpy.utils.register_class(MATERIAL_OT_tetra3dAutoUV)
 
     bpy.utils.register_class(OBJECT_OT_tetra3dSetVector)
     
@@ -1803,6 +1913,11 @@ def register():
     bpy.types.Material.t3dCustomDepthOn__ = bpy.props.BoolProperty(name="Custom Depth", description="Whether custom depth offsetting should be enabled", default=False)
     bpy.types.Material.t3dCustomDepthValue__ = bpy.props.FloatProperty(name="Depth Offset Value", description="How far in world units the material should offset when rendering (negative values are closer to the camera, positive values are further)")
     bpy.types.Material.t3dNormalFacesLights__ = bpy.props.BoolProperty(name="Normals Always Face Lights", description="Whether normals that use this material should always face light sources or not; particularly useful for billboarded 2D sprites", default=False)
+
+    bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode")
+    bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5)
+    bpy.types.Material.t3dAutoUVRotation__ = bpy.props.FloatProperty(name="Rotation", description="How many degrees to rotate the UVs after projection", step = 500, update=autoUVChange)
+    bpy.types.Material.t3dAutoUVOffset__ = bpy.props.FloatVectorProperty(name="Offset", description="How many texels to offset the texture after projection", default=[0,0], size=2, update=autoUVChange, step=1)
         
     bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
 
@@ -1819,11 +1934,13 @@ def register():
     bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
     bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
 
+    # Handlers and callbacks
+
     if not exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.append(exportOnSave)
     if not onLoad in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(onLoad)
-    
+
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
     bpy.utils.unregister_class(MESH_PT_tetra3d)
@@ -1845,6 +1962,7 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetVector)
 
     bpy.utils.unregister_class(MATERIAL_OT_tetra3dMaterialCopyProps)
+    bpy.utils.unregister_class(MATERIAL_OT_tetra3dAutoUV)
 
     bpy.utils.unregister_class(EXPORT_OT_tetra3d)
     
@@ -1895,6 +2013,9 @@ def unregister():
     del bpy.types.Material.t3dCustomDepthValue__
     del bpy.types.Material.t3dNormalFacesLights__
     del bpy.types.Material.t3dGameProperties__
+    del bpy.types.Material.t3dAutoUV__
+    del bpy.types.Material.t3dAutoUVUnitSize__
+    del bpy.types.Material.t3dAutoUVRotation__
 
     del bpy.types.World.t3dClearColor__
     del bpy.types.World.t3dFogColor__
@@ -1912,6 +2033,8 @@ def unregister():
         bpy.app.handlers.save_post.remove(exportOnSave)
     if onLoad in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(onLoad)
+
+    bpy.msgbus.clear_by_owner("tetra3d")
 
 if __name__ == "__main__":
     register()
