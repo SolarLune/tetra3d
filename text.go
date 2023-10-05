@@ -23,7 +23,7 @@ const (
 )
 
 type TextStyle struct {
-	Font                 font.Face     // The font to use for rendering the text.
+	Font                 font.Face     // The font face to use for rendering the text. The size is customizeable, but the DPI should be 72.
 	Cursor               string        // A cursor string sequence is drawn at the end while typewriter-ing; defaults to a blank string ("").
 	LineHeightMultiplier float64       // The multiplier for line height changes.
 	AlignmentHorizontal  TextAlignment // How the text should be horizontally aligned in the Text texture.
@@ -106,7 +106,6 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 	if meshPart.Material == nil {
 		// If no material is present, then we can create a new one with sane defaults
 		meshPart.Material = NewMaterial("text material")
-		meshPart.Material.Texture = text.Texture
 		meshPart.Material.BackfaceCulling = true
 		meshPart.Material.Shadeless = true
 	}
@@ -226,15 +225,12 @@ func (textObj *Text) SetText(txt string, arguments ...interface{}) *Text {
 
 			// Some fonts have space characters that are basically empty somehow...?
 			spaceAdd := 0
-			if text.BoundString(textObj.style.Font, " ").Dx() <= 0 {
-				spaceAdd = text.BoundString(textObj.style.Font, "M").Dx()
+			if measureText(" ", textObj.style.Font) <= 0 {
+				spaceAdd = measureText("M", textObj.style.Font)
 			}
 
 			for i, word := range split {
-				ws := text.BoundString(textObj.style.Font, word)
-				// wordSpace := text.BoundString(textObj.font, word+".").Dx()
-				wordSpace := ws.Dx()
-
+				wordSpace := measureText(word, textObj.style.Font)
 				runningMeasure += wordSpace + spaceAdd
 
 				if runningMeasure >= textureWidth-safetyMargin {
@@ -345,6 +341,8 @@ func (text *Text) CurrentStyle() TextStyle {
 
 func (text *Text) ApplyStyle(style TextStyle) {
 	if text.style != style {
+
+		oldStyle := text.style
 		text.style = style
 
 		rounded := float32(0)
@@ -378,7 +376,15 @@ func (text *Text) ApplyStyle(style TextStyle) {
 			Uniforms: uniformMap,
 		}
 
+		// If the font changes, we have to set the text again to ensure the text wraps properly.
+		if style.Font != oldStyle.Font {
+			setText := text.setText
+			text.setText = ""
+			text.SetText(setText)
+		}
+
 		text.UpdateTexture()
+
 	}
 }
 

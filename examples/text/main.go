@@ -58,11 +58,11 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	targetSize := 7.5
+	targetSize := 10
 
 	newFace, err := opentype.NewFace(fontData, &opentype.FaceOptions{
 		Size:    float64(targetSize),
-		DPI:     96, // Pixel art fonts tend to be made for 96 PPI, apparently?
+		DPI:     72, // opentype expects 72 DPI.
 		Hinting: font.HintingFull,
 	})
 

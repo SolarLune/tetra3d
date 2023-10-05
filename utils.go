@@ -1,6 +1,10 @@
 package tetra3d
 
-import "math"
+import (
+	"math"
+
+	"golang.org/x/image/font"
+)
 
 type FinishMode int
 
@@ -63,4 +67,10 @@ func round(value float64) float64 {
 
 	return iv
 
+}
+
+func measureText(text string, fontFace font.Face) int {
+	// bounds, _ := font.BoundString(fontFace, text)
+	advance := font.MeasureString(fontFace, text)
+	return int(advance >> 6)
 }
