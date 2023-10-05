@@ -43,7 +43,7 @@ func NewVector(x, y, z float64) Vector {
 	return Vector{X: x, Y: y, Z: z, W: 0}
 }
 
-// NewVector creates a new Vector with the specified x and y components. The W and Z components are set to 0.
+// NewVector creates a new Vector with the specified x and y components. The Z and W components are set to 0.
 func NewVector2d(x, y float64) Vector {
 	return Vector{X: x, Y: y, Z: 0, W: 0}
 }
