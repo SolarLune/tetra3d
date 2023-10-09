@@ -1,5 +1,7 @@
 package tetra3d
 
+import "math"
+
 // ILight represents an interface that is fulfilled by an object that emits light, returning the color a vertex should be given that Vertex and its model matrix.
 type ILight interface {
 	INode
@@ -15,6 +17,11 @@ type ILight interface {
 	// color buffer. If onlyVisible is true, only the visible vertices will be lit; if it's false, they will all be lit.
 	IsOn() bool    // isOn is simply used tfo tell if a "generic" Light is on or not.
 	SetOn(on bool) // SetOn sets whether the light is on or not
+
+	Color() Color
+	SetColor(c Color)
+	Energy() float32
+	SetEnergy(energy float32)
 }
 
 //---------------//
@@ -22,11 +29,11 @@ type ILight interface {
 // AmbientLight represents an ambient light that colors the entire Scene.
 type AmbientLight struct {
 	*Node
-	Color Color // Color is the color of the PointLight.
-	// Energy is the overall energy of the Light. Internally, technically there's no difference between a brighter color and a
+	color Color // Color is the color of the PointLight.
+	// energy is the overall energy of the Light. Internally, technically there's no difference between a brighter color and a
 	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
-	Energy float32
-	On     bool // If the light is on and contributing to the scene.
+	energy float32
+	on     bool // If the light is on and contributing to the scene.
 
 	result [3]float32
 }
@@ -35,16 +42,16 @@ type AmbientLight struct {
 func NewAmbientLight(name string, r, g, b, energy float32) *AmbientLight {
 	return &AmbientLight{
 		Node:   NewNode(name),
-		Color:  NewColor(r, g, b, 1),
-		Energy: energy,
-		On:     true,
+		color:  NewColor(r, g, b, 1),
+		energy: energy,
+		on:     true,
 	}
 }
 
 func (amb *AmbientLight) Clone() INode {
 
-	clone := NewAmbientLight(amb.name, amb.Color.R, amb.Color.G, amb.Color.B, amb.Energy)
-	clone.On = amb.On
+	clone := NewAmbientLight(amb.name, amb.color.R, amb.color.G, amb.color.B, amb.energy)
+	clone.on = amb.on
 
 	clone.Node = amb.Node.Clone().(*Node)
 	for _, child := range amb.children {
@@ -56,7 +63,7 @@ func (amb *AmbientLight) Clone() INode {
 }
 
 func (amb *AmbientLight) beginRender() {
-	amb.result = [3]float32{amb.Color.R * amb.Energy, amb.Color.G * amb.Energy, amb.Color.B * amb.Energy}
+	amb.result = [3]float32{amb.color.R * amb.energy, amb.color.G * amb.energy, amb.color.B * amb.energy}
 }
 
 func (amb *AmbientLight) beginModel(model *Model) {}
@@ -82,11 +89,27 @@ func (amb *AmbientLight) Unparent() {
 }
 
 func (amb *AmbientLight) IsOn() bool {
-	return amb.On && amb.Energy > 0
+	return amb.on && amb.energy > 0
 }
 
 func (amb *AmbientLight) SetOn(on bool) {
-	amb.On = on
+	amb.on = on
+}
+
+func (amb *AmbientLight) Color() Color {
+	return amb.color
+}
+
+func (amb *AmbientLight) SetColor(color Color) {
+	amb.color = color
+}
+
+func (amb *AmbientLight) Energy() float32 {
+	return amb.energy
+}
+
+func (amb *AmbientLight) SetEnergy(energy float32) {
+	amb.energy = energy
 }
 
 // Type returns the NodeType for this object.
@@ -115,12 +138,12 @@ type PointLight struct {
 	// Range represents the distance after which the light fully attenuates. If this is 0 (the default),
 	// it falls off using something akin to the inverse square law.
 	Range float64
-	// Color is the color of the PointLight.
-	Color Color
-	// Energy is the overall energy of the Light, with 1.0 being full brightness. Internally, technically there's no
+	// color is the color of the PointLight.
+	color Color
+	// energy is the overall energy of the Light, with 1.0 being full brightness. Internally, technically there's no
 	// difference between a brighter color and a higher energy, but this is here for convenience / adherance to the
 	// GLTF spec and 3D modelers.
-	Energy float32
+	energy float32
 	// If the light is on and contributing to the scene.
 	On bool
 
@@ -132,50 +155,50 @@ type PointLight struct {
 func NewPointLight(name string, r, g, b, energy float32) *PointLight {
 	return &PointLight{
 		Node:   NewNode(name),
-		Energy: energy,
-		Color:  NewColor(r, g, b, 1),
+		energy: energy,
+		color:  NewColor(r, g, b, 1),
 		On:     true,
 	}
 }
 
 // Clone returns a new clone of the given point light.
-func (point *PointLight) Clone() INode {
+func (p *PointLight) Clone() INode {
 
-	clone := NewPointLight(point.name, point.Color.R, point.Color.G, point.Color.B, point.Energy)
-	clone.On = point.On
-	clone.Range = point.Range
+	clone := NewPointLight(p.name, p.color.R, p.color.G, p.color.B, p.energy)
+	clone.On = p.On
+	clone.Range = p.Range
 
-	clone.Node = point.Node.Clone().(*Node)
-	for _, child := range point.children {
-		child.setParent(point)
+	clone.Node = p.Node.Clone().(*Node)
+	for _, child := range p.children {
+		child.setParent(p)
 	}
 
 	return clone
 
 }
 
-func (point *PointLight) beginRender() {
-	point.rangeSquared = point.Range * point.Range
+func (p *PointLight) beginRender() {
+	p.rangeSquared = p.Range * p.Range
 }
 
-func (point *PointLight) beginModel(model *Model) {
+func (p *PointLight) beginModel(model *Model) {
 
-	p, s, r := model.Transform().Inverted().Decompose()
+	pos, sca, rot := model.Transform().Inverted().Decompose()
 
 	// Rather than transforming all vertices of all triangles of a mesh, we can just transform the
 	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
 
 	if model.skinned {
-		point.workingPosition = point.WorldPosition()
+		p.workingPosition = p.WorldPosition()
 	} else {
-		point.workingPosition = r.MultVec(point.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
+		p.workingPosition = rot.MultVec(p.WorldPosition()).Add(pos.Mult(Vector{1 / sca.X, 1 / sca.Y, 1 / sca.Z, sca.W}))
 	}
 
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
+func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
@@ -195,11 +218,11 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 			vertNormal = model.Mesh.VertexNormals[index]
 		}
 
-		distance := point.workingPosition.DistanceSquared(vertPos)
+		distance := p.workingPosition.DistanceSquared(vertPos)
 
-		if point.Range > 0 {
+		if p.Range > 0 {
 
-			if distance > point.rangeSquared {
+			if distance > p.rangeSquared {
 				return
 			}
 
@@ -220,7 +243,7 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 			// }
 
 		} else {
-			if 1/distance*float64(point.Energy) < 0.001 {
+			if 1/distance*float64(p.energy) < 0.001 {
 				return
 			}
 		}
@@ -230,26 +253,30 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 		// 	return light
 		// }
 
-		lightVec := point.workingPosition.Sub(vertPos).Unit()
-		if mat := meshPart.Material; mat != nil && mat.NormalsAlwaysFaceLights {
+		lightVec := p.workingPosition.Sub(vertPos).Unit()
+		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
 			vertNormal = lightVec
 		}
 
 		diffuse := vertNormal.Dot(lightVec)
 
+		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
+			diffuse = math.Abs(diffuse)
+		}
+
 		if diffuse > 0 {
 
 			diffuseFactor := diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
 
-			if point.Range > 0 {
-				distClamp := clamp((point.rangeSquared-distance)/distance, 0, 1)
+			if p.Range > 0 {
+				distClamp := clamp((p.rangeSquared-distance)/distance, 0, 1)
 				diffuseFactor *= distClamp
 			}
 
 			targetColors[index] = targetColors[index].AddRGBA(
-				point.Color.R*float32(diffuseFactor)*point.Energy,
-				point.Color.G*float32(diffuseFactor)*point.Energy,
-				point.Color.B*float32(diffuseFactor)*point.Energy,
+				p.color.R*float32(diffuseFactor)*p.energy,
+				p.color.G*float32(diffuseFactor)*p.energy,
+				p.color.B*float32(diffuseFactor)*p.energy,
 				0,
 			)
 
@@ -261,31 +288,47 @@ func (point *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []
 
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 // hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (point *PointLight) AddChildren(children ...INode) {
-	point.addChildren(point, children...)
+func (p *PointLight) AddChildren(children ...INode) {
+	p.addChildren(p, children...)
 }
 
 // Unparent unparents the PointLight from its parent, removing it from the scenegraph.
-func (point *PointLight) Unparent() {
-	if point.parent != nil {
-		point.parent.RemoveChildren(point)
+func (p *PointLight) Unparent() {
+	if p.parent != nil {
+		p.parent.RemoveChildren(p)
 	}
 }
 
-func (point *PointLight) IsOn() bool {
-	return point.On && point.Energy > 0
+func (p *PointLight) IsOn() bool {
+	return p.On && p.energy > 0
 }
 
-func (point *PointLight) SetOn(on bool) {
-	point.On = on
+func (p *PointLight) SetOn(on bool) {
+	p.On = on
+}
+
+func (p *PointLight) Color() Color {
+	return p.color
+}
+
+func (p *PointLight) SetColor(color Color) {
+	p.color = color
+}
+
+func (p *PointLight) Energy() float32 {
+	return p.energy
+}
+
+func (p *PointLight) SetEnergy(energy float32) {
+	p.energy = energy
 }
 
 // Index returns the index of the Node in its parent's children list.
 // If the node doesn't have a parent, its index will be -1.
-func (point *PointLight) Index() int {
-	if point.parent != nil {
-		for i, c := range point.parent.Children() {
-			if c == point {
+func (p *PointLight) Index() int {
+	if p.parent != nil {
+		for i, c := range p.parent.Children() {
+			if c == p {
 				return i
 			}
 		}
@@ -294,7 +337,7 @@ func (point *PointLight) Index() int {
 }
 
 // Type returns the NodeType for this object.
-func (point *PointLight) Type() NodeType {
+func (p *PointLight) Type() NodeType {
 	return NodeTypePointLight
 }
 
@@ -303,10 +346,10 @@ func (point *PointLight) Type() NodeType {
 // DirectionalLight represents a directional light of infinite distance.
 type DirectionalLight struct {
 	*Node
-	Color Color // Color is the color of the light.
-	// Energy is the overall energy of the light. Internally, technically there's no difference between a brighter color and a
+	color Color // Color is the color of the light.
+	// energy is the overall energy of the light. Internally, technically there's no difference between a brighter color and a
 	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
-	Energy float32
+	energy float32
 	On     bool // If the light is on and contributing to the scene.
 
 	workingForward       Vector  // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
@@ -317,8 +360,8 @@ type DirectionalLight struct {
 func NewDirectionalLight(name string, r, g, b, energy float32) *DirectionalLight {
 	return &DirectionalLight{
 		Node:   NewNode(name),
-		Color:  NewColor(r, g, b, 1),
-		Energy: energy,
+		color:  NewColor(r, g, b, 1),
+		energy: energy,
 		On:     true,
 	}
 }
@@ -326,7 +369,7 @@ func NewDirectionalLight(name string, r, g, b, energy float32) *DirectionalLight
 // Clone returns a new DirectionalLight clone from the given DirectionalLight.
 func (sun *DirectionalLight) Clone() INode {
 
-	clone := NewDirectionalLight(sun.name, sun.Color.R, sun.Color.G, sun.Color.B, sun.Energy)
+	clone := NewDirectionalLight(sun.name, sun.color.R, sun.color.G, sun.color.B, sun.energy)
 
 	clone.On = sun.On
 
@@ -362,20 +405,24 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[index])
 		}
 
-		if mat := meshPart.Material; mat != nil && mat.NormalsAlwaysFaceLights {
+		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
 			normal = sun.workingForward
 		}
 
 		diffuseFactor := normal.Dot(sun.workingForward)
+
+		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
+			diffuseFactor = math.Abs(diffuseFactor)
+		}
 
 		if diffuseFactor <= 0 {
 			return
 		}
 
 		targetColors[index] = targetColors[index].AddRGBA(
-			sun.Color.R*float32(diffuseFactor)*sun.Energy,
-			sun.Color.G*float32(diffuseFactor)*sun.Energy,
-			sun.Color.B*float32(diffuseFactor)*sun.Energy,
+			sun.color.R*float32(diffuseFactor)*sun.energy,
+			sun.color.G*float32(diffuseFactor)*sun.energy,
+			sun.color.B*float32(diffuseFactor)*sun.energy,
 			0,
 		)
 
@@ -397,11 +444,27 @@ func (sun *DirectionalLight) Unparent() {
 }
 
 func (sun *DirectionalLight) IsOn() bool {
-	return sun.On && sun.Energy > 0
+	return sun.On && sun.energy > 0
 }
 
 func (sun *DirectionalLight) SetOn(on bool) {
 	sun.On = on
+}
+
+func (d *DirectionalLight) Color() Color {
+	return d.color
+}
+
+func (d *DirectionalLight) SetColor(color Color) {
+	d.color = color
+}
+
+func (d *DirectionalLight) Energy() float32 {
+	return d.energy
+}
+
+func (d *DirectionalLight) SetEnergy(energy float32) {
+	d.energy = energy
 }
 
 // Index returns the index of the Node in its parent's children list.
@@ -426,8 +489,8 @@ func (sun *DirectionalLight) Type() NodeType {
 type CubeLight struct {
 	*Node
 	Dimensions Dimensions // The overall dimensions of the CubeLight.
-	Energy     float32    // The overall energy of the CubeLight
-	Color      Color      // The color of the CubeLight
+	energy     float32    // The overall energy of the CubeLight
+	color      Color      // The color of the CubeLight
 	On         bool       // If the CubeLight is on or not
 	// A value between 0 and 1 indicating how much opposite faces are still lit within the volume (i.e. at LightBleed = 0.0,
 	// faces away from the light are dark; at 1.0, faces away from the light are fully illuminated)
@@ -444,8 +507,8 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 		Node: NewNode(name),
 		// Dimensions:    Dimensions{{-w / 2, -h / 2, -d / 2}, {w / 2, h / 2, d / 2}},
 		Dimensions:    dimensions,
-		Energy:        1,
-		Color:         NewColor(1, 1, 1, 1),
+		energy:        1,
+		color:         NewColor(1, 1, 1, 1),
 		On:            true,
 		LightingAngle: Vector{0, -1, 0, 0},
 	}
@@ -465,8 +528,8 @@ func NewCubeLightFromModel(name string, model *Model) *CubeLight {
 // Clone clones the CubeLight, returning a deep copy.
 func (cube *CubeLight) Clone() INode {
 	newCube := NewCubeLight(cube.name, cube.Dimensions)
-	newCube.Energy = cube.Energy
-	newCube.Color = cube.Color
+	newCube.energy = cube.energy
+	newCube.color = cube.color
 	newCube.On = cube.On
 	newCube.Bleed = cube.Bleed
 	newCube.LightingAngle = cube.LightingAngle
@@ -623,11 +686,15 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []Co
 
 		var diffuse, diffuseFactor float64
 
-		if mat := meshPart.Material; mat != nil && mat.NormalsAlwaysFaceLights {
+		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
 			vertNormal = cube.workingAngle
 		}
 
 		diffuse = vertNormal.Dot(cube.workingAngle)
+
+		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
+			diffuse = math.Abs(diffuse)
+		}
 
 		if cube.Bleed > 0 {
 
@@ -661,9 +728,9 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []Co
 		}
 
 		targetColors[index] = targetColors[index].AddRGBA(
-			cube.Color.R*float32(diffuseFactor)*cube.Energy,
-			cube.Color.G*float32(diffuseFactor)*cube.Energy,
-			cube.Color.B*float32(diffuseFactor)*cube.Energy,
+			cube.color.R*float32(diffuseFactor)*cube.energy,
+			cube.color.G*float32(diffuseFactor)*cube.energy,
+			cube.color.B*float32(diffuseFactor)*cube.energy,
 			0,
 		)
 
@@ -679,6 +746,22 @@ func (cube *CubeLight) IsOn() bool {
 // SetOn sets the CubeLight to be on or off.
 func (cube *CubeLight) SetOn(on bool) {
 	cube.On = on
+}
+
+func (cube *CubeLight) Color() Color {
+	return cube.color
+}
+
+func (cube *CubeLight) SetColor(color Color) {
+	cube.color = color
+}
+
+func (cube *CubeLight) Energy() float32 {
+	return cube.energy
+}
+
+func (cube *CubeLight) SetEnergy(energy float32) {
+	cube.energy = energy
 }
 
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph

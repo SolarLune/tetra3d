@@ -310,8 +310,16 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				if s, exists := dataMap["t3dCustomDepthValue__"]; exists {
 					newMat.CustomDepthOffsetValue = s.(float64)
 				}
-				if s, exists := dataMap["t3dNormalFacesLights__"]; exists {
-					newMat.NormalsAlwaysFaceLights = s.(float64) > 0
+				if s, exists := dataMap["t3dMaterialLightingMode__"]; exists {
+					// newMat.NormalsAlwaysFaceLights = s.(float64) > 0
+					switch int(s.(float64)) {
+					case 0:
+						newMat.LightingMode = LightingModeDefault
+					case 1:
+						newMat.LightingMode = LightingModeFixedNormals
+					case 2:
+						newMat.LightingMode = LightingModeDoubleSided
+					}
 				}
 
 				// At this point, parenting should be set up.
@@ -1285,11 +1293,11 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				if wc, exists := props["ambient color"]; exists {
 					wcc := wc.([]interface{})
 					worldColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1).ConvertTosRGB()
-					world.AmbientLight.Color = worldColor
+					world.AmbientLight.color = worldColor
 				}
 
 				if wc, exists := props["ambient energy"]; exists {
-					world.AmbientLight.Energy = float32(wc.(float64))
+					world.AmbientLight.energy = float32(wc.(float64))
 				}
 
 				if cc, exists := props["clear color"]; exists {

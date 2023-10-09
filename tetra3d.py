@@ -57,6 +57,12 @@ materialBillboardModes = [
     ("FULL", "Full", "Full billboarding - the (unskinned) object rotates fully to face the camera.", 0, 3),
 ]
 
+materialLightingModes = [
+    ("DEFAULT", "Default", "Default lighting; light is dependent on normal of lit faces.", 0, 0),
+    ("NORMAL", "Point Towards Lights", "Lighting acts as though faces always face light sources. Particularly useful for billboarded 2D sprites", 0, 1),
+    ("DOUBLE", "Double-Sided", "Double-sided lighting; lighting is dependent on normal of lit faces, but on both sides of a face.", 0, 2),
+]
+
 worldFogCompositeModes = [
     ("OFF", "Off", "No fog. Object colors aren't changed with distance from the camera", 0, 0),
     ("ADDITIVE", "Additive", "Additive fog - this fog mode brightens objects in the distance, with full effect being adding the color given to the object's color at maximum distance (according to the camera's far range)", 0, 1),
@@ -792,11 +798,14 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.prop(context.material, "use_backface_culling")
         row = self.layout.row()
-        row.prop(context.material, "blend_method")
+        row.label(text="Blend Mode:")
+        row.prop(context.material, "blend_method", text="")
         row = self.layout.row()
-        row.prop(context.material, "t3dCompositeMode__")
+        row.label(text="Composite Mode:")
+        row.prop(context.material, "t3dCompositeMode__", text="")
         row = self.layout.row()
-        row.prop(context.material, "t3dBillboardMode__")
+        row.label(text="Billboard Mode:")
+        row.prop(context.material, "t3dBillboardMode__", text="")
 
         box = self.layout.box()
         row = box.row()
@@ -816,7 +825,8 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.enabled = context.material.t3dCustomDepthOn__
         row.prop(context.material, "t3dCustomDepthValue__")
         row = box.row()
-        row.prop(context.material, "t3dNormalFacesLights__")
+        row.label(text="Lighting Mode:")
+        row.prop(context.material, "t3dMaterialLightingMode__", text="")
 
         if context.object.active_material != None:
 
@@ -1912,7 +1922,7 @@ def register():
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
     bpy.types.Material.t3dCustomDepthOn__ = bpy.props.BoolProperty(name="Custom Depth", description="Whether custom depth offsetting should be enabled", default=False)
     bpy.types.Material.t3dCustomDepthValue__ = bpy.props.FloatProperty(name="Depth Offset Value", description="How far in world units the material should offset when rendering (negative values are closer to the camera, positive values are further)")
-    bpy.types.Material.t3dNormalFacesLights__ = bpy.props.BoolProperty(name="Normals Always Face Lights", description="Whether normals that use this material should always face light sources or not; particularly useful for billboarded 2D sprites", default=False)
+    bpy.types.Material.t3dMaterialLightingMode__ = bpy.props.EnumProperty(items=materialLightingModes, name="Lighting mode", description="How materials should be lit", default="DEFAULT")
 
     bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode")
     bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5)
@@ -2008,10 +2018,10 @@ def unregister():
     del bpy.types.Material.t3dMaterialFogless__
     del bpy.types.Material.t3dCompositeMode__
     del bpy.types.Material.t3dBillboardMode__
+    del bpy.types.Material.t3dMaterialLightingMode__
 
     del bpy.types.Material.t3dCustomDepthOn__
     del bpy.types.Material.t3dCustomDepthValue__
-    del bpy.types.Material.t3dNormalFacesLights__
     del bpy.types.Material.t3dGameProperties__
     del bpy.types.Material.t3dAutoUV__
     del bpy.types.Material.t3dAutoUVUnitSize__

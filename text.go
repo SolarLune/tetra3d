@@ -225,12 +225,12 @@ func (textObj *Text) SetText(txt string, arguments ...interface{}) *Text {
 
 			// Some fonts have space characters that are basically empty somehow...?
 			spaceAdd := 0
-			if measureText(" ", textObj.style.Font) <= 0 {
-				spaceAdd = measureText("M", textObj.style.Font)
+			if measureText(" ", textObj.style.Font).Dx() <= 0 {
+				spaceAdd = measureText("M", textObj.style.Font).Dx()
 			}
 
 			for i, word := range split {
-				wordSpace := measureText(word, textObj.style.Font)
+				wordSpace := measureText(word, textObj.style.Font).Dx()
 				runningMeasure += wordSpace + spaceAdd
 
 				if runningMeasure >= textureWidth-safetyMargin {
@@ -256,6 +256,10 @@ func (textObj *Text) SetText(txt string, arguments ...interface{}) *Text {
 		textObj.parsedText = parsedText
 
 		textObj.UpdateTexture()
+
+		if textObj.typewriterIndex >= 0 {
+			textObj.typewriterIndex = 0
+		}
 	}
 
 	return textObj
@@ -293,7 +297,7 @@ func (textObj *Text) UpdateTexture() {
 
 	for lineIndex, line := range textObj.parsedText {
 
-		measure := text.BoundString(textObj.style.Font, line)
+		measure := measureText(line, textObj.style.Font)
 
 		if textObj.typewriterOn && typewriterIndex >= 0 {
 
@@ -304,7 +308,7 @@ func (textObj *Text) UpdateTexture() {
 			if typewriterIndex > len(line) {
 				typewriterIndex -= len(line)
 			} else if typing {
-				line = line[:typewriterIndex] + textObj.style.Cursor
+				line = line[:typewriterIndex]
 				typing = false
 			}
 
@@ -326,6 +330,10 @@ func (textObj *Text) UpdateTexture() {
 			x -= textObj.style.MarginHorizontal
 		} else {
 			x += textObj.style.MarginHorizontal
+		}
+
+		if textObj.typewriterOn && (len(line) < len(textObj.parsedText[lineIndex]) || lineIndex == len(textObj.parsedText)-1) {
+			line += textObj.style.Cursor
 		}
 
 		text.Draw(textObj.Texture, line, textObj.style.Font, x, y, color.RGBA{255, 255, 255, 255})

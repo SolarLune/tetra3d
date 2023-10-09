@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"image"
 	"math"
 
 	"golang.org/x/image/font"
@@ -69,8 +70,14 @@ func round(value float64) float64 {
 
 }
 
-func measureText(text string, fontFace font.Face) int {
-	// bounds, _ := font.BoundString(fontFace, text)
-	advance := font.MeasureString(fontFace, text)
-	return int(advance >> 6)
+// type TextMeasure struct {
+// 	X, Y int
+// }
+
+func measureText(text string, fontFace font.Face) image.Rectangle {
+	bounds, _ := font.BoundString(fontFace, text)
+	// advance := font.MeasureString(fontFace, text)
+	newBounds := image.Rect(int(bounds.Min.X)>>6, int(bounds.Min.Y)>>6, int(bounds.Max.X)>>6, int(bounds.Max.Y)>>6)
+	// newBounds := TextMeasure{int((bounds.Max.X - bounds.Min.X) >> 6), int((bounds.Max.Y - bounds.Min.Y) >> 6)}
+	return newBounds
 }

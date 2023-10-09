@@ -33,6 +33,12 @@ const (
 	BillboardModeAll                  // Billboard on all axes
 )
 
+const (
+	LightingModeDefault      = iota // Default lighting mode
+	LightingModeFixedNormals        // Lighting applies as though faces always point towards light sources; good for 2D sprites
+	LightingModeDoubleSided         // Lighting applies for double-sided faces
+)
+
 type Material struct {
 	library           *Library             // library is a reference to the Library that this Material came from.
 	Name              string               // Name is the name of the Material.
@@ -64,9 +70,9 @@ type Material struct {
 	// all non-transparent materials.
 	TransparencyMode int
 
-	CustomDepthOffsetOn     bool    // Whether custom depth offset is on or not.
-	CustomDepthOffsetValue  float64 // How many world units to offset the depth of the material by.
-	NormalsAlwaysFaceLights bool    // Whether normals should always face light sources for lighting or not.
+	CustomDepthOffsetOn    bool    // Whether custom depth offset is on or not.
+	CustomDepthOffsetValue float64 // How many world units to offset the depth of the material by.
+	LightingMode           int     // How materials are lit
 
 	// CustomDepthFunction is a customizeable function that takes the depth value of each vertex of a rendered MeshPart and
 	// transforms it, returning a different value.

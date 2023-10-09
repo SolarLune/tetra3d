@@ -153,7 +153,8 @@ func NewCamera(w, h int) *Camera {
 	}
 
 	clipAlphaShaderText := []byte(
-		`package main
+		`//kage:unit pixels
+		package main
 
 		func encodeDepth(depth float) vec4 {
 			r := floor(depth * 255) / 255
@@ -162,9 +163,28 @@ func NewCamera(w, h int) *Camera {
 			return vec4(r, g, b, 1);
 		}
 
-		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
-			
-			tex := imageSrc0UnsafeAt(texCoord)
+		func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+
+			srcOrigin := imageSrc0Origin()
+			srcSize := imageSrc0Size()
+
+			// There's atlassing going on behind the scenes here, so:
+			// Subtract the source position by the src texture's origin on the atlas.
+			// This gives us the actual pixel coordinates.
+			tx := srcPos - srcOrigin
+
+			// Divide by the source image size to get the UV coordinates.
+			tx /= srcSize
+
+			// Apply fract() to loop the UV coords around [0-1].
+			tx = fract(tx)
+
+			// Multiply by the size to get the pixel coordinates again.
+			tx *= srcSize
+
+			// Add the origin back in to get the texture coordinates that Kage expects.
+			tex := imageSrc0UnsafeAt(tx + srcOrigin)
+
 			if (tex.a == 0) {
 				discard()
 			}
@@ -1500,7 +1520,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				camera.clipAlphaIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:indexListIndex], camera.clipAlphaRenderShader, &ebiten.DrawTrianglesShaderOptions{Images: [4]*ebiten.Image{img}})
 
-				w, h := camera.depthIntermediate.Size()
+				w := camera.depthIntermediate.Bounds().Dx()
+				h := camera.depthIntermediate.Bounds().Dy()
 
 				camera.depthIntermediate.DrawRectShader(w, h, camera.clipAlphaCompositeShader, &ebiten.DrawRectShaderOptions{Images: [4]*ebiten.Image{camera.resultDepthTexture, camera.clipAlphaIntermediate}})
 
