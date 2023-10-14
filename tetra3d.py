@@ -939,9 +939,6 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         row = box.row()
         row.label(text="Quick set render resolution:")
 
-        row = self.layout.row()
-        row.prop(context.scene, "t3dRenderResolutionW__")
-        row.prop(context.scene, "t3dRenderResolutionH__")
 
         row = box.row()
         row.label(text="PS1-like:")
@@ -960,7 +957,13 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="1080p")
         op.resolutionHeight = 1080
 
+        row = box.row()
+        row.prop(context.scene, "t3dRenderResolutionW__")
+        row.prop(context.scene, "t3dRenderResolutionH__")
 
+        box = self.layout.box()
+        row = box.row()
+        row.prop(context.scene, "t3dMaxLightCount__")
 
         box = self.layout.box()
         box.prop(context.scene, "t3dSectorRendering__")
@@ -1646,6 +1649,12 @@ def getSectorRendering(self):
 def setSectorRendering(self, value):
     globalSet("t3dSectorRendering__", value)
 
+def getMaxLightCount(self):
+    return globalGet("t3dMaxLightCount__", 0)
+
+def setMaxLightCount(self, value):
+    globalSet("t3dMaxLightCount__", value)
+
 
 def getSectorRenderDepth(self):
     return globalGet("t3dSectorRenderDepth__", 0)
@@ -1854,6 +1863,9 @@ def register():
     bpy.types.Scene.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not", default=False, 
     get=getSectorRendering, set=setSectorRendering)
 
+    bpy.types.Scene.t3dMaxLightCount__ = bpy.props.IntProperty(name="Max light count", description="How many lights (sorted by distance to the camera, including ambient lights) should be used to light objects; if 0, then there is no limit", default=0, 
+    get=getMaxLightCount, set=setMaxLightCount, min = 0)
+
     bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=1, min=0,
     get=getSectorRenderDepth, set=setSectorRenderDepth)
 
@@ -2005,6 +2017,8 @@ def unregister():
     del bpy.types.Scene.t3dPackTextures__
     del bpy.types.Scene.t3dAnimationSampling__
     del bpy.types.Scene.t3dAnimationInterpolation__
+
+    del bpy.types.Scene.t3dMaxLightCount__
 
     del bpy.types.Scene.t3dRenderResolutionW__
     del bpy.types.Scene.t3dRenderResolutionH__

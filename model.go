@@ -532,6 +532,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		_, _, mvJustRForNormals = modelTransform.Mult(camera.ViewMatrix()).Decompose()
 	}
 
+	// There's pop-in for faces where the camera is looking at an object through the corner of the viewport
 	farSquared := (camera.far * camera.far) + (mesh.maxTriangleSpan * mesh.maxTriangleSpan)
 
 	var skinnedTriCenter Vector

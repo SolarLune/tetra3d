@@ -48,6 +48,9 @@ type Camera struct {
 	SectorRendering   bool // If the Camera should render using sectors or not; if no sectors are present, then it won't attempt to render with them. Defaults to false.
 	SectorRenderDepth int  // How far out the Camera renders other sectors. Defaults to 1 (so the current sector and its immediate neighbors).
 	currentSector     *Sector
+	// How many lights (sorted by distance) should be used to render each object, maximum. If it's greater than 0,
+	// then only that many lights will be considered. If less than or equal to 0 (the default), then all available lights will be used.
+	MaxLightCount int
 
 	resultColorTexture    *ebiten.Image // ColorTexture holds the color results of rendering any models.
 	resultDepthTexture    *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
@@ -385,6 +388,7 @@ func (camera *Camera) Clone() INode {
 	for _, child := range camera.children {
 		child.setParent(camera)
 	}
+	clone.MaxLightCount = camera.MaxLightCount
 
 	return clone
 
@@ -911,7 +915,6 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 				if insideSector == nil || sector.AABB.Dimensions.MaxSpan() < insideSector.AABB.Dimensions.MaxSpan() {
 					insideSector = sector
 					insideSector.sectorVisible = true
-					break
 				}
 			}
 		}
@@ -1235,9 +1238,16 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			if model.LightGroup != nil && model.LightGroup.Active {
 				sceneLights = model.LightGroup.Lights
-				for _, l := range model.LightGroup.Lights {
+				for _, l := range sceneLights {
 					l.beginRender() // Call this because it's relatively cheap and necessary if a light doesn't exist in the Scene
 				}
+			} else if camera.MaxLightCount > 0 {
+				sort.SliceStable(sceneLights, func(i, j int) bool {
+					// We sort ambient lights as being closest to the camera, naturally
+					_, iOK := sceneLights[i].(*AmbientLight)
+					return iOK || camera.DistanceSquaredTo(sceneLights[i]) < camera.DistanceSquaredTo(sceneLights[j])
+				})
+				sceneLights = sceneLights[:camera.MaxLightCount]
 			}
 
 			for _, light := range sceneLights {
@@ -1293,6 +1303,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		}
 
 		sceneLights = originalSceneLights
+
+		if camera.MaxLightCount > 0 {
+			sceneLights = sceneLights[:camera.MaxLightCount]
+		}
 
 		// TODO: Implement PS1-style automatic tesselation
 
@@ -1806,8 +1820,17 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 	m = camera.DebugInfo.AvgLightTime.Round(time.Microsecond).Microseconds()
 	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
 
+	sectorName := "<Sector Rendering Off>"
+	if camera.SectorRendering {
+		if camera.currentSector == nil {
+			sectorName = "nil"
+		} else {
+			sectorName = camera.currentSector.Model.name
+		}
+	}
+
 	debugText := fmt.Sprintf(
-		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d",
+		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d\nCurrent Sector:%s",
 		ebiten.ActualTPS(),
 		ebiten.ActualFPS(),
 		ft,
@@ -1819,7 +1842,9 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 		camera.DebugInfo.DrawnTris,
 		camera.DebugInfo.TotalTris,
 		camera.DebugInfo.ActiveLightCount,
-		camera.DebugInfo.LightCount)
+		camera.DebugInfo.LightCount,
+		sectorName,
+	)
 
 	camera.DebugDrawText(screen, debugText, 0, 0, textScale, color)
 

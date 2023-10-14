@@ -106,6 +106,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	exportedCameras := []*Camera{}
 
 	sectorRendering := false
+	maxLightCount := 0
 	sectorRenderDepth := 0
 	sectorDetection := SectorDetectionTypeVertices
 
@@ -204,6 +205,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			if depth, exists := globalExporterSettings["t3dSectorRenderDepth__"]; exists {
 				sectorRenderDepth = int(depth.(float64))
+			}
+
+			if count, exists := globalExporterSettings["t3dMaxLightCount__"]; exists {
+				maxLightCount = int(count.(float64))
 			}
 
 			if value, exists := globalExporterSettings["t3dSectorDetectionType__"]; exists {
@@ -795,6 +800,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			}
 
 			newCam.SectorRendering = sectorRendering
+			newCam.MaxLightCount = maxLightCount
 			newCam.SectorRenderDepth = sectorRenderDepth
 
 			obj = newCam
