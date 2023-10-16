@@ -142,7 +142,7 @@ func ExtendBase3DShader(customFragment string) (*ebiten.Shader, error) {
 				out += strings.Join(customTextSplit[customShaderStart:fragFunctionStart], "\n") + "\n"
 				out += line + "\n"
 			} else if i == customFragmentCallLocation {
-				// Replace teh line with a new ColorTex definition
+				// Replace the line with a new ColorTex definition
 				out += "colorTex := CustomFragment(dstPos, srcPos, color)\n\n"
 			} else if i == customFragmentDefinitionLocation {
 				out += strings.Join(customTextSplit[fragFunctionStart:], "\n") + "\n"

@@ -24,7 +24,7 @@ var OutlineColor vec4
 // which is the result of the shader from the generic 3D shader part.
 func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
 
-    res := imageSrc2UnsafeAt(srcPos)
+    res := imageSrc0UnsafeAt(srcPos)
     color := FGColor
     transparency := res.a
     colorSet := false
@@ -48,13 +48,13 @@ func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
             
             check.x += shadowV.x
 
-            if imageSrc2UnsafeAt(check).a > 0.5 {
+            if imageSrc0UnsafeAt(check).a > 0.5 {
                 shaded = true
             }
 
             check.y += shadowV.y
 
-            if imageSrc2UnsafeAt(check).a > 0.5 {
+            if imageSrc0UnsafeAt(check).a > 0.5 {
                 shaded = true
             }
 
@@ -95,7 +95,7 @@ func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
                             srcTexels += ShadowVector * shadowI
                         }
 
-                        if imageSrc2UnsafeAt(srcTexels).a > 0.5 {
+                        if imageSrc0UnsafeAt(srcTexels).a > 0.5 {
 
                             if OutlineRounded < 1 || (distance(srcPos + vec2(x,y), srcPos) <= OutlineThickness) {
 

@@ -62,8 +62,9 @@ type Material struct {
 	FragmentShaderOn bool
 	// FragmentShaderOptions allows you to customize the custom fragment shader with uniforms or images.
 	// By default, it's an empty DrawTrianglesShaderOptions struct.
-	// Note that the second image slot is reserved for a depth texture (primarily the texture used to "cut" a
-	// rendered model); the first image slot by default contains the Texture used in this Material.
+	// Note that the first image slot is reserved for the color texture associated with the Material.
+	// The second slot is reserved for a depth texture (primarily the intermediate texture used to "cut" a
+	// rendered model).
 	// If you want a custom fragment shader that already has fog and depth-testing, use Extend3DBaseShader() to
 	// extend your custom fragment shader from Tetra3D's base 3D shader.
 	FragmentShaderOptions *ebiten.DrawTrianglesShaderOptions
