@@ -7,6 +7,8 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"golang.org/x/image/font"
+
+	_ "embed"
 )
 
 type FinishMode int
@@ -84,6 +86,9 @@ func measureText(text string, fontFace font.Face) image.Rectangle {
 	return newBounds
 }
 
+//go:embed shaders/base3d.kage
+var base3DShaderText []byte
+
 // ExtendBase3DShader allows you to make a custom fragment shader that extends the base 3D shader, allowing you
 // to make a shader that has fog and depth testing built-in, as well as access to the combined painted vertex
 // colors and vertex-based lighting.
@@ -95,122 +100,7 @@ func measureText(text string, fontFace font.Face) image.Rectangle {
 // your object's Material (or shadelessness in your Model itself).
 func ExtendBase3DShader(customFragment string) (*ebiten.Shader, error) {
 
-	shaderText := `
-//kage:unit pixels
-
-package main
-
-var Fog vec4
-var FogRange [2]float
-var DitherSize float
-var FogCurve float
-var Fogless float
-
-var BayerMatrix [16]float
-
-func decodeDepth(rgba vec4) float {
-	return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
-}
-
-func OutCirc(v float) float {
-	return sqrt(1 - pow(v - 1, 2))
-}
-
-func InCirc(v float) float {
-	return 1 - sqrt(1 - pow(v, 2))
-}
-
-func dstPosToSrcPos(dstPos vec2) vec2 {
-	return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
-}
-
-// tetra3d Custom Uniform Location //
-
-func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
-
-	depth := imageSrc1UnsafeAt(dstPosToSrcPos(dstPos.xy))
-	
-	if depth.a > 0 {
-
-		srcOrigin := imageSrc0Origin()
-		srcSize := imageSrc0Size()
-
-		// There's atlassing going on behind the scenes here, so:
-		// Subtract the source position by the src texture's origin on the atlas.
-		// This gives us the actual pixel coordinates.
-		tx := srcPos - srcOrigin
-
-		// Divide by the source image size to get the UV coordinates.
-		tx /= srcSize
-
-		// Apply fract() to loop the UV coords around [0-1].
-		tx = fract(tx)
-
-		// Multiply by the size to get the pixel coordinates again.
-		tx *= srcSize
-
-		// tetra3d Custom Fragment Call Location //
-		colorTex := imageSrc0UnsafeAt(tx + srcOrigin) * color
-
-		if Fogless == 0 {
-
-			var d float
-		
-			if FogCurve == 0 {
-				d = smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
-			} else if FogCurve == 1 {
-				d = smoothstep(FogRange[0], FogRange[1], OutCirc(decodeDepth(depth)))
-			} else if FogCurve == 2 {
-				d = smoothstep(FogRange[0], FogRange[1], InCirc(decodeDepth(depth)))
-			}
-
-			if DitherSize > 0 {
-
-				yc := int(dstPos.y / DitherSize)%4
-				xc := int(dstPos.x / DitherSize)%4
-
-				fogMult := step(0, d - BayerMatrix[(yc*4) + xc])
-
-				// Fog mode is 4th channel in Fog vector ([4]float32)
-				if Fog.a == 0 {
-					colorTex.rgb += Fog.rgb * fogMult * colorTex.a
-				} else if Fog.a == 1 {
-					colorTex.rgb -= Fog.rgb * fogMult * colorTex.a
-				} else if Fog.a == 2 {
-					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, fogMult) * colorTex.a
-				} else if Fog.a == 3 {
-					colorTex.a *= abs(1-d) * step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
-					colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
-				}
-
-			} else {
-
-				if Fog.a == 0 {
-					colorTex.rgb += Fog.rgb * d * colorTex.a
-				} else if Fog.a == 1 {
-					colorTex.rgb -= Fog.rgb * d * colorTex.a
-				} else if Fog.a == 2 {
-					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
-				} else if Fog.a == 3 {
-					colorTex.a *= abs(1-d)
-					colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
-				}
-
-			}
-
-		}
-
-		return colorTex
-
-	}
-
-	discard()
-
-}
-
-// tetra3d Custom Fragment Definition Location //
-
-`
+	shaderText := string(base3DShaderText)
 
 	if len(customFragment) > 0 {
 
