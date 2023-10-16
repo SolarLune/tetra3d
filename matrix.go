@@ -63,11 +63,10 @@ func (matrix *Matrix4) Set(other Matrix4) {
 
 // BlenderToTetra returns a Matrix with the rows altered such that Blender's +Z is now Tetra's +Y and Blender's +Y is now Tetra's -Z.
 func (matrix Matrix4) BlenderToTetra() Matrix4 {
-	newMat := matrix.Clone()
-	prevRow := newMat.Row(1)
-	newMat.SetRow(1, matrix.Row(2).Invert())
-	newMat.SetRow(2, prevRow)
-	return newMat
+	prevRow := matrix.Row(1)
+	matrix.SetRow(1, matrix.Row(2).Invert())
+	matrix.SetRow(2, prevRow)
+	return matrix
 }
 
 // NewMatrix4Scale returns a new identity Matrix4, but with the x, y, and z translation components set as provided.
@@ -581,43 +580,37 @@ func (matrix Matrix4) Mult(other Matrix4) Matrix4 {
 
 func (matrix Matrix4) Add(other Matrix4) Matrix4 {
 
-	newMat := matrix.Clone()
-
 	for i := 0; i < len(matrix); i++ {
 		for j := 0; j < len(matrix[i]); j++ {
-			newMat[i][j] += other[i][j]
+			matrix[i][j] += other[i][j]
 		}
 	}
 
-	return newMat
+	return matrix
 
 }
 
 func (matrix Matrix4) ScaleByScalar(scalar float64) Matrix4 {
 
-	newMat := matrix.Clone()
-
 	for i := 0; i < len(matrix); i++ {
 		for j := 0; j < len(matrix[i]); j++ {
-			newMat[i][j] *= scalar
+			matrix[i][j] *= scalar
 		}
 	}
 
-	return newMat
+	return matrix
 
 }
 
 func (matrix Matrix4) Sub(other Matrix4) Matrix4 {
 
-	newMat := matrix.Clone()
-
 	for i := 0; i < len(matrix); i++ {
 		for j := 0; j < len(matrix[i]); j++ {
-			newMat[i][j] -= other[i][j]
+			matrix[i][j] -= other[i][j]
 		}
 	}
 
-	return newMat
+	return matrix
 
 }
 
