@@ -1329,6 +1329,15 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				}
 
+				w := mesh.vertexTransforms[vertIndex].W
+
+				uvU = float32((mesh.VertexUVs[vertIndex].X / w) * srcW)
+				uvV = float32(((1 - mesh.VertexUVs[vertIndex].Y) / w) * srcH)
+
+				colorVertex.SrcX = uvU
+				colorVertex.SrcY = uvV
+				colorVertex.ColorA = 1.0 / float32(w)
+
 				colorVertexList[vertexListIndex] = colorVertex
 				depthVertexList[vertexListIndex] = depthVertex
 
