@@ -46,7 +46,7 @@ type Material struct {
 	Texture           *ebiten.Image        // The texture applied to the Material.
 	TexturePath       string               // The path to the texture, if it was not packed into the exporter.
 	TextureFilterMode ebiten.Filter        // Texture filtering mode
-	TextureWrapMode   ebiten.Address       // Texture wrapping mode
+	textureWrapMode   ebiten.Address       // Texture wrapping mode; this is ignored currently, as all triangles render through shaders, where looping is enforced.
 	properties        Properties           // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
 	BackfaceCulling   bool                 // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
 	TriangleSortMode  int                  // TriangleSortMode influences how triangles with this Material are sorted.
@@ -60,8 +60,12 @@ type Material struct {
 	fragmentShader *ebiten.Shader
 	// FragmentShaderOn is an easy boolean toggle to control whether the shader is activated or not (it defaults to on).
 	FragmentShaderOn bool
-	// FragmentShaderOptions allows you to customize the custom fragment shader with uniforms or images. It does NOT take the
-	// CompositeMode property from the Material's CompositeMode. By default, it's an empty DrawTrianglesShaderOptions struct.
+	// FragmentShaderOptions allows you to customize the custom fragment shader with uniforms or images.
+	// By default, it's an empty DrawTrianglesShaderOptions struct.
+	// Note that the second image slot is reserved for a depth texture (primarily the texture used to "cut" a
+	// rendered model); the first image slot by default contains the Texture used in this Material.
+	// If you want a custom fragment shader that already has fog and depth-testing, use Extend3DBaseShader() to
+	// extend your custom fragment shader from Tetra3D's base 3D shader.
 	FragmentShaderOptions *ebiten.DrawTrianglesShaderOptions
 	fragmentSrc           []byte
 
@@ -89,7 +93,7 @@ func NewMaterial(name string) *Material {
 		Color:                 NewColor(1, 1, 1, 1),
 		properties:            NewProperties(),
 		TextureFilterMode:     ebiten.FilterNearest,
-		TextureWrapMode:       ebiten.AddressRepeat,
+		textureWrapMode:       ebiten.AddressRepeat,
 		BackfaceCulling:       true,
 		TriangleSortMode:      TriangleSortModeBackToFront,
 		TransparencyMode:      TransparencyModeAuto,
@@ -112,7 +116,7 @@ func (material *Material) Clone() *Material {
 	newMat.Fogless = material.Fogless
 	newMat.TransparencyMode = material.TransparencyMode
 	newMat.TextureFilterMode = material.TextureFilterMode
-	newMat.TextureWrapMode = material.TextureWrapMode
+	newMat.textureWrapMode = material.textureWrapMode
 	newMat.CompositeMode = material.CompositeMode
 
 	newMat.BillboardMode = material.BillboardMode
@@ -136,6 +140,7 @@ func (material *Material) Clone() *Material {
 // compositing the finished render to the screen after fog. If the shader is nil, the Material will render using the default Tetra3D
 // render setup (e.g. texture, UV values, vertex colors, and vertex lighting).
 // SetShader will return the Shader, and an error if the Shader failed to compile.
+// Note that custom shaders require usage of pixel-unit Kage shaders.
 func (material *Material) SetShaderText(src []byte) (*ebiten.Shader, error) {
 
 	if src == nil {
@@ -156,7 +161,11 @@ func (material *Material) SetShaderText(src []byte) (*ebiten.Shader, error) {
 
 }
 
-// SetShader sets an already-compiled Kage shader to the Material.
+// SetShader sets an already-compiled custom Kage shader to the Material.
+// By default, a custom shader will render on top of everything and with no fog.
+// Lighting will also be missing, but that's included in the Model's vertex color.
+// If you want to extend the base 3D shader, use tetra3d.ExtendBase3DShader().
+// Note that custom shaders require usage of pixel-unit Kage shaders.
 func (material *Material) SetShader(shader *ebiten.Shader) {
 	if material.fragmentShader != shader {
 		material.fragmentShader = shader

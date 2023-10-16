@@ -116,10 +116,13 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 	// We set this because Alpha Clip doesn't work with shadows / outlines, as just the text itself writes depth values
 	meshPart.Material.TransparencyMode = TransparencyModeTransparent
 
-	_, err := meshPart.Material.SetShaderText(textShaderSrc)
+	// shader, err := ebiten.NewShader(textShaderSrc)
+	shader, err := ExtendBase3DShader(string(textShaderSrc))
 	if err != nil {
 		panic(err)
 	}
+
+	meshPart.Material.SetShader(shader)
 
 	// We set the default text here so that something appears, and we
 	// apply a style using the function because otherwise, the text would be invisible.

@@ -36,14 +36,18 @@ func (g *Game) Init() {
 
 	mesh := tetra3d.NewCubeMesh()
 
-	// Here we specify a fragment shader
+	// Here we specify a fragment shader...
 	_, err := mesh.MeshParts[0].Material.SetShaderText([]byte(`
-	package main
 
+	//kage:unit pixels
+
+	package main
+	
 	func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 		scrSize := imageDstTextureSize()
 		return vec4(position.x / scrSize.x, position.y / scrSize.y, 0, 1)
-	}`))
+	}`),
+	)
 
 	if err != nil {
 		panic(err)

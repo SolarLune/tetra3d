@@ -103,13 +103,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Render the scene.
 	g.Camera.RenderScene(g.Scene)
 
-	opt := &ebiten.DrawImageOptions{}
-	opt.GeoM.Translate(-float64(g.HeartSprite.Bounds().Dx())/2, -float64(g.HeartSprite.Bounds().Dy())/2)
-	g.Camera.DrawImageIn3D(
+	// Draw the sprite after the rest of the scene.
+	g.Camera.DrawSprite3D(
 		g.Camera.ColorTexture(),
-		tetra3d.SpriteRender3d{
+		tetra3d.DrawSprite3dSettings{
 			Image:         g.HeartSprite,
-			Options:       opt,
 			WorldPosition: g.Scene.Root.Get("Heart").WorldPosition(),
 		},
 	)
@@ -118,7 +116,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	if g.System.DrawDebugText {
-		g.Camera.DebugDrawText(screen, "This is an example showing\nhow you can render a sprite in 2D, while\nmaintaining its ability to render over or under\nother 3D objects by simply moving\nit through 3D space.\n\nA: Toggle wireframe view of heart position", 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, "This is an example showing\nhow you can render a sprite in 2D, while\nmaintaining its ability to render over or under\nother 3D objects.\n\nA: Toggle wireframe view of heart position", 0, 200, 1, colors.LightGray())
 	}
 
 	if g.WireframeDrawHeart {

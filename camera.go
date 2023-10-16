@@ -52,12 +52,10 @@ type Camera struct {
 	// then only that many lights will be considered. If less than or equal to 0 (the default), then all available lights will be used.
 	MaxLightCount int
 
-	resultColorTexture    *ebiten.Image // ColorTexture holds the color results of rendering any models.
-	resultDepthTexture    *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
-	resultNormalTexture   *ebiten.Image // NormalTexture holds a texture indicating the normal render
-	colorIntermediate     *ebiten.Image
-	depthIntermediate     *ebiten.Image
-	clipAlphaIntermediate *ebiten.Image
+	resultColorTexture  *ebiten.Image // ColorTexture holds the color results of rendering any models.
+	resultDepthTexture  *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
+	resultNormalTexture *ebiten.Image // NormalTexture holds a texture indicating the normal render
+	depthIntermediate   *ebiten.Image
 
 	resultAccumulatedColorTexture *ebiten.Image // ResultAccumulatedColorTexture holds the previous frame's render result of rendering any models.
 	accumulatedBackBuffer         *ebiten.Image
@@ -73,11 +71,10 @@ type Camera struct {
 
 	DebugInfo DebugInfo
 
-	depthShader              *ebiten.Shader
-	clipAlphaCompositeShader *ebiten.Shader
-	clipAlphaRenderShader    *ebiten.Shader
-	colorShader              *ebiten.Shader
-	sprite3DShader           *ebiten.Shader
+	depthShader     *ebiten.Shader
+	clipAlphaShader *ebiten.Shader
+	colorShader     *ebiten.Shader
+	sprite3DShader  *ebiten.Shader
 
 	// Visibility check variables
 	cameraForward          Vector
@@ -121,6 +118,8 @@ func NewCamera(w, h int) *Camera {
 	depthShaderText := []byte(
 		`package main
 
+		//kage:unit pixels
+
 		func encodeDepth(depth float) vec4 {
 			r := floor(depth * 255) / 255
 			g := floor(fract(depth * 255) * 255) / 255
@@ -132,9 +131,13 @@ func NewCamera(w, h int) *Camera {
 			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
 		}
 
-		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+		func dstPosToSrcPos(dstPos vec2) vec2 {
+			return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
+		}
 
-			existingDepth := imageSrc0At(position.xy / imageSrcTextureSize())
+		func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+
+			existingDepth := imageSrc0UnsafeAt(dstPosToSrcPos(dstPos.xy))
 
 			if existingDepth.a == 0 || decodeDepth(existingDepth) > color.r {
 				return encodeDepth(color.r)
@@ -166,15 +169,22 @@ func NewCamera(w, h int) *Camera {
 			return vec4(r, g, b, 1);
 		}
 
+		func decodeDepth(rgba vec4) float {
+			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+		}
+
+		func dstPosToSrcPos(dstPos vec2) vec2 {
+			return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
+		}
+
 		func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
 
-			srcOrigin := imageSrc0Origin()
-			srcSize := imageSrc0Size()
+			srcSize := imageSrc1Size()
 
 			// There's atlassing going on behind the scenes here, so:
 			// Subtract the source position by the src texture's origin on the atlas.
 			// This gives us the actual pixel coordinates.
-			tx := srcPos - srcOrigin
+			tx := srcPos
 
 			// Divide by the source image size to get the UV coordinates.
 			tx /= srcSize
@@ -185,39 +195,16 @@ func NewCamera(w, h int) *Camera {
 			// Multiply by the size to get the pixel coordinates again.
 			tx *= srcSize
 
-			// Add the origin back in to get the texture coordinates that Kage expects.
-			tex := imageSrc0UnsafeAt(tx + srcOrigin)
+			tex := imageSrc1UnsafeAt(tx)
 
 			if (tex.a == 0) {
 				discard()
 			}
-			return vec4(encodeDepth(color.r).rgb, tex.a)
 
-		}
+			depthValue := imageSrc0UnsafeAt(dstPosToSrcPos(dstPos.xy))
 
-		`,
-	)
-
-	cam.clipAlphaRenderShader, err = ebiten.NewShader(clipAlphaShaderText)
-
-	if err != nil {
-		panic(err)
-	}
-
-	clipCompositeShaderText := []byte(
-		`package main
-
-		func decodeDepth(rgba vec4) float {
-			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
-		}
-
-		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
-
-			depthValue := imageSrc0UnsafeAt(texCoord)
-			texture := imageSrc1UnsafeAt(texCoord)
-
-			if depthValue.a == 0 || decodeDepth(depthValue) > texture.r {
-				return texture
+			if depthValue.a == 0 || decodeDepth(depthValue) > color.r {
+				return vec4(encodeDepth(color.r).rgb, tex.a)
 			}
 
 			discard()
@@ -227,100 +214,13 @@ func NewCamera(w, h int) *Camera {
 		`,
 	)
 
-	cam.clipAlphaCompositeShader, err = ebiten.NewShader(clipCompositeShaderText)
+	cam.clipAlphaShader, err = ebiten.NewShader(clipAlphaShaderText)
 
 	if err != nil {
 		panic(err)
 	}
 
-	cam.colorShader, err = ebiten.NewShader([]byte(
-		`package main
-
-		var Fog vec4
-		var FogRange [2]float
-		var DitherSize float
-		var FogCurve float
-		var Fogless float
-
-		var BayerMatrix [16]float
-
-		func decodeDepth(rgba vec4) float {
-			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
-		}
-
-		func OutCirc(v float) float {
-			return sqrt(1 - pow(v - 1, 2))
-		}
-
-		func InCirc(v float) float {
-			return 1 - sqrt(1 - pow(v, 2))
-		}
-		
-		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
-
-			depth := imageSrc1UnsafeAt(texCoord)
-			
-			if depth.a > 0 {
-				colorTex := imageSrc0UnsafeAt(texCoord)
-
-				if Fogless == 0 {
-
-					var d float
-				
-					if FogCurve == 0 {
-						d = smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
-					} else if FogCurve == 1 {
-						d = smoothstep(FogRange[0], FogRange[1], OutCirc(decodeDepth(depth)))
-					} else if FogCurve == 2 {
-						d = smoothstep(FogRange[0], FogRange[1], InCirc(decodeDepth(depth)))
-					}
-
-					if DitherSize > 0 {
-
-						yc := int(position.y / DitherSize)%4
-						xc := int(position.x / DitherSize)%4
-
-						fogMult := step(0, d - BayerMatrix[(yc*4) + xc])
-
-						// Fog mode is 4th channel in Fog vector ([4]float32)
-						if Fog.a == 0 {
-							colorTex.rgb += Fog.rgb * fogMult * colorTex.a
-						} else if Fog.a == 1 {
-							colorTex.rgb -= Fog.rgb * fogMult * colorTex.a
-						} else if Fog.a == 2 {
-							colorTex.rgb = mix(colorTex.rgb, Fog.rgb, fogMult) * colorTex.a
-						} else if Fog.a == 3 {
-							colorTex.a *= abs(1-d) * step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
-							colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
-						}
-
-					} else {
-
-						if Fog.a == 0 {
-							colorTex.rgb += Fog.rgb * d * colorTex.a
-						} else if Fog.a == 1 {
-							colorTex.rgb -= Fog.rgb * d * colorTex.a
-						} else if Fog.a == 2 {
-							colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
-						} else if Fog.a == 3 {
-							colorTex.a *= abs(1-d)
-							colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
-						}
-
-					}
-
-				}
-
-				return colorTex
-			}
-
-			// This should be discard as well, rather than alpha 0
-			discard()
-
-		}
-
-		`,
-	))
+	cam.colorShader, err = ExtendBase3DShader("")
 
 	if err != nil {
 		panic(err)
@@ -328,6 +228,7 @@ func NewCamera(w, h int) *Camera {
 
 	sprite3DShaderText := []byte(
 		`package main
+		//kage:unit pixels
 
 		var SpriteDepth float
 
@@ -335,12 +236,16 @@ func NewCamera(w, h int) *Camera {
 			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
 		}
 
-		func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
+		func dstPosToSrcPos(dstPos vec2) vec2 {
+			return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
+		}
 
-			resultDepth := imageSrc1UnsafeAt(texCoord)
+		func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+
+			resultDepth := imageSrc1UnsafeAt(dstPosToSrcPos(dstPos.xy))
 
 			if resultDepth.a == 0 || decodeDepth(resultDepth) > SpriteDepth {
-				return imageSrc0UnsafeAt(texCoord)
+				return imageSrc0UnsafeAt(srcPos)
 			}
 
 			discard()
@@ -408,9 +313,7 @@ func (camera *Camera) Resize(w, h int) {
 		camera.resultNormalTexture.Dispose()
 		camera.accumulatedBackBuffer.Dispose()
 		camera.resultDepthTexture.Dispose()
-		camera.colorIntermediate.Dispose()
 		camera.depthIntermediate.Dispose()
-		camera.clipAlphaIntermediate.Dispose()
 	}
 
 	bounds := image.Rect(0, 0, w, h)
@@ -422,9 +325,7 @@ func (camera *Camera) Resize(w, h int) {
 	camera.resultColorTexture = ebiten.NewImageWithOptions(bounds, opt)
 	camera.resultDepthTexture = ebiten.NewImageWithOptions(bounds, opt)
 	camera.resultNormalTexture = ebiten.NewImageWithOptions(bounds, opt)
-	camera.colorIntermediate = ebiten.NewImageWithOptions(bounds, opt)
 	camera.depthIntermediate = ebiten.NewImageWithOptions(bounds, opt)
-	camera.clipAlphaIntermediate = ebiten.NewImageWithOptions(bounds, opt)
 	camera.sphereFactorCalculated = false
 	camera.updateProjectionMatrix = true
 
@@ -1045,28 +946,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	rectShaderOptions := &ebiten.DrawRectShaderOptions{}
-	rectShaderOptions.Images[0] = camera.colorIntermediate
-	rectShaderOptions.Images[1] = camera.depthIntermediate
-
-	if scene != nil && scene.World != nil {
-
-		rectShaderOptions.Uniforms = map[string]interface{}{
-			"Fog":         scene.World.fogAsFloatSlice(),
-			"FogRange":    scene.World.FogRange,
-			"DitherSize":  scene.World.DitheredFogSize,
-			"FogCurve":    float32(scene.World.FogCurve),
-			"BayerMatrix": bayerMatrix,
-		}
-
-	} else {
-
-		rectShaderOptions.Uniforms = map[string]interface{}{
-			"Fog":      []float32{0, 0, 0, 0},
-			"FogRange": []float32{0, 1},
-		}
-
-	}
+	colorPassShaderOptions := &ebiten.DrawTrianglesShaderOptions{}
 
 	// Reusing vectors rather than reallocating for all triangles for all models
 	solids := []renderPair{}
@@ -1530,14 +1410,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			if transparencyMode == TransparencyModeAlphaClip {
 
-				camera.clipAlphaIntermediate.Clear()
-
-				camera.clipAlphaIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:indexListIndex], camera.clipAlphaRenderShader, &ebiten.DrawTrianglesShaderOptions{Images: [4]*ebiten.Image{img}})
-
-				w := camera.depthIntermediate.Bounds().Dx()
-				h := camera.depthIntermediate.Bounds().Dy()
-
-				camera.depthIntermediate.DrawRectShader(w, h, camera.clipAlphaCompositeShader, &ebiten.DrawRectShaderOptions{Images: [4]*ebiten.Image{camera.resultDepthTexture, camera.clipAlphaIntermediate}})
+				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
+					Images: [4]*ebiten.Image{camera.resultDepthTexture, img},
+				}
+				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:indexListIndex], camera.clipAlphaShader, shaderOpt)
 
 			} else {
 				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
@@ -1553,65 +1429,107 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		}
 
-		t := &ebiten.DrawTrianglesOptions{}
+		colorPassOptions := &ebiten.DrawTrianglesOptions{}
 		if model.ColorBlendingFunc != nil {
-			t.ColorM = model.ColorBlendingFunc(model, meshPart) // Modify the model's appearance using its color blending function
+			colorPassOptions.ColorM = model.ColorBlendingFunc(model, meshPart) // Modify the model's appearance using its color blending function
 		}
 		if mat != nil {
-			t.Filter = mat.TextureFilterMode
-			t.Address = mat.TextureWrapMode
+			colorPassOptions.Filter = mat.TextureFilterMode
+			colorPassOptions.Address = mat.textureWrapMode
 		}
 
 		hasFragShader := mat != nil && mat.fragmentShader != nil && mat.FragmentShaderOn
-		w, h := camera.resultColorTexture.Size()
 
 		// If rendering depth, and rendering through a custom fragment shader, we'll need to render the tris to the ColorIntermediate buffer using the custom shader.
 		// If we're not rendering through a custom shader, we can render to ColorIntermediate and then composite that onto the finished ColorTexture.
 		// If we're not rendering depth, but still rendering through the shader, we can render to the intermediate texture, and then from there composite.
 		// Otherwise, we can just draw the triangles normally.
 
+		if mat != nil {
+			colorPassShaderOptions.CompositeMode = mat.CompositeMode
+		}
+
+		if scene != nil && scene.World != nil {
+
+			colorPassShaderOptions.Uniforms = map[string]interface{}{
+				"Fog":         scene.World.fogAsFloatSlice(),
+				"FogRange":    scene.World.FogRange,
+				"DitherSize":  scene.World.DitheredFogSize,
+				"FogCurve":    float32(scene.World.FogCurve),
+				"BayerMatrix": bayerMatrix,
+			}
+
+		} else {
+
+			colorPassShaderOptions.Uniforms = map[string]interface{}{
+				"Fog":      []float32{0, 0, 0, 0},
+				"FogRange": []float32{0, 1},
+			}
+
+		}
+
+		colorPassShaderOptions.Images[0] = img
+		colorPassShaderOptions.Images[1] = camera.depthIntermediate
+
+		colorPassOptions.CompositeMode = ebiten.CompositeModeSourceOver
+		colorPassShaderOptions.CompositeMode = ebiten.CompositeModeSourceOver
+
 		fogless := float32(0)
 		if mat != nil && mat.Fogless {
 			fogless = 1
 		}
 
-		rectShaderOptions.Uniforms["Fogless"] = fogless
-
-		t.CompositeMode = ebiten.CompositeModeSourceOver
-		rectShaderOptions.CompositeMode = ebiten.CompositeModeSourceOver
-
 		if camera.RenderNormals {
-			camera.colorIntermediate.Clear()
-			camera.colorIntermediate.DrawTriangles(normalVertexList[:vertexListIndex], indexList[:indexListIndex], img, t)
-			camera.resultNormalTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
+			colorPassShaderOptions.Images[0] = defaultImg
+			colorPassShaderOptions.Uniforms["Fogless"] = 1 // No fog in a normal render
+			camera.resultNormalTexture.DrawTrianglesShader(normalVertexList[:vertexListIndex], indexList[:indexListIndex], camera.colorShader, colorPassShaderOptions)
+			// camera.resultNormalTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], camera.colorShader, colorPassShaderOptions)
+		} else {
+			colorPassShaderOptions.Uniforms["Fogless"] = fogless
 		}
 
 		if camera.RenderDepth {
 
-			camera.colorIntermediate.Clear()
-
-			if mat != nil {
-				rectShaderOptions.CompositeMode = mat.CompositeMode
-			}
-
 			if hasFragShader {
-				camera.colorIntermediate.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], mat.fragmentShader, mat.FragmentShaderOptions)
+
+				if mat.FragmentShaderOptions != nil {
+					colorPassShaderOptions.Blend = mat.FragmentShaderOptions.Blend
+					colorPassShaderOptions.AntiAlias = mat.FragmentShaderOptions.AntiAlias
+					colorPassShaderOptions.FillRule = mat.FragmentShaderOptions.FillRule
+					colorPassShaderOptions.CompositeMode = mat.FragmentShaderOptions.CompositeMode
+					for k, v := range mat.FragmentShaderOptions.Uniforms {
+						colorPassShaderOptions.Uniforms[k] = v
+					}
+					if len(mat.FragmentShaderOptions.Images) > 0 && mat.FragmentShaderOptions.Images[0] != nil {
+						colorPassShaderOptions.Images[0] = mat.FragmentShaderOptions.Images[0]
+					}
+					if len(mat.FragmentShaderOptions.Images) > 1 && mat.FragmentShaderOptions.Images[1] != nil {
+						colorPassShaderOptions.Images[1] = mat.FragmentShaderOptions.Images[1]
+					}
+					if len(mat.FragmentShaderOptions.Images) > 2 && mat.FragmentShaderOptions.Images[2] != nil {
+						colorPassShaderOptions.Images[2] = mat.FragmentShaderOptions.Images[2]
+					}
+					if len(mat.FragmentShaderOptions.Images) > 3 && mat.FragmentShaderOptions.Images[3] != nil {
+						colorPassShaderOptions.Images[3] = mat.FragmentShaderOptions.Images[3]
+					}
+				}
+				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], mat.fragmentShader, colorPassShaderOptions)
 			} else {
-				camera.colorIntermediate.DrawTriangles(colorVertexList[:vertexListIndex], indexList[:indexListIndex], img, t)
+				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], camera.colorShader, colorPassShaderOptions)
 			}
 
-			camera.resultColorTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
+			// camera.resultColorTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
 
 		} else {
 
 			if mat != nil {
-				t.CompositeMode = mat.CompositeMode
+				colorPassOptions.CompositeMode = mat.CompositeMode
 			}
 
 			if hasFragShader {
 				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], mat.fragmentShader, mat.FragmentShaderOptions)
 			} else {
-				camera.resultColorTexture.DrawTriangles(colorVertexList[:vertexListIndex], indexList[:indexListIndex], img, t)
+				camera.resultColorTexture.DrawTriangles(colorVertexList[:vertexListIndex], indexList[:indexListIndex], img, colorPassOptions)
 			}
 
 		}
@@ -1748,30 +1666,48 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 // }
 
-type SpriteRender3d struct {
-	Image         *ebiten.Image
-	Options       *ebiten.DrawImageOptions
-	WorldPosition Vector
+type DrawSprite3dSettings struct {
+	// The image to render
+	Image *ebiten.Image
+	// Options for drawing the sprite; defaults to nil, which is default settings.
+	Options *ebiten.DrawTrianglesShaderOptions
+	// How much to offset the depth - useful if you want the object to appear at a position,
+	// but in front of or behind other objects. Negative is towards the camera, positive is away.
+	// The offset ranges from 0 to 1.
+	DepthOffset   float32
+	WorldPosition Vector // The position of the sprite in 3D space
 }
 
-// DrawImageIn3D draws an image on the screen in 2D, but at the screen position of the 3D world position provided
+var spriteRender3DVerts = []ebiten.Vertex{
+	{DstX: 0, DstY: 0, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+	{DstX: 0, DstY: 0, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+	{DstX: 0, DstY: 0, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+	{DstX: 0, DstY: 0, SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+}
+
+var spriteRender3DIndices = []uint16{
+	0, 1, 2,
+	2, 3, 0,
+}
+
+// DrawSprite3D draws an image on the screen in 2D, but at the screen position of the 3D world position provided,
 // and with depth intersection.
 // This allows you to render 2D elements "at" a 3D position, and can be very useful in situations where you want
 // a sprite to render at 100% size and no perspective or skewing, but still look like it's in the 3D space (like in
 // a game with a fixed camera viewpoint).
-func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...SpriteRender3d) {
+func (camera *Camera) DrawSprite3D(screen *ebiten.Image, renderSettings ...DrawSprite3dSettings) {
 
 	// TODO: Replace this with a more performant alternative, where we minimize shader / texture switches.
 
 	depthMarginPercentage := (camera.far - camera.near) * camera.DepthMargin
 
-	for _, rs := range renderSettings {
+	camViewProj := camera.ViewMatrix().Mult(camera.Projection())
 
-		camera.colorIntermediate.Clear()
+	for _, rs := range renderSettings {
 
 		px := camera.WorldToScreen(rs.WorldPosition)
 
-		out := camera.ViewMatrix().Mult(camera.Projection()).MultVec(rs.WorldPosition)
+		out := camViewProj.MultVec(rs.WorldPosition)
 
 		depth := float32((out.Z + depthMarginPercentage) / (camera.far - camera.near + (depthMarginPercentage * 2)))
 
@@ -1782,23 +1718,36 @@ func (camera *Camera) DrawImageIn3D(screen *ebiten.Image, renderSettings ...Spri
 			depth = 1
 		}
 
-		opt := rs.Options
+		depth += float32(rs.DepthOffset)
 
-		if opt == nil {
-			opt = &ebiten.DrawImageOptions{}
-		}
-		opt.GeoM.Translate(px.X, px.Y)
+		imageW := float32(rs.Image.Bounds().Dx())
+		imageH := float32(rs.Image.Bounds().Dy())
+		halfImageW := imageW / 2
+		halfImageH := imageH / 2
 
-		camera.colorIntermediate.DrawImage(rs.Image, opt)
+		spriteRender3DVerts[0].DstX = float32(px.X) - halfImageW
+		spriteRender3DVerts[0].DstY = float32(px.Y) - halfImageH
 
-		colorTextureW, colorTextureH := camera.resultColorTexture.Size()
-		rectShaderOptions := &ebiten.DrawRectShaderOptions{}
-		rectShaderOptions.Images[0] = camera.colorIntermediate
-		rectShaderOptions.Images[1] = camera.resultDepthTexture
-		rectShaderOptions.Uniforms = map[string]interface{}{
+		spriteRender3DVerts[1].DstX = float32(px.X) + halfImageW
+		spriteRender3DVerts[1].DstY = float32(px.Y) - halfImageH
+		spriteRender3DVerts[1].SrcX = imageW
+
+		spriteRender3DVerts[2].DstX = float32(px.X) + halfImageW
+		spriteRender3DVerts[2].DstY = float32(px.Y) + halfImageH
+		spriteRender3DVerts[2].SrcX = imageW
+		spriteRender3DVerts[2].SrcY = imageH
+
+		spriteRender3DVerts[3].DstX = float32(px.X) - halfImageW
+		spriteRender3DVerts[3].DstY = float32(px.Y) + halfImageH
+		spriteRender3DVerts[3].SrcY = imageH
+
+		shaderOptions := &ebiten.DrawTrianglesShaderOptions{}
+		shaderOptions.Images[0] = rs.Image
+		shaderOptions.Images[1] = camera.resultDepthTexture
+		shaderOptions.Uniforms = map[string]interface{}{
 			"SpriteDepth": depth,
 		}
-		screen.DrawRectShader(colorTextureW, colorTextureH, camera.sprite3DShader, rectShaderOptions)
+		screen.DrawTrianglesShader(spriteRender3DVerts, spriteRender3DIndices, camera.sprite3DShader, shaderOptions)
 
 	}
 
