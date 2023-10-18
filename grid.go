@@ -650,8 +650,8 @@ func (gp *GridPath) DebugDraw(screen *ebiten.Image, camera *Camera, color Color)
 
 	points := gp.Points()
 	for i := 0; i < len(points)-1; i++ {
-		p1 := camera.WorldToScreen(points[i])
-		p2 := camera.WorldToScreen(points[i+1])
+		p1 := camera.WorldToScreenPixels(points[i])
+		p2 := camera.WorldToScreenPixels(points[i+1])
 		ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
 		ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.ToRGBA64())
 		if i == len(points)-2 {

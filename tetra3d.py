@@ -1525,8 +1525,13 @@ class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
     def execute(self, context):
         
         obj = bpy.context.object
-        ogMode = bpy.context.object.mode
         
+        # If there's no polygons, we'll just return early
+        if len(obj.data.polygons) == 0:
+            return {'FINISHED'}
+        
+        ogMode = bpy.context.object.mode
+
         prevActiveMaterialIndex = obj.active_material_index
 
         # We need to be in Object mode to get vertex / edge / polygon selection data

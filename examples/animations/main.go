@@ -37,7 +37,7 @@ func (g *Game) Init() {
 
 	g.Library = library
 
-	scene := g.Library.Scenes[0]
+	scene := g.Library.Scenes[0].Clone()
 
 	g.Camera = examples.NewBasicFreeCam(scene)
 	g.Camera.Move(0, 0, 10)

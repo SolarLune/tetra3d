@@ -1081,8 +1081,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
-	allBones := []*Node{}
-
 	// We do this again here so we can be sure that all of the nodes can be created first
 	for i, node := range doc.Nodes {
 
@@ -1112,7 +1110,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				// This is incorrect, but it gives us a link to any bone in the armature to establish
 				// the true root after parenting is set below
 				model.SkinRoot = bone
-				allBones = append(allBones, bone)
 				localBones = append(localBones, bone)
 			}
 
@@ -1137,25 +1134,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				model.bones = append(model.bones, []*Node{})
 
 				for _, boneID := range boneIndices {
-					model.bones[vertIndex] = append(model.bones[vertIndex], allBones[boneID])
+					model.bones[vertIndex] = append(model.bones[vertIndex], localBones[boneID])
 				}
 
-				// model.Mesh.VertexBones[i] = append(model.Mesh.VertexBones[i], )
 			}
-
-			// for _, part := range model.Mesh.MeshParts {
-
-			// 	for _, vertex := range part.Vertices {
-
-			// 		model.bones = append(model.bones, []*Node{})
-
-			// 		for _, boneID := range verticesToBones[vertex] {
-			// 			model.bones[vertex.ID] = append(model.bones[vertex.ID], allBones[boneID])
-			// 		}
-
-			// 	}
-
-			// }
 
 		}
 

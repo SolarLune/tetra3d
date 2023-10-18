@@ -78,7 +78,7 @@ func (g *Game) Init() {
 	// target, and how large to make the text rendering surface
 	g.Text = tetra3d.NewText(textPlane.Mesh.FindMeshPart("Text"), 256)
 
-	g.Text.ApplyStyle(
+	g.Text.SetStyle(
 		tetra3d.TextStyle{
 			Font:                 font,
 			FGColor:              colors.SkyBlue(),

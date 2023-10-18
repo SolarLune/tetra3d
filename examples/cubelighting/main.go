@@ -48,7 +48,7 @@ func (g *Game) Init() {
 	for _, cubeLightModel := range g.Scene.Root.SearchTree().ByPropNames("cubelight").Models() {
 
 		cubeLight := tetra3d.NewCubeLightFromModel("cube light", cubeLightModel)
-		cubeLight.Energy = 3
+		cubeLight.SetEnergy(3)
 		g.Scene.Root.AddChildren(cubeLight)
 
 	}

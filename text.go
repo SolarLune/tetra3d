@@ -129,7 +129,7 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 	text.setText = "Default text"
 	text.parsedText = []string{"Default text"}
 
-	text.ApplyStyle(NewDefaultTextStyle()) // The texture will update when we apply the style.
+	text.SetStyle(NewDefaultTextStyle()) // The texture will update when we apply the style.
 
 	return text
 }
@@ -146,6 +146,7 @@ func NewTextAutoSize(meshPart *MeshPart, camera *Camera) *Text {
 	meshPartDimWidth, _ := meshPart.primaryDimensions()
 
 	texWidth := meshPartDimWidth / camera.OrthoScale() * float64(w)
+
 	return NewText(meshPart, int(texWidth))
 }
 
@@ -346,11 +347,11 @@ func (textObj *Text) UpdateTexture() {
 
 }
 
-func (text *Text) CurrentStyle() TextStyle {
+func (text *Text) Style() TextStyle {
 	return text.style
 }
 
-func (text *Text) ApplyStyle(style TextStyle) {
+func (text *Text) SetStyle(style TextStyle) {
 	if text.style != style {
 
 		oldStyle := text.style

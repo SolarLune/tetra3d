@@ -29,14 +29,14 @@ func ToDegrees(radians float64) float64 {
 	return radians / math.Pi * 180
 }
 
-func min(a, b float64) float64 {
+func min[V float64 | int](a, b V) V {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func max(a, b float64) float64 {
+func max[V float64 | int](a, b V) V {
 	if a > b {
 		return a
 	}

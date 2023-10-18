@@ -321,11 +321,27 @@ func (vec Vector) Rotate(x, y, z, angle float64) Vector {
 	return NewQuaternionFromAxisAngle(Vector{X: x, Y: y, Z: z}, angle).RotateVec(vec)
 }
 
-// Angle returns the angle between the calling Vector and the provided other Vector (ignoring the W component).
+// Angle returns the angle in radians between the calling Vector and the provided other Vector (ignoring the W component).
 func (vec Vector) Angle(other Vector) float64 {
 	d := vec.Unit().Dot(other.Unit())
 	d = clamp(d, -1, 1) // Acos returns NaN if value < -1 or > 1
 	return math.Acos(float64(d))
+}
+
+// ClampAngle clamps the Vector such that it doesn't exceed the angle specified (in radians).
+// This function returns a normalized (unit) Vector.
+func (vec Vector) ClampAngle(baselineVec Vector, maxAngle float64) Vector {
+
+	mag := vec.Magnitude()
+
+	angle := vec.Angle(baselineVec)
+
+	if angle > maxAngle {
+		vec = baselineVec.Slerp(vec, maxAngle/angle).Unit()
+	}
+
+	return vec.Scale(mag)
+
 }
 
 // Scale scales a Vector by the given scalar (ignoring the W component), returning a copy with the result.
@@ -373,6 +389,54 @@ func (vec Vector) Ceil() Vector {
 	vec.X = math.Ceil(vec.X)
 	vec.Y = math.Ceil(vec.Y)
 	vec.Z = math.Ceil(vec.Z)
+	return vec
+}
+
+// Lerp performs a linear interpolation between the starting Vector and the provided
+// other Vector, to the given percentage (ranging from 0 to 1).
+func (vec Vector) Lerp(other Vector, percentage float64) Vector {
+	percentage = clamp(percentage, 0, 1)
+	vec.X = vec.X + ((other.X - vec.X) * percentage)
+	vec.Y = vec.Y + ((other.Y - vec.Y) * percentage)
+	vec.Z = vec.Z + ((other.Z - vec.Z) * percentage)
+	return vec
+}
+
+// Slerp performs a spherical linear interpolation between the starting Vector and the provided
+// ending Vector, to the given percentage (ranging from 0 to 1).
+// This normalizes both Vectors.
+func (vec Vector) Slerp(end Vector, percentage float64) Vector {
+
+	vec = vec.Unit()
+	end = end.Unit()
+
+	// Thank you StackOverflow, once again! : https://stackoverflow.com/questions/67919193/how-does-unity-implements-vector3-slerp-exactly
+	percentage = clamp(percentage, 0, 1)
+
+	dot := vec.Dot(end)
+
+	dot = clamp(dot, -1, 1)
+
+	theta := math.Acos(dot) * percentage
+	relative := end.Sub(vec.Scale(dot)).Unit()
+
+	return (vec.Scale(math.Cos(theta)).Add(relative.Scale(math.Sin(theta)))).Unit()
+
+}
+
+// Clamp clamps the Vector to the maximum values provided.
+func (vec Vector) Clamp(x, y, z float64) Vector {
+	vec.X = clamp(vec.X, -x, x)
+	vec.Y = clamp(vec.Y, -y, y)
+	vec.Z = clamp(vec.Z, -z, z)
+	return vec
+}
+
+// ClampVec clamps the Vector to the maximum values in the Vector provided.
+func (vec Vector) ClampVec(extents Vector) Vector {
+	vec.X = clamp(vec.X, -extents.X, extents.X)
+	vec.Y = clamp(vec.Y, -extents.Y, extents.Y)
+	vec.Z = clamp(vec.Z, -extents.Z, extents.Z)
 	return vec
 }
 
@@ -570,6 +634,58 @@ func (ip ModVector) SubMagnitude(mag float64) ModVector {
 	}
 	return ip
 
+}
+
+// Lerp performs a linear interpolation between the starting ModVector and the provided
+// other Vector, to the given percentage.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Lerp(other Vector, percentage float64) ModVector {
+	lerped := (*ip.Vector).Lerp(other, percentage)
+	ip.X = lerped.X
+	ip.Y = lerped.Y
+	ip.Z = lerped.Z
+	return ip
+}
+
+// Slerp performs a spherical linear interpolation between the starting ModVector and the provided
+// other Vector, to the given percentage.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Slerp(other Vector, percentage float64) ModVector {
+	slerped := (*ip.Vector).Slerp(other, percentage)
+	ip.X = slerped.X
+	ip.Y = slerped.Y
+	ip.Z = slerped.Z
+	return ip
+}
+
+// Clamp clamps the Vector to the maximum values provided.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) Clamp(x, y, z float64) ModVector {
+	clamped := (*ip.Vector).Clamp(x, y, z)
+	ip.X = clamped.X
+	ip.Y = clamped.Y
+	ip.Z = clamped.Z
+	return ip
+}
+
+// ClampVec clamps the Vector to the maximum values in the Vector provided.
+// This function returns the calling ModVector for method chaining.
+func (ip ModVector) ClampVec(extents Vector) ModVector {
+	clamped := (*ip.Vector).ClampVec(extents)
+	ip.X = clamped.X
+	ip.Y = clamped.Y
+	ip.Z = clamped.Z
+	return ip
+}
+
+// ClampAngle clamps the Vector such that it doesn't exceed the angle specified (in radians).
+// This function returns a normalized (unit) ModVector for method chaining.
+func (ip ModVector) ClampAngle(baselineVec Vector, maxAngle float64) ModVector {
+	clamped := (*ip.Vector).ClampAngle(baselineVec, maxAngle)
+	ip.X = clamped.X
+	ip.Y = clamped.Y
+	ip.Z = clamped.Z
+	return ip
 }
 
 // String converts the ModVector to a string. Because it's a ModVector, it's represented with a *.
