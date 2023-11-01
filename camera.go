@@ -495,14 +495,14 @@ func (camera *Camera) ClipToScreen(vert Vector) Vector {
 }
 
 // WorldToScreenPixels transforms a 3D position in the world to a position onscreen, with X and Y representing the pixels.
-// The Z coordinate indicates depth away from the camera in standard units.
+// The Z coordinate indicates depth away from the camera in 3D world units.
 func (camera *Camera) WorldToScreenPixels(vert Vector) Vector {
 	v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 	return camera.ClipToScreen(v.MultVecW(NewVectorZero()))
 }
 
 // WorldToScreen transforms a 3D position in the world to a 2D vector, with X and Y ranging from -1 to 1.
-// The Z coordinate indicates depth away from the camera in standard units.
+// The Z coordinate indicates depth away from the camera in 3D world units.
 func (camera *Camera) WorldToScreen(vert Vector) Vector {
 	v := camera.WorldToScreenPixels(vert)
 	w, h := camera.Size()

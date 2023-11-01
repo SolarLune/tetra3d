@@ -1,33 +1,5 @@
 package tetra3d
 
-// neighborSet represents a set of Sectors that are neighbors for any given Sector.
-type neighborSet map[*Sector]bool
-
-// Contains returns if the given sector is contained within the calling NeighborSet.
-func (np neighborSet) Contains(sector *Sector) bool {
-	_, ok := np[sector]
-	return ok
-}
-
-// Combine combines the given other NeighborSet with the calling set.
-func (np neighborSet) Combine(other neighborSet) {
-	for neighbor := range other {
-		np[neighbor] = true
-	}
-}
-
-// Remove removes the given sector from the NeighborSet.
-func (np neighborSet) Remove(sector *Sector) {
-	delete(np, sector)
-}
-
-// Clear clears the NeighborSet.
-func (np neighborSet) Clear() {
-	for v := range np {
-		delete(np, v)
-	}
-}
-
 type SectorDetectionType int
 
 const (
@@ -40,10 +12,12 @@ const (
 // only the objects within the current sector and any neighboring sectors, up to a customizeable
 // depth.
 // A Sector is, spatially, an AABB, which sits next to or within other Sectors (AABBs).
+// Logically, a Sector is determined to be a neighbor of another Sector if they either intersect,
+// or share vertex positions. Which of these is the case depends on the Sectors' SectorDetectionType.
 type Sector struct {
 	Model               *Model              // The owning Model that forms the Sector
 	AABB                *BoundingAABB       // The AABB used to search for neighbors if the SectorDetectionType is set to SectorDetectionTypeAABB
-	Neighbors           neighborSet         // The Sector's neighbors
+	Neighbors           Set[*Sector]        // The Sector's neighbors
 	SectorDetectionType SectorDetectionType // How the Sector is detected
 	sectorVisible       bool
 }
@@ -59,7 +33,7 @@ func NewSector(model *Model) *Sector {
 	return &Sector{
 		Model:     model,
 		AABB:      sectorAABB,
-		Neighbors: neighborSet{},
+		Neighbors: newSet[*Sector](),
 	}
 
 }
@@ -70,10 +44,10 @@ func (sector *Sector) Clone() *Sector {
 	newSector := &Sector{
 		Model:     sector.Model,
 		AABB:      sector.AABB.Clone().(*BoundingAABB),
-		Neighbors: make(neighborSet, len(sector.Neighbors)),
+		Neighbors: make(Set[*Sector], len(sector.Neighbors)),
 	}
 	for n := range sector.Neighbors {
-		newSector.Neighbors[n] = true
+		newSector.Neighbors[n] = struct{}{}
 	}
 
 	return newSector
@@ -113,8 +87,8 @@ func (sector *Sector) UpdateNeighbors(otherModels ...*Model) {
 
 					if transformedV.Equals(transformedV2) {
 
-						sector.Neighbors[otherModel.sector] = true
-						otherModel.sector.Neighbors[sector] = true
+						sector.Neighbors.Add(otherModel.sector)
+						otherModel.sector.Neighbors.Add(sector)
 						break exit
 
 					}
@@ -122,15 +96,11 @@ func (sector *Sector) UpdateNeighbors(otherModels ...*Model) {
 
 			}
 
-			// sector.Model.Mesh.SelectVertices().SelectAll().ForEachIndex(func(index int) {
-
-			// })
-
 		case SectorDetectionTypeAABB:
 
 			if sector.AABB.Colliding(otherModel.sector.AABB) {
-				sector.Neighbors[otherModel.sector] = true
-				otherModel.sector.Neighbors[sector] = true
+				sector.Neighbors.Add(otherModel.sector)
+				otherModel.sector.Neighbors.Add(sector)
 			}
 
 		}
@@ -145,9 +115,9 @@ func (sector *Sector) UpdateNeighbors(otherModels ...*Model) {
 // # A - B - C - D - E - F
 //
 // If you were to check NeighborsWithinRange(2) from E, it would return F, D, and C.
-func (sector *Sector) NeighborsWithinRange(searchRange int) neighborSet {
+func (sector *Sector) NeighborsWithinRange(searchRange int) Set[*Sector] {
 
-	out := neighborSet{}
+	out := newSet[*Sector]()
 
 	if searchRange > 0 {
 
@@ -158,6 +128,9 @@ func (sector *Sector) NeighborsWithinRange(searchRange int) neighborSet {
 		}
 
 	}
+
+	// The sector itself is not a neighbor of itself
+	out.Remove(sector)
 
 	return out
 

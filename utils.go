@@ -159,3 +159,54 @@ func ExtendBase3DShader(customFragment string) (*ebiten.Shader, error) {
 	return ebiten.NewShader([]byte(shaderText))
 
 }
+
+// Set represents a Set of elements.
+type Set[E comparable] map[E]struct{}
+
+// newSet creates a new set.
+func newSet[E comparable]() Set[E] {
+	return Set[E]{}
+}
+
+func (s Set[E]) Clone() Set[E] {
+	newSet := newSet[E]()
+	newSet.Combine(s)
+	return newSet
+}
+
+// Add adds the given elements to a set.
+func (s Set[E]) Add(element E) {
+	s[element] = struct{}{}
+}
+
+// Combine combines the given other elements to the set.
+func (s Set[E]) Combine(otherSet Set[E]) {
+	for element := range otherSet {
+		s.Add(element)
+	}
+}
+
+// Contains returns if the set contains the given element.
+func (s Set[E]) Contains(element E) bool {
+	_, ok := s[element]
+	return ok
+}
+
+// Remove removes the given element from the set.
+func (s Set[E]) Remove(element E) {
+	delete(s, element)
+}
+
+// Clear clears the set.
+func (s Set[E]) Clear() {
+	for v := range s {
+		delete(s, v)
+	}
+}
+
+// ForEach runs the provided function for each element in the set.
+func (s Set[E]) ForEach(f func(element E)) {
+	for element := range s {
+		f(element)
+	}
+}

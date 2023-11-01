@@ -410,6 +410,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Armature animation improvements?
 - [X] -- Custom Vectors
 - [ ] -- -- Vector pools again? 
+- [ ] -- -- Move over to float32 for mathematics - should be possible with math32 : https://github.com/chewxy/math32
 - [ ] -- Matrix pools?
 - [ ] -- Raytest optimization
 - [ ] -- -- Sphere?

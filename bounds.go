@@ -258,7 +258,7 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.TrianglesFromBounding(sphere)
+	tris := triangles.Broadphase.TrianglesFromBoundingObject(sphere)
 
 	for triID := range tris {
 
@@ -394,7 +394,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.TrianglesFromBounding(box)
+	tris := triangles.Broadphase.TrianglesFromBoundingObject(box)
 
 	for triID := range tris {
 
@@ -705,7 +705,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.TrianglesFromBounding(capsule)
+	tris := triangles.Broadphase.TrianglesFromBoundingObject(capsule)
 
 	spherePos := NewVectorZero()
 

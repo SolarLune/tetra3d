@@ -90,9 +90,8 @@ var textShaderSrc []byte
 func NewText(meshPart *MeshPart, textureWidth int) *Text {
 
 	text := &Text{
-		meshPart:        meshPart,
-		textureSize:     textureWidth,
-		typewriterIndex: 0,
+		meshPart:    meshPart,
+		textureSize: textureWidth,
 	}
 
 	// Calculate the width and height of the dimensions based off of the
@@ -108,6 +107,10 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 		meshPart.Material = NewMaterial("text material")
 		meshPart.Material.BackfaceCulling = true
 		meshPart.Material.Shadeless = true
+	} else {
+		// We have to clone the material to ensure that unique objects that share the same material can both
+		// have their own Text textures.
+		meshPart.Material = meshPart.Material.Clone()
 	}
 
 	meshPart.Material.FragmentShaderOn = true
@@ -284,6 +287,9 @@ func (textObj *Text) UpdateTexture() {
 	}
 
 	typewriterIndex := textObj.typewriterIndex
+	if !textObj.typewriterOn {
+		typewriterIndex = len(textObj.parsedText) - 1
+	}
 
 	textLineMargin := 2
 	lineHeight := int(float64(textObj.style.Font.Metrics().Height.Ceil()+textLineMargin) * textObj.style.LineHeightMultiplier)
@@ -409,10 +415,8 @@ func (text *Text) TypewriterIndex() int {
 func (text *Text) SetTypewriterIndex(typewriterIndex int) {
 
 	oldIndex := text.typewriterIndex
-	oldTypewriterOn := text.typewriterOn
 
 	text.typewriterIndex = typewriterIndex
-	text.typewriterOn = true
 
 	if text.typewriterIndex >= len(text.setText) {
 		text.typewriterIndex = len(text.setText)
@@ -421,9 +425,10 @@ func (text *Text) SetTypewriterIndex(typewriterIndex int) {
 		text.typewriterIndex = 0
 	}
 
-	if oldTypewriterOn != text.typewriterOn || oldIndex != text.typewriterIndex {
+	if text.typewriterOn && oldIndex != text.typewriterIndex {
 		text.UpdateTexture()
 	}
+
 }
 
 // FinishTypewriter finishes the typewriter effect, so that the entire message is visible.
@@ -452,6 +457,13 @@ func (text *Text) AdvanceTypewriterIndex(advanceBy int) bool {
 // TypewriterFinished returns if the typewriter effect is finished.
 func (text *Text) TypewriterFinished() bool {
 	return text.typewriterIndex >= len(text.setText)
+}
+
+func (text *Text) SetTypewriterOn(on bool) {
+	if text.typewriterOn != on {
+		text.UpdateTexture()
+	}
+	text.typewriterOn = on
 }
 
 // Dispose disposes of the text object's backing texture; this needs to be called to free VRAM, and should be called

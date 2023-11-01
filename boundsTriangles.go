@@ -38,7 +38,7 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float64) *
 		gridSize = int(math.Ceil(maxDim / broadphaseGridSize))
 	}
 
-	bt.Broadphase = NewBroadphase(gridSize, bt)
+	bt.Broadphase = NewBroadphase(gridSize, bt.WorldPosition(), mesh)
 
 	return bt
 }
@@ -62,9 +62,9 @@ func (bt *BoundingTriangles) UpdateTransform() {
 	bt.BoundingAABB.Transform()
 
 	if bt.Broadphase != nil {
-		bt.Broadphase.Center.SetWorldTransform(transform)
-		bt.Broadphase.Center.MoveVec(rot)
-		bt.Broadphase.Center.Transform() // Update the transform
+		bt.Broadphase.center.SetWorldTransform(transform)
+		bt.Broadphase.center.MoveVec(rot)
+		bt.Broadphase.center.Transform() // Update the transform
 	}
 
 }
