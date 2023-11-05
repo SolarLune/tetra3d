@@ -965,7 +965,8 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 func (model *Model) isTransparent(meshPart *MeshPart) bool {
 	mat := meshPart.Material
 	matTransparent := mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || mat.CompositeMode != ebiten.CompositeModeSourceOver || (mat.TransparencyMode == TransparencyModeAuto && mat.Color.A < 0.99))
-	modelTransparent := model.Color.A < 0.99
+	modelTransparent := mat.TransparencyMode != TransparencyModeOpaque && model.Color.A < 0.99
+	// modelTransparent := mat.TransparencyMode != TransparencyModeOpaque && model.Color.A < 0.99
 	return matTransparent || modelTransparent
 }
 

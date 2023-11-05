@@ -43,7 +43,6 @@ func (g *Game) Init() {
 	}
 
 	g.Library = library
-	library.Materials["Gate"].BackfaceCulling = false
 	g.Scene = library.Scenes[0]
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
@@ -51,11 +50,6 @@ func (g *Game) Init() {
 	g.Camera.SetLocalPosition(0, 5, 15)
 
 	g.System = examples.NewBasicSystemHandler(g)
-
-	ambientLight := tetra3d.NewAmbientLight("ambient", 0.8, 0.9, 1, 0.5)
-	g.Scene.Root.AddChildren(ambientLight)
-
-	g.Scene.Root.Get("Water").(*tetra3d.Model).Color.A = 0.6
 
 	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
@@ -91,7 +85,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	// Clear, but with a color
-	screen.Fill(g.Scene.World.FogColor.ToRGBA64())
+	screen.Fill(g.Scene.World.ClearColor.ToRGBA64())
 
 	// Clear the Camera
 	g.Camera.Clear()

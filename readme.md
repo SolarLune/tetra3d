@@ -310,6 +310,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] **Materials**
 - [X] -- Basic Texturing
 - [ ] -- Ability to use screen coordinates instead of just UV texturing (useful for repeating patterns)
+- [ ] -- Replace opaque transparency mode with just automatic transparency mode? I feel like there might be a reason to have opaque separate, but I can't imagine a normal situation where you'd want it when you could just go with auto + setting alpha to 1
 - [X] **Animations**
 - [X] -- Armature-based animations
 - [X] -- Object transform-based animations
