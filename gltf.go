@@ -106,6 +106,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	exportedCameras := []*Camera{}
 
 	sectorRendering := false
+	perspectiveCorrectedTextureMapping := false
 	maxLightCount := 0
 	sectorRenderDepth := 0
 	sectorDetection := SectorDetectionTypeVertices
@@ -209,6 +210,10 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			if count, exists := globalExporterSettings["t3dMaxLightCount__"]; exists {
 				maxLightCount = int(count.(float64))
+			}
+
+			if on, exists := globalExporterSettings["t3dPerspectiveCorrectedTextureMapping__"]; exists {
+				perspectiveCorrectedTextureMapping = on.(bool)
 			}
 
 			if value, exists := globalExporterSettings["t3dSectorDetectionType__"]; exists {
@@ -802,6 +807,7 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 			newCam.SectorRendering = sectorRendering
 			newCam.MaxLightCount = maxLightCount
 			newCam.SectorRenderDepth = sectorRenderDepth
+			newCam.PerspectiveCorrectedTextureMapping = perspectiveCorrectedTextureMapping
 
 			obj = newCam
 

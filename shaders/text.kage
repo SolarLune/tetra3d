@@ -14,14 +14,6 @@ var OutlineThickness float
 var OutlineRounded float
 var OutlineColor vec4
 
-// This is just a stub to get the shader to compile; we're piggybacking off of 
-// Tetra3d's default shader, which has depth testing and fog and stuff, so we
-// just create a custom fragment shader named CustomFragment.
-// func Fragment(dstPos vec4, srcPos vec2, col vec4) vec4 {}
-
-// The CustomFragment function is the same as the default Fragment function
-// (and the arguments mean the same things) except for the defaultColor argument,
-// which is the result of the shader from the generic 3D shader part.
 func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
 
     res := imageSrc0UnsafeAt(srcPos)

@@ -43,7 +43,7 @@ func max[V float64 | int](a, b V) V {
 	return b
 }
 
-func clamp[V float64 | int](value, min, max V) V {
+func clamp[V float64 | float32 | int](value, min, max V) V {
 	if value < min {
 		return min
 	} else if value > max {
@@ -130,7 +130,7 @@ func ExtendBase3DShader(customFragment string) (*ebiten.Shader, error) {
 			if strings.Contains(line, "package main") {
 				customShaderStart = i + 1
 			}
-			if strings.Contains(line, "func Fragment(") {
+			if strings.Contains(line, "func CustomFragment(") {
 				fragFunctionStart = i
 			}
 		}
@@ -143,7 +143,7 @@ func ExtendBase3DShader(customFragment string) (*ebiten.Shader, error) {
 				out += line + "\n"
 			} else if i == customFragmentCallLocation {
 				// Replace the line with a new ColorTex definition
-				out += "colorTex := CustomFragment(dstPos, srcPos, color)\n\n"
+				out += "colorTex := CustomFragment(dstPos, tx + srcOrigin, color)\n\n"
 			} else if i == customFragmentDefinitionLocation {
 				out += strings.Join(customTextSplit[fragFunctionStart:], "\n") + "\n"
 				out += line + "\n"

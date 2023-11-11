@@ -933,6 +933,8 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box.prop(context.scene, "t3dPackTextures__")
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
+        box.prop(context.scene, "t3dPerspectiveCorrectedTextureMapping__")
+        box.prop(context.scene, "t3dMaxLightCount__")
 
         box = self.layout.box()
 
@@ -960,10 +962,6 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         row = box.row()
         row.prop(context.scene, "t3dRenderResolutionW__")
         row.prop(context.scene, "t3dRenderResolutionH__")
-
-        box = self.layout.box()
-        row = box.row()
-        row.prop(context.scene, "t3dMaxLightCount__")
 
         box = self.layout.box()
         box.prop(context.scene, "t3dSectorRendering__")
@@ -1654,6 +1652,12 @@ def getSectorRendering(self):
 def setSectorRendering(self, value):
     globalSet("t3dSectorRendering__", value)
 
+def getPerspectiveCorrectedTextureMapping(self):
+    return globalGet("t3dPerspectiveCorrectedTextureMapping__", False)
+
+def setPerspectiveCorrectedTextureMapping(self, value):
+    globalSet("t3dPerspectiveCorrectedTextureMapping__", value)
+
 def getMaxLightCount(self):
     return globalGet("t3dMaxLightCount__", 0)
 
@@ -1865,16 +1869,24 @@ def register():
     
     bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
 
-    bpy.types.Scene.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not", default=False, 
+    bpy.types.Scene.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not. Takes effect on Cameras created in this Blender file", default=False, 
     get=getSectorRendering, set=setSectorRendering)
 
-    bpy.types.Scene.t3dMaxLightCount__ = bpy.props.IntProperty(name="Max light count", description="How many lights (sorted by distance to the camera, including ambient lights) should be used to light objects; if 0, then there is no limit", default=0, 
+    perspectiveDescription = ("Whether the game should be rendered with perspective-corrected "
+    "texture mapping or not. When enabled, it will look more like modern 3D texturing; when disabled, "
+    "it will look like PS1 affine texture mapping (which is the default). Takes effect on Cameras created in this Blender file. "
+    "This feature is experimental / not perfect currently (it looks fuzzy, and triangles aren't clipped properly at the edges of the viewport, "
+    "which means you still get texture skewing when a triangle is largely offscreen)")
+    bpy.types.Scene.t3dPerspectiveCorrectedTextureMapping__ = bpy.props.BoolProperty(name="Perspective-corrected Texture Mapping (Experimental)", description=perspectiveDescription, default=False, 
+    get=getPerspectiveCorrectedTextureMapping, set=setPerspectiveCorrectedTextureMapping)
+
+    bpy.types.Scene.t3dMaxLightCount__ = bpy.props.IntProperty(name="Max light count", description="How many lights (sorted by distance to the camera, including ambient lights) should be used to light objects; if 0, then there is no limit. Takes effect on Cameras created in this Blender file", default=0, 
     get=getMaxLightCount, set=setMaxLightCount, min = 0)
 
-    bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=1, min=0,
+    bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time. Takes effect on Cameras created in this Blender file", default=1, min=0,
     get=getSectorRenderDepth, set=setSectorRenderDepth)
 
-    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined", default='VERTICES', 
+    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined. Takes effect on Cameras created in this Blender file", default='VERTICES', 
     get=getSectorDetectionType, set=setSectorDetectionType)
 
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
@@ -2022,6 +2034,7 @@ def unregister():
     del bpy.types.Scene.t3dPackTextures__
     del bpy.types.Scene.t3dAnimationSampling__
     del bpy.types.Scene.t3dAnimationInterpolation__
+    del bpy.types.Scene.t3dPerspectiveCorrectedTextureMapping__
 
     del bpy.types.Scene.t3dMaxLightCount__
 

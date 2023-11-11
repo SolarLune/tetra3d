@@ -7,6 +7,7 @@ var FogRange [2]float
 var DitherSize float
 var FogCurve float
 var Fogless float
+var PerspectiveCorrection int
 
 var BayerMatrix [16]float
 
@@ -26,9 +27,18 @@ func dstPosToSrcPos(dstPos vec2) vec2 {
 	return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
 }
 
+func unpackFloat(input float, precision float) vec2 {
+	return vec2(input / precision, mod(input, 1) / 0.05)
+}
+
 // tetra3d Custom Uniform Location //
 
-func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
+
+	color := vc
+	// We store the depth in the alpha channel
+	unpacked := unpackFloat(vc.a, 256)
+	z := 1.0 / unpacked.y
 
 	depth := imageSrc1UnsafeAt(dstPosToSrcPos(dstPos.xy))
 	
@@ -45,6 +55,11 @@ func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
 		// Divide by the source image size to get the UV coordinates.
 		tx /= srcSize
 
+		if PerspectiveCorrection > 0 {
+			tx *= z
+			color.a = unpacked.x
+		}
+		
 		// Apply fract() to loop the UV coords around [0-1].
 		tx = fract(tx)
 

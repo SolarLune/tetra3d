@@ -615,7 +615,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			transformedVertexPositions[i].X = mesh.vertexTransforms[tri.VertexIndices[i]].X / w
 			transformedVertexPositions[i].Y = mesh.vertexTransforms[tri.VertexIndices[i]].Y / w
 
-			if mesh.vertexTransforms[tri.VertexIndices[i]].W >= 0 && mesh.vertexTransforms[tri.VertexIndices[i]].Z < far {
+			if mesh.vertexTransforms[tri.VertexIndices[i]].Z+1 >= camera.near && mesh.vertexTransforms[tri.VertexIndices[i]].Z < far {
 				outOfBounds = false
 			}
 
@@ -627,7 +627,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		// Backface culling
 
-		if !outOfBounds && meshPart.Material != nil && meshPart.Material.BackfaceCulling {
+		if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
 
 			v0 := transformedVertexPositions[0]
 			v1 := transformedVertexPositions[1]
@@ -962,12 +962,15 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 // isTransparent returns true if the provided MeshPart has a Material with TransparencyModeTransparent, or if it's
 // TransparencyModeAuto with the model or material alpha color being under 0.99. This is a helper function for sorting
 // MeshParts into either transparent or opaque buckets for rendering.
+// Note that this function doesn't work with transparent vertex colors.
 func (model *Model) isTransparent(meshPart *MeshPart) bool {
 	mat := meshPart.Material
-	matTransparent := mat != nil && (mat.TransparencyMode == TransparencyModeTransparent || mat.CompositeMode != ebiten.CompositeModeSourceOver || (mat.TransparencyMode == TransparencyModeAuto && mat.Color.A < 0.99))
-	modelTransparent := mat.TransparencyMode != TransparencyModeOpaque && model.Color.A < 0.99
-	// modelTransparent := mat.TransparencyMode != TransparencyModeOpaque && model.Color.A < 0.99
-	return matTransparent || modelTransparent
+	if mat != nil {
+		matTransparent := mat.TransparencyMode == TransparencyModeTransparent || mat.CompositeMode != ebiten.CompositeModeSourceOver || (mat.TransparencyMode == TransparencyModeAuto && mat.Color.A < 0.999)
+		modelTransparent := mat.TransparencyMode != TransparencyModeOpaque && model.Color.A < 0.999
+		return matTransparent || modelTransparent
+	}
+	return model.Color.A < 0.999
 }
 
 ////////

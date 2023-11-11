@@ -291,7 +291,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- -- Letters changing to other glyphs randomly
 - [ ] -- -- Additional effects? (Wavy text, shaky text, etc.)
 - [X] -- Multitexturing / Per-triangle Materials
-- [ ] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
+- [x] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
 - [ ] -- Automatic triangle / mesh subdivision depending on distance
 - [ ] -- Automatic level of detail
 - [ ] -- Manual level of detail (ability to render a model using various meshes in stages); note that these stages should be accessible at runtime to allow cloning meshes, for example

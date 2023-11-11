@@ -43,11 +43,12 @@ const (
 type Camera struct {
 	*Node
 
-	RenderDepth       bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture() will hold the depth texture render results. Defaults to true.
-	RenderNormals     bool // If the Camera should attempt to render a normal texture; if this is true, then NormalTexture() will hold the normal texture render results. Defaults to false.
-	SectorRendering   bool // If the Camera should render using sectors or not; if no sectors are present, then it won't attempt to render with them. Defaults to false.
-	SectorRenderDepth int  // How far out the Camera renders other sectors. Defaults to 1 (so the current sector and its immediate neighbors).
-	currentSector     *Sector
+	RenderDepth                        bool // If the Camera should attempt to render a depth texture; if this is true, then DepthTexture() will hold the depth texture render results. Defaults to true.
+	RenderNormals                      bool // If the Camera should attempt to render a normal texture; if this is true, then NormalTexture() will hold the normal texture render results. Defaults to false.
+	SectorRendering                    bool // If the Camera should render using sectors or not; if no sectors are present, then it won't attempt to render with them. Defaults to false.
+	SectorRenderDepth                  int  // How far out the Camera renders other sectors. Defaults to 1 (so the current sector and its immediate neighbors).
+	PerspectiveCorrectedTextureMapping bool // If the Camera should render textures with perspective corrected texture mapping. Defaults to false.
+	currentSector                      *Sector
 	// How many lights (sorted by distance) should be used to render each object, maximum. If it's greater than 0,
 	// then only that many lights will be considered. If less than or equal to 0 (the default), then all available lights will be used.
 	MaxLightCount int
@@ -162,6 +163,8 @@ func NewCamera(w, h int) *Camera {
 		`//kage:unit pixels
 		package main
 
+		var PerspectiveCorrection int
+
 		func encodeDepth(depth float) vec4 {
 			r := floor(depth * 255) / 255
 			g := floor(fract(depth * 255) * 255) / 255
@@ -177,8 +180,18 @@ func NewCamera(w, h int) *Camera {
 			return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
 		}
 
-		func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+		func unpackFloat(input float, precision float) vec2 {
+			return vec2(input / precision, mod(input, precision) / 0.05)
+		}
 
+		func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
+
+			color := vc
+			
+			// We store the depth in the alpha channel
+			unpacked := unpackFloat(vc.a, 256)
+			z := 1.0 / unpacked.y
+	
 			srcSize := imageSrc1Size()
 
 			// There's atlassing going on behind the scenes here, so:
@@ -188,6 +201,11 @@ func NewCamera(w, h int) *Camera {
 
 			// Divide by the source image size to get the UV coordinates.
 			tx /= srcSize
+
+			if PerspectiveCorrection > 0 {
+				tx *= z
+				color.a = unpacked.x
+			}
 
 			// Apply fract() to loop the UV coords around [0-1].
 			tx = fract(tx)
@@ -284,6 +302,7 @@ func (camera *Camera) Clone() INode {
 	clone.orthoScale = camera.orthoScale
 	clone.SectorRendering = camera.SectorRendering
 	clone.SectorRenderDepth = camera.SectorRenderDepth
+	clone.PerspectiveCorrectedTextureMapping = camera.PerspectiveCorrectedTextureMapping
 
 	clone.AccumulateColorMode = camera.AccumulateColorMode
 	newOptions := *camera.AccumulateDrawOptions
@@ -1227,11 +1246,27 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				colorVertex.DstX = float32(clipped.X)
 				colorVertex.DstY = float32(clipped.Y)
 
-				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
-				uvU := float32(mesh.VertexUVs[vertIndex].X * srcW)
-				// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
-				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
-				uvV := float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
+				w := mesh.vertexTransforms[vertIndex].W
+
+				var uvU, uvV float32
+
+				if camera.PerspectiveCorrectedTextureMapping {
+
+					uvU = float32((mesh.VertexUVs[vertIndex].X / w) * srcW)
+					uvV = float32(((1 - mesh.VertexUVs[vertIndex].Y) / w) * srcH)
+
+					// colorVertex.ColorA = 1.0 / float32(w)
+					// colorVertex.ColorA = colorVertex.ColorA*0.5 + ((1.0 / float32(w)) * 0.5) // Second half of alpha vertex color controls
+
+				} else {
+
+					// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
+					uvU = float32(mesh.VertexUVs[vertIndex].X * srcW)
+					// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
+					// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
+					uvV = float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
+
+				}
 
 				colorVertex.SrcX = uvU
 				colorVertex.SrcY = uvV
@@ -1244,7 +1279,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				depthVertex.ColorA = 1
 
 				if camera.RenderNormals {
-					normalVertex = depthVertex
+					normalVertex = colorVertex
 					normalVertex.ColorR = float32(mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
 					normalVertex.ColorG = float32(mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
 					normalVertex.ColorB = float32(mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
@@ -1269,6 +1304,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					colorVertex.ColorR *= mesh.vertexLights[vertIndex].R
 					colorVertex.ColorG *= mesh.vertexLights[vertIndex].G
 					colorVertex.ColorB *= mesh.vertexLights[vertIndex].B
+				}
+
+				if camera.PerspectiveCorrectedTextureMapping {
+					// TODO: Replace this with custom vertex attributes when possible.
+					colorVertex.ColorA = float32(packFloat(colorVertex.ColorA, 1.0/float32(w), 256))
 				}
 
 				if camera.RenderDepth {
@@ -1306,7 +1346,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					depthVertex.ColorR = float32(depth)
 					depthVertex.ColorG = float32(depth)
 					depthVertex.ColorB = float32(depth)
-					depthVertex.ColorA = 1
+					if camera.PerspectiveCorrectedTextureMapping {
+						depthVertex.ColorA = colorVertex.ColorA
+					} else {
+						depthVertex.ColorA = 1
+					}
 
 				} else if scene.World != nil && scene.World.FogOn {
 
@@ -1392,6 +1436,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			img = defaultImg
 		}
 
+		perspectiveCorrection := 0
+		if camera.PerspectiveCorrectedTextureMapping {
+			perspectiveCorrection = 1
+		}
+
 		// Render the depth map here
 		if camera.RenderDepth {
 
@@ -1425,6 +1474,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
 					Images: [4]*ebiten.Image{camera.resultDepthTexture, img},
+					Uniforms: map[string]any{
+						"PerspectiveCorrection": perspectiveCorrection,
+					},
 				}
 				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:indexListIndex], camera.clipAlphaShader, shaderOpt)
 
@@ -1465,18 +1517,20 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		if scene != nil && scene.World != nil {
 
 			colorPassShaderOptions.Uniforms = map[string]interface{}{
-				"Fog":         scene.World.fogAsFloatSlice(),
-				"FogRange":    scene.World.FogRange,
-				"DitherSize":  scene.World.DitheredFogSize,
-				"FogCurve":    float32(scene.World.FogCurve),
-				"BayerMatrix": bayerMatrix,
+				"Fog":                   scene.World.fogAsFloatSlice(),
+				"FogRange":              scene.World.FogRange,
+				"DitherSize":            scene.World.DitheredFogSize,
+				"FogCurve":              float32(scene.World.FogCurve),
+				"BayerMatrix":           bayerMatrix,
+				"PerspectiveCorrection": perspectiveCorrection,
 			}
 
 		} else {
 
 			colorPassShaderOptions.Uniforms = map[string]interface{}{
-				"Fog":      []float32{0, 0, 0, 0},
-				"FogRange": []float32{0, 1},
+				"Fog":                   []float32{0, 0, 0, 0},
+				"FogRange":              []float32{0, 1},
+				"PerspectiveCorrection": perspectiveCorrection,
 			}
 
 		}
@@ -1651,33 +1705,12 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 }
 
-// func encodeDepth(depth float64) *Color {
-
-// 	r := math.Floor(depth*255) / 255
-// 	_, f := math.Modf(depth * 255)
-// 	g := math.Floor(f*255) / 255
-// 	_, f = math.Modf(depth * 255 * 255)
-// 	b := f
-
-// 	if r < 0 {
-// 		r = 0
-// 	} else if r > 1 {
-// 		r = 1
-// 	}
-// 	if g < 0 {
-// 		g = 0
-// 	} else if g > 1 {
-// 		g = 1
-// 	}
-// 	if b < 0 {
-// 		b = 0
-// 	} else if b > 1 {
-// 		b = 1
-// 	}
-
-// 	return NewColor(float32(r), float32(g), float32(b), 1)
-
-// }
+// packFloat packs two numbers into a single float64 with a given precision. 128 is a good number.
+func packFloat(input1, input2, precision float32) float32 {
+	a := float32(int(input1 * precision))
+	b := input2 * 0.05
+	return a + b
+}
 
 type DrawSprite3dSettings struct {
 	// The image to render
