@@ -505,7 +505,8 @@ class MESH_PT_tetra3d(bpy.types.Panel):
     def draw(self, context): 
 
         row = self.layout.row()
-        row.prop(context.object.data, "t3dUniqueMesh__")
+        if context.object.data and context.object.type == "MESH":
+            row.prop(context.object.data, "t3dUniqueMesh__")
 
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
@@ -1093,6 +1094,14 @@ def export():
 
     ogVertexColorNames = {}
 
+    referencedActions = {}
+
+    def checkAction(action):
+        if obj.type == "ARMATURE":
+            if action.name not in referencedActions:
+                referencedActions[action.name] = set()
+            referencedActions[action.name].add(obj.data.name)
+
     for scene in bpy.data.scenes:
 
         currentFrame[scene] = scene.frame_current
@@ -1104,6 +1113,12 @@ def export():
 
             for layer in scene.view_layers:
                 for obj in layer.objects:
+                    if obj.animation_data:
+                        if obj.animation_data.action:
+                            checkAction(obj.animation_data.action)
+                        for track in obj.animation_data.nla_tracks.values():
+                            for strip in track.strips.values():
+                                checkAction(strip.action)
 
                     obj["t3dOriginalLocalPosition__"] = obj.location
 
@@ -1486,6 +1501,17 @@ def export():
     for obj in old_selected:
         if obj:
             obj.select_set(True)
+
+    problematicActions = ""
+    for actionName, armatureSet in referencedActions.items():
+
+        if len(armatureSet) > 1:
+            problematicActions += actionName + ", "
+
+    if len(problematicActions) > 0:
+        def report(self, context):
+            self.layout.label(text="Warning: The following actions are assigned to or set in the NLA Stash for multiple different armatures: [ " + problematicActions + "]. This can be problematic if these armatures have different shapes, as the animations may be incorrect for the armature.")
+        bpy.context.window_manager.popup_menu(report, title="Warning: Action Export Issue", icon="ERROR")
 
     return True
 
