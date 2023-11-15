@@ -40,20 +40,20 @@ const (
 )
 
 type Material struct {
-	library           *Library             // library is a reference to the Library that this Material came from.
-	Name              string               // Name is the name of the Material.
-	Color             Color                // The overall color of the Material.
-	Texture           *ebiten.Image        // The texture applied to the Material.
-	TexturePath       string               // The path to the texture, if it was not packed into the exporter.
-	TextureFilterMode ebiten.Filter        // Texture filtering mode
-	textureWrapMode   ebiten.Address       // Texture wrapping mode; this is ignored currently, as all triangles render through shaders, where looping is enforced.
-	properties        Properties           // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
-	BackfaceCulling   bool                 // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
-	TriangleSortMode  int                  // TriangleSortMode influences how triangles with this Material are sorted.
-	Shadeless         bool                 // If the material should be shadeless (unlit) or not
-	Fogless           bool                 // If the material should be fogless or not
-	CompositeMode     ebiten.CompositeMode // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
-	BillboardMode     int                  // Billboard mode
+	library           *Library       // library is a reference to the Library that this Material came from.
+	Name              string         // Name is the name of the Material.
+	Color             Color          // The overall color of the Material.
+	Texture           *ebiten.Image  // The texture applied to the Material.
+	TexturePath       string         // The path to the texture, if it was not packed into the exporter.
+	TextureFilterMode ebiten.Filter  // Texture filtering mode
+	textureWrapMode   ebiten.Address // Texture wrapping mode; this is ignored currently, as all triangles render through shaders, where looping is enforced.
+	properties        Properties     // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
+	BackfaceCulling   bool           // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
+	TriangleSortMode  int            // TriangleSortMode influences how triangles with this Material are sorted.
+	Shadeless         bool           // If the material should be shadeless (unlit) or not
+	Fogless           bool           // If the material should be fogless or not
+	Blend             ebiten.Blend   // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
+	BillboardMode     int            // Billboard mode
 
 	// fragmentShader represents a shader used to render the material with. This shader is activated after rendering
 	// to the depth texture, but before compositing the finished render to the screen after fog.
@@ -100,7 +100,7 @@ func NewMaterial(name string) *Material {
 		TransparencyMode:      TransparencyModeAuto,
 		FragmentShaderOptions: &ebiten.DrawTrianglesShaderOptions{},
 		FragmentShaderOn:      true,
-		CompositeMode:         ebiten.CompositeModeSourceOver,
+		Blend:                 ebiten.BlendSourceOver,
 	}
 }
 
@@ -118,7 +118,7 @@ func (material *Material) Clone() *Material {
 	newMat.TransparencyMode = material.TransparencyMode
 	newMat.TextureFilterMode = material.TextureFilterMode
 	newMat.textureWrapMode = material.textureWrapMode
-	newMat.CompositeMode = material.CompositeMode
+	newMat.Blend = material.Blend
 
 	newMat.BillboardMode = material.BillboardMode
 	newMat.SetShaderText(material.fragmentSrc)

@@ -116,6 +116,9 @@ func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
 			}
 
 		}
+		
+		// We have to multiply the rgb component by a to fade out over time
+		colorTex.rgb *= color.a
 
 		return colorTex
 

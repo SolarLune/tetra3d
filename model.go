@@ -18,12 +18,11 @@ const (
 // Position, Rotation, and/or Scale (where and how to draw).
 type Model struct {
 	*Node
-	Mesh              *Mesh
-	FrustumCulling    bool                                                 // Whether the Model is culled when it leaves the frustum.
-	Color             Color                                                // The overall multiplicative color of the Model.
-	Shadeless         bool                                                 // Indicates if a Model is shadeless.
-	ColorBlendingFunc func(model *Model, meshPart *MeshPart) ebiten.ColorM // A user-customizeable blending function used to color the Model.
-	BoundingSphere    *BoundingSphere
+	Mesh           *Mesh
+	FrustumCulling bool  // Whether the Model is culled when it leaves the frustum.
+	Color          Color // The overall multiplicative color of the Model.
+	Shadeless      bool  // Indicates if a Model is shadeless.
+	BoundingSphere *BoundingSphere
 
 	DynamicBatchModels map[*MeshPart][]*Model // Models that are dynamically merged into this one.
 	DynamicBatchOwner  *Model
@@ -486,7 +485,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	camPos := camera.WorldPosition()
-	invertedCamPos := modelTransform.Inverted().MultVec(camPos)
+
+	// invertedCamPos := modelTransform.Inverted().MultVec(camPos)
+
+	// TODO: Review this, as it still seems problematic?
+	p, s, r := modelTransform.Inverted().Decompose()
+	invertedCamPos := r.MultVec(camPos).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 1}))
+
+	// invertedCamPos := camPos
 
 	if mat != nil && mat.BillboardMode != BillboardModeNone {
 
@@ -543,10 +549,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		meshPart.sortingTriangles[sortingTriIndex].Triangle = tri
 
-		// if invertedCamPos.DistanceSquared(tri.Center) > pow(camera.far+tri.MaxSpan, 2) {
-		// 	continue
-		// }
-
 		outOfBounds := true
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
@@ -558,6 +560,12 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			skinnedTriCenter.X = 0
 			skinnedTriCenter.Y = 0
 			skinnedTriCenter.Z = 0
+		}
+
+		invertedCamDist := invertedCamPos.DistanceSquared(tri.Center)
+
+		if !model.skinned && invertedCamDist > farSquared {
+			continue
 		}
 
 		for i := 0; i < 3; i++ {
@@ -581,10 +589,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				skinnedTriCenter = skinnedTriCenter.Add(vertPos)
 
 			} else {
-
-				if invertedCamPos.DistanceSquared(tri.Center) > farSquared {
-					continue
-				}
 
 				v0 := mesh.VertexPositions[tri.VertexIndices[i]]
 
@@ -712,7 +716,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			if model.skinned {
 				meshPart.sortingTriangles[sortingTriIndex].depth = float32(camPos.DistanceSquared(skinnedTriCenter.Divide(3)))
 			} else {
-				meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamPos.DistanceSquared(tri.Center))
+				meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamDist)
 			}
 		}
 
@@ -966,7 +970,7 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 func (model *Model) isTransparent(meshPart *MeshPart) bool {
 	mat := meshPart.Material
 	if mat != nil {
-		matTransparent := mat.TransparencyMode == TransparencyModeTransparent || mat.CompositeMode != ebiten.CompositeModeSourceOver || (mat.TransparencyMode == TransparencyModeAuto && mat.Color.A < 0.999)
+		matTransparent := mat.TransparencyMode == TransparencyModeTransparent || mat.Blend != ebiten.BlendSourceOver || (mat.TransparencyMode == TransparencyModeAuto && mat.Color.A < 0.999)
 		modelTransparent := mat.TransparencyMode != TransparencyModeOpaque && model.Color.A < 0.999
 		return matTransparent || modelTransparent
 	}

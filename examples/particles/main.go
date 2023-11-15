@@ -80,10 +80,10 @@ func (g *Game) Init() {
 
 	// ColorCurve controls how the particle changes color as time passes. It is controlled by adding points to the curve, consisting of a color
 	// and the percentage of time through the particle's life where that color appears. This is very similar to how Godot does particles.
-	settings.ColorCurve.Add(colors.Red(), 0)
-	settings.ColorCurve.Add(colors.Yellow(), 0.25)
-	settings.ColorCurve.Add(colors.Gray(), 0.35)
-	settings.ColorCurve.Add(colors.Gray().SetAlpha(0), 1.0)
+	settings.ColorCurve.Add(colors.Red().SetValue(0.5), 0)
+	settings.ColorCurve.Add(colors.Yellow().SetValue(0.5), 0.25)
+	settings.ColorCurve.Add(colors.White().SetValue(0.1), 0.35)
+	settings.ColorCurve.Add(colors.Black(), 1.0)
 
 	// Now, for the Field particle system.
 

@@ -22,8 +22,8 @@ type Game struct {
 	BG *ebiten.Image
 }
 
-//go:embed compositing.gltf
-var compositingGLTF []byte
+//go:embed blendmodes.gltf
+var gltfData []byte
 
 //go:embed bg.png
 var bgPng []byte
@@ -39,7 +39,7 @@ func NewGame() *Game {
 func (g *Game) Init() {
 
 	// Load the GLTF.
-	data, err := tetra3d.LoadGLTFData(compositingGLTF, nil)
+	data, err := tetra3d.LoadGLTFData(gltfData, nil)
 	if err != nil {
 		panic(err)
 	}

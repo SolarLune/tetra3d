@@ -1,6 +1,6 @@
 {
 	"asset":{
-		"generator":"Khronos glTF Blender I/O v3.6.27",
+		"generator":"Khronos glTF Blender I/O v3.6.28",
 		"version":"2.0"
 	},
 	"extensionsUsed":[
@@ -72,10 +72,57 @@
 							0.05087608844041824,
 							1.0
 						],
-						"ambient energy":1.0
+						"ambient energy":1.0,
+						"clear color":[
+							0.007000000216066837,
+							0.00800000037997961,
+							0.009999999776482582,
+							1.0
+						],
+						"fog mode":"OFF",
+						"dithered transparency":0.0,
+						"fog curve":"LINEAR",
+						"fog color":[
+							0.0,
+							0.0,
+							0.0,
+							1.0
+						],
+						"fog range start":0.0,
+						"fog range end":1.0
 					}
 				},
-				"t3dCurrentWorld__":"World"
+				"t3dCurrentWorld__":"World",
+				"t3dView3DCameraData__":[
+					{
+						"clip_start":0.009999999776482582,
+						"clip_end":1000.0,
+						"location":[
+							0.257296621799469,
+							13.145347595214844,
+							33.48214340209961
+						],
+						"rotation":[
+							[
+								0.9999983906745911,
+								-0.0005528924521058798,
+								0.001707879244349897
+							],
+							[
+								2.1827119667250372e-07,
+								0.9514260292053223,
+								0.30787762999534607
+							],
+							[
+								-0.0017951439367607236,
+								-0.30787715315818787,
+								0.9514244794845581
+							]
+						],
+						"fovY":39.597752709049864,
+						"perspective":true
+					}
+				]
 			},
 			"name":"Scene",
 			"nodes":[
@@ -268,7 +315,8 @@
 			"extras":{
 				"t3dMaterialShadeless__":1,
 				"t3dCompositeMode__":1,
-				"t3dBillboardMode__":3
+				"t3dBillboardMode__":3,
+				"t3dBlendMode__":1
 			},
 			"name":"Particle",
 			"pbrMetallicRoughness":{
@@ -282,7 +330,8 @@
 		{
 			"extras":{
 				"t3dMaterialShadeless__":1,
-				"t3dCompositeMode__":0
+				"t3dCompositeMode__":0,
+				"t3dBlendMode__":0
 			},
 			"name":"Field",
 			"pbrMetallicRoughness":{
@@ -297,7 +346,8 @@
 			"alphaMode":"BLEND",
 			"extras":{
 				"t3dMaterialShadeless__":1,
-				"t3dCompositeMode__":1
+				"t3dCompositeMode__":1,
+				"t3dBlendMode__":1
 			},
 			"name":"FieldAdditive",
 			"pbrMetallicRoughness":{

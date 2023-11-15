@@ -285,17 +285,24 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 					newMat.Fogless = s.(float64) > 0.5
 				}
 
-				if s, exists := dataMap["t3dCompositeMode__"]; exists {
+				if s, exists := dataMap["t3dBlendMode__"]; exists {
 					switch int(s.(float64)) {
 					case 0:
-						newMat.CompositeMode = ebiten.CompositeModeSourceOver
+						newMat.Blend = ebiten.BlendSourceOver
 					case 1:
-						newMat.CompositeMode = ebiten.CompositeModeLighter
-					// case 2:
-					// 	newMat.CompositeMode = ebiten.CompositeModeMultiply // Multiply doesn't work right currently
+						newMat.Blend = ebiten.BlendLighter
+					case 2:
+						// Custom multiply blend mode
+						newMat.Blend = ebiten.Blend{
+							BlendFactorSourceRGB:        ebiten.BlendFactorDestinationColor,
+							BlendFactorSourceAlpha:      ebiten.BlendFactorDestinationColor,
+							BlendFactorDestinationRGB:   ebiten.BlendFactorZero,
+							BlendFactorDestinationAlpha: ebiten.BlendFactorZero,
+							BlendOperationRGB:           ebiten.BlendOperationAdd,
+							BlendOperationAlpha:         ebiten.BlendOperationAdd,
+						}
 					case 3:
-						newMat.CompositeMode = ebiten.CompositeModeDestinationOut
-						// newMat.CompositeMode = ebiten.CompositeModeClear
+						newMat.Blend = ebiten.BlendDestinationOut
 					}
 
 				}

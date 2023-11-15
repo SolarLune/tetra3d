@@ -1495,9 +1495,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		}
 
 		colorPassOptions := &ebiten.DrawTrianglesOptions{}
-		if model.ColorBlendingFunc != nil {
-			colorPassOptions.ColorM = model.ColorBlendingFunc(model, meshPart) // Modify the model's appearance using its color blending function
-		}
+
 		if mat != nil {
 			colorPassOptions.Filter = mat.TextureFilterMode
 			colorPassOptions.Address = mat.textureWrapMode
@@ -1510,8 +1508,17 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		// If we're not rendering depth, but still rendering through the shader, we can render to the intermediate texture, and then from there composite.
 		// Otherwise, we can just draw the triangles normally.
 
+		// Removing this because using ColorM has been deprecated by the colorm package and has no analog for rendering using shaders, which is what we now always do
+		// if model.ColorBlendingFunc != nil {
+		// 	colorPassOptions.ColorM = model.ColorBlendingFunc(model, meshPart) // Modify the model's appearance using its color blending function
+		// }
+
+		colorPassOptions.Blend = ebiten.BlendSourceOver
+		colorPassShaderOptions.Blend = ebiten.BlendSourceOver
+
 		if mat != nil {
-			colorPassShaderOptions.CompositeMode = mat.CompositeMode
+			colorPassOptions.Blend = mat.Blend
+			colorPassShaderOptions.Blend = mat.Blend
 		}
 
 		if scene != nil && scene.World != nil {
@@ -1538,9 +1545,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		colorPassShaderOptions.Images[0] = img
 		colorPassShaderOptions.Images[1] = camera.depthIntermediate
 
-		colorPassOptions.CompositeMode = ebiten.CompositeModeSourceOver
-		colorPassShaderOptions.CompositeMode = ebiten.CompositeModeSourceOver
-
 		fogless := float32(0)
 		if mat != nil && mat.Fogless {
 			fogless = 1
@@ -1563,7 +1567,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					colorPassShaderOptions.Blend = mat.FragmentShaderOptions.Blend
 					colorPassShaderOptions.AntiAlias = mat.FragmentShaderOptions.AntiAlias
 					colorPassShaderOptions.FillRule = mat.FragmentShaderOptions.FillRule
-					colorPassShaderOptions.CompositeMode = mat.FragmentShaderOptions.CompositeMode
+					colorPassShaderOptions.Blend = mat.FragmentShaderOptions.Blend
 					for k, v := range mat.FragmentShaderOptions.Uniforms {
 						colorPassShaderOptions.Uniforms[k] = v
 					}
@@ -1589,11 +1593,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		} else {
 
-			if mat != nil {
-				colorPassOptions.CompositeMode = mat.CompositeMode
-			}
-
 			if hasFragShader {
+				// TODO: Review usage of FragmentShaderOptions here.
 				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], mat.fragmentShader, mat.FragmentShaderOptions)
 			} else {
 				camera.resultColorTexture.DrawTriangles(colorVertexList[:vertexListIndex], indexList[:indexListIndex], img, colorPassOptions)
@@ -2073,7 +2074,7 @@ func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, p
 	// TODO: This is slow, this could be way faster by drawing once to an image and then drawing that result
 
 	dr := &ebiten.DrawImageOptions{}
-	dr.ColorM.Scale(0, 0, 0, 1)
+	dr.ColorScale.Scale(0, 0, 0, 1)
 
 	periodOffset := 8.0
 
@@ -2090,8 +2091,8 @@ func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, p
 
 	}
 
-	dr.ColorM.Reset()
-	dr.ColorM.Scale(color.ToFloat64s())
+	dr.ColorScale.Reset()
+	dr.ColorScale.ScaleWithColor(color.ToRGBA64())
 
 	dr.GeoM.Reset()
 	dr.GeoM.Translate(posX+4, posY+4+periodOffset)

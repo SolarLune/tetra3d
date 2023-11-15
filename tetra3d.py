@@ -43,11 +43,11 @@ sectorDetectionType = [
     ("AABB", "AABB", "Sector neighborhood is determined by AABB intersection. Fast, but inaccurate.", 0, 1),
 ]
 
-materialCompositeModes = [
-    ("DEFAULT", "Default", "Blends the destination by the material's color modulated by the material's alpha value. The default alpha-blending composite mode. Also known as CompositeModeSourceOver", 0, 0),
-    ("ADDITIVE", "Additive", "Adds the material's color to the destination. Also known as CompositeModeLighter", 0, 1),
-    # ("MULTIPLY", "Multiply", "Multiplies the material's color by the destination. Also known as CompositeModeMultiply", 0, 2),
-    ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as CompositeModeClear", 0, 3),
+materialBlendModes = [
+    ("DEFAULT", "Default", "Blends the destination by the material's color modulated by the material's alpha value. The default alpha-blending composite mode. Also known as BlendSourceOver", 0, 0),
+    ("ADDITIVE", "Additive", "Adds the material's color to the destination. Also known as BlendLighter", 0, 1),
+    ("MULTIPLY", "Multiply", "Multiplies the material's color by the destination. Known as Multiply compositing using a custom Blend object", 0, 2),
+    ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as BlendClear", 0, 3),
 ]
 
 materialBillboardModes = [
@@ -799,11 +799,11 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.prop(context.material, "use_backface_culling")
         row = self.layout.row()
-        row.label(text="Blend Mode:")
+        row.label(text="Transparency Mode:")
         row.prop(context.material, "blend_method", text="")
         row = self.layout.row()
-        row.label(text="Composite Mode:")
-        row.prop(context.material, "t3dCompositeMode__", text="")
+        row.label(text="Blend Mode:")
+        row.prop(context.material, "t3dBlendMode__", text="")
         row = self.layout.row()
         row.label(text="Billboard Mode:")
         row.prop(context.material, "t3dBillboardMode__", text="")
@@ -1973,7 +1973,7 @@ def register():
     bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
     bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
-    bpy.types.Material.t3dCompositeMode__ = bpy.props.EnumProperty(items=materialCompositeModes, name="Composite Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
+    bpy.types.Material.t3dBlendMode__ = bpy.props.EnumProperty(items=materialBlendModes, name="Blend Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
     bpy.types.Material.t3dCustomDepthOn__ = bpy.props.BoolProperty(name="Custom Depth", description="Whether custom depth offsetting should be enabled", default=False)
     bpy.types.Material.t3dCustomDepthValue__ = bpy.props.FloatProperty(name="Depth Offset Value", description="How far in world units the material should offset when rendering (negative values are closer to the camera, positive values are further)")
@@ -2074,7 +2074,7 @@ def unregister():
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__
     del bpy.types.Material.t3dMaterialFogless__
-    del bpy.types.Material.t3dCompositeMode__
+    del bpy.types.Material.t3dBlendMode__
     del bpy.types.Material.t3dBillboardMode__
     del bpy.types.Material.t3dMaterialLightingMode__
 
