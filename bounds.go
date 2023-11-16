@@ -895,6 +895,8 @@ var sphereTestObject = NewBoundingSphere("sphere check", 1)
 
 // CollisionTestSphere performs a quick bounding sphere check at the specified X, Y, and Z position with the radius given,
 // against the bounding objects provided in "others".
+// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
+// If no collisions were found, the function will return an empty slice.
 func CollisionTestSphere(x, y, z, radius float64, settings CollisionTestSettings) []*Collision {
 	sphereTestObject.SetLocalPosition(x, y, z)
 	sphereTestObject.Radius = radius
@@ -903,6 +905,8 @@ func CollisionTestSphere(x, y, z, radius float64, settings CollisionTestSettings
 
 // CollisionTestSphereVec performs a quick bounding sphere check at the specified position with the radius given, against the
 // bounding objects provided in "others".
+// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
+// If no collisions were found, the function will return an empty slice.
 func CollisionTestSphereVec(position Vector, radius float64, settings CollisionTestSettings) []*Collision {
 	return CollisionTestSphere(position.X, position.Y, position.Z, radius, settings)
 }
@@ -911,6 +915,8 @@ var aabbTestObject = NewBoundingAABB("aabb check", 1, 1, 1)
 
 // CollisionTestAABB performs a quick bounding AABB check at the specified x, y, and z position using the collision settings
 // provided. The bounding AABB will have the provided width, height, and depth.
+// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
+// If no collisions were found, the function will return an empty slice.
 // Note that AABB tests with BoundingTriangles are currently buggy.
 func CollisionTestAABB(x, y, z, width, height, depth float64, settings CollisionTestSettings) []*Collision {
 	aabbTestObject.SetLocalPosition(x, y, z)
@@ -920,6 +926,8 @@ func CollisionTestAABB(x, y, z, width, height, depth float64, settings Collision
 
 // CollisionTestAABBVec places a bounding AABB at the position given with the specified size to perform a collision test.
 // Note that AABB tests with BoundingTriangles are currently buggy.
+// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
+// If no collisions were found, the function will return an empty slice.
 func CollisionTestAABBVec(position, size Vector, settings CollisionTestSettings) []*Collision {
 	return CollisionTestAABB(position.X, position.Y, position.Z, size.X, size.Y, size.Z, settings)
 }
@@ -928,6 +936,8 @@ var capsuleTestObject = NewBoundingCapsule("capsule check", 2, 1)
 
 // CollisionTestCapsule performs a quick bounding capsule check at the specified x, y, and z position using the collision settings
 // provided. The bounding capsule will have the provided radius and height.
+// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
+// If no collisions were found, the function will return an empty slice.
 func CollisionTestCapsule(x, y, z, radius, height float64, settings CollisionTestSettings) []*Collision {
 	capsuleTestObject.SetLocalPosition(x, y, z)
 	capsuleTestObject.Radius = radius
@@ -936,6 +946,8 @@ func CollisionTestCapsule(x, y, z, radius, height float64, settings CollisionTes
 }
 
 // CollisionTestCapsuleVec places a bounding capsule at the position given with the specified radius and height to perform a collision test
+// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
+// If no collisions were found, the function will return an empty slice.
 func CollisionTestCapsuleVec(position Vector, radius, height float64, settings CollisionTestSettings) []*Collision {
 	return CollisionTestCapsule(position.X, position.Y, position.Z, radius, height, settings)
 }

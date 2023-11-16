@@ -101,6 +101,12 @@ func (color Color) Mix(other Color, percentage float32) Color {
 
 }
 
+// AddAlpha adds the provided alpha amount to the Color
+func (c Color) AddAlpha(alpha float32) Color {
+	c.A += alpha
+	return c
+}
+
 // SetAlpha returns a copy of the the Color with the alpha set to the provided alpha value.
 func (color Color) SetAlpha(alpha float32) Color {
 	color.A = alpha
@@ -165,6 +171,30 @@ func (color Color) ConvertTosRGB() Color {
 
 	return color
 
+}
+
+// Lerp linearly interpolates the color from the starting color to the target by the percentage given.
+func (c Color) Lerp(other Color, percentage float64) Color {
+
+	percentage = clamp(percentage, 0, 1)
+	c.R += (other.R - c.R) * float32(percentage)
+	c.G += (other.G - c.G) * float32(percentage)
+	c.B += (other.B - c.B) * float32(percentage)
+	c.A += (other.A - c.A) * float32(percentage)
+
+	return c
+}
+
+// Lerp linearly interpolates the color from the starting color to the target by the percentage given.
+func (c Color) LerpRGBA(r, g, b, a, percentage float64) Color {
+
+	percentage = clamp(percentage, 0, 1)
+	c.R += (float32(r) - c.R) * float32(percentage)
+	c.G += (float32(g) - c.G) * float32(percentage)
+	c.B += (float32(b) - c.B) * float32(percentage)
+	c.A += (float32(a) - c.A) * float32(percentage)
+
+	return c
 }
 
 func (color Color) String() string {
