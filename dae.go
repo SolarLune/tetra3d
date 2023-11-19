@@ -135,8 +135,9 @@ func DefaultDaeLoadOptions() *DaeLoadOptions {
 
 // LoadDAEFile takes a filepath to a .dae model file, and returns a *Library populated with the .dae file's objects and meshes.
 // Animations will not be loaded from DAE files, as DAE exports through Blender only support one animation per object (so it's generally
-// advised to use the GLTF or GLB format instead). Cameras exported in the DAE file will be turned into simple Nodes in Tetra3D, as
-// there's not enough information to instantiate a tetra3d.Camera. If the call couldn't complete for any reason, like due to a malformed DAE file,
+// advised to use the GLTF or GLB format instead).
+// Cameras exported in the DAE file will be turned into simple Nodes in Tetra3D, as there's not enough information to instantiate a tetra3d.Camera.
+// If the call couldn't complete for any reason, like due to a malformed DAE file,
 // it will return an error.
 func LoadDAEFile(path string, options *DaeLoadOptions) (*Library, error) {
 
@@ -150,8 +151,9 @@ func LoadDAEFile(path string, options *DaeLoadOptions) (*Library, error) {
 
 // LoadDAEData takes a []byte consisting of the contents of a DAE file, and returns a *Library populated with the .dae file's objects and meshes.
 // Animations will not be loaded from DAE files, as DAE exports through Blender only support one animation per object (so it's generally
-// advised to use the GLTF or GLB format instead). Cameras exported in the DAE file will be turned into simple Nodes in Tetra3D, as
-// there's not enough information to instantiate a tetra3d.Camera. If the call couldn't complete for any reason, like due to a malformed DAE file,
+// advised to use the GLTF or GLB format instead).
+// Cameras exported in the DAE file will be turned into simple Nodes in Tetra3D, as there's not enough information to instantiate a tetra3d.Camera.
+// If the call couldn't complete for any reason, like due to a malformed DAE file,
 // it will return an error.
 func LoadDAEData(data []byte, options *DaeLoadOptions) (*Library, error) {
 

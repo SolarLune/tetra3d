@@ -228,6 +228,7 @@ func (matrix Matrix4) Transposed() Matrix4 {
 
 // }
 
+// Inverted returns an inverted version of the Matrix4.
 // The ultimate sin; I'm just going to copy this code for inverting a 4x4 Matrix and call it a day.
 // This code was obtained from https://stackoverflow.com/questions/1148309/inverting-a-4x4-matrix,
 // and is like 200x faster than my old inversion code, whaaaaa

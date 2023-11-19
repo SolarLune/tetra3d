@@ -13,7 +13,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-//go:embed cameraTest.gltf
+//go:embed cameraTest.glb
 var shapes []byte
 
 type Game struct {

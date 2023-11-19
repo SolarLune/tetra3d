@@ -303,6 +303,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Sectors - The general idea is that the camera can be set up to only render sectors that it's in / neighboring (up to a customizeable depth)
 - [ ] -- -- Some method to have objects appear in multiple Sectors, but not others?
 - [ ] -- Occlusion culling - this should be possible using octrees to determine if an object is visible before rendering it; see: https://www.gamedeveloper.com/programming/occlusion-culling-algorithms
+- [ ] -- -- Something to reduce overdraw
 - [X] **Debug**
 - [X] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
 - [X] -- Wireframe debug rendering

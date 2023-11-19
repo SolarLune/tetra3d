@@ -736,7 +736,7 @@ func (vs *VertexSelection) ForEachIndex(forEach func(index int)) {
 	}
 }
 
-// NewCubeMesh creates a new Cube Mesh and gives it a new material (suitably named "Cube").
+// NewCubeMesh creates a new 2x2x2 Cube Mesh and gives it a new material (suitably named "Cube").
 func NewCubeMesh() *Mesh {
 
 	mesh := NewMesh("Cube",
@@ -1511,6 +1511,13 @@ func (part *MeshPart) primaryDimensions() (float64, float64) {
 
 	return w, h
 
+}
+
+func (p *MeshPart) isVisible() bool {
+	if p.Material != nil {
+		return p.Material.Visible
+	}
+	return true
 }
 
 type VertexInfo struct {

@@ -584,7 +584,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 				mesh.vertexTransforms[tri.VertexIndices[i]] = vpMatrix.MultVecW(vertPos)
 
-				camera.DebugInfo.animationTime += time.Since(t)
+				camera.DebugInfo.currentAnimationTime += time.Since(t)
 
 				skinnedTriCenter = skinnedTriCenter.Add(vertPos)
 

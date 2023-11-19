@@ -20,22 +20,21 @@ bl_info = {
 }
 
 objectTypes = [
-    ("MESH", "Mesh", "A standard, visible mesh object", 0, 0),
-    ("GRID", "Grid", "A grid object; not visualized or 'physically present'. The vertices in Blender become grid points in Tetra3D; the edges become their connections", 0, 1),
+    ("MESH", "Mesh", "A standard, visible mesh object.", 0, 0),
+    ("GRID", "Grid", "A grid object; not visualized or 'physically present'. The vertices in Blender become grid points in Tetra3D; the edges become their connections.", 0, 1),
 ]
 
 boundsTypes = [
     ("NONE", "No Bounds", "No collision will be created for this object.", 0, 0),
-    ("AABB", "AABB", "An AABB (axis-aligned bounding box). If the size isn't customized, it will be big enough to fully contain the mesh of the current object. Currently buggy when resolving intersections between AABB or other Triangle Nodes", 0, 1),
-    ("CAPSULE", "Capsule", "A capsule, which can rotate. If the radius and height are not set, it will have a radius and height to fully contain the current object", 0, 2),
-    ("SPHERE", "Sphere", "A sphere. If the radius is not custom set, it will have a large enough radius to fully contain the provided object", 0, 3),
-    ("TRIANGLES", "Triangle Mesh", "A triangle mesh bounds type. Only works on mesh-type objects (i.e. an Empty won't generate a BoundingTriangles). Accurate, but slow. Currently buggy when resolving intersections between AABB or other Triangle Nodes", 0, 4),
+    ("AABB", "AABB", "An AABB (axis-aligned bounding box). If the size isn't customized, it will be big enough to fully contain the mesh of the current object. Currently buggy when resolving intersections between AABB or other Triangle Nodes.", 0, 1),
+    ("CAPSULE", "Capsule", "A capsule, which can rotate. If the radius and height are not set, it will have a radius and height to fully contain the current object.", 0, 2),
+    ("SPHERE", "Sphere", "A sphere. If the radius is not custom set, it will have a large enough radius to fully contain the provided object.", 0, 3),
+    ("TRIANGLES", "Triangle Mesh", "A triangle mesh bounds type. Only works on mesh-type objects (i.e. an Empty won't generate a BoundingTriangles). Accurate, but slow. Currently buggy when resolving intersections between AABB or other Triangle Nodes.", 0, 4),
 ]
 
 gltfExportTypes = [
-    ("GLB", ".glb", "Exports a single file, with all data packed in binary form. Most efficient and portable, but more difficult to edit later", 0, 0),
-    ("GLTF_SEPARATE", ".gltf + .bin + textures", "Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later - Note that Tetra3D doesn't support this properly currently", 0, 1),
-    ("GLTF_EMBEDDED", ".gltf", "Exports a single file, with all data packed in JSON. Less efficient than binary, but easier to edit later", 0, 2),
+    ("GLB", ".glb", "Exports a single file, with all data packed in binary form. Textures can be packed into the file. Most efficient and portable, but more difficult to edit later.", 0, 0),
+    ("GLTF_SEPARATE", ".gltf + .bin + external textures", "Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later.", 0, 1),
 ]
 
 sectorDetectionType = [
@@ -44,10 +43,10 @@ sectorDetectionType = [
 ]
 
 materialBlendModes = [
-    ("DEFAULT", "Default", "Blends the destination by the material's color modulated by the material's alpha value. The default alpha-blending composite mode. Also known as BlendSourceOver", 0, 0),
-    ("ADDITIVE", "Additive", "Adds the material's color to the destination. Also known as BlendLighter", 0, 1),
-    ("MULTIPLY", "Multiply", "Multiplies the material's color by the destination. Known as Multiply compositing using a custom Blend object", 0, 2),
-    ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as BlendClear", 0, 3),
+    ("DEFAULT", "Default", "Blends the destination by the material's color modulated by the material's alpha value. The default alpha-blending composite mode. Also known as BlendSourceOver.", 0, 0),
+    ("ADDITIVE", "Additive", "Adds the material's color to the destination. Also known as BlendLighter.", 0, 1),
+    ("MULTIPLY", "Multiply", "Multiplies the material's color by the destination. Known as Multiply compositing using a custom Blend object.", 0, 2),
+    ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as BlendClear.", 0, 3),
 ]
 
 materialBillboardModes = [
@@ -59,22 +58,22 @@ materialBillboardModes = [
 
 materialLightingModes = [
     ("DEFAULT", "Default", "Default lighting; light is dependent on normal of lit faces.", 0, 0),
-    ("NORMAL", "Point Towards Lights", "Lighting acts as though faces always face light sources. Particularly useful for billboarded 2D sprites", 0, 1),
+    ("NORMAL", "Point Towards Lights", "Lighting acts as though faces always face light sources. Particularly useful for billboarded 2D sprites.", 0, 1),
     ("DOUBLE", "Double-Sided", "Double-sided lighting; lighting is dependent on normal of lit faces, but on both sides of a face.", 0, 2),
 ]
 
 worldFogCompositeModes = [
-    ("OFF", "Off", "No fog. Object colors aren't changed with distance from the camera", 0, 0),
-    ("ADDITIVE", "Additive", "Additive fog - this fog mode brightens objects in the distance, with full effect being adding the color given to the object's color at maximum distance (according to the camera's far range)", 0, 1),
-    ("SUBTRACT", "Subtractive", "Subtractive fog - this fog mode darkens objects in the distance, with full effect being subtracting the object's color by the fog color at maximum distance (according to the camera's far range)", 0, 2),
-    ("OVERWRITE", "Overwrite", "Overwrite fog - this fog mode overwrites the object's color with the fog color, with maximum distance being the camera's far distance", 0, 3),
+    ("OFF", "Off", "No fog. Object colors aren't changed with distance from the camera.", 0, 0),
+    ("ADDITIVE", "Additive", "Additive fog - this fog mode brightens objects in the distance, with full effect being adding the color given to the object's color at maximum distance (according to the camera's far range).", 0, 1),
+    ("SUBTRACT", "Subtractive", "Subtractive fog - this fog mode darkens objects in the distance, with full effect being subtracting the object's color by the fog color at maximum distance (according to the camera's far range).", 0, 2),
+    ("OVERWRITE", "Overwrite", "Overwrite fog - this fog mode overwrites the object's color with the fog color, with maximum distance being the camera's far distance.", 0, 3),
     ("TRANSPARENT", "Transparent", "Transparent fog - this fog mode fades the object out over distance, such that at maximum distance / fog range, the object is wholly transparent.", 0, 4),
 ]
 
 worldFogCurveTypes = [
-    ("LINEAR", "Smooth", "Smooth fog (Ease: Linear); this goes from 0% in the near range to 100% in the far range evenly", "LINCURVE", 0),
-    ("OUTCIRC", "Dense", "Dense fog (Ease: Out Circ); fog will increase aggressively in the near range, ramping up to 100% at the far range", "SPHERECURVE", 1),
-    ("INCIRC", "Light", "Light fog (Ease: In Circ); fog will increase aggressively towards the far range, ramping up to 100% at the far range", "SHARPCURVE", 2),
+    ("LINEAR", "Smooth", "Smooth fog (Ease: Linear); this goes from 0% in the near range to 100% in the far range evenly.", "LINCURVE", 0),
+    ("OUTCIRC", "Dense", "Dense fog (Ease: Out Circ); fog will increase aggressively in the near range, ramping up to 100% at the far range.", "SPHERECURVE", 1),
+    ("INCIRC", "Light", "Light fog (Ease: In Circ); fog will increase aggressively towards the far range, ramping up to 100% at the far range.", "SHARPCURVE", 2),
 ]
 
 gamePropTypes = [
@@ -89,9 +88,9 @@ gamePropTypes = [
 ]
 
 batchModes = [ 
-    ("OFF", "Off", "No automatic batching", 0, 0), 
-    ("DYNAMIC", "Dynamic Batching", "Dynamic batching based off of one material (the first one)", 0, 1), 
-    ("STATIC", "Static Merging", "Static merging; merged objects cannot move or deviate in any way. After automatic static merging, the merged models will be automatically set to invisible", 0, 2),
+    ("OFF", "Off", "No automatic batching.", 0, 0), 
+    ("DYNAMIC", "Dynamic Batching", "Dynamic batching based off of one material (the first one).", 0, 1), 
+    ("STATIC", "Static Merging", "Static merging; merged objects cannot move or deviate in any way. After automatic static merging, the merged models will be automatically set to invisible.", 0, 2),
 ]
 
 def filepathSet(self, value):
@@ -798,6 +797,7 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.prop(context.material, "t3dMaterialFogless__")
         row = self.layout.row()
         row.prop(context.material, "use_backface_culling")
+        row.prop(context.material, "t3dVisible__")
         row = self.layout.row()
         row.label(text="Transparency Mode:")
         row.prop(context.material, "blend_method", text="")
@@ -931,7 +931,10 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         row.prop(context.scene, "t3dExportFormat__")
         
         box = self.layout.box()
-        box.prop(context.scene, "t3dPackTextures__")
+        row = box.row()
+        row.active = context.scene.t3dExportFormat__ == "GLB"
+        row.prop(context.scene, "t3dPackTextures__")
+
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
         box.prop(context.scene, "t3dPerspectiveCorrectedTextureMapping__")
@@ -1017,7 +1020,7 @@ def export():
     
     if scene.t3dExportFormat__ == "GLB":
         ending = ".glb"
-    elif scene.t3dExportFormat__ == "GLTF_SEPARATE" or scene.t3dExportFormat__ == "GLTF_EMBEDDED":
+    elif scene.t3dExportFormat__ == "GLTF_SEPARATE":
         ending = ".gltf"
     
     newPath = os.path.splitext(blendPath)[0] + ending
@@ -1921,7 +1924,7 @@ def register():
     bpy.types.Scene.t3dExportFilepath__ = bpy.props.StringProperty(name="Export Filepath", description="Filepath to export GLTF file. If left blank, it will export to the same directory as the blend file and will have the same filename; in this case, if the blend file has not been saved, nothing will happen", 
     default="", subtype="FILE_PATH", get=getExportFilepath, set=setExportFilepath)
     
-    bpy.types.Scene.t3dExportFormat__ = bpy.props.EnumProperty(items=gltfExportTypes, name="Export Format", description="What format to export the file in", default="GLTF_EMBEDDED",
+    bpy.types.Scene.t3dExportFormat__ = bpy.props.EnumProperty(items=gltfExportTypes, name="Export Format", description="What format to export the file in", default="GLB",
     get=getExportFormat, set=setExportFormat)
     
     bpy.types.Scene.t3dExportCameras__ = bpy.props.BoolProperty(name="Export Cameras", description="Whether Blender should export cameras to the GLTF file", default=True,
@@ -1978,6 +1981,7 @@ def register():
     bpy.types.Material.t3dCustomDepthOn__ = bpy.props.BoolProperty(name="Custom Depth", description="Whether custom depth offsetting should be enabled", default=False)
     bpy.types.Material.t3dCustomDepthValue__ = bpy.props.FloatProperty(name="Depth Offset Value", description="How far in world units the material should offset when rendering (negative values are closer to the camera, positive values are further)")
     bpy.types.Material.t3dMaterialLightingMode__ = bpy.props.EnumProperty(items=materialLightingModes, name="Lighting mode", description="How materials should be lit", default="DEFAULT")
+    bpy.types.Material.t3dVisible__ = bpy.props.BoolProperty(name="Visible", description="Whether this material is visible", default=True)
 
     bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode")
     bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5)
@@ -2084,6 +2088,7 @@ def unregister():
     del bpy.types.Material.t3dAutoUV__
     del bpy.types.Material.t3dAutoUVUnitSize__
     del bpy.types.Material.t3dAutoUVRotation__
+    del bpy.types.Material.t3dVisible__
 
     del bpy.types.World.t3dClearColor__
     del bpy.types.World.t3dFogColor__

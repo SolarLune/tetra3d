@@ -22,7 +22,7 @@ type Game struct {
 	BG *ebiten.Image
 }
 
-//go:embed blendmodes.gltf
+//go:embed blendmodes.glb
 var gltfData []byte
 
 //go:embed bg.png

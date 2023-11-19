@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
@@ -19,8 +20,8 @@ type Game struct {
 	System examples.BasicSystemHandler
 }
 
-//go:embed animations.gltf
-var gltf []byte
+//go:embed assets
+var assets embed.FS
 
 func NewGame() *Game {
 	game := &Game{}
@@ -30,7 +31,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(gltf, nil)
+	library, err := tetra3d.LoadGLTFFile(assets, "assets/animations.glb", nil)
 	if err != nil {
 		panic(err)
 	}

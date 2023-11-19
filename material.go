@@ -54,6 +54,7 @@ type Material struct {
 	Fogless           bool           // If the material should be fogless or not
 	Blend             ebiten.Blend   // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
 	BillboardMode     int            // Billboard mode
+	Visible           bool           // Whether the material is visible or not
 
 	// fragmentShader represents a shader used to render the material with. This shader is activated after rendering
 	// to the depth texture, but before compositing the finished render to the screen after fog.
@@ -101,6 +102,7 @@ func NewMaterial(name string) *Material {
 		FragmentShaderOptions: &ebiten.DrawTrianglesShaderOptions{},
 		FragmentShaderOn:      true,
 		Blend:                 ebiten.BlendSourceOver,
+		Visible:               true,
 	}
 }
 
@@ -132,6 +134,7 @@ func (material *Material) Clone() *Material {
 	for k, v := range newMat.FragmentShaderOptions.Uniforms {
 		newMat.FragmentShaderOptions.Uniforms[k] = v
 	}
+	newMat.Visible = material.Visible
 
 	return newMat
 }

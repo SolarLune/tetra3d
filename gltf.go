@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"image"
+	"io"
+	"io/fs"
 	"log"
 	"math"
-	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -36,6 +38,9 @@ type GLTFLoadOptions struct {
 
 	// If top-level objects in collections should be renamed according to their instance objects.
 	RenameCollectionObjects bool
+
+	rootFilename             string
+	externalBufferFileSystem fs.FS // The file system to use for loading external buffers; automatically set if you use LoadGLTFFile().
 }
 
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
@@ -48,31 +53,47 @@ func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 	}
 }
 
-// LoadGLTFFile loads a .gltf or .glb file from the filepath given, using a provided GLTFLoadOptions struct to alter how the file is loaded.
-// Passing nil for loadOptions will load the file using default load options. Unlike with DAE files, Animations (including armature-based
-// animations) and Cameras (assuming they are exported in the GLTF file) will be parsed properly.
+// LoadGLTFFile loads a .gltf or .glb file from the file system given using the filename provided.
+// The provided GLTFLoadOptions struct alters how the file is loaded.
+// Passing nil for gltfLoadOptions will load the file using default load options.
+// LoadGLTFFile properly handles .gltf + .bin file pairs.
 // LoadGLTFFile will return a Library, and an error if the process fails.
-func LoadGLTFFile(path string, loadOptions *GLTFLoadOptions) (*Library, error) {
+func LoadGLTFFile(fileSystem fs.FS, filename string, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
 
-	fileData, err := os.ReadFile(path)
+	file, err := fileSystem.Open(filename)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return LoadGLTFData(fileData, loadOptions)
+	byteString, err := io.ReadAll(file)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if gltfLoadOptions == nil {
+		gltfLoadOptions = DefaultGLTFLoadOptions()
+	}
+
+	gltfLoadOptions.externalBufferFileSystem = fileSystem
+	gltfLoadOptions.rootFilename = filename
+
+	return LoadGLTFData(byteString, gltfLoadOptions)
 
 }
 
 // LoadGLTFData loads a .gltf or .glb file from the byte data given, using a provided GLTFLoadOptions struct to alter how the file is loaded.
 // Passing nil for loadOptions will load the file using default load options. Unlike with DAE files, Animations (including armature-based
 // animations) and Cameras (assuming they are exported in the GLTF file) will be parsed properly.
+// LoadGLTFFile will not work by default with external byte information buffers (i.e. .gltf and .glb file pairs)
+// as the buffer is referenced in .gltf as just a filename. To handle this properly, load the .gltf file using LoadGLTFFile().
 // LoadGLTFFile will return a Library, and an error if the process fails.
 func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
 
-	decoder := gltf.NewDecoder(bytes.NewReader(data))
-
 	doc := gltf.NewDocument()
+
+	decoder := gltf.NewDecoder(bytes.NewReader(data))
 
 	err := decoder.Decode(doc)
 
@@ -82,6 +103,31 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	if gltfLoadOptions == nil {
 		gltfLoadOptions = DefaultGLTFLoadOptions()
+	} else if gltfLoadOptions.externalBufferFileSystem != nil {
+
+		for _, buffer := range doc.Buffers {
+
+			// We need to load this buffer
+			if buffer.URI != "" && len(buffer.Data) == 0 {
+
+				// We get the base directory for the loaded filename
+				dir, _ := path.Split(gltfLoadOptions.rootFilename)
+
+				openedFile, err := gltfLoadOptions.externalBufferFileSystem.Open(path.Join(dir, buffer.URI))
+				if err != nil {
+					panic(err)
+				}
+				bytesData, err := io.ReadAll(openedFile)
+				if err != nil {
+					panic(err)
+				}
+				buffer.Data = bytesData
+				continue
+				// decoder = gltf.NewDecoderFS(bytes.NewReader(data), gltfLoadOptions.externalBufferFileSystem)
+			}
+
+		}
+
 	}
 
 	library := NewLibrary()
@@ -139,9 +185,15 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
+			exportFormat := 0 // 0 = GLB, 1 = GLTF Separate
+
+			if format, exists := globalExporterSettings["t3dExportFormat__"]; exists {
+				exportFormat = int(format.(float64))
+			}
+
 			if et, exists := globalExporterSettings["t3dPackTextures__"]; exists {
 				t3dExport = true
-				exportedTextures = et.(bool)
+				exportedTextures = et.(bool) && exportFormat == 0
 			}
 
 			if col, exists := globalExporterSettings["t3dCollections__"]; exists {

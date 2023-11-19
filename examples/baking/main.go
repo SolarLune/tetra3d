@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
@@ -11,8 +12,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-//go:embed baking.gltf
-var gltfData []byte
+//go:embed assets
+var assetData embed.FS
 
 type Game struct {
 	Library *tetra3d.Library
@@ -39,7 +40,7 @@ const (
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(gltfData, nil)
+	library, err := tetra3d.LoadGLTFFile(assetData, "assets/baking.glb", nil)
 	if err != nil {
 		panic(err)
 	}

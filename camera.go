@@ -15,21 +15,20 @@ import (
 
 // DebugInfo is a struct that holds debugging information for a Camera's render pass. These values are reset when Camera.Clear() is called.
 type DebugInfo struct {
-	AvgFrameTime     time.Duration // Amount of CPU frame time spent transforming vertices and calling Image.DrawTriangles. Doesn't include time ebitengine spends flushing the command queue.
-	AvgAnimationTime time.Duration // Amount of CPU frame time spent animating vertices.
-	AvgLightTime     time.Duration // Amount of CPU frame time spent lighting vertices.
-	animationTime    time.Duration
-	lightTime        time.Duration
-	frameTime        time.Duration
-	frameCount       int
-	tickTime         time.Time
-	DrawnParts       int // Number of draw calls, excluding those invisible or culled based on distance
-	TotalParts       int // Total number of draw calls
-	BatchedParts     int // Total batched number of draw calls
-	DrawnTris        int // Number of drawn triangles, excluding those hidden from backface culling
-	TotalTris        int // Total number of triangles
-	LightCount       int // Total number of lights
-	ActiveLightCount int // Total active number of lights
+	FrameTime            time.Duration // Amount of CPU frame time spent transforming vertices and calling Image.DrawTriangles. Doesn't include time ebitengine spends flushing the command queue.
+	AnimationTime        time.Duration // Amount of CPU frame time spent animating vertices.
+	LightTime            time.Duration // Amount of CPU frame time spent lighting vertices.
+	currentAnimationTime time.Duration
+	currentLightTime     time.Duration
+	currentFrameTime     time.Duration
+	tickTime             time.Time
+	DrawnParts           int // Number of draw calls, excluding those invisible or culled based on distance
+	TotalParts           int // Total number of draw calls
+	BatchedParts         int // Total batched number of draw calls
+	DrawnTris            int // Number of drawn triangles, excluding those hidden from backface culling
+	TotalTris            int // Total number of triangles
+	LightCount           int // Total number of lights
+	ActiveLightCount     int // Total active number of lights
 }
 
 const (
@@ -762,25 +761,16 @@ func (camera *Camera) Clear() {
 		camera.resultNormalTexture.Clear()
 	}
 
-	if camera.DebugInfo.frameCount > 0 && time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
+	if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 1000 {
 
-		if !camera.DebugInfo.tickTime.IsZero() {
-
-			camera.DebugInfo.AvgFrameTime = camera.DebugInfo.frameTime / time.Duration(camera.DebugInfo.frameCount)
-
-			camera.DebugInfo.AvgAnimationTime = camera.DebugInfo.animationTime / time.Duration(camera.DebugInfo.frameCount)
-
-			camera.DebugInfo.AvgLightTime = camera.DebugInfo.lightTime / time.Duration(camera.DebugInfo.frameCount)
-
-		}
-
+		camera.DebugInfo.FrameTime = camera.DebugInfo.currentFrameTime
+		camera.DebugInfo.AnimationTime = camera.DebugInfo.currentAnimationTime
+		camera.DebugInfo.LightTime = camera.DebugInfo.currentLightTime
 		camera.DebugInfo.tickTime = time.Now()
-		camera.DebugInfo.frameTime = 0
-		camera.DebugInfo.animationTime = 0
-		camera.DebugInfo.lightTime = 0
-		camera.DebugInfo.frameCount = 0
-
 	}
+	camera.DebugInfo.currentFrameTime = 0
+	camera.DebugInfo.currentAnimationTime = 0
+	camera.DebugInfo.currentLightTime = 0
 	camera.DebugInfo.DrawnParts = 0
 	camera.DebugInfo.BatchedParts = 0
 	camera.DebugInfo.TotalParts = 0
@@ -1017,6 +1007,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			for meshPart, modelSlice := range model.DynamicBatchModels {
 
+				if !meshPart.isVisible() {
+					continue
+				}
+
 				for _, child := range modelSlice {
 
 					if !child.visible {
@@ -1063,6 +1057,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			modelIsTransparent := false
 
 			for _, mp := range model.Mesh.MeshParts {
+
+				if !mp.isVisible() {
+					continue
+				}
+
 				if model.isTransparent(mp) {
 					transparents = append(transparents, renderPair{model, mp})
 					modelIsTransparent = true
@@ -1166,7 +1165,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				light.beginModel(model)
 			}
 
-			camera.DebugInfo.lightTime += time.Since(t)
+			camera.DebugInfo.currentLightTime += time.Since(t)
 
 		}
 
@@ -1210,7 +1209,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			}
 
-			camera.DebugInfo.lightTime += time.Since(t)
+			camera.DebugInfo.currentLightTime += time.Since(t)
 
 		}
 
@@ -1700,9 +1699,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	}
 
-	camera.DebugInfo.frameTime += time.Since(frametimeStart)
-
-	camera.DebugInfo.frameCount++
+	camera.DebugInfo.currentFrameTime += time.Since(frametimeStart)
 
 }
 
@@ -1716,8 +1713,6 @@ func packFloat(input1, input2, precision float32) float32 {
 type DrawSprite3dSettings struct {
 	// The image to render
 	Image *ebiten.Image
-	// Options for drawing the sprite; defaults to nil, which is default settings.
-	Options *ebiten.DrawTrianglesShaderOptions
 	// How much to offset the depth - useful if you want the object to appear at a position,
 	// but in front of or behind other objects. Negative is towards the camera, positive is away.
 	// The offset ranges from 0 to 1.
@@ -1737,12 +1732,12 @@ var spriteRender3DIndices = []uint16{
 	2, 3, 0,
 }
 
-// DrawSprite3D draws an image on the screen in 2D, but at the screen position of the 3D world position provided,
+// RenderSprite3D draws an image on the screen in 2D, but at the screen position of the 3D world position provided,
 // and with depth intersection.
 // This allows you to render 2D elements "at" a 3D position, and can be very useful in situations where you want
 // a sprite to render at 100% size and no perspective or skewing, but still look like it's in the 3D space (like in
 // a game with a fixed camera viewpoint).
-func (camera *Camera) DrawSprite3D(screen *ebiten.Image, renderSettings ...DrawSprite3dSettings) {
+func (camera *Camera) RenderSprite3D(screen *ebiten.Image, renderSettings ...DrawSprite3dSettings) {
 
 	// TODO: Replace this with a more performant alternative, where we minimize shader / texture switches.
 
@@ -1800,6 +1795,25 @@ func (camera *Camera) DrawSprite3D(screen *ebiten.Image, renderSettings ...DrawS
 
 }
 
+var renderCube = NewModel("render cube", NewCubeMesh())
+
+// RenderCube quickly and easily renders a cube with the position and scale desired.
+// The Camera must be present in a scene to perform this function.
+func (camera *Camera) RenderCube(position Vector, scale Vector, color Color, shadelessness bool) {
+
+	// TODO: Optimize this with perhaps background cubes that are dynamically batched so they could be rendered in one
+	// Render call.
+
+	if scene := camera.Scene(); scene != nil {
+		renderCube.SetLocalPositionVec(position)
+		renderCube.SetLocalScaleVec(scale.Scale(0.5))
+		renderCube.Color = color
+		renderCube.Mesh.Materials()[0].Shadeless = shadelessness
+		camera.Render(scene, nil, renderCube)
+	}
+
+}
+
 // DrawDebugRenderInfo draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
 // at the top-left of the provided screen *ebiten.Image, using the textScale and color provided.
 // Note that the frame-time mentioned here is purely the time that Tetra3D spends sending render commands to the command queue.
@@ -1807,13 +1821,13 @@ func (camera *Camera) DrawSprite3D(screen *ebiten.Image, renderSettings ...DrawS
 // visible outside of debugging and profiling, like with pprof.
 func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float64, color Color) {
 
-	m := camera.DebugInfo.AvgFrameTime.Round(time.Microsecond).Microseconds()
+	m := camera.DebugInfo.FrameTime.Round(time.Microsecond).Microseconds()
 	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
 
-	m = camera.DebugInfo.AvgAnimationTime.Round(time.Microsecond).Microseconds()
+	m = camera.DebugInfo.AnimationTime.Round(time.Microsecond).Microseconds()
 	at := fmt.Sprintf("%.2fms", float32(m)/1000)
 
-	m = camera.DebugInfo.AvgLightTime.Round(time.Microsecond).Microseconds()
+	m = camera.DebugInfo.LightTime.Round(time.Microsecond).Microseconds()
 	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
 
 	sectorName := "<Sector Rendering Off>"

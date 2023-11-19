@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
@@ -23,8 +24,8 @@ type Game struct {
 	Character *tetra3d.Model
 }
 
-//go:embed animatedTextures.gltf
-var libraryData []byte
+//go:embed assets
+var assets embed.FS
 
 func NewGame() *Game {
 	game := &Game{}
@@ -36,7 +37,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(libraryData, nil)
+	library, err := tetra3d.LoadGLTFFile(assets, "assets/animatedTextures.glb", nil)
 	if err != nil {
 		panic(err)
 	}

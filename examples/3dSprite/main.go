@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"embed"
 
 	_ "embed"
 
@@ -14,11 +15,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-//go:embed heart.png
-var heartImg []byte
-
-//go:embed scene.gltf
-var scene []byte
+//go:embed assets
+var assets embed.FS
 
 type Game struct {
 	Scene              *tetra3d.Scene
@@ -41,13 +39,18 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	scene, err := tetra3d.LoadGLTFData(scene, nil)
+	scene, err := tetra3d.LoadGLTFFile(assets, "assets/scene.gltf", nil)
 	if err != nil {
 		panic(err)
 	}
 	g.Scene = scene.FindScene("Scene").Clone()
 
 	g.Camera = g.Scene.Root.Get("Camera").(*tetra3d.Camera)
+
+	heartImg, err := assets.ReadFile("assets/heart.png")
+	if err != nil {
+		panic(err)
+	}
 
 	reader := bytes.NewReader(heartImg)
 	newImg, _, err := ebitenutil.NewImageFromReader(reader)
@@ -104,7 +107,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.RenderScene(g.Scene)
 
 	// Draw the sprite after the rest of the scene.
-	g.Camera.DrawSprite3D(
+	g.Camera.RenderSprite3D(
 		g.Camera.ColorTexture(),
 		tetra3d.DrawSprite3dSettings{
 			Image:         g.HeartSprite,

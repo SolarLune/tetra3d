@@ -13,7 +13,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-//go:embed bounds.gltf
+//go:embed bounds.glb
 var gltfData []byte
 
 type Game struct {

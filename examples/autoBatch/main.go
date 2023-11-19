@@ -18,7 +18,7 @@ type Game struct {
 	System examples.BasicSystemHandler
 }
 
-//go:embed autobatch.gltf
+//go:embed autobatch.glb
 var libraryData []byte
 
 func NewGame() *Game {
