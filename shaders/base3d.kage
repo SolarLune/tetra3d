@@ -69,6 +69,9 @@ func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
 		// tetra3d Custom Fragment Call Location //
 		colorTex := imageSrc0UnsafeAt(tx + srcOrigin) * color
 
+		// We have to multiply the rgb component by a to fade out over time
+		colorTex.rgb *= color.a
+		
 		if Fogless == 0 {
 
 			var d float
@@ -117,8 +120,7 @@ func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
 
 		}
 		
-		// We have to multiply the rgb component by a to fade out over time
-		colorTex.rgb *= color.a
+
 
 		return colorTex
 
