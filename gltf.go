@@ -390,6 +390,9 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 						newMat.LightingMode = LightingModeDoubleSided
 					}
 				}
+				if s, exists := dataMap["t3dVisible__"]; exists {
+					newMat.Visible = s.(float64) > 0
+				}
 
 				// At this point, parenting should be set up.
 

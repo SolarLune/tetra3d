@@ -12,12 +12,11 @@ import (
 type NodeType string
 
 const (
-	NodeTypeNode   NodeType = "Node"       // NodeTypeNode represents any generic node
-	NodeTypeModel  NodeType = "NodeModel"  // NodeTypeModel represents specifically a Model
-	NodeTypeCamera NodeType = "NodeCamera" // NodeTypeCamera represents specifically a Camera
-	NodeTypePath   NodeType = "NodePath"   // NodeTypePath represents specifically a Path
-	NodeTypeGrid   NodeType = "NodeGrid"   // NodeTypeGrid represents specifically a Grid
-
+	NodeTypeNode      NodeType = "NodeNode"       // NodeTypeNode represents specifically a node
+	NodeTypeModel     NodeType = "NodeModel"      // NodeTypeModel represents specifically a Model
+	NodeTypeCamera    NodeType = "NodeCamera"     // NodeTypeCamera represents specifically a Camera
+	NodeTypePath      NodeType = "NodePath"       // NodeTypePath represents specifically a Path
+	NodeTypeGrid      NodeType = "NodeGrid"       // NodeTypeGrid represents specifically a Grid
 	NodeTypeGridPoint NodeType = "Node_GridPoint" // NodeTypeGrid represents specifically a GridPoint (note the extra underscore to ensure !NodeTypeGridPoint.Is(NodeTypeGrid))
 
 	NodeTypeBoundingObject    NodeType = "NodeBounding"          // NodeTypeBoundingObject represents any generic bounding object
@@ -32,7 +31,6 @@ const (
 	NodeTypeDirectionalLight NodeType = "NodeLightDirectional" // NodeTypeDirectionalLight represents specifically a directional (sun) light
 	NodeTypeCubeLight        NodeType = "NodeLightCube"        // NodeTypeCubeLight represents, specifically, a cube light
 
-	NodeTypeText NodeType = "NodeModelText" // NodeTypeText represents specifically a Text object
 )
 
 // Is returns true if a NodeType satisfies another NodeType category. A specific node type can be said to
@@ -672,6 +670,9 @@ func (node *Node) LocalRotation() Matrix4 {
 
 // SetLocalRotation sets the object's local rotation Matrix4 (relative to any parent).
 func (node *Node) SetLocalRotation(rotation Matrix4) {
+	if rotation.IsZero() {
+		return
+	}
 	node.rotation.Set(rotation)
 	node.dirtyTransform()
 }
@@ -913,9 +914,7 @@ func (node *Node) HierarchyAsString() string {
 
 			nodeType := node.Type()
 
-			if nodeType.Is(NodeTypeText) {
-				prefix = "TEXT"
-			} else if nodeType.Is(NodeTypeCamera) {
+			if nodeType.Is(NodeTypeCamera) {
 				prefix = "CAM"
 			} else if nodeType.Is(NodeTypePath) {
 				prefix = "PATH"

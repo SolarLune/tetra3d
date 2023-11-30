@@ -412,7 +412,15 @@ func (nf NodeFilter) SortReverse() NodeFilter {
 	return nf
 }
 
+// SortReverse randomizes the elements returned by the NodeFilter finishing functions.
+// Sorts do not combine.
 func (nf NodeFilter) SortRandom() NodeFilter {
 	nf.sortMode = nfSortModeRandom
+	return nf
+}
+
+// SetDepth sets the maximum search depth of the NodeFilter to the value provided.
+func (nf NodeFilter) SetMaxDepth(depth int) NodeFilter {
+	nf.MaxDepth = depth
 	return nf
 }

@@ -1001,7 +1001,7 @@ func NewIcosphereMesh(detailLevel int) *Mesh {
 	return mesh
 }
 
-// NewPlaneMesh creates a new plane Mesh with a new material (suitably named "Plane").
+// NewPlaneMesh creates a new 2x2 plane Mesh with a new material (suitably named "Plane").
 // vertexCountX and vertexCountY indicate how many vertices should be on the plane in the X
 // and Z direction, respectively. The minimum number of vertices for either argument is 2.
 // Code for this is taken from https://answers.unity.com/questions/1850185/mesh-triangles-not-filling-whole-space-2.html.
@@ -1021,8 +1021,8 @@ func NewPlaneMesh(vertexCountX, vertexCountZ int) *Mesh {
 
 		for x := 0; x < vertexCountX; x++ {
 
-			tx := float64(x) / float64(vertexCountX-1)
-			tz := float64(z) / float64(vertexCountZ-1)
+			tx := float64(x) / float64(vertexCountX-1) * 2
+			tz := float64(z) / float64(vertexCountZ-1) * 2
 			verts = append(verts, NewVertex(-0.5+tx, 0, -0.5+tz, tx, -tz))
 
 		}
