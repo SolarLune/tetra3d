@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
