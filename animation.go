@@ -375,10 +375,11 @@ func (ap *AnimationPlayer) PlayAnim(animation *Animation) {
 // it will return an error.
 func (ap *AnimationPlayer) Play(animationName string) error {
 	anim, ok := ap.RootNode.Library().Animations[animationName]
-	if ok {
-		ap.PlayAnim(anim)
+	if !ok {
+	  return errors.New("Animation named {" + animationName + "} not found in node's owning Library")
 	}
-	return errors.New("Animation named {" + animationName + "} not found in node's owning Library")
+  ap.PlayAnim(anim)
+  return nil
 }
 
 // Stop stops the AnimationPlayer's playback. Note that this is fundamentally the same as calling ap.Playing = false (for now).
