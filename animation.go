@@ -762,6 +762,11 @@ func (ap *AnimationPlayer) FinishedPlayingAnimation(animName string) bool {
 	return ap.prevFinishedAnimation == animName && ap.Finished()
 }
 
+// IsPlaying returns if the AnimationPlayer is playing an animation of the given name.
+func (ap *AnimationPlayer) IsPlaying(animName string) bool {
+	return ap.Animation != nil && ap.Animation.Name == animName
+}
+
 // TouchedMarker returns if a marker with the specified name was touched this past frame - note that this relies on calling AnimationPlayer.Update().
 func (ap *AnimationPlayer) TouchedMarker(markerName string) bool {
 
