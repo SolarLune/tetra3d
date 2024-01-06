@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"embed"
 
-	_ "embed"
-
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"

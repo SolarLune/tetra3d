@@ -4,8 +4,6 @@ import (
 	"embed"
 	"strings"
 
-	_ "embed"
-
 	"github.com/solarlune/tetra3d"
 
 	"github.com/hajimehoshi/ebiten/v2"
