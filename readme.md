@@ -320,6 +320,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
 - [ ] -- Morph (mesh-based / shape key) animations (See: https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_017_SimpleMorphTarget.md)
+- [ ] -- Mesh swapping during animations, primarily for 2D skeletal animation? (Can be worked around using bones.)
 - [X] **Scenes**
 - [X] -- Fog
 - [X] -- A node or scenegraph for parenting and simple visibility culling

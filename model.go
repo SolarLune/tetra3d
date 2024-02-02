@@ -18,11 +18,12 @@ const (
 // Position, Rotation, and/or Scale (where and how to draw).
 type Model struct {
 	*Node
-	Mesh           *Mesh
-	FrustumCulling bool  // Whether the Model is culled when it leaves the frustum.
-	Color          Color // The overall multiplicative color of the Model.
-	Shadeless      bool  // Indicates if a Model is shadeless.
-	BoundingSphere *BoundingSphere
+	Mesh                 *Mesh
+	FrustumCulling       bool            // Whether the Model is culled when it leaves the frustum.
+	frustumCullingSphere *BoundingSphere // Used for frustum culling
+	updateFrustumSphere  bool            // True usually, but false for particles because we calculate it ourselves
+	Color                Color           // The overall multiplicative color of the Model.
+	Shadeless            bool            // Indicates if a Model is shadeless.
 
 	DynamicBatchModels map[*MeshPart][]*Model // Models that are dynamically merged into this one.
 	DynamicBatchOwner  *Model
@@ -52,9 +53,8 @@ type Model struct {
 
 	// Automatic batching mode; when set and a Model changes parenting, it will be automatically batched as necessary according to
 	// the AutoBatchMode set.
-	AutoBatchMode  int
-	autoBatched    bool
-	dynamicBatcher bool
+	AutoBatchMode int
+	autoBatched   bool
 
 	sector *Sector // Sector is a reference to the Sector object that the Model stands in for, if sector-based rendering is enabled.
 }
@@ -63,12 +63,13 @@ type Model struct {
 func NewModel(name string, mesh *Mesh) *Model {
 
 	model := &Model{
-		Node:               NewNode(name),
-		Mesh:               mesh,
-		FrustumCulling:     true,
-		Color:              NewColor(1, 1, 1, 1),
-		skinMatrix:         NewMatrix4(),
-		DynamicBatchModels: map[*MeshPart][]*Model{},
+		Node:                NewNode(name),
+		Mesh:                mesh,
+		FrustumCulling:      true,
+		updateFrustumSphere: true,
+		Color:               NewColor(1, 1, 1, 1),
+		skinMatrix:          NewMatrix4(),
+		DynamicBatchModels:  map[*MeshPart][]*Model{},
 	}
 
 	model.Node.onTransformUpdate = model.onTransformUpdate
@@ -77,7 +78,7 @@ func NewModel(name string, mesh *Mesh) *Model {
 	if mesh != nil {
 		radius = mesh.Dimensions.MaxSpan() / 2
 	}
-	model.BoundingSphere = NewBoundingSphere("bounding sphere", radius)
+	model.frustumCullingSphere = NewBoundingSphere("bounding sphere", radius)
 
 	return model
 
@@ -92,8 +93,9 @@ func (model *Model) Clone() INode {
 	}
 
 	newModel := NewModel(model.name, mesh)
-	newModel.BoundingSphere = model.BoundingSphere.Clone().(*BoundingSphere)
+	newModel.frustumCullingSphere = model.frustumCullingSphere.Clone().(*BoundingSphere)
 	newModel.FrustumCulling = model.FrustumCulling
+	newModel.updateFrustumSphere = model.updateFrustumSphere
 	newModel.visible = model.visible
 	newModel.Color = model.Color
 	newModel.Shadeless = model.Shadeless
@@ -123,7 +125,6 @@ func (model *Model) Clone() INode {
 
 	newModel.VertexClipFunction = model.VertexClipFunction
 	newModel.VertexTransformFunction = model.VertexTransformFunction
-	newModel.dynamicBatcher = model.dynamicBatcher
 
 	if model.sector != nil {
 		newModel.sector = model.sector.Clone()
@@ -136,6 +137,10 @@ func (model *Model) Clone() INode {
 
 // When updating a Model's transform, we have to also update its bounding sphere for frustum culling.
 func (model *Model) onTransformUpdate() {
+
+	if !model.updateFrustumSphere {
+		return
+	}
 
 	transform := model.cachedTransform
 
@@ -158,7 +163,7 @@ func (model *Model) onTransformUpdate() {
 	position.X += center.X * scale.X
 	position.Y += center.Y * scale.Y
 	position.Z += center.Z * scale.Z
-	model.BoundingSphere.SetLocalPositionVec(position)
+	model.frustumCullingSphere.SetLocalPositionVec(position)
 
 	dim := model.Mesh.Dimensions
 	dim.Min.X *= scale.X
@@ -169,7 +174,7 @@ func (model *Model) onTransformUpdate() {
 	dim.Max.Y *= scale.Y
 	dim.Max.Z *= scale.Z
 
-	model.BoundingSphere.Radius = dim.MaxSpan() / 2
+	model.frustumCullingSphere.Radius = dim.MaxSpan() / 2
 
 }
 
@@ -199,8 +204,6 @@ Calling this turns the model into a dynamic batching owner, meaning that it will
 For more information, see this Wiki page on batching / merging: https://github.com/SolarLune/Tetra3d/wiki/Merging-and-Batching-Draw-Calls
 */
 func (model *Model) DynamicBatchAdd(meshPart *MeshPart, batchedModels ...*Model) error {
-
-	model.dynamicBatcher = true
 
 	for _, other := range batchedModels {
 
@@ -252,6 +255,26 @@ func (model *Model) DynamicBatchRemove(batched ...*Model) {
 			delete(model.DynamicBatchModels, mp)
 		}
 	}
+
+}
+
+func (model *Model) DynamicBatcher() bool {
+	return len(model.DynamicBatchModels) > 0
+}
+
+// DynamicBatchClear clears the model's dynamic batch map from any models associated with it.
+func (model *Model) DynamicBatchClear() {
+
+	for _, modelSlice := range model.DynamicBatchModels {
+		for _, existing := range modelSlice {
+			existing.DynamicBatchOwner = nil
+		}
+	}
+
+	for mp := range model.DynamicBatchModels {
+		delete(model.DynamicBatchModels, mp)
+	}
+
 }
 
 // DynamicBatchTriangleCount returns the total number of triangles of Models in the calling Model's dynamic batch.
@@ -363,8 +386,8 @@ func (model *Model) StaticMerge(models ...*Model) {
 
 	model.Mesh.UpdateBounds()
 
-	model.BoundingSphere.SetLocalPositionVec(model.Mesh.Dimensions.Center())
-	model.BoundingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
+	model.frustumCullingSphere.SetLocalPositionVec(model.Mesh.Dimensions.Center())
+	model.frustumCullingSphere.Radius = model.Mesh.Dimensions.MaxSpan() / 2
 
 }
 
@@ -455,9 +478,9 @@ func (model *Model) refreshVertexVisibility() {
 
 // ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
 // matrix, a camera, and the MeshPart being rendered.
-func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, scene *Scene) []sortingTriangle {
+func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, processOnlyVisible bool) []sortingTriangle {
 
-	if (model.Color.A == 0 && model.isTransparent(meshPart)) || !model.visible {
+	if processOnlyVisible && ((model.Color.A == 0 && model.isTransparent(meshPart)) || !model.visible) {
 		meshPart.sortingTriangles = meshPart.sortingTriangles[:0]
 		return meshPart.sortingTriangles
 	}
@@ -846,8 +869,8 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 	for _, other := range bakeOptions.OtherModels {
 
-		rad := model.BoundingSphere.WorldRadius()
-		if or := other.BoundingSphere.WorldRadius(); or > rad {
+		rad := model.frustumCullingSphere.WorldRadius()
+		if or := other.frustumCullingSphere.WorldRadius(); or > rad {
 			rad = or
 		}
 		if model == other || model.WorldPosition().DistanceSquared(other.WorldPosition()) > rad*rad {

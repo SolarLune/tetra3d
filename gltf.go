@@ -150,11 +150,6 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 	camHeight := gltfLoadOptions.CameraHeight
 	camDefaultSize := false
 	exportedCameras := []*Camera{}
-
-	sectorRendering := false
-	perspectiveCorrectedTextureMapping := false
-	maxLightCount := 0
-	sectorRenderDepth := 0
 	sectorDetection := SectorDetectionTypeVertices
 
 	if gltfLoadOptions.CameraWidth <= 0 && gltfLoadOptions.CameraHeight <= 0 {
@@ -252,28 +247,12 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 			}
 
-			if on, exists := globalExporterSettings["t3dSectorRendering__"]; exists {
-				sectorRendering = on.(bool)
-			}
-
-			if depth, exists := globalExporterSettings["t3dSectorRenderDepth__"]; exists {
-				sectorRenderDepth = int(depth.(float64))
-			}
-
-			if count, exists := globalExporterSettings["t3dMaxLightCount__"]; exists {
-				maxLightCount = int(count.(float64))
-			}
-
-			if on, exists := globalExporterSettings["t3dPerspectiveCorrectedTextureMapping__"]; exists {
-				perspectiveCorrectedTextureMapping = on.(bool)
-			}
-
 			if value, exists := globalExporterSettings["t3dSectorDetectionType__"]; exists {
 				switch value.(string) {
 				case "AABB":
 					sectorDetection = SectorDetectionTypeAABB
-					// case "VERTICES":
-					// 	sectorDetection = SectorDetectionTypeVertices
+				case "VERTICES":
+					sectorDetection = SectorDetectionTypeVertices
 				}
 			}
 
@@ -866,10 +845,31 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				newCam.perspective = false
 			}
 
-			newCam.SectorRendering = sectorRendering
-			newCam.MaxLightCount = maxLightCount
-			newCam.SectorRenderDepth = sectorRenderDepth
-			newCam.PerspectiveCorrectedTextureMapping = perspectiveCorrectedTextureMapping
+			camProp := func(cam *gltf.Camera, propName string) any {
+
+				if cam.Extras == nil {
+					return nil
+				}
+
+				if value, exists := cam.Extras.(map[string]interface{})[propName]; exists {
+					return value
+				}
+				return nil
+
+			}
+
+			if v := camProp(gltfCam, "t3dSectorRendering__"); v != nil {
+				newCam.SectorRendering = v.(float64) > 0
+			}
+			if v := camProp(gltfCam, "t3dMaxLightCount__"); v != nil {
+				newCam.MaxLightCount = int(v.(float64))
+			}
+			if v := camProp(gltfCam, "t3dSectorRenderDepth__"); v != nil {
+				newCam.SectorRenderDepth = int(v.(float64))
+			}
+			if v := camProp(gltfCam, "t3dPerspectiveCorrectedTextureMapping__"); v != nil {
+				newCam.PerspectiveCorrectedTextureMapping = v.(float64) > 0
+			}
 
 			obj = newCam
 
@@ -1139,10 +1139,22 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 		}
 
-		if value := nodeGetProp(node, "t3dSector__"); value != nil && value.(float64) > 0 {
-			sec := NewSector(obj.(*Model))
-			sec.SectorDetectionType = SectorDetectionType(sectorDetection)
-			obj.(*Model).sector = sec
+		// if value := nodeGetProp(node, "t3dSector__"); value != nil && value.(float64) > 0 {
+		// 	sec := NewSector(obj.(*Model))
+		// 	sec.SectorDetectionType = SectorDetectionType(sectorDetection)
+		// 	obj.(*Model).sector = sec
+		// }
+
+		if value := nodeGetProp(node, "t3dSectorType__"); value != nil {
+			obj.SetSectorType(SectorType(value.(float64)))
+			switch value.(float64) {
+			// case 0: // SectorTypeObject
+			case 1: // SectorTypeSector
+				sec := NewSector(obj.(*Model))
+				sec.SectorDetectionType = SectorDetectionType(sectorDetection)
+				obj.(*Model).sector = sec
+				// case 2: // SectorTypeStandalone
+			}
 		}
 
 		objects = append(objects, obj)

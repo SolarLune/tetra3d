@@ -87,7 +87,9 @@ var textShaderSrc []byte
 // All changes to the Text require that the Text object updates its texture, which can be costly as this means redrawing the text as
 // necessary; this is handled automatically.
 // Note that for this to work ideally, the mesh cannot be rotated (i.e. the mesh's faces should not be at an angle).
-func NewText(meshPart *MeshPart, textureWidth int) *Text {
+// The function will return an error if the UV values for the vertices don't cover a large enough range (i.e. if the plane doesn't cover
+// the entire text texture, from 0,0 to 1,1). This isn't necessarily a problem, but can indicate an issue that would make text not render.
+func NewText(meshPart *MeshPart, textureWidth int) (*Text, error) {
 
 	text := &Text{
 		meshPart:    meshPart,
@@ -134,7 +136,35 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 
 	text.SetStyle(NewDefaultTextStyle()) // The texture will update when we apply the style.
 
-	return text
+	uvMin := Vector{math.MaxFloat64, math.MaxFloat64, 0, 0}
+	uvMax := Vector{-math.MaxFloat64, -math.MaxFloat64, 0, 0}
+
+	meshPart.ForEachVertexIndex(func(vertIndex int) {
+		uv := meshPart.Mesh.VertexUVs[vertIndex]
+
+		if uv.X < uvMin.X {
+			uvMin.X = uv.X
+		}
+		if uv.Y < uvMin.Y {
+			uvMin.Y = uv.Y
+		}
+
+		if uv.X > uvMax.X {
+			uvMax.X = uv.X
+		}
+		if uv.Y > uvMax.Y {
+			uvMax.Y = uv.Y
+		}
+
+	}, false)
+
+	err = nil
+
+	if uvMax.X-uvMin.X < 0.99 || uvMax.Y-uvMin.Y < 0.99 {
+		err = fmt.Errorf("warning: uv values for text mesh part bounds have a small or unusual bounds of: %s : %s", uvMin, uvMax)
+	}
+
+	return text, err
 }
 
 // NewTextAutoSize creates a new Text rendering surface for typing out text,
@@ -143,7 +173,9 @@ func NewText(meshPart *MeshPart, textureWidth int) *Text {
 // Note that for this to work ideally, the mesh cannot be rotated (i.e. the mesh's faces should not be at an angle).
 // All changes to the Text require that the Text object updates its texture, which can be costly as this means redrawing the text as
 // necessary; this is handled automatically.
-func NewTextAutoSize(meshPart *MeshPart, camera *Camera) *Text {
+// The function will return an error if the UV values for the vertices don't cover a large enough range (i.e. if the plane doesn't cover
+// the entire text texture, from 0,0 to 1,1). This isn't necessarily a problem, but can indicate an issue that would make text not render.
+func NewTextAutoSize(meshPart *MeshPart, camera *Camera) (*Text, error) {
 	w, _ := camera.Size()
 
 	meshPartDimWidth, _ := meshPart.primaryDimensions()
@@ -156,7 +188,7 @@ func NewTextAutoSize(meshPart *MeshPart, camera *Camera) *Text {
 // Clone clones the Text object.
 func (text *Text) Clone() *Text {
 
-	newText := NewText(text.meshPart, text.textureSize)
+	newText, _ := NewText(text.meshPart, text.textureSize)
 	newText.typewriterIndex = text.typewriterIndex
 	newText.typewriterOn = text.typewriterOn
 	newText.setText = text.setText
@@ -459,11 +491,17 @@ func (text *Text) TypewriterFinished() bool {
 	return text.typewriterIndex >= len(text.setText)
 }
 
+// SetTypewriterOn sets the typewriter effect on the Text object.
 func (text *Text) SetTypewriterOn(on bool) {
 	if text.typewriterOn != on {
 		text.UpdateTexture()
 	}
 	text.typewriterOn = on
+}
+
+// TypewriterOn returns if the typewriter effect is enabled on the Text object.
+func (text *Text) TypewriterOn() bool {
+	return text.typewriterOn
 }
 
 // Dispose disposes of the text object's backing texture; this needs to be called to free VRAM, and should be called

@@ -107,6 +107,12 @@ func (c Color) AddAlpha(alpha float32) Color {
 	return c
 }
 
+// SubAlpha adds the provided alpha amount to the Color
+func (c Color) SubAlpha(alpha float32) Color {
+	c.A -= alpha
+	return c
+}
+
 // SetAlpha returns a copy of the the Color with the alpha set to the provided alpha value.
 func (color Color) SetAlpha(alpha float32) Color {
 	color.A = alpha

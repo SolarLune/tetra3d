@@ -76,7 +76,11 @@ func (g *Game) Init() {
 
 	// Create a new Text object to handle text display; we specify what Meshpart it should
 	// target, and how large to make the text rendering surface
-	g.Text = tetra3d.NewText(textPlane.Mesh.FindMeshPart("Text"), 256)
+	text, err := tetra3d.NewText(textPlane.Mesh.FindMeshPart("Text"), 256)
+	if err != nil {
+		panic(err)
+	}
+	g.Text = text
 
 	g.Text.SetStyle(
 		tetra3d.TextStyle{

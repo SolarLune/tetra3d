@@ -117,7 +117,7 @@ func (scene *Scene) HandleAutobatch() {
 							mesh.AddMeshPart(mat)
 							m := NewModel("auto dynamic batch", mesh)
 							m.FrustumCulling = false
-							m.dynamicBatcher = true
+							m.sectorType = SectorTypeStandalone
 							scene.autobatchDynamicMap[mat] = m
 							scene.Root.AddChildren(m)
 						}
@@ -127,6 +127,7 @@ func (scene *Scene) HandleAutobatch() {
 
 						if _, exists := scene.autobatchStaticMap[mat]; !exists {
 							m := NewModel("auto static merge", NewMesh("auto static merge"))
+							m.sectorType = SectorTypeStandalone
 							scene.autobatchStaticMap[mat] = m
 							scene.Root.AddChildren(scene.autobatchStaticMap[mat])
 						}

@@ -19,7 +19,7 @@ type Game struct {
 	System examples.BasicSystemHandler
 }
 
-//go:embed sectors.gltf
+//go:embed sectors.glb
 var sceneData []byte
 
 func NewGame() *Game {
@@ -40,14 +40,9 @@ func (g *Game) Init() {
 	g.Scene = library.ExportedScene.Clone()
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
-	g.Camera.SetLocalPosition(0, 0, 0)
-	g.Camera.SetFar(100)
 
-	// We need to enable SectorRendering here because we're making the
-	// camera in code; if the camera were imported from the Blender scene,
-	// we wouldn't need to do so.
-	g.Camera.SectorRendering = true
-	g.Camera.SectorRenderDepth = 1
+	// We use the existing camera for this.
+	g.Camera.Camera = g.Scene.Root.Get("Camera").(*tetra3d.Camera)
 
 	g.System = examples.NewBasicSystemHandler(g)
 

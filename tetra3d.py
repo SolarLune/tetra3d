@@ -24,6 +24,18 @@ objectTypes = [
     ("GRID", "Grid", "A grid object; not visualized or 'physically present'. The vertices in Blender become grid points in Tetra3D; the edges become their connections.", 0, 1),
 ]
 
+sectorTypes = [
+    ("OBJECT", "Object", "An Object that lies in a sector will only render if the sector it is in also renders.", 0, 0),
+    ("SECTOR", "Sector", "A Sector indicates a space that contains objects and maintains neighborly relationships with other Sectors.", 0, 1),
+    ("STANDALONE", "Standalone", "A Standalone object will render regardless of if the sector it lies in renders (or if it lies in any sector at all).", 0, 2),
+]
+
+def listSectorTypes(self, context):
+
+    if context.object.type == "MESH" or (context.object.instance_type == "COLLECTION" and context.object.instance_collection is not None):
+        return sectorTypes
+    return sectorTypes[::2]
+
 boundsTypes = [
     ("NONE", "No Bounds", "No collision will be created for this object.", 0, 0),
     ("AABB", "AABB", "An AABB (axis-aligned bounding box). If the size isn't customized, it will be big enough to fully contain the mesh of the current object. Currently buggy when resolving intersections between AABB or other Triangle Nodes.", 0, 1),
@@ -490,7 +502,22 @@ def objectNodePath(object):
     p = object.name
 
     if object.parent:
-        p = objectNodePath(object.parent) + "/" + object.name
+
+        if object.parent_type == "BONE":
+            armaturePath = ""
+
+            parentBoneName = object.parent_bone
+            armatureData = object.parent.data
+            parent = armatureData.bones[parentBoneName]
+
+            while parent:
+                armaturePath = parent.name + "/" + armaturePath
+                parent = parent.parent
+
+            p = objectNodePath(object.parent) + "/" + armaturePath + object.name
+
+        else:
+            p = objectNodePath(object.parent) + "/" + object.name
 
     return p
 
@@ -545,10 +572,24 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             row.prop(context.object, "t3dAutoSubdivide__")
             if context.object.t3dAutoSubdivide__:
                 row.prop(context.object, "t3dAutoSubdivideSize__") 
-            
+
+        isCollection = context.object.instance_type == "COLLECTION" and context.object.instance_collection is not None
+
+        box = self.layout.box()
+        row = box.row()
+        row.label(text="Sector Type:")
+        
+        if isCollection:
             row = box.row()
             row.enabled = context.object.t3dObjectType__ == 'MESH'
-            row.prop(context.object, "t3dSector__")
+            row.prop(context.object, "t3dSectorTypeOverride__", expand=True)
+
+        row = box.row()
+        if isCollection:
+            row.enabled = context.object.t3dSectorTypeOverride__
+        else:
+            row.enabled = context.object.t3dObjectType__ == 'MESH'
+        row.prop(context.object, "t3dSectorType__", expand=True)
 
         row = self.layout.row()
         row.prop(context.object, "t3dBoundsType__")
@@ -579,7 +620,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.separator()
 
-        if context.object.instance_type == "COLLECTION" and context.object.instance_collection is not None:
+        if isCollection:
 
             row = self.layout.row()
             row.label(text="Collection Object Properties")
@@ -722,6 +763,20 @@ class CAMERA_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.prop(context.object.data, "clip_start")
         row.prop(context.object.data, "clip_end")
+        row = self.layout.row()
+        row.prop(context.object.data, "t3dMaxLightCount__")
+
+        box = self.layout.box()
+        box.prop(context.object.data, "t3dSectorRendering__")
+        row = box.row()
+        sectorRenderingOn = context.object.data.t3dSectorRendering__
+        row.enabled = sectorRenderingOn
+        row.prop(context.object.data, "t3dSectorRenderDepth__")
+        row.enabled = sectorRenderingOn
+
+        box = self.layout.box()
+        row = box.row()
+        row.prop(context.object.data, "t3dPerspectiveCorrectedTextureMapping__")
 
 
 def handleT3DProperty(index, box, prop, operatorType, enabled=True):
@@ -937,8 +992,6 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
 
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
-        box.prop(context.scene, "t3dPerspectiveCorrectedTextureMapping__")
-        box.prop(context.scene, "t3dMaxLightCount__")
 
         box = self.layout.box()
 
@@ -966,19 +1019,13 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         row = box.row()
         row.prop(context.scene, "t3dRenderResolutionW__")
         row.prop(context.scene, "t3dRenderResolutionH__")
-
+        
         box = self.layout.box()
-        box.prop(context.scene, "t3dSectorRendering__")
         row = box.row()
-        sectorRenderingOn = context.scene.t3dSectorRendering__
-        row.enabled = sectorRenderingOn
-        row.prop(context.scene, "t3dSectorRenderDepth__")
-        row = box.row()
-        row.enabled = sectorRenderingOn
         row.label(text="Sector detection type:")
+
         row = box.row()
         row.prop(context.scene, "t3dSectorDetectionType__", expand=True)
-        row.enabled = sectorRenderingOn
 
         box = self.layout.box()
         row = box.row()
@@ -1654,53 +1701,6 @@ class EXPORT_OT_tetra3d(bpy.types.Operator):
         return {'FINISHED'}
 
 
-objectProps = {
-    "t3dVisible__" : bpy.props.BoolProperty(name="Visible", description="Whether the object is visible or not when exported to Tetra3D", default=True),
-    "t3dBoundsType__" : bpy.props.EnumProperty(items=boundsTypes, name="Bounds", description="What Bounding node type to create and parent to this object"),
-    "t3dAABBCustomEnabled__" : bpy.props.BoolProperty(name="Custom AABB Size", description="If enabled, you can manually set the BoundingAABB node's size. If disabled, the AABB's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingAABB node will be generated)", default=False),
-    "t3dAABBCustomSize__" : bpy.props.FloatVectorProperty(name="Size", description="Width (X), height (Y), and depth (Z) of the BoundingAABB node that will be created", min=0.0, default=[2,2,2]),
-    "t3dTrianglesCustomBroadphaseEnabled__" : bpy.props.BoolProperty(name="Custom Broadphase Size", description="If enabled, you can manually set the BoundingTriangle's broadphase settings. If disabled, the BoundingTriangle's broadphase settings will be automatically determined by this object's size", default=False),
-    "t3dTrianglesCustomBroadphaseGridSize__" : bpy.props.IntProperty(name="Broadphase Cell Size", description="How large the cells are in the broadphase collision grid (a cell size of 0 disables broadphase collision)", min=0, default=20),
-    "t3dCapsuleCustomEnabled__" : bpy.props.BoolProperty(name="Custom Capsule Size", description="If enabled, you can manually set the BoundingCapsule node's size properties. If disabled, the Capsule's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingCapsule node will be generated)", default=False),
-    "t3dCapsuleCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="The radius of the BoundingCapsule node", min=0.0, default=0.5),
-    "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Height", description="The height of the BoundingCapsule node", min=0.0, default=2),
-    "t3dSphereCustomEnabled__" : bpy.props.BoolProperty(name="Custom Sphere Size", description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)", default=False),
-    "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
-    "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
-    "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
-    "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),
-    "t3dAutoSubdivide__" : bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, Tetra3D will do its best to loop cut edges that are too large before export"),
-    "t3dAutoSubdivideSize__" : bpy.props.FloatProperty(name="Max Edge Length", description="The maximum length an edge is allowed to be before automatically cutting prior to export", min=0.0, default=1.0),
-    "t3dSector__" : bpy.props.BoolProperty(name="Is a Sector", description="If enabled, this identifies a mesh as being a Sector. When this is the case and sector-based rendering has been enabled on a Camera, this allows you to granularly restrict how far the camera renders, not based off of near/far plane only, but also based off of which sector you're in and how many sectors in you can look")
-}
-
-
-def getSectorRendering(self):
-    return globalGet("t3dSectorRendering__", False)
-
-def setSectorRendering(self, value):
-    globalSet("t3dSectorRendering__", value)
-
-def getPerspectiveCorrectedTextureMapping(self):
-    return globalGet("t3dPerspectiveCorrectedTextureMapping__", False)
-
-def setPerspectiveCorrectedTextureMapping(self, value):
-    globalSet("t3dPerspectiveCorrectedTextureMapping__", value)
-
-def getMaxLightCount(self):
-    return globalGet("t3dMaxLightCount__", 0)
-
-def setMaxLightCount(self, value):
-    globalSet("t3dMaxLightCount__", value)
-
-
-def getSectorRenderDepth(self):
-    return globalGet("t3dSectorRenderDepth__", 0)
-
-def setSectorRenderDepth(self, value):
-    globalSet("t3dSectorRenderDepth__", value)
-
-
 def getSectorDetectionType(self):
     return globalGet("t3dSectorDetection__", 0)
 
@@ -1855,6 +1855,31 @@ def setFOV(self, value):
     else:
         self.angle = math.radians(value)
 
+####
+
+objectProps = {
+    "t3dVisible__" : bpy.props.BoolProperty(name="Visible", description="Whether the object is visible or not when exported to Tetra3D", default=True),
+    "t3dBoundsType__" : bpy.props.EnumProperty(items=boundsTypes, name="Bounds", description="What Bounding node type to create and parent to this object"),
+    "t3dAABBCustomEnabled__" : bpy.props.BoolProperty(name="Custom AABB Size", description="If enabled, you can manually set the BoundingAABB node's size. If disabled, the AABB's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingAABB node will be generated)", default=False),
+    "t3dAABBCustomSize__" : bpy.props.FloatVectorProperty(name="Size", description="Width (X), height (Y), and depth (Z) of the BoundingAABB node that will be created", min=0.0, default=[2,2,2]),
+    "t3dTrianglesCustomBroadphaseEnabled__" : bpy.props.BoolProperty(name="Custom Broadphase Size", description="If enabled, you can manually set the BoundingTriangle's broadphase settings. If disabled, the BoundingTriangle's broadphase settings will be automatically determined by this object's size", default=False),
+    "t3dTrianglesCustomBroadphaseGridSize__" : bpy.props.IntProperty(name="Broadphase Cell Size", description="How large the cells are in the broadphase collision grid (a cell size of 0 disables broadphase collision)", min=0, default=20),
+    "t3dCapsuleCustomEnabled__" : bpy.props.BoolProperty(name="Custom Capsule Size", description="If enabled, you can manually set the BoundingCapsule node's size properties. If disabled, the Capsule's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingCapsule node will be generated)", default=False),
+    "t3dCapsuleCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="The radius of the BoundingCapsule node", min=0.0, default=0.5),
+    "t3dCapsuleCustomHeight__" : bpy.props.FloatProperty(name="Height", description="The height of the BoundingCapsule node", min=0.0, default=2),
+    "t3dSphereCustomEnabled__" : bpy.props.BoolProperty(name="Custom Sphere Size", description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)", default=False),
+    "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
+    "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
+    "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
+    "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),
+    "t3dAutoSubdivide__" : bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, Tetra3D will do its best to loop cut edges that are too large before export"),
+    "t3dAutoSubdivideSize__" : bpy.props.FloatProperty(name="Max Edge Length", description="The maximum length an edge is allowed to be before automatically cutting prior to export", min=0.0, default=1.0),
+    "t3dSectorType__" : bpy.props.EnumProperty(items=listSectorTypes,name="Sector Type", description="The type of sector capability this object has; only used if rendered with a camera with Sector Rendering on"),
+    "t3dSectorTypeOverride__" : bpy.props.BoolProperty(name="Override Sector Type", description="If the collection object should override the sector type for its top-level objects"),
+}
+
+####
+
 def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
@@ -1896,27 +1921,23 @@ def register():
     bpy.types.Camera.t3dFOV__ = bpy.props.IntProperty(name="FOV", description="Vertical field of view", default=75,
     get=getFOV, set=setFOV, min=1, max=179)
     
-    bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
+    bpy.types.Camera.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not", default=False)
+    
+    bpy.types.Camera.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=1, min=0)
 
-    bpy.types.Scene.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not. Takes effect on Cameras created in this Blender file", default=False, 
-    get=getSectorRendering, set=setSectorRendering)
+    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined", default='VERTICES', 
+    get=getSectorDetectionType, set=setSectorDetectionType)
+
+    bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
 
     perspectiveDescription = ("Whether the game should be rendered with perspective-corrected "
     "texture mapping or not. When enabled, it will look more like modern 3D texturing; when disabled, "
-    "it will look like PS1 affine texture mapping (which is the default). Takes effect on Cameras created in this Blender file. "
+    "it will look like PS1 affine texture mapping (which is the default)."
     "This feature is experimental / not perfect currently (it looks fuzzy, and triangles aren't clipped properly at the edges of the viewport, "
     "which means you still get texture skewing when a triangle is largely offscreen)")
-    bpy.types.Scene.t3dPerspectiveCorrectedTextureMapping__ = bpy.props.BoolProperty(name="Perspective-corrected Texture Mapping (Experimental)", description=perspectiveDescription, default=False, 
-    get=getPerspectiveCorrectedTextureMapping, set=setPerspectiveCorrectedTextureMapping)
+    bpy.types.Camera.t3dPerspectiveCorrectedTextureMapping__ = bpy.props.BoolProperty(name="Perspective-corrected Texture Mapping (Experimental)", description=perspectiveDescription, default=False)
 
-    bpy.types.Scene.t3dMaxLightCount__ = bpy.props.IntProperty(name="Max light count", description="How many lights (sorted by distance to the camera, including ambient lights) should be used to light objects; if 0, then there is no limit. Takes effect on Cameras created in this Blender file", default=0, 
-    get=getMaxLightCount, set=setMaxLightCount, min = 0)
-
-    bpy.types.Scene.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time. Takes effect on Cameras created in this Blender file", default=1, min=0,
-    get=getSectorRenderDepth, set=setSectorRenderDepth)
-
-    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined. Takes effect on Cameras created in this Blender file", default='VERTICES', 
-    get=getSectorDetectionType, set=setSectorDetectionType)
+    bpy.types.Camera.t3dMaxLightCount__ = bpy.props.IntProperty(name="Max light count", description="How many lights (sorted by distance to the camera, including ambient lights) should be used to light objects; if 0, then there is no limit", default=0, min = 0)
 
     bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
     get=getExportOnSave, set=setExportOnSave)
@@ -2053,8 +2074,6 @@ def unregister():
 
     del bpy.types.Scene.t3dGameProperties__
 
-    del bpy.types.Scene.t3dSectorRendering__
-    del bpy.types.Scene.t3dSectorRenderDepth__
     del bpy.types.Scene.t3dSectorDetectionType__
     del bpy.types.Scene.t3dExportOnSave__
     del bpy.types.Scene.t3dExportFilepath__
@@ -2064,9 +2083,6 @@ def unregister():
     del bpy.types.Scene.t3dPackTextures__
     del bpy.types.Scene.t3dAnimationSampling__
     del bpy.types.Scene.t3dAnimationInterpolation__
-    del bpy.types.Scene.t3dPerspectiveCorrectedTextureMapping__
-
-    del bpy.types.Scene.t3dMaxLightCount__
 
     del bpy.types.Scene.t3dRenderResolutionW__
     del bpy.types.Scene.t3dRenderResolutionH__
@@ -2100,7 +2116,11 @@ def unregister():
 
     del bpy.types.Mesh.t3dUniqueMesh__
 
+    del bpy.types.Camera.t3dSectorRendering__
+    del bpy.types.Camera.t3dSectorRenderDepth__
+    del bpy.types.Camera.t3dPerspectiveCorrectedTextureMapping__
     del bpy.types.Camera.t3dFOV__
+    del bpy.types.Camera.t3dMaxLightCount__
 
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)

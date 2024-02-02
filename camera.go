@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"math"
@@ -477,18 +478,26 @@ func (camera *Camera) SetFar(far float64) {
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
 // does this by taking outVec, a vertex (Vector) that it stores the values in and returns, which avoids reallocation.
-func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width, height float64) Vector {
+func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width, height float64, limitW bool) Vector {
 
 	v3 := vert.W
 
-	if !camera.perspective {
-		v3 = 1.0
-	}
+	if limitW {
 
-	// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
-	// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
-	if v3 < 0 {
-		v3 = 0.000001
+		if !camera.perspective {
+			v3 = 1.0
+		}
+
+		// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
+		// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
+		if v3 < 0 {
+			v3 = 0.000001
+		}
+
+	} else {
+		if v3 < 0 {
+			v3 *= -1
+		}
 	}
 
 	// Again, this function should only be called with pre-transformed 4D vertex arguments.
@@ -508,15 +517,16 @@ func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width,
 
 // ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
 func (camera *Camera) ClipToScreen(vert Vector) Vector {
-	width, height := camera.resultColorTexture.Size()
-	return camera.clipToScreen(vert, 0, nil, float64(width), float64(height))
+	width, height := camera.Size()
+	return camera.clipToScreen(vert, 0, nil, float64(width), float64(height), false)
 }
 
 // WorldToScreenPixels transforms a 3D position in the world to a position onscreen, with X and Y representing the pixels.
 // The Z coordinate indicates depth away from the camera in 3D world units.
 func (camera *Camera) WorldToScreenPixels(vert Vector) Vector {
 	v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
-	return camera.ClipToScreen(v.MultVecW(NewVectorZero()))
+	width, height := camera.Size()
+	return camera.clipToScreen(v.MultVecW(NewVectorZero()), 0, nil, float64(width), float64(height), false)
 }
 
 // WorldToScreen transforms a 3D position in the world to a 2D vector, with X and Y ranging from -1 to 1.
@@ -808,80 +818,121 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 	if camera.SectorRendering {
 
 		// Gather sectors
-		sectorSearch := rootNode.SearchTree().bySectors()
+		sectors := rootNode.SearchTree().bySectors()
+		sectorModels := sectors.Models()
 
-		nonSectorSearch := rootNode.SearchTree().ByFunc(func(node INode) bool {
-			model, ok := node.(*Model)
-			return !ok || model.sector == nil
-		})
+		var insideSector *Sector
 
-		nonSectorSearch.StopOnFiltered = true
+		sectors.ForEach(func(node INode) bool {
 
-		sectorModels := sectorSearch.Models()
+			sectorModel := node.(*Model)
+			sector := node.(*Model).sector
+			sector.sectorVisible = false
 
-		// Set them all to be invisible by default
-		for _, sectorModel := range sectorModels {
+			// Set them all to be invisible by default
 			if sectorModel.DynamicBatchOwner == nil {
-				sectorModel.sector.sectorVisible = false
+				sector.sectorVisible = false
 			} else {
 				// Making a sector dynamically batched is just way too much to deal with, I'm sorry
 				panic("Can't make a sector " + sectorModel.Path() + " dynamically batched as well")
 			}
-		}
 
-		var insideSector *Sector
-
-		// Find which one the camera's inside
-		for _, s := range sectorModels {
-			sector := s.sector
 			if sector.AABB.PointInside(camera.WorldPosition()) {
 				if insideSector == nil || sector.AABB.Dimensions.MaxSpan() < insideSector.AABB.Dimensions.MaxSpan() {
 					insideSector = sector
-					insideSector.sectorVisible = true
 				}
 			}
-		}
 
+			return true
+		})
+
+		camera.currentSector = insideSector
 		if insideSector != nil {
+			insideSector.sectorVisible = true
 
+			// Make neighbors visible
 			for r := range insideSector.NeighborsWithinRange(camera.SectorRenderDepth) {
 				r.sectorVisible = true
 			}
 
-		}
+			rootNode.SearchTree().ByType(NodeTypeModel).ForEach(func(node INode) bool {
+				model := node.(*Model)
 
-		// Make sectors and objects under their tree visible
-		for _, s := range sectorModels {
-
-			if s.sector.sectorVisible {
-
-				search := s.SearchTree().INodes()
-				meshes = append(meshes, s)
-				for _, n := range search {
-					if model, ok := n.(*Model); ok {
+				if model.sector != nil && model.sector.sectorVisible {
+					if model.sector.sectorVisible {
 						meshes = append(meshes, model)
 					}
-					if light, ok := n.(ILight); ok && light.IsOn() {
-						lights = append(lights, light)
+				} else if model.DynamicBatchOwner == nil {
+
+					// If something is dynamically batching, then we don't want to deal with sectors, because the batched objects belong to sectors.
+					if model.DynamicBatcher() {
+						meshes = append(meshes, model)
+					} else if model.SectorType() == SectorTypeStandalone || (model.SectorType() == SectorTypeObject && model.isInVisibleSector(sectorModels)) {
+						meshes = append(meshes, model)
+					} else if s := model.sectorHierarchy(); s != nil && s.sectorVisible {
+						meshes = append(meshes, model)
 					}
+
 				}
 
-			}
+				return true
+			})
+
+			rootNode.SearchTree().ByType(NodeTypeLight).ForEach(func(node INode) bool {
+				light := node.(ILight)
+				if light.SectorType() == SectorTypeStandalone || (light.SectorType() == SectorTypeObject && light.isInVisibleSector(sectorModels)) {
+					lights = append(lights, light)
+				} else if s := light.sectorHierarchy(); s != nil && s.sectorVisible {
+					lights = append(lights, light)
+				}
+				return true
+			})
 
 		}
 
-		// Now search for non-Sectors
+		// for _, s := range sectorModels {
+		// 	if s.sector.sectorVisible {
 
-		for _, i := range nonSectorSearch.INodes() {
-			if model, ok := i.(*Model); ok {
-				meshes = append(meshes, model)
-			}
-			if light, ok := i.(ILight); ok && light.IsOn() {
-				lights = append(lights, light)
-			}
-		}
+		// 	}
+		// }
 
-		camera.currentSector = insideSector
+		// // Make sectors and objects under their tree visible
+		// for _, s := range sectorModels {
+
+		// 	if s.sector.sectorVisible {
+
+		// 		search := s.SearchTree().INodes()
+		// 		meshes = append(meshes, s)
+		// 		for _, n := range search {
+		// 			if model, ok := n.(*Model); ok {
+		// 				meshes = append(meshes, model)
+		// 			}
+		// 			if light, ok := n.(ILight); ok && light.IsOn() {
+		// 				lights = append(lights, light)
+		// 			}
+		// 		}
+
+		// 	}
+
+		// }
+
+		// // Now search for non-Sectors
+
+		// nonSectorSearch := rootNode.SearchTree().ByFunc(func(node INode) bool {
+		// 	model, ok := node.(*Model)
+		// 	return !ok || model.sector == nil
+		// })
+
+		// nonSectorSearch.StopOnFiltered = true
+
+		// for _, i := range nonSectorSearch.INodes() {
+		// 	if model, ok := i.(*Model); ok {
+		// 		meshes = append(meshes, model)
+		// 	}
+		// 	if light, ok := i.(ILight); ok && light.IsOn() {
+		// 		lights = append(lights, light)
+		// 	}
+		// }
 
 	} else {
 		models := rootNode.SearchTree().Models()
@@ -984,7 +1035,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	for _, model := range models {
 
-		if !model.visible {
+		if !model.visible || model.DynamicBatchOwner != nil {
 			continue
 		}
 
@@ -992,14 +1043,14 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			model.Transform()
 
-			if !camera.SphereInFrustum(model.BoundingSphere) {
+			if model.DynamicBatcher() && !camera.SphereInFrustum(model.frustumCullingSphere) {
 				continue
 			}
 			model.refreshVertexVisibility()
 
 		}
 
-		if len(model.DynamicBatchModels) > 0 {
+		if model.DynamicBatcher() {
 
 			dynamicDepths := map[*Model]float64{}
 
@@ -1128,7 +1179,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			camera.DebugInfo.BatchedParts++
 		}
 
-		sortingTris := model.ProcessVertices(vpMatrix, camera, meshPart, scene)
+		sortingTris := model.ProcessVertices(vpMatrix, camera, meshPart, true)
 
 		srcW := 0.0
 		srcH := 0.0
@@ -1234,7 +1285,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				// triIndex := meshPart.sortingTriangles[t].ID
 				// tri := meshPart.Mesh.Triangles[triIndex]
 
-				clipped := camera.clipToScreen(mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight))
+				clipped := camera.clipToScreen(mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight), true)
 
 				// if visible {
 				// 	renderedAnything = trueForEachVertexIndex
@@ -1622,7 +1673,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		// object sharing the same material / object-level properties (color / material blending mode, for
 		// example).
 
-		if pair.Model.dynamicBatcher {
+		if pair.Model.DynamicBatcher() {
 
 			modelSlice := pair.Model.DynamicBatchModels[pair.MeshPart]
 
@@ -1634,7 +1685,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				if merged.FrustumCulling {
 					merged.Transform()
-					if !camera.SphereInFrustum(merged.BoundingSphere) {
+					if !camera.SphereInFrustum(merged.frustumCullingSphere) {
 						continue
 					}
 				}
@@ -1663,7 +1714,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			continue
 		}
 
-		if pair.Model.dynamicBatcher {
+		if pair.Model.DynamicBatcher() {
 
 			if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
 
@@ -1677,7 +1728,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 					if merged.FrustumCulling {
 						merged.Transform()
-						if !camera.SphereInFrustum(merged.BoundingSphere) {
+						if !camera.SphereInFrustum(merged.frustumCullingSphere) {
 							continue
 						}
 					}
@@ -1795,22 +1846,71 @@ func (camera *Camera) RenderSprite3D(screen *ebiten.Image, renderSettings ...Dra
 
 }
 
-var renderCube = NewModel("render cube", NewCubeMesh())
+type DynamicRenderSettings struct {
+	Model       *Model // The model to be cloned for usage
+	clonedModel *Model
 
-// RenderCube quickly and easily renders a cube with the position and scale desired.
-// The Camera must be present in a scene to perform this function.
-func (camera *Camera) RenderCube(position Vector, scale Vector, color Color, shadelessness bool) {
+	Position Vector  // The position to render the Model at. Ignored if Transform is set.
+	Scale    Vector  // The scale to render the Model at. Ignored if Transform is set.
+	Rotation Matrix4 // The rotation to render the Model with. Ignored if Transform is set.
+
+	Transform Matrix4 // A transform to use for rendering; this is used if it is non-zero.
+
+	Color Color // The color to render the Model.
+}
+
+var dynamicRenderMesh = NewCubeMesh()
+var dynamicRenderOwner = NewModel("dynamic batch render cubes", dynamicRenderMesh)
+
+// DynamicRender quickly and easily renders an object with the desired setup.
+// The Camera must be present in a Scene to perform this function.
+func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 
 	// TODO: Optimize this with perhaps background cubes that are dynamically batched so they could be rendered in one
 	// Render call.
 
 	if scene := camera.Scene(); scene != nil {
-		renderCube.SetLocalPositionVec(position)
-		renderCube.SetLocalScaleVec(scale.Scale(0.5))
-		renderCube.Color = color
-		renderCube.Mesh.Materials()[0].Shadeless = shadelessness
-		camera.Render(scene, nil, renderCube)
+
+		if len(settings) == 0 {
+			return errors.New("no render settings to render")
+		}
+
+		dynamicRenderOwner.Mesh.MeshParts[0].Material = settings[0].Model.Mesh.MeshParts[0].Material
+
+		dynamicRenderOwner.FrustumCulling = false
+
+		dynamicRenderOwner.DynamicBatchClear()
+
+		for _, setting := range settings {
+
+			if setting.clonedModel == nil {
+				if setting.Model == nil {
+					return errors.New("no model specified for usage with Camera.DynamicRender(); this function requires a model to clone")
+				}
+				setting.clonedModel = setting.Model.Clone().(*Model)
+			}
+
+			model := setting.clonedModel
+			if !setting.Transform.IsZero() {
+				model.SetWorldTransform(setting.Transform)
+			} else {
+				model.SetLocalPositionVec(setting.Position)
+				model.SetLocalScaleVec(setting.Scale.Scale(0.5))
+				model.SetLocalRotation(setting.Rotation)
+			}
+			model.Color = setting.Color
+			dynamicRenderOwner.DynamicBatchAdd(dynamicRenderOwner.Mesh.MeshParts[0], model)
+
+		}
+
+		lights := scene.Root.SearchTree().Lights()
+		camera.Render(scene, lights, dynamicRenderOwner)
+
+	} else {
+		return errors.New("camera is not in a scene; cannot render cubes")
 	}
+
+	return nil
 
 }
 
@@ -1875,24 +1975,31 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 		if model, isModel := m.(*Model); isModel {
 
 			if model.FrustumCulling {
-
 				model.Transform()
-				if !camera.SphereInFrustum(model.BoundingSphere) {
+				if !camera.SphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
 			}
 
+			// if model.dynamicBatcher {
+			// 	for _, m := range model.DynamicBatchModels {
+			// 		for _, model := range m {
+			// 			if model.Root() == nil {
+			// 				camera.DrawDebugWireframe(screen, model, color)
+			// 			}
+			// 		}
+			// 	}
+			// }
+
 			for _, meshPart := range model.Mesh.MeshParts {
 
-				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
+				for _, tri := range model.ProcessVertices(vpMatrix, camera, meshPart, false) {
 
-				meshPart.ForEachTri(func(tri *Triangle) {
-
-					indices := tri.VertexIndices
-					v0 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[0]])
-					v1 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[1]])
-					v2 := camera.ClipToScreen(model.Mesh.vertexTransforms[indices[2]])
+					indices := tri.Triangle.VertexIndices
+					v0 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[0]], indices[0], model, float64(camWidth), float64(camHeight), true)
+					v1 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[1]], indices[1], model, float64(camWidth), float64(camHeight), true)
+					v2 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[2]], indices[2], model, float64(camWidth), float64(camHeight), true)
 
 					if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 						(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
@@ -1906,7 +2013,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 					ebitenutil.DrawLine(screen, float64(v1.X), float64(v1.Y), float64(v2.X), float64(v2.Y), c)
 					ebitenutil.DrawLine(screen, float64(v2.X), float64(v2.Y), float64(v0.X), float64(v0.Y), c)
 
-				})
+				}
 
 			}
 
@@ -1956,7 +2063,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 			if model.FrustumCulling {
 
 				model.Transform()
-				if !camera.SphereInFrustum(model.BoundingSphere) {
+				if !camera.SphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
@@ -1964,7 +2071,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 			for _, meshPart := range model.Mesh.MeshParts {
 
-				model.ProcessVertices(vpMatrix, camera, meshPart, nil)
+				model.ProcessVertices(vpMatrix, camera, meshPart, false)
 
 				for triIndex, sortingTri := range meshPart.sortingTriangles {
 
@@ -1995,7 +2102,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 			if model.FrustumCulling {
 
 				model.Transform()
-				if !camera.SphereInFrustum(model.BoundingSphere) {
+				if !camera.SphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
@@ -2024,7 +2131,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 			if model.FrustumCulling {
 
 				model.Transform()
-				if !camera.SphereInFrustum(model.BoundingSphere) {
+				if !camera.SphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
@@ -2291,9 +2398,9 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
 
-						v0 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]))
-						v1 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]))
-						v2 := camera.ClipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]))
+						v0 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]), 0, nil, float64(camWidth), float64(camHeight), false)
+						v1 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]), 0, nil, float64(camWidth), float64(camHeight), false)
+						v2 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]), 0, nil, float64(camWidth), float64(camHeight), false)
 
 						if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 							(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
@@ -2374,7 +2481,7 @@ func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, co
 
 		if model, ok := n.(*Model); ok {
 
-			bounds := model.BoundingSphere
+			bounds := model.frustumCullingSphere
 			camera.drawSphere(screen, bounds, color)
 
 		}

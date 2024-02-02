@@ -11,7 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-//go:embed cubeLighting.gltf
+//go:embed cubeLighting.glb
 var gltfData []byte
 
 type Game struct {

@@ -6,6 +6,14 @@ import (
 	"strings"
 )
 
+type SectorType int
+
+const (
+	SectorTypeObject SectorType = iota
+	SectorTypeSector
+	SectorTypeStandalone
+)
+
 // NodeType represents a Node's type. Node types are categorized, and can be said to extend or "be of" more general types.
 // For example, a BoundingSphere has a type of NodeTypeBoundingSphere. That type can also be said to be NodeTypeBoundingObject
 // (because it is a bounding object). However, it is not of type NodeTypeBoundingTriangles, as that is a different category.
@@ -230,6 +238,10 @@ type INode interface {
 	// Sector returns the Sector this Node is in.
 	Sector() *Sector
 	sectorHierarchy() *Sector
+	isInVisibleSector(sectorsModels []*Model) bool
+
+	SetSectorType(sectorType SectorType)
+	SectorType() SectorType
 
 	// DistanceTo returns the distance between the given Nodes' centers.
 	// Quick syntactic sugar for Node.WorldPosition().Distance(otherNode.WorldPosition()).
@@ -267,6 +279,7 @@ type Node struct {
 	library           *Library // The Library this Node was instantiated from (nil if it wasn't instantiated with a library at all)
 	scene             *Scene
 	onTransformUpdate func()
+	sectorType        SectorType
 }
 
 // NewNode returns a new Node.
@@ -285,6 +298,7 @@ func NewNode(name string) *Node {
 		// We set this just in case we call a transform property getter before setting it and caching anything
 		cachedTransform: NewMatrix4(),
 		// originalLocalPosition: NewVectorZero(),
+		// sectorType: NewBitMask(0 + 1 + 2 + 3 + 4 + 5 + 6 + 7),
 	}
 
 	nodeID++
@@ -331,6 +345,7 @@ func (node *Node) Clone() INode {
 	newNode.rotation = node.rotation.Clone()
 	newNode.visible = node.visible
 	newNode.data = node.data
+	newNode.sectorType = node.sectorType
 	newNode.setOriginalTransform()
 
 	newNode.props = node.props.Clone()
@@ -384,6 +399,7 @@ func (node *Node) Transform() Matrix4 {
 		return node.cachedTransform
 	}
 
+	// TODO: I think I could speed up this area considerably.
 	transform := NewMatrix4Scale(node.scale.X, node.scale.Y, node.scale.Z)
 	transform = transform.Mult(node.rotation)
 	transform = transform.Mult(NewMatrix4Translate(node.position.X, node.position.Y, node.position.Z))
@@ -1130,14 +1146,34 @@ func (node *Node) Sector() *Sector {
 		return sectorHierarchy
 	}
 
+	pos := node.WorldPosition()
 	for _, sectorModel := range node.Root().SearchTree().bySectors().Models() {
-		if sectorModel.sector.AABB.PointInside(node.WorldPosition()) {
+		if sectorModel.sector.AABB.PointInside(pos) {
 			return sectorModel.sector
 		}
 	}
 
 	return nil
 
+}
+
+func (node *Node) isInVisibleSector(sectorModels []*Model) bool {
+	for _, model := range sectorModels {
+		if model.sector.sectorVisible && model.sector.AABB.PointInside(node.WorldPosition()) {
+			return true
+		}
+	}
+	return false
+}
+
+// SectorType returns the current SectorType of the Node.
+func (node *Node) SectorType() SectorType {
+	return node.sectorType
+}
+
+// SetSectorType sets the current SectorType of the Node. Note that setting this to Sector won't work.
+func (node *Node) SetSectorType(sectorType SectorType) {
+	node.sectorType = sectorType
 }
 
 // DistanceTo returns the distance between the given Nodes' centers.
