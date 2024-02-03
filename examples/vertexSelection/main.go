@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"image/color"
 
 	_ "embed"
@@ -26,7 +27,7 @@ type Game struct {
 	Cube *tetra3d.Model
 }
 
-//go:embed vertexSelection.gltf
+//go:embed vertexSelection.glb
 var libraryData []byte
 
 func NewGame() *Game {
@@ -39,7 +40,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(libraryData, nil)
+	library, err := tetra3d.LoadGLTFData(bytes.NewReader(libraryData), nil)
 	if err != nil {
 		panic(err)
 	}

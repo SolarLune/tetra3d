@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
@@ -10,8 +11,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-//go:embed shapes.gltf
-var shapes []byte
+//go:embed *.gltf *.bin *.png
+var shapes embed.FS
 
 type Game struct {
 	Scene *tetra3d.Scene
@@ -32,7 +33,7 @@ func (g *Game) Init() {
 
 	// Load the GLTF file and turn it into a Library, which is a collection of scenes and data shared between them (like meshes or animations).
 
-	library, err := tetra3d.LoadGLTFData(shapes, nil)
+	library, err := tetra3d.LoadGLTFFileSystem(shapes, "shapes.gltf", nil)
 	if err != nil {
 		panic(err)
 	}

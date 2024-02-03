@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
@@ -10,7 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-//go:embed rays.gltf
+//go:embed rays.glb
 var blendFile []byte
 
 type Game struct {
@@ -32,7 +33,7 @@ func (g *Game) Init() {
 
 	// Load the GLTF file and turn it into a Library, which is a collection of scenes and data shared between them (like meshes or animations).
 
-	library, err := tetra3d.LoadGLTFData(blendFile, nil)
+	library, err := tetra3d.LoadGLTFData(bytes.NewReader(blendFile), nil)
 	if err != nil {
 		panic(err)
 	}

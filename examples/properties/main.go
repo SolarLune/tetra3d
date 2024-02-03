@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"strings"
@@ -23,7 +24,7 @@ type Game struct {
 	System examples.BasicSystemHandler
 }
 
-//go:embed properties.gltf
+//go:embed properties.glb
 var libraryData []byte
 
 func NewGame() *Game {
@@ -36,7 +37,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	data, err := tetra3d.LoadGLTFData(libraryData, nil)
+	data, err := tetra3d.LoadGLTFData(bytes.NewReader(libraryData), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -68,8 +69,6 @@ func (g *Game) Init() {
 		}
 
 	}
-
-	fmt.Println(g.Scene.Root.HierarchyAsString())
 
 }
 

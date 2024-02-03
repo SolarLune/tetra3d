@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
@@ -11,8 +12,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-//go:embed lighting.gltf
-var gltfData []byte
+//go:embed assets/*
+var assets embed.FS
 
 type Game struct {
 	Library *tetra3d.Library
@@ -32,7 +33,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(gltfData, nil)
+	library, err := tetra3d.LoadGLTFFileSystem(assets, "assets/lighting.gltf", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -67,14 +68,6 @@ func (g *Game) Update() error {
 	player := armature.AnimationPlayer()
 	player.Play("ArmatureAction")
 	player.Update(1.0 / 60.0)
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyA) {
-		if player.PlaySpeed > 0 {
-			player.PlaySpeed = 0
-		} else {
-			player.PlaySpeed = 1
-		}
-	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		g.Scene.World.LightingOn = !g.Scene.World.LightingOn

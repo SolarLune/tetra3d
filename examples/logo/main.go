@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"image/color"
 
 	_ "embed"
@@ -35,7 +36,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	data, err := tetra3d.LoadGLTFData(logoModel, nil)
+	data, err := tetra3d.LoadGLTFData(bytes.NewReader(logoModel), nil)
 
 	if err != nil {
 		panic(err)

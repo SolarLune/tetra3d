@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
@@ -14,7 +15,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
-//go:embed text.gltf
+//go:embed text.glb
 var sceneData []byte
 
 //go:embed excel.ttf
@@ -43,7 +44,7 @@ func (g *Game) Init() {
 
 	// Load the GLTF file and turn it into a Library, which is a collection of scenes and data shared between them (like meshes or animations).
 
-	library, err := tetra3d.LoadGLTFData(sceneData, nil)
+	library, err := tetra3d.LoadGLTFData(bytes.NewReader(sceneData), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -94,6 +95,8 @@ func (g *Game) Init() {
 	)
 
 	g.Text.SetText("This screen will slowly display text; you can press the Q key to reset the typewriter effect. Got it? I think you do.\n\n-------\n\nManual newlines also work here.")
+
+	g.Text.SetTypewriterOn(true)
 
 	// g.Text.HorizontalAlignment = tetra3d.TextAlignCenter
 

@@ -39,7 +39,7 @@ const (
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFFile(assetData, "assets/baking.glb", nil)
+	library, err := tetra3d.LoadGLTFFileSystem(assetData, "assets/baking.glb", nil)
 	if err != nil {
 		panic(err)
 	}

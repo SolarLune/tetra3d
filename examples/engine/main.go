@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"image/color"
 
 	_ "embed"
@@ -21,6 +22,8 @@ type Game struct {
 
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
+
+	Watcher *tetra3d.TreeWatcher
 }
 
 //go:embed engine.gltf
@@ -36,7 +39,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(libraryData, nil)
+	library, err := tetra3d.LoadGLTFData(bytes.NewReader(libraryData), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -46,13 +49,23 @@ func (g *Game) Init() {
 	// We clone the scene so we have an original to work from
 	g.Scene = library.ExportedScene.Clone()
 
-	for _, o := range g.Scene.Root.Children() {
+	// By creating and updating the Watcher, whenever anything under
+	// the watched Node's hierarchy changes, the attached function will run.
+	g.Watcher = tetra3d.NewTreeWatcher(g.Scene.Root, func(node tetra3d.INode) {
 
-		if o.Properties().Has("gameobject") {
-			g.SetGameObject(o)
+		if node.Properties().Has("gameobject") {
+
+			switch node.Properties().Get("gameobject").AsString() {
+
+			case "player":
+				player := NewPlayer(node)
+				node.SetData(player)
+
+			}
+
 		}
 
-	}
+	})
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
 	g.Camera.SetLocalPosition(0, 2, 5)
@@ -61,31 +74,19 @@ func (g *Game) Init() {
 
 }
 
-func (g *Game) SetGameObject(o tetra3d.INode) {
-
-	switch o.Properties().Get("gameobject").AsString() {
-
-	case "player":
-		player := NewPlayer(o)
-		o.SetData(player)
-
-	}
-
-}
-
-func (g *Game) CreateFromTemplate(node tetra3d.INode) {
-	newObj := node.Clone()
-	g.Scene.Root.AddChildren(newObj)
-	g.SetGameObject(newObj)
-}
-
 func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.CreateFromTemplate(g.Library.Scenes[0].Root.Get("Player"))
+		// Cloning a Node is as simple as getting it (from any Scene), Cloning it, and adding it under the hierarchy of your target Scene.
+		player := g.Library.Scenes[0].Root.Get("Player")
+		newPlayer := player.Clone()
+		g.Scene.Root.AddChildren(newPlayer)
 	}
 
-	for _, node := range g.Scene.Root.SearchTree().INodes() {
+	g.Watcher.Update() // Update the TreeWatcher.
+
+	// By using NodeFilter.ForEach(), we avoid allocating a new Slice just to iterate through a tree.
+	g.Scene.Root.SearchTree().ForEach(func(node tetra3d.INode) bool {
 
 		if node.Data() != nil {
 
@@ -96,7 +97,8 @@ func (g *Game) Update() error {
 
 		}
 
-	}
+		return true
+	})
 
 	g.Camera.Update()
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"image/color"
 	"math"
 
@@ -43,7 +44,7 @@ func (g *Game) Init() {
 
 	g.Scene.World.LightingOn = false
 
-	lib, err := tetra3d.LoadGLTFData(particlesScene, nil)
+	lib, err := tetra3d.LoadGLTFData(bytes.NewReader(particlesScene), nil)
 	if err != nil {
 		panic(err)
 	}

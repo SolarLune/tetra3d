@@ -1,7 +1,6 @@
 package examples
 
 import (
-	"errors"
 	"fmt"
 	"image/png"
 	"math"
@@ -42,7 +41,7 @@ func (system *BasicSystemHandler) Update() error {
 	var err error
 
 	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-		err = errors.New("quit")
+		err = ebiten.Termination
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {

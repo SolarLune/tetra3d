@@ -39,7 +39,7 @@ func NewGame() *Game {
 func (g *Game) Init() {
 
 	// Load the GLTF.
-	data, err := tetra3d.LoadGLTFData(gltfData, nil)
+	data, err := tetra3d.LoadGLTFData(bytes.NewReader(gltfData), nil)
 	if err != nil {
 		panic(err)
 	}

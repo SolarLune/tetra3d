@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"image/color"
 
 	_ "embed"
@@ -36,7 +37,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(libraryData, nil)
+	library, err := tetra3d.LoadGLTFData(bytes.NewReader(libraryData), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -100,7 +101,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := `This demo shows how paths work.
 The cube will follow the path (which is invisible,
 as it is made up of Nodes).
-1 key: Toggle running through path
 Left, Right keys: Step 1 unit forward or
 back through the path`
 		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())

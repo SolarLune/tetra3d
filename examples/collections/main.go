@@ -18,26 +18,21 @@ type Game struct {
 	Camera        examples.BasicFreeCam
 }
 
-//go:embed *.gltf
+//go:embed assets/*.gltf
 var assets embed.FS
 
 func loadAsset(assetName string) *tetra3d.Library {
 
-	filedata, err := assets.ReadFile(assetName)
-	if err != nil {
-		panic(err)
-	}
-
 	loadOptions := tetra3d.DefaultGLTFLoadOptions()
 
 	// If a dependent library is found, then try to load it using the loadAsset function as well; in truth, this should
-	// store the result in a map / dictionary and then return that if possible, for efficiency.
+	// store the result in a map / dictionary and then return that if possible, rather than loading the asset again, for efficiency.
 	loadOptions.DependentLibraryResolver = func(blendPath string) *tetra3d.Library {
-		path := strings.Split(blendPath, ".blend")[0] + ".gltf"
+		path := "assets/" + strings.Split(blendPath, ".blend")[0] + ".gltf"
 		return loadAsset(path)
 	}
 
-	library, err := tetra3d.LoadGLTFData(filedata, loadOptions)
+	library, err := tetra3d.LoadGLTFFileSystem(assets, assetName, loadOptions)
 
 	if err != nil {
 		panic(err)
@@ -56,7 +51,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library := loadAsset("collections.gltf")
+	library := loadAsset("assets/collections.gltf")
 
 	g.Scene = library.ExportedScene.Clone()
 	g.Camera = examples.NewBasicFreeCam(g.Scene)

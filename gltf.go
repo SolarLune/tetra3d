@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/qmuntal/gltf"
 	"github.com/qmuntal/gltf/ext/lightspuntual"
 	"github.com/qmuntal/gltf/modeler"
@@ -35,6 +36,7 @@ type GLTFLoadOptions struct {
 	// You could then simply load the assets library first and then code the DependentLibraryResolver function to take the assets library, or code the
 	// function to use the path to load the library on demand. You could then store the loaded result as necessary if multiple levels use this assets Library.
 	DependentLibraryResolver func(blendPath string) *Library
+	LoadExternalTextures     bool // Whether any external textures should automatically be loaded if you load a GLTF file using LoadGLTFFile(). Defaults to true.
 
 	// If top-level objects in collections should be renamed according to their instance objects.
 	RenameCollectionObjects bool
@@ -50,23 +52,18 @@ func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 		CameraHeight:              -1,
 		CameraDepth:               true,
 		DefaultToAutoTransparency: true,
+		LoadExternalTextures:      true,
 	}
 }
 
-// LoadGLTFFile loads a .gltf or .glb file from the file system given using the filename provided.
+// LoadGLTFFileSystem loads a .gltf or .glb file from the file system given using the filename provided.
 // The provided GLTFLoadOptions struct alters how the file is loaded.
 // Passing nil for gltfLoadOptions will load the file using default load options.
-// LoadGLTFFile properly handles .gltf + .bin file pairs.
-// LoadGLTFFile will return a Library, and an error if the process fails.
-func LoadGLTFFile(fileSystem fs.FS, filename string, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
+// LoadGLTFFileSystem properly handles .gltf + .bin file pairs.
+// LoadGLTFFileSystem will return a Library, and an error if the process fails.
+func LoadGLTFFileSystem(fileSystem fs.FS, filename string, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
 
 	file, err := fileSystem.Open(filename)
-
-	if err != nil {
-		return nil, err
-	}
-
-	byteString, err := io.ReadAll(file)
 
 	if err != nil {
 		return nil, err
@@ -79,7 +76,7 @@ func LoadGLTFFile(fileSystem fs.FS, filename string, gltfLoadOptions *GLTFLoadOp
 	gltfLoadOptions.externalBufferFileSystem = fileSystem
 	gltfLoadOptions.rootFilename = filename
 
-	return LoadGLTFData(byteString, gltfLoadOptions)
+	return LoadGLTFData(file, gltfLoadOptions)
 
 }
 
@@ -89,11 +86,11 @@ func LoadGLTFFile(fileSystem fs.FS, filename string, gltfLoadOptions *GLTFLoadOp
 // LoadGLTFFile will not work by default with external byte information buffers (i.e. .gltf and .glb file pairs)
 // as the buffer is referenced in .gltf as just a filename. To handle this properly, load the .gltf file using LoadGLTFFile().
 // LoadGLTFFile will return a Library, and an error if the process fails.
-func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
+func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
 
 	doc := gltf.NewDocument()
 
-	decoder := gltf.NewDecoder(bytes.NewReader(data))
+	decoder := gltf.NewDecoder(data)
 
 	err := decoder.Decode(doc)
 
@@ -101,19 +98,23 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 		return nil, err
 	}
 
+	// base directory when using a file system
+	baseDir := ""
+
 	if gltfLoadOptions == nil {
 		gltfLoadOptions = DefaultGLTFLoadOptions()
 	} else if gltfLoadOptions.externalBufferFileSystem != nil {
+
+		// We get the base directory for the loaded filename
+		dir, _ := path.Split(gltfLoadOptions.rootFilename)
+		baseDir = dir
 
 		for _, buffer := range doc.Buffers {
 
 			// We need to load this buffer
 			if buffer.URI != "" && len(buffer.Data) == 0 {
 
-				// We get the base directory for the loaded filename
-				dir, _ := path.Split(gltfLoadOptions.rootFilename)
-
-				openedFile, err := gltfLoadOptions.externalBufferFileSystem.Open(path.Join(dir, buffer.URI))
+				openedFile, err := gltfLoadOptions.externalBufferFileSystem.Open(path.Join(baseDir, buffer.URI))
 				if err != nil {
 					panic(err)
 				}
@@ -282,6 +283,8 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 
 	}
 
+	externalTextures := map[string]*ebiten.Image{}
+
 	for _, gltfMat := range doc.Materials {
 
 		newMat := NewMaterial(gltfMat.Name)
@@ -294,6 +297,20 @@ func LoadGLTFData(data []byte, gltfLoadOptions *GLTFLoadOptions) (*Library, erro
 				newMat.Texture = images[*doc.Textures[texture.Index].Source]
 			} else {
 				newMat.TexturePath = doc.Images[*doc.Textures[texture.Index].Source].URI
+				if gltfLoadOptions.LoadExternalTextures && gltfLoadOptions.externalBufferFileSystem != nil {
+					if texture, ok := externalTextures[newMat.TexturePath]; ok {
+						newMat.Texture = texture
+					} else {
+						texture, _, err := ebitenutil.NewImageFromFileSystem(gltfLoadOptions.externalBufferFileSystem, baseDir+newMat.TexturePath)
+						if err != nil {
+							log.Println(err)
+						} else {
+							newMat.Texture = texture
+						}
+						externalTextures[newMat.TexturePath] = texture
+					}
+					// newMat.Texture =
+				}
 			}
 		}
 

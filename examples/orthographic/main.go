@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"image/color"
 	"math"
 
@@ -13,8 +14,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-//go:embed orthographic.gltf
-var sceneData []byte
+//go:embed *.gltf *.bin *.png
+var sceneData embed.FS
 
 type Game struct {
 	Scene     *tetra3d.Scene
@@ -34,7 +35,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFData(sceneData, nil)
+	library, err := tetra3d.LoadGLTFFileSystem(sceneData, "orthographic.gltf", nil)
 	if err != nil {
 		panic(err)
 	}

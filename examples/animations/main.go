@@ -30,7 +30,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFFile(assets, "assets/animations.glb", nil)
+	library, err := tetra3d.LoadGLTFFileSystem(assets, "assets/animations.glb", nil)
 	if err != nil {
 		panic(err)
 	}

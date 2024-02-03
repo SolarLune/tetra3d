@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 	"fmt"
 	"strconv"
@@ -34,7 +35,7 @@ func (g *Game) Init() {
 
 	// Load the GLTF file and turn it into a Library, which is a collection of scenes and data shared between them (like meshes or animations).
 
-	library, err := tetra3d.LoadGLTFData(shapes, nil)
+	library, err := tetra3d.LoadGLTFData(bytes.NewReader(shapes), nil)
 	if err != nil {
 		panic(err)
 	}

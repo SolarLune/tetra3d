@@ -289,6 +289,7 @@ func NewCamera(w, h int) *Camera {
 	return cam
 }
 
+// Clone clones the Camera and returns it.
 func (camera *Camera) Clone() INode {
 
 	w, h := camera.resultColorTexture.Size()
@@ -318,6 +319,8 @@ func (camera *Camera) Clone() INode {
 
 }
 
+// Resize resizes the backing texture for the Camera to the specified width and height. If the camera already has a backing texture and the
+// width and height are already set to the specified arguments, then the function does nothing.
 func (camera *Camera) Resize(w, h int) {
 
 	if camera.resultColorTexture != nil {
@@ -1039,22 +1042,53 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			continue
 		}
 
-		if model.FrustumCulling {
+		if !model.DynamicBatcher() {
 
-			model.Transform()
+			if model.FrustumCulling {
 
-			if model.DynamicBatcher() && !camera.SphereInFrustum(model.frustumCullingSphere) {
-				continue
+				model.Transform()
+
+				if !camera.SphereInFrustum(model.frustumCullingSphere) {
+					continue
+				}
+				model.refreshVertexVisibility()
+
 			}
-			model.refreshVertexVisibility()
 
-		}
+			if model.Mesh != nil {
 
-		if model.DynamicBatcher() {
+				modelIsTransparent := false
 
-			dynamicDepths := map[*Model]float64{}
+				for _, mp := range model.Mesh.MeshParts {
+
+					if !mp.isVisible() {
+						continue
+					}
+
+					if model.isTransparent(mp) {
+						transparents = append(transparents, renderPair{model, mp})
+						modelIsTransparent = true
+					} else {
+						solids = append(solids, renderPair{model, mp})
+					}
+				}
+
+				if !camera.RenderDepth || modelIsTransparent {
+					depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
+					// depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
+				}
+
+				if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
+					camera.DebugInfo.TotalParts++
+				}
+
+			}
+
+		} else {
 
 			transparent := false
+
+			// TODO: Review depth sorting for dynamic batchers
 
 			for meshPart, modelSlice := range model.DynamicBatchModels {
 
@@ -1067,8 +1101,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					if !child.visible {
 						continue
 					}
-
-					dynamicDepths[child] = cameraPos.DistanceSquared(child.WorldPosition())
 
 					if !transparent {
 
@@ -1085,10 +1117,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				}
 
-				sort.Slice(modelSlice, func(i, j int) bool {
-					return dynamicDepths[modelSlice[i]] > dynamicDepths[modelSlice[j]]
-				})
-
 				if transparent {
 					transparents = append(transparents, renderPair{model, meshPart})
 					depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
@@ -1101,33 +1129,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				camera.DebugInfo.TotalParts += len(modelSlice)
 
-			}
-
-		} else if model.Mesh != nil {
-
-			modelIsTransparent := false
-
-			for _, mp := range model.Mesh.MeshParts {
-
-				if !mp.isVisible() {
-					continue
-				}
-
-				if model.isTransparent(mp) {
-					transparents = append(transparents, renderPair{model, mp})
-					modelIsTransparent = true
-				} else {
-					solids = append(solids, renderPair{model, mp})
-				}
-			}
-
-			if !camera.RenderDepth || modelIsTransparent {
-				depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
-				// depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
-			}
-
-			if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
-				camera.DebugInfo.TotalParts++
 			}
 
 		}

@@ -12,8 +12,8 @@ type TreeWatcher struct {
 	OnChange    func(node INode) // OnChange is a function that is run for every altered node under a tree's root node whenever anything in that hierarchy is added or removed from the tree.
 }
 
-// NewTreeWatcher creates a new TreeWatcher, watching the scene tree underneath the rootNode.
-// onChange should be a function that is run for each node that is added or removed from the tree when the hierarchy changes.
+// NewTreeWatcher creates a new TreeWatcher, a utility that watches the scene tree underneath the rootNode for changes.
+// onChange should be the function that is run for each node when it is added to, or removed from, the tree underneath the rootNode.
 func NewTreeWatcher(rootNode INode, onChange func(node INode)) *TreeWatcher {
 	treeWatcher := &TreeWatcher{
 		rootNode: rootNode,
