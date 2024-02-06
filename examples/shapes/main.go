@@ -78,10 +78,8 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
-	// Clear, but with a color
-	screen.Fill(g.Scene.World.FogColor.ToRGBA64())
-
-	g.Camera.Clear()
+	g.Camera.ClearWithColor(g.Scene.World.FogColor)
+	// g.Camera.Clear()
 
 	g.Camera.RenderScene(g.Scene)
 

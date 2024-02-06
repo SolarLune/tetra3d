@@ -744,9 +744,30 @@ func (camera *Camera) AspectRatio() float64 {
 	return float64(w) / float64(h)
 }
 
-// Clear should be called at the beginning of a single rendered frame and clears the Camera's backing textures before rendering.
+// Clear should be called at the beginning of a single rendered frame and clears the Camera's backing textures
+// before rendering.
 // It also resets the debug values.
+// This function will use the world's clear color, assuming the Camera is in a Scene that has a World.
+// If the Scene has no World, or the Camera is not in the Scene, then it will clear using transparent black.
 func (camera *Camera) Clear() {
+
+	if scene := camera.Scene(); scene != nil {
+		if world := scene.World; world != nil {
+			camera.ClearWithColor(world.ClearColor)
+			return
+		}
+	}
+
+	camera.ClearWithColor(NewColor(0, 0, 0, 0))
+
+}
+
+// ClearWithColor should be called at the beginning of a single rendered frame and clears the Camera's backing textures
+// to the desired color before rendering.
+// It also resets the debug values.
+func (camera *Camera) ClearWithColor(clear Color) {
+
+	rgba := clear.ToRGBA64()
 
 	if camera.AccumulateColorMode != AccumlateColorModeNone {
 		camera.accumulatedBackBuffer.Clear()
@@ -764,7 +785,7 @@ func (camera *Camera) Clear() {
 		}
 	}
 
-	camera.resultColorTexture.Clear()
+	camera.resultColorTexture.Fill(rgba)
 
 	if camera.RenderDepth {
 		camera.resultDepthTexture.Clear()
@@ -1106,7 +1127,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 						for _, mp := range child.Mesh.MeshParts {
 
-							if child.isTransparent(mp) {
+							if mp.isVisible() && child.isTransparent(mp) {
 								transparent = true
 								break
 							}
@@ -1662,64 +1683,35 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	}
 
-	for _, pair := range solids {
-
-		// Automatically statically batched models can't render
-		if !pair.Model.visible || pair.Model.AutoBatchMode == AutoBatchStatic {
-			continue
-		}
-
-		// Internally, the idea behind dynamic batching is that we simply hold off on flushing until the
-		// end - this saves a lot of time if we're rendering singular low-poly objects, at the cost of each
-		// object sharing the same material / object-level properties (color / material blending mode, for
-		// example).
-
-		if pair.Model.DynamicBatcher() {
-
-			modelSlice := pair.Model.DynamicBatchModels[pair.MeshPart]
-
-			for _, merged := range modelSlice {
-
-				if !merged.visible {
-					continue
-				}
-
-				if merged.FrustumCulling {
-					merged.Transform()
-					if !camera.SphereInFrustum(merged.frustumCullingSphere) {
-						continue
-					}
-				}
-
-				for _, part := range merged.Mesh.MeshParts {
-					render(renderPair{Model: merged, MeshPart: part})
-				}
-			}
-
-			flush(pair)
-
-		} else {
-			render(pair)
-			flush(pair)
-		}
-
-	}
-
 	sort.SliceStable(transparents, func(i, j int) bool {
 		return depths[transparents[i].Model] > depths[transparents[j].Model]
 	})
 
-	for _, pair := range transparents {
+	renderPasses := [][]renderPair{
+		solids, transparents,
+	}
 
-		if !pair.Model.visible {
-			continue
-		}
+	for _, pass := range renderPasses {
 
-		if pair.Model.DynamicBatcher() {
+		for _, pair := range pass {
 
-			if dyn := pair.Model.DynamicBatchModels; len(dyn) > 0 {
+			// Automatically statically batched models can't render
+			if !pair.Model.visible || pair.Model.AutoBatchMode == AutoBatchStatic {
+				continue
+			}
 
-				modelSlice := dyn[pair.MeshPart]
+			// Internally, the idea behind dynamic batching is that we simply hold off on flushing until the
+			// end - this saves a lot of time if we're rendering singular low-poly objects, at the cost of each
+			// object sharing the same material / object-level properties (color / material blending mode, for
+			// example).
+
+			if pair.Model.DynamicBatcher() {
+
+				modelSlice := pair.Model.DynamicBatchModels[pair.MeshPart]
+
+				sort.Slice(modelSlice, func(i, j int) bool {
+					return camera.DistanceSquaredTo(modelSlice[i]) > camera.DistanceSquaredTo(modelSlice[j])
+				})
 
 				for _, merged := range modelSlice {
 
@@ -1741,12 +1733,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				flush(pair)
 
+			} else {
+				render(pair)
+				flush(pair)
 			}
 
-		} else {
-			// Autobatch models don't need to render if they don't have anything
-			render(pair)
-			flush(pair)
 		}
 
 	}

@@ -539,7 +539,7 @@ func (mesh *Mesh) AutoNormal() {
 
 // SelectVertices generates a new vertex selection for the current Mesh.
 func (mesh *Mesh) SelectVertices() *VertexSelection {
-	return &VertexSelection{Indices: map[int]any{}, Mesh: mesh}
+	return &VertexSelection{Indices: newSet[int](), Mesh: mesh}
 }
 
 // Properties returns this Mesh object's game Properties struct.
@@ -549,11 +549,11 @@ func (mesh *Mesh) Properties() Properties {
 
 // VertexSelection represents a selection of vertices on a Mesh.
 type VertexSelection struct {
-	Indices map[int]any
+	Indices Set[int]
 	Mesh    *Mesh
 }
 
-// SelectInChannel selects all vertices in the Mesh that have a non-pure black color in the color channel
+// SelectInChannel selects all vertices in the Mesh that have a non-pure black color in the vertex color channel
 // with the specified index. If the index lies outside of the bounds of currently existent color channels,
 // the color channel will be created.
 func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
@@ -565,7 +565,7 @@ func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
 		color := vs.Mesh.VertexColors[vertexIndex][channelIndex]
 
 		if color.R > 0.01 || color.G > 0.01 || color.B > 0.01 {
-			vs.Indices[vertexIndex] = struct{}{}
+			vs.Indices.Add(vertexIndex)
 		}
 
 	}
@@ -578,7 +578,7 @@ func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
 func (vs *VertexSelection) SelectAll() *VertexSelection {
 
 	for i := 0; i < len(vs.Mesh.VertexPositions); i++ {
-		vs.Indices[i] = struct{}{}
+		vs.Indices.Add(i)
 	}
 
 	return vs
@@ -592,12 +592,21 @@ func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
 		func(tri *Triangle) {
 
 			for _, index := range tri.VertexIndices {
-				vs.Indices[int(index)] = struct{}{}
+				vs.Indices.Add(index)
 			}
 
 		},
 	)
 
+	return vs
+
+}
+
+// SelectMeshPartByIndex selects all vertices in the Mesh belonging to the specified MeshPart by
+// index.
+// If the MeshPart doesn't exist, this function will panic.
+func (vs *VertexSelection) SelectMeshPartByIndex(indexNumber int) *VertexSelection {
+	vs.SelectMeshPart(vs.Mesh.MeshParts[indexNumber])
 	return vs
 
 }
@@ -618,7 +627,7 @@ func (vs *VertexSelection) SelectMaterialByName(materialNames ...string) *Vertex
 // SelectIndices selects the passed indices in the Mesh belonging to the specified MeshPart.
 func (vs *VertexSelection) SelectIndices(indices ...int) *VertexSelection {
 	for _, i := range indices {
-		vs.Indices[i] = struct{}{}
+		vs.Indices.Add(i)
 	}
 	return vs
 }
