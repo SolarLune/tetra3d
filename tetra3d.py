@@ -1616,7 +1616,8 @@ class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
 
         for matIndex, mat in enumerate(obj.data.materials):
 
-            if mat.t3dAutoUV__:
+            # mat could be None if it's just the slot and no Material is selected
+            if mat and mat.t3dAutoUV__:
 
                 bpy.ops.object.mode_set(mode='EDIT')
 
@@ -1880,6 +1881,8 @@ objectProps = {
 
 ####
 
+keymaps = []
+
 def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
@@ -2031,6 +2034,14 @@ def register():
     if not onLoad in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(onLoad)
 
+    keyconfig = bpy.context.window_manager.keyconfigs.addon
+
+    kc = keyconfig.keymaps.new(name="Window", space_type='EMPTY')
+    shortcut = kc.keymap_items.new("export.tetra3dgltf", 'E', 'PRESS', ctrl=True, shift=True)
+
+    global keymaps
+    keymaps.append((kc, shortcut))
+
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
     bpy.utils.unregister_class(MESH_PT_tetra3d)
@@ -2126,6 +2137,13 @@ def unregister():
         bpy.app.handlers.save_post.remove(exportOnSave)
     if onLoad in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(onLoad)
+
+    global keymaps
+
+    for keymap, shortcut in keymaps:
+        keymap.keymap_items.remove(shortcut)
+
+    keymaps.clear()
 
     bpy.msgbus.clear_by_owner("tetra3d")
 
