@@ -38,9 +38,6 @@ type GLTFLoadOptions struct {
 	DependentLibraryResolver func(blendPath string) *Library
 	LoadExternalTextures     bool // Whether any external textures should automatically be loaded if you load a GLTF file using LoadGLTFFile(). Defaults to true.
 
-	// If top-level objects in collections should be renamed according to their instance objects.
-	RenameCollectionObjects bool
-
 	rootFilename             string
 	externalBufferFileSystem fs.FS // The file system to use for loading external buffers; automatically set if you use LoadGLTFFile().
 }
@@ -159,11 +156,11 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		camDefaultSize = true
 	}
 
+	globalExporterSettings := doc.Scenes[0].Extras.(map[string]interface{})
+
 	if len(doc.Scenes) > 0 {
 
 		if doc.Scenes[0].Extras != nil {
-
-			globalExporterSettings := doc.Scenes[0].Extras.(map[string]interface{})
 
 			if camDefaultSize {
 
@@ -1353,6 +1350,13 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					}
 
+					if c, exists := dataMap["t3dSectorTypeOverride__"]; exists && c.(float64) > 0 {
+						n.SearchTree().ForEach(func(node INode) bool {
+							node.SetSectorType(obj.SectorType())
+							return true
+						})
+					}
+
 				}
 
 			}
@@ -1514,7 +1518,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				for _, child := range node.collectionObjects {
 					transform := child.Transform()
 					node.parent.AddChildren(child)
-					if gltfLoadOptions.RenameCollectionObjects {
+					if value, exists := globalExporterSettings["t3dRenameInstancedObjects__"]; exists && value.(bool) {
 						child.SetName(node.name)
 					}
 					child.SetWorldTransform(transform)

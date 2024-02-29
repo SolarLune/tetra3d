@@ -19,7 +19,7 @@ type Sector struct {
 	AABB                *BoundingAABB       // The AABB used to search for neighbors if the SectorDetectionType is set to SectorDetectionTypeAABB
 	Neighbors           Set[*Sector]        // The Sector's neighbors
 	SectorDetectionType SectorDetectionType // How the Sector is detected
-	sectorVisible       bool
+	rendering           bool                // If the Sector was rendering in the last Camera.Render____() call.
 }
 
 // NewSector creates a new Sector for the provided Model.
@@ -107,6 +107,13 @@ func (sector *Sector) UpdateNeighbors(otherModels ...*Model) {
 
 	}
 
+}
+
+// Rendering returns if the Sector was rendering as of the last time a Camera rendered Nodes in its Scene.
+// To be rendered, a Camera would have needed to be in the Sector, or in a neighboring sector within the
+// camera's neighbor rendering range.
+func (sector *Sector) Rendering() bool {
+	return sector.rendering
 }
 
 // NeighborsWithinRange returns the neighboring Sectors within a certain search range. For example,

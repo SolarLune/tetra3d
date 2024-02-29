@@ -32,11 +32,13 @@ type DebugInfo struct {
 	ActiveLightCount     int // Total active number of lights
 }
 
+type AccumulationColorMode int
+
 const (
-	AccumlateColorModeNone            = iota // No accumulation buffer rendering
-	AccumlateColorModeBelow                  // Accumulation buffer is on and applies over time, renders ColorTexture after the accumulation result (which is, then, below)
-	AccumlateColorModeAbove                  // Accumulation buffer is on and applies over time, renders ColorTexture before the accumulation result (which is on top)
-	AccumlateColorModeSingleLastFrame        // Accumulation buffer is on and renders just the previous frame's ColorTexture result
+	AccumulationColorModeNone            AccumulationColorMode = iota // No accumulation buffer rendering
+	AccumulationColorModeBelow                                        // Accumulation buffer is on and applies over time, renders ColorTexture after the accumulation result (which is, then, below)
+	AccumulationColorModeAbove                                        // Accumulation buffer is on and applies over time, renders ColorTexture before the accumulation result (which is on top)
+	AccumulationColorModeSingleLastFrame                              // Accumulation buffer is on and renders just the previous frame's ColorTexture result
 )
 
 // Camera represents a camera (where you look from) in Tetra3D.
@@ -60,15 +62,24 @@ type Camera struct {
 
 	resultAccumulatedColorTexture *ebiten.Image // ResultAccumulatedColorTexture holds the previous frame's render result of rendering any models.
 	accumulatedBackBuffer         *ebiten.Image
-	AccumulateColorMode           int                      // The mode to use when rendering previous frames to the accumulation buffer. Defaults to AccumulateColorModeNone.
-	AccumulateDrawOptions         *ebiten.DrawImageOptions // Draw image options to use when rendering frames to the accumulation buffer; use this to fade out or color previous frames.
+	// The mode to use when rendering previous frames to the accumulation buffer.
+	// When set to anything but AccumulationColorModeNone, clearing the Camera will copy the previous frame's color texture render result to the accumulation buffer.
+	// The AccumulationColorMode influences in what order the color texture and previous frame's acccumulation color mode result is drawn to the buffer.
+	// Defaults to AccumulateColorModeNone.
+	AccumulationColorMode AccumulationColorMode
+	// Draw image options to use when rendering frames to the accumulation buffer; use this to fade out or color previous frames.
+	// This should probably be set once, or once per frame before rendering; otherwise, the effects compound and it's impossible to see the result.
+	AccumulationDrawOptions *ebiten.DrawImageOptions
 
 	near, far   float64 // The near and far clipping plane. Near defaults to 0.1, Far to 100 (unless these settings are loaded from a camera in a GLTF file).
 	perspective bool    // If the Camera has a perspective projection. If not, it would be orthographic
 	fieldOfView float64 // Vertical field of view in degrees for a perspective projection camera
 	orthoScale  float64 // Scale of the view for an orthographic projection camera in units horizontally
 
-	VertexSnapping float64 // When set to a value > 0, it will snap all rendered models' vertices to a grid of the provided size (so VertexSnapping of 0.1 will snap all rendered positions to 0.1 intervals). Defaults to 0 (off).
+	// When set to a value > 0, it will snap all rendered models' vertices to a grid of the provided size (so VertexSnapping of 0.1 will snap all rendered positions to 0.1 intervals).
+	// Note that snapping vertices is not free and does take some time to execute (so if you're up against a performance limit, turning off vertex snapping might make a bit of a difference).
+	// Defaults to 0 (off).
+	VertexSnapping float64
 
 	DebugInfo DebugInfo
 
@@ -107,8 +118,6 @@ func NewCamera(w, h int) *Camera {
 		far:         100,
 
 		DepthMargin: 0.04,
-
-		AccumulateDrawOptions: &ebiten.DrawImageOptions{},
 
 		orthoScale: 20,
 
@@ -305,9 +314,11 @@ func (camera *Camera) Clone() INode {
 	clone.SectorRenderDepth = camera.SectorRenderDepth
 	clone.PerspectiveCorrectedTextureMapping = camera.PerspectiveCorrectedTextureMapping
 
-	clone.AccumulateColorMode = camera.AccumulateColorMode
-	newOptions := *camera.AccumulateDrawOptions
-	clone.AccumulateDrawOptions = &newOptions
+	clone.AccumulationColorMode = camera.AccumulationColorMode
+	if camera.AccumulationDrawOptions != nil {
+		newOptions := *camera.AccumulationDrawOptions
+		clone.AccumulationDrawOptions = &newOptions
+	}
 
 	clone.Node = camera.Node.Clone().(*Node)
 	for _, child := range camera.children {
@@ -769,19 +780,19 @@ func (camera *Camera) ClearWithColor(clear Color) {
 
 	rgba := clear.ToRGBA64()
 
-	if camera.AccumulateColorMode != AccumlateColorModeNone {
+	if camera.AccumulationColorMode != AccumulationColorModeNone {
 		camera.accumulatedBackBuffer.Clear()
 		camera.accumulatedBackBuffer.DrawImage(camera.resultAccumulatedColorTexture, nil)
 		camera.resultAccumulatedColorTexture.Clear()
-		switch camera.AccumulateColorMode {
-		case AccumlateColorModeBelow:
-			camera.resultAccumulatedColorTexture.DrawImage(camera.accumulatedBackBuffer, camera.AccumulateDrawOptions)
+		switch camera.AccumulationColorMode {
+		case AccumulationColorModeBelow:
+			camera.resultAccumulatedColorTexture.DrawImage(camera.accumulatedBackBuffer, camera.AccumulationDrawOptions)
 			camera.resultAccumulatedColorTexture.DrawImage(camera.resultColorTexture, nil)
-		case AccumlateColorModeAbove:
+		case AccumulationColorModeAbove:
 			camera.resultAccumulatedColorTexture.DrawImage(camera.resultColorTexture, nil)
-			camera.resultAccumulatedColorTexture.DrawImage(camera.accumulatedBackBuffer, camera.AccumulateDrawOptions)
-		case AccumlateColorModeSingleLastFrame:
-			camera.resultAccumulatedColorTexture.DrawImage(camera.resultColorTexture, nil)
+			camera.resultAccumulatedColorTexture.DrawImage(camera.accumulatedBackBuffer, camera.AccumulationDrawOptions)
+		case AccumulationColorModeSingleLastFrame:
+			camera.resultAccumulatedColorTexture.DrawImage(camera.resultColorTexture, camera.AccumulationDrawOptions)
 		}
 	}
 
@@ -851,11 +862,11 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 			sectorModel := node.(*Model)
 			sector := node.(*Model).sector
-			sector.sectorVisible = false
+			sector.rendering = false
 
 			// Set them all to be invisible by default
 			if sectorModel.DynamicBatchOwner == nil {
-				sector.sectorVisible = false
+				sector.rendering = false
 			} else {
 				// Making a sector dynamically batched is just way too much to deal with, I'm sorry
 				panic("Can't make a sector " + sectorModel.Path() + " dynamically batched as well")
@@ -872,18 +883,18 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 		camera.currentSector = insideSector
 		if insideSector != nil {
-			insideSector.sectorVisible = true
+			insideSector.rendering = true
 
 			// Make neighbors visible
 			for r := range insideSector.NeighborsWithinRange(camera.SectorRenderDepth) {
-				r.sectorVisible = true
+				r.rendering = true
 			}
 
 			rootNode.SearchTree().ByType(NodeTypeModel).ForEach(func(node INode) bool {
 				model := node.(*Model)
 
-				if model.sector != nil && model.sector.sectorVisible {
-					if model.sector.sectorVisible {
+				if model.sector != nil && model.sector.rendering {
+					if model.sector.rendering {
 						meshes = append(meshes, model)
 					}
 				} else if model.DynamicBatchOwner == nil {
@@ -893,7 +904,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 						meshes = append(meshes, model)
 					} else if model.SectorType() == SectorTypeStandalone || (model.SectorType() == SectorTypeObject && model.isInVisibleSector(sectorModels)) {
 						meshes = append(meshes, model)
-					} else if s := model.sectorHierarchy(); s != nil && s.sectorVisible {
+					} else if s := model.sectorHierarchy(); s != nil && s.rendering {
 						meshes = append(meshes, model)
 					}
 
@@ -906,7 +917,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 				light := node.(ILight)
 				if light.SectorType() == SectorTypeStandalone || (light.SectorType() == SectorTypeObject && light.isInVisibleSector(sectorModels)) {
 					lights = append(lights, light)
-				} else if s := light.sectorHierarchy(); s != nil && s.sectorVisible {
+				} else if s := light.sectorHierarchy(); s != nil && s.rendering {
 					lights = append(lights, light)
 				}
 				return true
@@ -2241,7 +2252,7 @@ func (camera *Camera) NormalTexture() *ebiten.Image {
 // AccumulationColorTexture returns the camera's final result accumulation color texture from previous renders. If the Camera's AccumulateColorMode
 // property is set to AccumulateColorModeNone, the function will return nil instead.
 func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
-	if camera.AccumulateColorMode == AccumlateColorModeNone {
+	if camera.AccumulationColorMode == AccumulationColorModeNone {
 		return nil
 	}
 	return camera.resultAccumulatedColorTexture

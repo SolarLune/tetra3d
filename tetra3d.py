@@ -642,9 +642,9 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                         for propIndex, prop in enumerate(object.t3dGameProperties__):
                             
                             row = box.row()
-                            row.label(text=prop.name)
+                            # row.label(text=prop.name)
 
-                            op = row.operator(OBJECT_OT_tetra3dOverrideProp.bl_idname)
+                            op = row.operator(OBJECT_OT_tetra3dOverrideProp.bl_idname, text="Override Game Property : < " + prop.name + " >")
                             op.objectIndex = objectIndex
                             op.propIndex = propIndex
 
@@ -992,6 +992,7 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
 
         box.prop(context.scene, "t3dExportCameras__")
         box.prop(context.scene, "t3dExportLights__")
+        box.prop(context.scene, "t3dRenameInstancedObjects__")
 
         box = self.layout.box()
 
@@ -1296,23 +1297,25 @@ def export():
                         if edge.calc_length() > mesh["size"]:
 
                             edges.add(edge)
-                            if workingEdge is None:
+                            if workingEdge is None and len(edge.link_loops) > 0:
                                 workingEdge = edge
 
-                            nextLoop = edge.link_loops[0]
+                            if len(edge.link_loops) > 0:
 
-                            passedCount = 0
+                                nextLoop = edge.link_loops[0]
 
-                            for x in range(100):
+                                passedCount = 0
 
-                                nextLoop = nextLoop.link_loop_next.link_loop_next.link_loop_radial_next
-        
-                                if nextLoop.edge == workingEdge:
-                                    passedCount += 1
-                                    if passedCount >= 2:
-                                        break
+                                for x in range(100):
 
-                                edges.add(nextLoop.edge)
+                                    nextLoop = nextLoop.link_loop_next.link_loop_next.link_loop_radial_next
+            
+                                    if nextLoop.edge == workingEdge:
+                                        passedCount += 1
+                                        if passedCount >= 2:
+                                            break
+
+                                    edges.add(nextLoop.edge)
 
                         if workingEdge:
                             break
@@ -1794,6 +1797,12 @@ def getPackTextures(self):
 def setPackTextures(self, value):
     globalSet("t3dPackTextures__", value)
 
+def getRenameInstancedObjects(self):
+    return globalGet("t3dRenameInstancedObjects__", True)
+
+def setRenameInstancedObjects(self, value):
+    globalSet("t3dRenameInstancedObjects__", value)
+
 
 def getAnimationSampling(self):
     return globalGet("t3dAnimationSampling__", True)
@@ -1876,7 +1885,7 @@ objectProps = {
     "t3dAutoSubdivide__" : bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, Tetra3D will do its best to loop cut edges that are too large before export"),
     "t3dAutoSubdivideSize__" : bpy.props.FloatProperty(name="Max Edge Length", description="The maximum length an edge is allowed to be before automatically cutting prior to export", min=0.0, default=1.0),
     "t3dSectorType__" : bpy.props.EnumProperty(items=listSectorTypes,name="Sector Type", description="The type of sector capability this object has; only used if rendered with a camera with Sector Rendering on"),
-    "t3dSectorTypeOverride__" : bpy.props.BoolProperty(name="Override Sector Type", description="If the collection object should override the sector type for its top-level objects"),
+    "t3dSectorTypeOverride__" : bpy.props.BoolProperty(name="Override Sector Type", description="If the collection object should override the sector type for ALL its objects"),
 }
 
 ####
@@ -1956,6 +1965,9 @@ def register():
 
     bpy.types.Scene.t3dExportLights__ = bpy.props.BoolProperty(name="Export Lights", description="Whether Blender should export lights to the GLTF file", default=True,
     get=getExportLights, set=setExportLights)
+
+    bpy.types.Scene.t3dRenameInstancedObjects__ = bpy.props.BoolProperty(name="Rename Collection-Instanced Objects", description="Whether collection instances' names should be used for their instanced top-level objects", default=True,
+    get=getRenameInstancedObjects, set=setRenameInstancedObjects)
 
     bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(name="Pack Textures", description="Whether Blender should pack textures into the GLTF file on export", default=False,
     get=getPackTextures, set=setPackTextures)
@@ -2091,6 +2103,7 @@ def unregister():
     del bpy.types.Scene.t3dExportFormat__
     del bpy.types.Scene.t3dExportCameras__
     del bpy.types.Scene.t3dExportLights__
+    del bpy.types.Scene.t3dRenameInstancedObjects__
     del bpy.types.Scene.t3dPackTextures__
     del bpy.types.Scene.t3dAnimationSampling__
     del bpy.types.Scene.t3dAnimationInterpolation__

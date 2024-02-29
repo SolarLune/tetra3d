@@ -86,7 +86,10 @@ type INode interface {
 	Scene() *Scene
 	// Root returns the root node in this tree by recursively traversing this node's hierarchy of
 	// parents upwards.
-	Root() INode
+	Root() *Node
+	InSceneTree() bool // Returns if this node is in the scene tree.
+	setCachedSceneRoot(root *Node)
+	cachedSceneRoot() *Node
 
 	// ReindexChild moves the child in the calling Node's children slice to the specified newPosition.
 	// The function returns the old index where the child Node was, or -1 if it wasn't a child of the calling Node.
@@ -280,6 +283,10 @@ type Node struct {
 	scene             *Scene
 	onTransformUpdate func()
 	sectorType        SectorType
+
+	cachedSceneRootNode *Node
+
+	cachedSector *Sector
 }
 
 // NewNode returns a new Node.
@@ -347,6 +354,7 @@ func (node *Node) Clone() INode {
 	newNode.data = node.data
 	newNode.sectorType = node.sectorType
 	newNode.setOriginalTransform()
+	newNode.cachedSector = node.cachedSector
 
 	newNode.props = node.props.Clone()
 	newNode.animationPlayer = node.animationPlayer.Clone()
@@ -446,6 +454,7 @@ func (node *Node) dirtyTransform() {
 	}
 
 	node.isTransformDirty = true
+	node.cachedSector = nil
 
 }
 
@@ -774,6 +783,21 @@ func (node *Node) Parent() INode {
 // setParent sets the Node's parent.
 func (node *Node) setParent(parent INode) {
 	node.parent = parent
+	// fmt.Println(node, "parent:", parent, parent != nil)
+	if parent != nil {
+		node.cachedSceneRootNode = parent.Root()
+	} else {
+		node.cachedSceneRootNode = nil
+	}
+	node.SearchTree().ForEach(func(child INode) bool { child.setCachedSceneRoot(node.cachedSceneRootNode); return true })
+}
+
+func (node *Node) setCachedSceneRoot(root *Node) {
+	node.cachedSceneRootNode = root
+}
+
+func (node *Node) cachedSceneRoot() *Node {
+	return node.cachedSceneRootNode
 }
 
 // Scene looks for the Node's parents recursively to return what scene it exists in.
@@ -781,7 +805,7 @@ func (node *Node) setParent(parent INode) {
 func (node *Node) Scene() *Scene {
 	root := node.Root()
 	if root != nil {
-		return root.(*Node).scene
+		return root.scene
 	}
 	return nil
 }
@@ -1089,19 +1113,30 @@ func (node *Node) Path() string {
 
 // Root returns the root node in the scene by recursively traversing this node's hierarchy of
 // parents upwards. If, instead, the node this is called on is the root (and so has no parents), this function
-// returns the node itself. If the node is not the root and it has no path to the scene root, this
-// function returns nil.
-func (node *Node) Root() INode {
+// returns the node itself. If the node has no path to the scene root, this function returns nil.
+func (node *Node) Root() *Node {
 
-	if node.parent == nil {
-		if node.scene != nil {
-			return node
-		}
-		return nil
+	if node.cachedSceneRootNode != nil {
+		return node.cachedSceneRootNode
 	}
 
-	return node.parent.Root()
+	if node.parent != nil {
+		parent := node.parent
+		for parent != nil {
+			if parent == parent.cachedSceneRoot() {
+				node.cachedSceneRootNode = parent.(*Node)
+				return node.cachedSceneRootNode
+			}
+			parent = parent.Parent()
+		}
+	}
 
+	return nil
+
+}
+
+func (node *Node) InSceneTree() bool {
+	return node.Root() != nil
 }
 
 // IsBone returns if the Node is a "bone" (a node that was a part of an armature and so can play animations back to influence a skinned mesh).
@@ -1142,24 +1177,42 @@ func (node *Node) sectorHierarchy() *Sector {
 // calling Node lies in.
 func (node *Node) Sector() *Sector {
 
+	if node.cachedSector != nil {
+		return node.cachedSector
+	}
+
 	if sectorHierarchy := node.sectorHierarchy(); sectorHierarchy != nil {
-		return sectorHierarchy
-	}
+		node.cachedSector = sectorHierarchy
+	} else {
 
-	pos := node.WorldPosition()
-	for _, sectorModel := range node.Root().SearchTree().bySectors().Models() {
-		if sectorModel.sector.AABB.PointInside(pos) {
-			return sectorModel.sector
+		root := node.Root()
+
+		if root == nil {
+			node.cachedSector = nil
+		} else {
+
+			pos := node.WorldPosition()
+
+			root.SearchTree().bySectors().ForEach(func(child INode) bool {
+				sectorModel := child.(*Model)
+				if sectorModel.sector.AABB.PointInside(pos) {
+					node.cachedSector = sectorModel.sector
+					return false
+				}
+				return true
+			})
+
 		}
+
 	}
 
-	return nil
+	return node.cachedSector
 
 }
 
 func (node *Node) isInVisibleSector(sectorModels []*Model) bool {
 	for _, model := range sectorModels {
-		if model.sector.sectorVisible && model.sector.AABB.PointInside(node.WorldPosition()) {
+		if model.sector.rendering && model.sector.AABB.PointInside(node.WorldPosition()) {
 			return true
 		}
 	}

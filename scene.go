@@ -9,7 +9,7 @@ type Scene struct {
 	// scene graph by simply adding them into the tree via parenting anywhere under the Root. For them to be removed from rendering,
 	// they simply need to be removed from the tree.
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
-	Root          INode
+	Root          *Node
 	World         *World
 	props         Properties
 	data          interface{}
@@ -32,7 +32,8 @@ func NewScene(name string) *Scene {
 		autobatchStaticMap:  map[*Material]*Model{},
 	}
 
-	scene.Root.(*Node).scene = scene
+	scene.Root.scene = scene
+	scene.Root.cachedSceneRootNode = scene.Root
 
 	return scene
 }
@@ -44,8 +45,9 @@ func (scene *Scene) Clone() *Scene {
 	newScene.library = scene.library
 
 	// newScene.Models = append(newScene.Models, scene.Models...)
-	newScene.Root = scene.Root.Clone()
-	newScene.Root.(*Node).scene = newScene
+	newScene.Root = scene.Root.Clone().(*Node)
+	newScene.Root.scene = newScene
+	newScene.Root.cachedSceneRootNode = newScene.Root
 
 	newScene.World = scene.World // Here, we simply reference the same world; we don't clone it, since a single world can be shared across multiple Scenes
 	newScene.props = scene.props.Clone()
