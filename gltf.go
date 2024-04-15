@@ -468,8 +468,12 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					}
 				}
 
-				if unique, exists := dataMap["t3dUniqueMesh__"]; exists {
-					newMesh.Unique = unique.(float64) > 0
+				if unique, exists := dataMap["t3dUniqueMesh__"]; exists && unique.(float64) > 0 {
+					if uniqueMats, exists := dataMap["t3dUniqueMaterials__"]; exists && uniqueMats.(float64) > 0 {
+						newMesh.Unique = MeshUniqueMeshAndMaterials
+					} else {
+						newMesh.Unique = MeshUniqueMesh
+					}
 				}
 
 				// Non-Tetra3D custom data
@@ -831,6 +835,11 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		}
 
 		if mesh != nil {
+
+			if mesh.Unique != MeshUniqueFalse {
+				mesh = mesh.Clone()
+			}
+
 			obj = NewModel(node.Name, mesh)
 
 			if node.Extras != nil && nodeHasProp(node, "t3dAutoBatch__") {
@@ -1666,6 +1675,11 @@ func handleGameProperties(p interface{}) (string, interface{}) {
 		value = Vector{vecValues[0], vecValues[2], -vecValues[1], 0}
 	} else if propType == 7 {
 		value = getOrDefaultString(property, "valueFilepath", "")
+		if value != "" {
+			value = convertBlenderPath(value.(string))
+		}
+	} else if propType == 8 {
+		value = getOrDefaultString(property, "valueDirpath", "")
 		if value != "" {
 			value = convertBlenderPath(value.(string))
 		}

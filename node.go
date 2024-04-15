@@ -918,7 +918,7 @@ func (node *Node) Visible() bool {
 
 // SetVisible sets the object's visibility. If recursive is true, all recursive children of this Node will have their visibility set the same way.
 func (node *Node) SetVisible(visible bool, recursive bool) {
-	if recursive && node.visible != visible {
+	if recursive {
 		for _, child := range node.SearchTree().INodes() {
 			child.SetVisible(visible, true)
 		}

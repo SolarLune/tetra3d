@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"errors"
 	"math"
 	"sort"
 
@@ -9,12 +10,13 @@ import (
 
 // RayHit represents the result of a raycast test.
 type RayHit struct {
-	Object   INode  // Object is a pointer to the object that was struck by the raycast.
+	Object   INode  // Object is a pointer to the BoundingObject that was struck by the raycast.
 	Position Vector // Position is the world position that the object was struct.
-	from     Vector
+	from     Vector // The starting position of the Ray
 	Normal   Vector // Normal is the normal of the surface the ray struck.
 	// What triangle the raycast hit - note that this is only set to a non-nil value for raycasts against BoundingTriangle objects
-	Triangle *Triangle
+	Triangle              *Triangle
+	untransformedPosition Vector // untransformed position of the ray test for BoundingTriangles tests
 }
 
 // Slope returns the slope of the RayHit's normal, in radians. This ranges from 0 (straight up) to pi (straight down).
@@ -25,6 +27,63 @@ func (r RayHit) Slope() float64 {
 // Distance returns the distance from the RayHit's originating ray source point to the struck position.
 func (r RayHit) Distance() float64 {
 	return r.from.Distance(r.Position)
+}
+
+const ErrorObjectHitNotBoundingTriangles = "error: object hit not a BoundingTriangles instance; no UV or vertex color data can be pulled from RayHit result"
+
+// VertexColor returns the vertex color from the given channel in the position struck on the object struck,
+// assuming it was a BoundingTriangles.
+// The returned vertex color is linearly interpolated across the triangle just like it would be when a triangle is rendered.
+// VertexColor will return a transparent color and an error if the BoundingObject hit was not a BoundingTriangles object, or if the channel index given
+// is higher than the number of vertex color channels on the BoundingTriangles' mesh.
+func (r RayHit) VertexColor(channelIndex int) (Color, error) {
+
+	if r.Triangle == nil {
+		return NewColor(0, 0, 0, 0), errors.New(ErrorObjectHitNotBoundingTriangles)
+	}
+
+	mesh := r.Object.(*BoundingTriangles).Mesh
+
+	if len(mesh.VertexColors[0]) <= channelIndex {
+		return NewColor(0, 0, 0, 0), errors.New(ErrorVertexChannelOutsideRange)
+	}
+
+	tri := r.Triangle
+	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndices[0]], mesh.VertexPositions[tri.VertexIndices[1]], mesh.VertexPositions[tri.VertexIndices[2]])
+
+	vc1 := mesh.VertexColors[tri.VertexIndices[0]][channelIndex]
+	vc2 := mesh.VertexColors[tri.VertexIndices[1]][channelIndex]
+	vc3 := mesh.VertexColors[tri.VertexIndices[2]][channelIndex]
+
+	output := vc1.Mix(vc2, float32(v)).Mix(vc3, float32(u))
+
+	return output, nil
+
+}
+
+// UV returns the UV value from the position struck on the corresponding triangle for the BoundingObject struck,
+// assuming the object struck was a BoundingTriangles.
+// The returned UV value is linearly interpolated across the triangle just like it would be when a triangle is rendered.
+// UV will return a zero Vector and an error if the BoundingObject hit was not a BoundingTriangles object.
+func (r RayHit) UV() (Vector, error) {
+
+	if r.Triangle == nil {
+		return NewVector2d(0, 0), errors.New(ErrorObjectHitNotBoundingTriangles)
+	}
+
+	mesh := r.Object.(*BoundingTriangles).Mesh
+
+	tri := r.Triangle
+	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndices[0]], mesh.VertexPositions[tri.VertexIndices[1]], mesh.VertexPositions[tri.VertexIndices[2]])
+
+	uv1 := mesh.VertexUVs[tri.VertexIndices[0]]
+	uv2 := mesh.VertexUVs[tri.VertexIndices[1]]
+	uv3 := mesh.VertexUVs[tri.VertexIndices[2]]
+
+	output := uv1.Lerp(uv2, v).Lerp(uv3, u)
+
+	return output, nil
+
 }
 
 func sphereRayTest(center Vector, radius float64, from, to Vector) (RayHit, bool) {
@@ -270,14 +329,15 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 
 					if vec, ok := plane.RayAgainstPlane(invFrom, invTo); ok {
 
-						if plane.pointInsideTriangle(vec, v0, v1, v2) {
+						if isPointInsideTriangle(vec, v0, v1, v2) {
 
 							rays = append(rays, RayHit{
-								Object:   test,
-								Position: test.Transform().MultVec(vec),
-								from:     from,
-								Triangle: tri,
-								Normal:   r.MultVec(tri.Normal),
+								Object:                test,
+								Position:              test.Transform().MultVec(vec),
+								untransformedPosition: vec,
+								from:                  from,
+								Triangle:              tri,
+								Normal:                r.MultVec(tri.Normal),
 							})
 
 							// break

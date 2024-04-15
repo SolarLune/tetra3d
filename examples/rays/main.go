@@ -55,9 +55,24 @@ func (g *Game) Update() error {
 
 		marker := g.Scene.Root.Get("Marker")
 
-		marker.SetWorldPositionVec(results[0].Position.Add(results[0].Normal.Scale(0.5)))
+		res := results[0]
 
-		mat := tetra3d.NewLookAtMatrix(marker.WorldPosition(), results[0].Position, tetra3d.WorldUp)
+		// Here, we'll set the color of the marker.
+		vc, err := res.VertexColor(0)
+
+		// If there's an error, it's because we're not colliding against a BoundingTriangles,
+		// so there's no triangle to pull UV or vertex color data from.
+
+		// If that's the case, we can just go with the material color instead.
+		if err != nil && err.Error() == tetra3d.ErrorObjectHitNotBoundingTriangles {
+			vc = res.Object.Parent().(*tetra3d.Model).Mesh.MeshParts[0].Material.Color
+		}
+
+		marker.(*tetra3d.Model).Mesh.SelectVertices().SelectMeshPartByIndex(1).SetColor(0, vc)
+
+		marker.SetWorldPositionVec(res.Position.Add(res.Normal.Scale(0.5)))
+
+		mat := tetra3d.NewLookAtMatrix(marker.WorldPosition(), res.Position, tetra3d.WorldUp)
 
 		marker.SetWorldRotation(mat)
 
@@ -83,8 +98,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := `In this example, a ray is cast
-from the mouse, forward. Whatever is hit will
-be marked with a blue arrow. If the mouse is locked
+forward from the mouse's position. Whatever is hit will
+be marked with the arrow, which will also change color 
+to match the object struck. If the mouse is locked
 to the game window, then the ray shoots directly forward
 from the center of the screen.
 `

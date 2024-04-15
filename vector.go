@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"strings"
 )
 
@@ -20,11 +21,11 @@ var WorldUp = NewVector(0, 1, 0)
 // WorldDown represents a unit vector in the global direction of WorldDown on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
 var WorldDown = WorldUp.Invert()
 
-// WorldBack represents a unit vector in the global direction of WorldBack on the right-handed OpenGL / Tetra3D's coordinate system (+Z).
-var WorldBack = NewVector(0, 0, 1)
+// WorldBackward represents a unit vector in the global direction of WorldBackward on the right-handed OpenGL / Tetra3D's coordinate system (+Z).
+var WorldBackward = NewVector(0, 0, 1)
 
 // WorldForward represents a unit vector in the global direction of WorldForward on the right-handed OpenGL / Tetra3D's coordinate system (-Z).
-var WorldForward = WorldBack.Invert()
+var WorldForward = WorldBackward.Invert()
 
 // Vector represents a 3D Vector, which can be used for usual 3D applications (position, direction, velocity, etc).
 // The fourth component, W, can be ignored and is used for internal Tetra3D usage.
@@ -51,6 +52,18 @@ func NewVector2d(x, y float64) Vector {
 // NewVectorZero creates a new "zero-ed out" Vector, with the values of 0, 0, 0, and 0 (for W).
 func NewVectorZero() Vector {
 	return Vector{}
+}
+
+// NewVectorRandom creates a new random vector with components ranging between the minimum and maximum values provided.
+func NewVectorRandom(minX, maxX, minY, maxY, minZ, maxZ float64) Vector {
+	dx := maxX - minX
+	dy := maxY - minY
+	dz := maxZ - minZ
+	return Vector{
+		X: minX + rand.Float64()*dx,
+		Y: minY + rand.Float64()*dy,
+		Z: minZ + rand.Float64()*dz,
+	}
 }
 
 // Modify returns a ModVector object (a pointer to the original vector).
@@ -328,7 +341,8 @@ func (vec Vector) Angle(other Vector) float64 {
 	return math.Acos(float64(d))
 }
 
-// ClampAngle clamps the Vector such that it doesn't exceed the angle specified (in radians).
+// ClampAngle clamps the Vector such that it doesn't exceed the angle specified (in radians)
+// between it and the baseline Vector.
 // This function returns a normalized (unit) Vector.
 func (vec Vector) ClampAngle(baselineVec Vector, maxAngle float64) Vector {
 

@@ -88,7 +88,7 @@ func NewModel(name string, mesh *Mesh) *Model {
 func (model *Model) Clone() INode {
 
 	mesh := model.Mesh
-	if mesh != nil && mesh.Unique {
+	if mesh != nil && mesh.Unique != MeshUniqueFalse {
 		mesh = mesh.Clone()
 	}
 
@@ -767,14 +767,26 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 }
 
+// Dimensions returns the transformed dimensions of the Model's mesh.
+func (model *Model) Dimensions() Dimensions {
+	dim := model.Mesh.Dimensions
+	transform := model.Transform()
+	dim.Min = transform.MultVec(dim.Min)
+	dim.Max = transform.MultVec(dim.Max)
+	return dim
+}
+
 type AOBakeOptions struct {
-	TargetChannel  int     // The target vertex color channel to bake the ambient occlusion to.
+	// The target vertex color channel to bake the ambient occlusion to.
+	// If the Model doesn't have enough vertex color channels to bake to this channel index, the BakeAO() function will
+	// create vertex color channels to fill in the values up to the target channel index.
+	TargetChannel  int
 	OcclusionAngle float64 // How severe the angle must be (in radians) for the occlusion effect to show up.
-	Color          Color   // The color for the ambient occlusion.
+	OcclusionColor Color   // The color for the ambient occlusion.
 
 	// A slice indicating other models that influence AO when baking. If this is empty, the AO will
 	// just take effect for triangles within the Model, rather than also taking effect for objects that
-	// are too close to the baking Model.
+	// are close to the baking Model.
 	OtherModels        []*Model
 	InterModelDistance float64 // How far the other models in OtherModels must be to influence the baking AO.
 }
@@ -785,7 +797,7 @@ func NewDefaultAOBakeOptions() *AOBakeOptions {
 	return &AOBakeOptions{
 		TargetChannel:      0,
 		OcclusionAngle:     ToRadians(60),
-		Color:              NewColor(0.4, 0.4, 0.4, 1),
+		OcclusionColor:     NewColor(0.4, 0.4, 0.4, 1),
 		InterModelDistance: 1,
 		OtherModels:        []*Model{},
 	}
@@ -793,7 +805,7 @@ func NewDefaultAOBakeOptions() *AOBakeOptions {
 }
 
 // BakeAO bakes the ambient occlusion for a model to its vertex colors, using the baking options set in the provided AOBakeOptions
-// struct. If a slice of models is passed in the OtherModels slice, then inter-object AO will also be baked.
+// struct.
 // If nil is passed instead of bake options, a default AOBakeOptions struct will be created and used.
 // The resulting vertex color will be mixed between whatever was originally there in that channel and the AO color where the color
 // takes effect.
@@ -856,7 +868,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 		for i := 0; i < 3; i++ {
 			color := model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel]
-			model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.Color, ao[i])
+			model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.OcclusionColor, ao[i])
 		}
 
 	}
@@ -925,7 +937,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 			for i := 0; i < 3; i++ {
 				color := model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel]
-				model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.Color, ao[i])
+				model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.OcclusionColor, ao[i])
 			}
 
 		}

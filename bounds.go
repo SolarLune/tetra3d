@@ -413,7 +413,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 			WorldRight,
 			WorldUp,
-			WorldBack,
+			WorldBackward,
 
 			WorldRight.Cross(ab),
 			WorldRight.Cross(bc),
@@ -423,9 +423,9 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 			WorldUp.Cross(bc),
 			WorldUp.Cross(ca),
 
-			WorldBack.Cross(ab),
-			WorldBack.Cross(bc),
-			WorldBack.Cross(ca),
+			WorldBackward.Cross(ab),
+			WorldBackward.Cross(bc),
+			WorldBackward.Cross(ca),
 
 			transformNoLoc.MultVec(tri.Normal),
 		}
@@ -445,7 +445,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 			r := boxSize.X*math.Abs(WorldRight.Dot(axis)) +
 				boxSize.Y*math.Abs(WorldUp.Dot(axis)) +
-				boxSize.Z*math.Abs(WorldBack.Dot(axis))
+				boxSize.Z*math.Abs(WorldBackward.Dot(axis))
 
 			p2 := projection{
 				Max: r,

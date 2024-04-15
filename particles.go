@@ -92,7 +92,7 @@ func (part *Particle) Update(dt float64) {
 	if !part.RotationAdd.IsZero() {
 		part.Model.RotateVec(WorldRight, part.RotationAdd.X)
 		part.Model.RotateVec(WorldUp, part.RotationAdd.Y)
-		part.Model.RotateVec(WorldBack, part.RotationAdd.Z)
+		part.Model.RotateVec(WorldBackward, part.RotationAdd.Z)
 	}
 
 	scale := part.Model.LocalScale()

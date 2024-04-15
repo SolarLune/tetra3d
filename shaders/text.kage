@@ -16,7 +16,7 @@ var OutlineColor vec4
 
 func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
 
-    res := imageSrc0UnsafeAt(srcPos)
+    res := imageSrc0At(srcPos)
     color := FGColor
     transparency := res.a
     colorSet := false
@@ -36,21 +36,15 @@ func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
                 break
             }
 
-            shaded := false
+            shaded := 0.0
             
             check.x += shadowV.x
-
-            if imageSrc0UnsafeAt(check).a > 0.5 {
-                shaded = true
-            }
+            shaded += step(0.5, imageSrc0At(check).a)
 
             check.y += shadowV.y
+            shaded += step(0.5, imageSrc0At(check).a)
 
-            if imageSrc0UnsafeAt(check).a > 0.5 {
-                shaded = true
-            }
-
-            if shaded {
+            if shaded > 0 {
                 color = ShadowColorNear
                 if ShadowColorFarSet > 0 {
                     color = mix(ShadowColorNear, ShadowColorFar, (distance(check, srcPos)-1) / ShadowLength)
@@ -87,7 +81,7 @@ func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
                             srcTexels += ShadowVector * shadowI
                         }
 
-                        if imageSrc0UnsafeAt(srcTexels).a > 0.5 {
+                        if imageSrc0At(srcTexels).a > 0.5 {
 
                             if OutlineRounded < 1 || (distance(srcPos + vec2(x,y), srcPos) <= OutlineThickness) {
 

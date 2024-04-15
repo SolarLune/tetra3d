@@ -8,10 +8,6 @@
 
 ![Tetra3D Logo](https://user-images.githubusercontent.com/4733521/207243838-b3ece6c4-965a-4cb5-aa81-b6b61f34d4d4.gif)
 
-![It Breeds Fear - Construction Worker](https://thumbs.gfycat.com/ThoughtfulChubbyBunny-size_restricted.gif)
-
-![Dark exploration](https://thumbs.gfycat.com/ScalySlimCrayfish-size_restricted.gif)
-
 [Tetra3D Docs](https://pkg.go.dev/github.com/solarlune/tetra3d) / [Tetra3D Wiki](https://github.com/SolarLune/Tetra3d/wiki)
 
 [Quickstart Project Repo](https://github.com/SolarLune/tetra3d-quickstart)
@@ -22,7 +18,7 @@ If you want to support development, feel free to check out my [itch.io](https://
 
 ## What is Tetra3D?
 
-Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebitengine](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow and buggy, but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering triangles and for depth testing (by use of shaders to compare and write depth and composite the result onto the finished texture). Depth testing can be turned off for a slight performance increase in exchange for no visual inter-object intersection.
+Tetra3D is a 3D hybrid software / hardware renderer written in Go by means of [Ebitengine](https://ebiten.org/), primarily for video games. Compared to a professional 3D rendering system like OpenGL or Vulkan, it's slow(er), but _it's also janky_, and I love it for that. Tetra3D is largely implemented in software, but uses the GPU a bit for rendering the triangles and for performing inter-object depth testing (by use of Kage shaders to compare and write depth and composite the result onto the finished texture). Depth testing can be turned off for a slight performance increase in exchange for no visual inter-object intersection.
 
 Tetra3D's rendering evokes a similar feeling to primitive 3D game consoles like the PS1, N64, or DS. Being that a largely-software renderer is not _nearly_ fast enough for big, modern 3D titles, the best you're going to get out of Tetra is drawing some 3D elements for your primarily 2D Ebitengine game, or a relatively simple fully 3D game (i.e. something on the level of a PS1, or N64 game). That said, limitation breeds creativity, and I am intrigued at the thought of what people could make with Tetra.
 
@@ -44,7 +40,7 @@ Because it's like a [tetrahedron](https://en.wikipedia.org/wiki/Tetrahedron), a 
 
 `go get github.com/solarlune/tetra3d`
 
-Tetra depends on [Ebitengine](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.16 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
+Tetra depends on [Ebitengine](https://ebiten.org/) itself for rendering. Tetra3D requires Go v1.18 or above. This minimum required version is somewhat arbitrary, as it could run on an older Go version if a couple of functions (primarily the ones that loads data from a file directly) were changed.
 
 There is an optional Blender add-on as well (`tetra3d.py`) that can be downloaded from the releases page or from the repo directly (i.e. click on the file and download it). The add-on provides some useful helper functionality that makes using Tetra3D simpler - for more information, check the [Wiki](https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon).
 
@@ -202,7 +198,7 @@ func main() {
 
 ```
 
-You can also do collision testing between BoundingObjects, a category of nodes designed for this purpose. As a simplified example:
+You can also do collision testing between BoundingObjects, a category of nodes designed for checking against collisions. As a simplified example:
 
 ```go
 
@@ -246,7 +242,7 @@ func (g *Game) Update() {
 
 If you wanted a deeper collision test with multiple objects, you can do so using `IBoundingObject.CollisionTest()`. Take a look at the [Wiki](https://github.com/SolarLune/tetra3d/wiki/Collision-Testing) and the `bounds` example for more info.
 
-That's basically it. Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works pretty well as is. Feel free to examine all of the examples in the `examples` folder. Calling `go run .` from within their directories will run them - the mouse usually controls the view, and clicking locks and unlocks the view.
+That's basically it. Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works _pretty_ well as is. Feel free to examine all of the examples in the `examples` folder. Calling `go run .` from within their directories will run them - the mouse usually controls the view, and clicking locks and unlocks the view.
 
 There's a quick start project repo available [here](https://github.com/SolarLune/tetra3d-quickstart), as well to help with getting started.
 
@@ -281,6 +277,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- -- Outlines
 - [x] -- -- Shadows
 - [ ] -- -- Gradients
+- [ ] -- -- -- Per-letter gradient
+- [ ] -- -- -- Per-sentence gradient?
+- [ ] -- -- -- Per-block gradient?
 - [ ] -- -- -- Other patterns?
 - [ ] -- -- Parsing text for per-letter effects (this would probably require rendering the glyphs from a font to individual images to render; could also involve shaders?)
 - [ ] -- -- -- Per-letter colors
@@ -295,6 +294,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Automatic triangle / mesh subdivision depending on distance
 - [ ] -- Automatic level of detail
 - [ ] -- Manual level of detail (ability to render a model using various meshes in stages); note that these stages should be accessible at runtime to allow cloning meshes, for example
+- [ ] -- Possibly some UI utilities?
 - [X] **Culling**
 - [X] -- Backface culling
 - [X] -- Frustum culling
@@ -338,9 +338,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
 - [X] **Blender Add-on**
 - [X] -- Export 3D view camera to Scenes for quick iteration
-- [ ] -- Object-level color checkbox
-- [ ] -- Object-level shadeless checkbox?
-- [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices
+- [ ] -- Object-level color option
+- [ ] -- Object-level shadeless checkbox
+- [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices (SolarLune 3/3/24: Doesn't seem to be possible outside of vertex colors)
+- [ ] -- Exporting animations and auto-subdivided mesh data doesn't work properly when the scene is not focused in Blender
+- [ ] -- Sharing materials and textures doesn't work properly
 - [X] -- Export GLTF on save / on command via button
 - [X] -- Bounds node creation
 - [X] -- Game property export (less clunky version of Blender's vanilla custom properties)
@@ -393,15 +395,20 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] -- Composing collision shapes out of multiple sub-shapes (this can be done by simply creating them, parenting them to some node, and then testing against that node)
 - [X] -- Bounding / Broadphase collision checking
 
+-   -- Supported collision types:
+
 | Collision Type | Sphere | AABB       | Triangle   | Capsule |
 | -------------- | ------ | ---------- | ---------- | ------- |
-| Sphere         | ✅     | ✅         | ✅         | ✅      |
-| AABB           | ✅     | ✅         | ⛔ (buggy) | ✅      |
-| Triangle       | ✅     | ⛔ (buggy) | ⛔ (buggy) | ✅      |
-| Capsule        | ✅     | ✅         | ✅         | ⛔ (buggy)      |
-| Ray            | ✅     | ✅         | ✅         | ✅      |
+| Sphere         | ✅     | ✅        | ✅         | ✅      |
+| AABB           | ✅     | ✅        | ⛔         | ✅      |
+| Triangle       | ✅     | ⛔        | ⛔         | ✅      |
+| Capsule        | ✅     | ✅        | ✅         | ⛔      |
+| Ray            | ✅     | ✅        | ✅         | ✅      |
 
-- [ ] -- An actual collision system?
+✅ = Fully supported, should be working without issues
+⛔ = Partially supported; somewhat buggy
+
+- [ ] -- An actual collision system, rather than simply doing basic collision checks?
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location?)
 - [ ] **Optimization**
@@ -412,8 +419,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?
 - [X] -- Custom Vectors
+- [ ] -- -- Move Vector and Matrix to external package for simplicity / resuability / create separate Vector types for 2D / 4D (?) Vectors. Maybe Colors as well?
 - [ ] -- -- Vector pools again? 
-- [ ] -- -- Move over to float32 for mathematics - should be possible with math32 : https://github.com/chewxy/math32
+- [ ] -- -- Move over to float32 for mathematics - seems like it should be faster? Should be possible with math32 : https://github.com/chewxy/math32
 - [ ] -- Matrix pools?
 - [ ] -- Raytest optimization
 - [ ] -- -- Sphere?
@@ -428,11 +436,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- Model
 - [ ] -- -- Mesh
 - [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
-- [ ] -- Replace *Color with just the plain Color struct (this would be a breaking change)
+- [x] -- Replace *Color with just the plain Color struct (this would be a breaking change)
 - [ ] -- Replace color usage with HTML or W3C colors? : https://www.computerhope.com/htmcolor.htm#gray / https://www.computerhope.com/jargon/w/w3c-color-names.htm
 - [ ] -- Update to use Generics where possible; we're already on Go 1.18.
 - [ ] -- Move utility objects (quaternion, vector, color, text, matrix, treewatcher, etc) to utility package.
 - [ ] -- Optimize getting an object by path; maybe this could be done with some kind of string serialization, rather than text parsing?
+- [ ] -- Replace panics / log.prints with error returns (e.g. gltf.go)
 
 Again, it's incomplete and jank. However, it's also pretty cool!
 

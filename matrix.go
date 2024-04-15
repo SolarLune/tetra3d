@@ -743,7 +743,7 @@ func NewLookAtMatrix(from, to, up Vector) Matrix4 {
 		if !up.Equals(WorldRight) {
 			up = WorldRight
 		} else {
-			up = WorldBack
+			up = WorldBackward
 		}
 	}
 

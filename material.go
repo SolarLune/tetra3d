@@ -107,34 +107,37 @@ func NewMaterial(name string) *Material {
 }
 
 // Clone creates a clone of the specified Material. Note that Clone() cannot clone the Material's fragment shader or shader options.
-func (material *Material) Clone() *Material {
-	newMat := NewMaterial(material.Name)
-	newMat.library = material.library
-	newMat.Color = material.Color
-	newMat.Texture = material.Texture
-	newMat.properties = material.properties.Clone()
-	newMat.BackfaceCulling = material.BackfaceCulling
-	newMat.TriangleSortMode = material.TriangleSortMode
-	newMat.Shadeless = material.Shadeless
-	newMat.Fogless = material.Fogless
-	newMat.TransparencyMode = material.TransparencyMode
-	newMat.TextureFilterMode = material.TextureFilterMode
-	newMat.textureWrapMode = material.textureWrapMode
-	newMat.Blend = material.Blend
+func (m *Material) Clone() *Material {
+	newMat := NewMaterial(m.Name)
+	newMat.library = m.library
+	newMat.Color = m.Color
 
-	newMat.BillboardMode = material.BillboardMode
-	newMat.SetShaderText(material.fragmentSrc)
-	newMat.FragmentShaderOn = material.FragmentShaderOn
+	newMat.Texture = m.Texture
+	newMat.TexturePath = m.TexturePath
+	newMat.TextureFilterMode = m.TextureFilterMode
+	newMat.textureWrapMode = m.textureWrapMode
 
-	newMat.FragmentShaderOptions.CompositeMode = material.FragmentShaderOptions.CompositeMode
-	newMat.FragmentShaderOptions.FillRule = material.FragmentShaderOptions.FillRule
-	for i := range material.FragmentShaderOptions.Images {
-		newMat.FragmentShaderOptions.Images[i] = material.FragmentShaderOptions.Images[i]
+	newMat.properties = m.properties.Clone()
+	newMat.BackfaceCulling = m.BackfaceCulling
+	newMat.TriangleSortMode = m.TriangleSortMode
+	newMat.Shadeless = m.Shadeless
+	newMat.Fogless = m.Fogless
+	newMat.Blend = m.Blend
+	newMat.BillboardMode = m.BillboardMode
+	newMat.Visible = m.Visible
+
+	newMat.SetShaderText(m.fragmentSrc)
+	newMat.FragmentShaderOn = m.FragmentShaderOn
+
+	newMat.FragmentShaderOptions.CompositeMode = m.FragmentShaderOptions.CompositeMode
+	newMat.FragmentShaderOptions.FillRule = m.FragmentShaderOptions.FillRule
+	for i := range m.FragmentShaderOptions.Images {
+		newMat.FragmentShaderOptions.Images[i] = m.FragmentShaderOptions.Images[i]
 	}
 	for k, v := range newMat.FragmentShaderOptions.Uniforms {
 		newMat.FragmentShaderOptions.Uniforms[k] = v
 	}
-	newMat.Visible = material.Visible
+	newMat.TransparencyMode = m.TransparencyMode
 
 	return newMat
 }
@@ -145,11 +148,16 @@ func (material *Material) Clone() *Material {
 // render setup (e.g. texture, UV values, vertex colors, and vertex lighting).
 // SetShader will return the Shader, and an error if the Shader failed to compile.
 // Note that custom shaders require usage of pixel-unit Kage shaders.
-func (material *Material) SetShaderText(src []byte) (*ebiten.Shader, error) {
+func (m *Material) SetShaderText(src []byte) (*ebiten.Shader, error) {
+
+	if m.fragmentShader != nil {
+		m.fragmentShader.Dispose()
+		m.fragmentShader = nil
+	}
 
 	if src == nil {
-		material.fragmentShader = nil
-		material.fragmentSrc = nil
+		m.fragmentShader = nil
+		m.fragmentSrc = nil
 		return nil, nil
 	}
 
@@ -158,10 +166,10 @@ func (material *Material) SetShaderText(src []byte) (*ebiten.Shader, error) {
 		return nil, err
 	}
 
-	material.fragmentShader = newShader
-	material.fragmentSrc = src
+	m.fragmentShader = newShader
+	m.fragmentSrc = src
 
-	return material.fragmentShader, nil
+	return m.fragmentShader, nil
 
 }
 
@@ -170,41 +178,41 @@ func (material *Material) SetShaderText(src []byte) (*ebiten.Shader, error) {
 // Lighting will also be missing, but that's included in the Model's vertex color.
 // If you want to extend the base 3D shader, use tetra3d.ExtendBase3DShader().
 // Note that custom shaders require usage of pixel-unit Kage shaders.
-func (material *Material) SetShader(shader *ebiten.Shader) {
-	if material.fragmentShader != shader {
-		material.fragmentShader = shader
-		material.fragmentSrc = nil
+func (m *Material) SetShader(shader *ebiten.Shader) {
+	if m.fragmentShader != shader {
+		m.fragmentShader = shader
+		m.fragmentSrc = nil
 	}
 }
 
 // Shader returns the custom Kage fragment shader for the Material.
-func (material *Material) Shader() *ebiten.Shader {
-	return material.fragmentShader
+func (m *Material) Shader() *ebiten.Shader {
+	return m.fragmentShader
 }
 
 // DisposeShader disposes the custom fragment Shader for the Material (assuming it has one). If it does not have a Shader, nothing happens.
-func (material *Material) DisposeShader() {
-	if material.fragmentShader != nil {
-		material.fragmentShader.Dispose()
+func (m *Material) DisposeShader() {
+	if m.fragmentShader != nil {
+		m.fragmentShader.Dispose()
 	}
-	material.fragmentSrc = nil
-	material.fragmentShader = nil
+	m.fragmentSrc = nil
+	m.fragmentShader = nil
 }
 
 // Library returns the Library from which this Material was loaded. If it was created through code, this function will return nil.
-func (material *Material) Library() *Library {
-	return material.library
+func (m *Material) Library() *Library {
+	return m.library
 }
 
-func (material *Material) String() string {
+func (m *Material) String() string {
 	if ReadableReferences {
-		return "<" + material.Name + ">"
+		return "<" + m.Name + ">"
 	} else {
-		return fmt.Sprintf("%p", material)
+		return fmt.Sprintf("%p", m)
 	}
 }
 
 // Properties returns this Material's game Properties struct.
-func (material *Material) Properties() Properties {
-	return material.properties
+func (m *Material) Properties() Properties {
+	return m.properties
 }

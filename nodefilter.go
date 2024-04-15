@@ -194,14 +194,31 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 	return nf
 }
 
-// ByPropNames allows you to filter a given selection of nodes by the provided set of property names.
-// If the Nodes in the filter have properties by the given name, they pass the filter and are included.
+// ByPropNameRegex allows you to filter a given selection of nodes by the provided set of property names,
+// evaluated as regex strings.
+// If the Nodes in the filter have any property that satisfy one of the supplied regex string, they pass
+// the filter and are included.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByPropNames(propNames ...string) NodeFilter {
+func (nf NodeFilter) ByPropNameRegex(propNameRegexStrings ...string) NodeFilter {
+
 	nf.Filters = append(nf.Filters, func(node INode) bool {
-		return node.Properties().Has(propNames...)
+
+		for _, propName := range propNameRegexStrings {
+
+			for existingName := range node.Properties() {
+				match, _ := regexp.MatchString(propName, existingName)
+				if match {
+					return true
+				}
+			}
+
+		}
+		return false
+
 	})
+
 	return nf
+
 }
 
 // ByProp allows you to filter a given selection of nodes by a property value check - if the nodes filtered
@@ -233,7 +250,7 @@ func (nf NodeFilter) ByName(name string) NodeFilter {
 	return nf
 }
 
-// ByRegex allows you to filter a given selection of nodes by their namers using the given regex string.
+// ByRegex allows you to filter a given selection of nodes by their names using the given regex string.
 // If you want to filter a selection of nodes in such a way that only nodes that have names that
 // >contain< the given text (i.e. strings.Contains()) are selected for filtering, you can just pass
 // that string into ByRegex directly.
@@ -387,7 +404,7 @@ func (nf NodeFilter) SortByX() NodeFilter {
 // SortByY applies an Y-axis sort on the results of the NodeFilter.
 // Sorts do not combine.
 func (nf NodeFilter) SortByY() NodeFilter {
-	nf.sortMode = nfSortModeAxisX
+	nf.sortMode = nfSortModeAxisY
 	return nf
 }
 

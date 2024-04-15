@@ -14,7 +14,7 @@ bl_info = {
     "blender" : (3, 0, 1),                             # Lowest version to use
     "location" : "View3D",
     "category" : "Gamedev",
-    "version" : (0, 15, 0),
+    "version" : (0, 16, 0),
     "support" : "COMMUNITY",
     "doc_url" : "https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon",
 }
@@ -96,7 +96,8 @@ gamePropTypes = [
     ("reference", "Object", "Object reference data type; converted to a string composed as follows on export - [SCENE NAME]:[OBJECT NAME]", 0, 4),
     ("color", "Color", "Color data type", 0, 5),
     ("vector3d", "3D Vector", "3D vector data type", 0, 6),
-    ("file", "Filepath", "Filepath", 0, 7),
+    ("file", "Filepath", "Filepath as a string", 0, 7),
+    ("directory", "Directory Path", "Directory Path as a string", 0, 8),
 ]
 
 batchModes = [ 
@@ -135,6 +136,7 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="XYZ")
 
     valueFilepath: bpy.props.StringProperty(name = "", description="The filepath of the property", subtype="FILE_PATH", set=filepathSet, get=filepathGet)
+    valueDirpath: bpy.props.StringProperty(name = "", description="The directory path of the property", subtype="DIR_PATH")
     # valueFilepathAbsolute
     # valueVector4D: bpy.props.FloatVectorProperty(name = "", description="The 4D vector value of the property")
 
@@ -260,7 +262,8 @@ def copyProp(fromProp, toProp):
     toProp.valueReferenceScene = fromProp.valueReferenceScene
     toProp.valueColor = fromProp.valueColor
     toProp.valueVector3D = fromProp.valueVector3D
-
+    toProp.valueFilepath = fromProp.valueFilepath
+    toProp.valueDirpath = fromProp.valueDirpath
 
 class OBJECT_OT_tetra3dOverrideProp(bpy.types.Operator):
     bl_idname = "object.tetra3doverrideprop"
@@ -531,8 +534,16 @@ class MESH_PT_tetra3d(bpy.types.Panel):
     def draw(self, context): 
 
         row = self.layout.row()
-        if context.object.data and context.object.type == "MESH":
-            row.prop(context.object.data, "t3dUniqueMesh__")
+        meshData = context.object.data
+        if meshData and context.object.type == "MESH":
+            row.prop(meshData, "t3dUniqueMesh__")
+            
+            row = self.layout.row()
+            row.prop(meshData, "t3dUniqueMaterials__")
+            if "t3dUniqueMesh__" in meshData:
+                row.enabled = meshData["t3dUniqueMesh__"]
+            else:
+                row.enabled = False
 
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
@@ -829,6 +840,8 @@ def handleT3DProperty(index, box, prop, operatorType, enabled=True):
             else:
                 playButton = row.operator("object.t3dplaysound", text="", icon="PLAY")
                 playButton.filepath = prop.valueFilepath
+    elif prop.valueType == "directory":
+        row.prop(prop, "valueDirpath")
         
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"
@@ -2026,7 +2039,8 @@ def register():
         
     bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
 
-    bpy.types.Mesh.t3dUniqueMesh__ = bpy.props.BoolProperty(name="Unique Mesh", description="Whether each Model that uses this Mesh will have a unique clone of it (true) or if they will share them (false)")
+    bpy.types.Mesh.t3dUniqueMesh__ = bpy.props.BoolProperty(name="Unique Mesh", description="Whether each Model that uses this mesh will have a unique clone of it or not. When enabled, any Models that use this mesh will clone the mesh on creation")
+    bpy.types.Mesh.t3dUniqueMaterials__ = bpy.props.BoolProperty(name="Unique Materials", description="Whether each Model that uses this mesh's materials will have unique clones of them or not. When enabled, any Models that use this mesh will clone the materials on creation")
     
     bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
     bpy.types.World.t3dSyncClearColor__ = bpy.props.BoolProperty(name="Sync Clear Color to World Color", description="If the clear color should be a copy of the world's color")
@@ -2139,6 +2153,7 @@ def unregister():
     del bpy.types.World.t3dFogCurve__
 
     del bpy.types.Mesh.t3dUniqueMesh__
+    del bpy.types.Mesh.t3dUniqueMaterials__
 
     del bpy.types.Camera.t3dSectorRendering__
     del bpy.types.Camera.t3dSectorRenderDepth__

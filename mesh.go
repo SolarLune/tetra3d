@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -155,11 +156,18 @@ func NewDimensionsFromPoints(points ...Vector) Dimensions {
 	return dim
 }
 
+type MeshUniqueType int
+
+const (
+	MeshUniqueFalse MeshUniqueType = iota
+	MeshUniqueMesh
+	MeshUniqueMeshAndMaterials
+)
+
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one
 // manually if you want to construct a Mesh via code).
 type Mesh struct {
 	Name    string   // The name of the Mesh resource
-	Unique  bool     // If true, whenever a Mesh is used for a Model and the Model is cloned, the Mesh is cloned with it. Useful for things like sprites.
 	library *Library // A reference to the Library this Mesh came from.
 
 	MeshParts []*MeshPart // The various mesh parts (collections of triangles, rendered with a single material).
@@ -175,7 +183,8 @@ type Mesh struct {
 	vertexSkinnedNormals     []Vector
 	vertexSkinnedPositions   []Vector
 	vertexTransformedNormals []Vector
-	VertexUVs                []Vector
+	VertexUVs                []Vector // The UV values for each vertex
+	VertexUVOriginalValues   []Vector // The original UV values for each vertex
 	VertexColors             [][]Color
 	VertexActiveColorChannel []int       // VertexActiveColorChannel is the active vertex color used for coloring the vertex in the index given.
 	VertexWeights            [][]float32 // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
@@ -190,6 +199,10 @@ type Mesh struct {
 	VertexColorChannelNames map[string]int // VertexColorChannelNames is a map allowing you to get the index of a mesh's vertex color channel by its name.
 	Dimensions              Dimensions
 	properties              Properties
+
+	// If Unique is set to a value other than MeshUniqueNone, whenever a Mesh is used for a Model and the Model is cloned,
+	// the Mesh or Mesh and Materials are cloned with it. Useful for things like sprites.
+	Unique MeshUniqueType
 }
 
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,
@@ -250,6 +263,7 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	for i := range mesh.VertexUVs {
 		newMesh.VertexUVs = append(newMesh.VertexUVs, mesh.VertexUVs[i])
+		newMesh.VertexUVOriginalValues = append(newMesh.VertexUVOriginalValues, mesh.VertexUVs[i])
 	}
 
 	for i := range mesh.VertexColors {
@@ -320,6 +334,12 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	newMesh.Unique = mesh.Unique
 
+	if newMesh.Unique == MeshUniqueMeshAndMaterials {
+		for _, meshPart := range newMesh.MeshParts {
+			meshPart.Material = meshPart.Material.Clone()
+		}
+	}
+
 	newMesh.maxTriangleSpan = mesh.maxTriangleSpan
 
 	return newMesh
@@ -343,6 +363,7 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 	mesh.vertexLights = append(make([]Color, 0, vertexCount), mesh.vertexLights...)
 
 	mesh.VertexUVs = append(make([]Vector, 0, vertexCount), mesh.VertexUVs...)
+	mesh.VertexUVOriginalValues = append(make([]Vector, 0, vertexCount), mesh.VertexUVs...)
 
 	mesh.VertexColors = append(make([][]Color, 0, vertexCount), mesh.VertexColors...)
 
@@ -375,6 +396,8 @@ func (mesh *Mesh) ensureEnoughVertexColorChannels(channelIndex int) {
 // CombineVertexColors allows you to combine vertex color channels together. The targetChannel is the channel that will hold
 // the result, and multiplicative controls whether the combination is multiplicative (true) or additive (false). The sourceChannels
 // ...int is the vertex color channel indices to combine together.
+// If the channel indices provided in the sourceChannels ...int are too high for the number of channels on each vertex in the mesh,
+// then those indices will be skipped.
 func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, sourceChannels ...int) {
 
 	if len(sourceChannels) == 0 {
@@ -469,6 +492,7 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 		mesh.VertexPositions = append(mesh.VertexPositions, Vector{vertInfo.X, vertInfo.Y, vertInfo.Z, 0})
 		mesh.VertexNormals = append(mesh.VertexNormals, Vector{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ, 0})
 		mesh.VertexUVs = append(mesh.VertexUVs, Vector{vertInfo.U, vertInfo.V, 0, 0})
+		mesh.VertexUVOriginalValues = append(mesh.VertexUVOriginalValues, Vector{vertInfo.U, vertInfo.V, 0, 0})
 		mesh.VertexColors = append(mesh.VertexColors, vertInfo.Colors)
 		mesh.VertexActiveColorChannel = append(mesh.VertexActiveColorChannel, vertInfo.ActiveColorChannel)
 		mesh.VertexBones = append(mesh.VertexBones, vertInfo.Bones)
@@ -538,8 +562,9 @@ func (mesh *Mesh) AutoNormal() {
 }
 
 // SelectVertices generates a new vertex selection for the current Mesh.
-func (mesh *Mesh) SelectVertices() *VertexSelection {
-	return &VertexSelection{Indices: newSet[int](), Mesh: mesh}
+// This selection should generally be retained to operate on sequentially.
+func (mesh *Mesh) SelectVertices() VertexSelection {
+	return VertexSelection{Indices: newSet[int](), Mesh: mesh}
 }
 
 // Properties returns this Mesh object's game Properties struct.
@@ -553,12 +578,20 @@ type VertexSelection struct {
 	Mesh    *Mesh
 }
 
-// SelectInChannel selects all vertices in the Mesh that have a non-pure black color in the vertex color channel
-// with the specified index. If the index lies outside of the bounds of currently existent color channels,
-// the color channel will be created.
-func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
+const ErrorVertexChannelOutsideRange = "error: vertex channel index provided too large; the mesh does not have this many vertex color channels"
 
-	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
+// SelectInVertexColorChannel selects all vertices in the Mesh that have a non-pure black color in the vertex color channel
+// with the specified index. If the index is over the number of vertex colors currently on the Mesh, then the function
+// will not alter the VertexSelection and will return an error.
+func (vs VertexSelection) SelectInVertexColorChannel(channelIndex int) (VertexSelection, error) {
+
+	if channelIndex < 0 {
+		channelIndex = 0
+	}
+
+	if channelIndex > len(vs.Mesh.VertexColors[0]) {
+		return vs, errors.New(ErrorVertexChannelOutsideRange)
+	}
 
 	for vertexIndex := range vs.Mesh.VertexColors {
 
@@ -570,12 +603,12 @@ func (vs *VertexSelection) SelectInChannel(channelIndex int) *VertexSelection {
 
 	}
 
-	return vs
+	return vs, nil
 
 }
 
 // SelectAll selects all vertices on the source Mesh.
-func (vs *VertexSelection) SelectAll() *VertexSelection {
+func (vs VertexSelection) SelectAll() VertexSelection {
 
 	for i := 0; i < len(vs.Mesh.VertexPositions); i++ {
 		vs.Indices.Add(i)
@@ -585,7 +618,7 @@ func (vs *VertexSelection) SelectAll() *VertexSelection {
 }
 
 // SelectMeshPart selects all vertices in the Mesh belonging to the specified MeshPart.
-func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
+func (vs VertexSelection) SelectMeshPart(meshPart *MeshPart) VertexSelection {
 
 	meshPart.ForEachTri(
 
@@ -605,14 +638,14 @@ func (vs *VertexSelection) SelectMeshPart(meshPart *MeshPart) *VertexSelection {
 // SelectMeshPartByIndex selects all vertices in the Mesh belonging to the specified MeshPart by
 // index.
 // If the MeshPart doesn't exist, this function will panic.
-func (vs *VertexSelection) SelectMeshPartByIndex(indexNumber int) *VertexSelection {
+func (vs VertexSelection) SelectMeshPartByIndex(indexNumber int) VertexSelection {
 	vs.SelectMeshPart(vs.Mesh.MeshParts[indexNumber])
 	return vs
 
 }
 
 // SelectMaterialByName selects all vertices in the Mesh belonging to the specified material.
-func (vs *VertexSelection) SelectMaterialByName(materialNames ...string) *VertexSelection {
+func (vs VertexSelection) SelectMaterialByName(materialNames ...string) VertexSelection {
 
 	for _, matName := range materialNames {
 		if mp := vs.Mesh.FindMeshPart(matName); mp != nil {
@@ -624,8 +657,9 @@ func (vs *VertexSelection) SelectMaterialByName(materialNames ...string) *Vertex
 
 }
 
-// SelectIndices selects the passed indices in the Mesh belonging to the specified MeshPart.
-func (vs *VertexSelection) SelectIndices(indices ...int) *VertexSelection {
+// SelectIndices selects the passed vertex indices in the Mesh.
+// This is syntactic sugar for VertexSelection.Indices.Add(indices...)
+func (vs VertexSelection) SelectIndices(indices ...int) VertexSelection {
 	for _, i := range indices {
 		vs.Indices.Add(i)
 	}
@@ -633,7 +667,9 @@ func (vs *VertexSelection) SelectIndices(indices ...int) *VertexSelection {
 }
 
 // SetColor sets the color of the specified channel in all vertices contained within the VertexSelection to the provided Color.
-func (vs *VertexSelection) SetColor(channelIndex int, color Color) {
+// If the channelIndex provided is greater than the number of channels in the Mesh minus one, vertex color channels will be created for all vertices
+// up to the index provided (e.g. VertexSelection.SetColor(2, colors.White()) will make it so that the mesh has at least three color channels - 0, 1, and 2).
+func (vs VertexSelection) SetColor(channelIndex int, color Color) {
 
 	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
@@ -644,7 +680,7 @@ func (vs *VertexSelection) SetColor(channelIndex int, color Color) {
 }
 
 // SetNormal sets the normal of all vertices contained within the VertexSelection to the provided normal vector.
-func (vs *VertexSelection) SetNormal(normal Vector) {
+func (vs VertexSelection) SetNormal(normal Vector) {
 
 	for i := range vs.Indices {
 		vs.Mesh.VertexNormals[i].X = normal.X
@@ -655,7 +691,7 @@ func (vs *VertexSelection) SetNormal(normal Vector) {
 }
 
 // MoveUVs moves the UV values by the values specified.
-func (vs *VertexSelection) MoveUVs(dx, dy float64) {
+func (vs VertexSelection) MoveUVs(dx, dy float64) {
 
 	for index := range vs.Indices {
 		vs.Mesh.VertexUVs[index].X += dx
@@ -666,16 +702,24 @@ func (vs *VertexSelection) MoveUVs(dx, dy float64) {
 
 // MoveUVsVec moves the UV values by the Vector values specified.
 func (vs *VertexSelection) MoveUVsVec(vec Vector) {
+	vs.MoveUVs(vec.X, vec.Y)
+}
+
+// SetUVOffset moves all UV values for vertices selected to be offset by the values specified, with [0, 0] being their original locations.
+// Note that for this to work, you would need to store and work with the same vertex selection over multiple frames.
+func (vs VertexSelection) SetUVOffset(x, y float64) {
 
 	for index := range vs.Indices {
-		vs.Mesh.VertexUVs[index].X += vec.X
-		vs.Mesh.VertexUVs[index].Y += vec.Y
+
+		vs.Mesh.VertexUVs[index].X = x + vs.Mesh.VertexUVOriginalValues[index].X
+		vs.Mesh.VertexUVs[index].Y = y + vs.Mesh.VertexUVOriginalValues[index].Y
+
 	}
 
 }
 
 // RotateUVs rotates the UV values around the center of the UV values for the mesh in radians
-func (vs *VertexSelection) RotateUVs(rotation float64) {
+func (vs VertexSelection) RotateUVs(rotation float64) {
 	center := Vector{}
 
 	for index := range vs.Indices {
@@ -693,7 +737,9 @@ func (vs *VertexSelection) RotateUVs(rotation float64) {
 
 // SetActiveColorChannel sets the active color channel in all vertices contained within the VertexSelection to the channel with the
 // specified index.
-func (vs *VertexSelection) SetActiveColorChannel(channelIndex int) {
+// If the channelIndex provided is greater than the number of vertex color channels in the Mesh minus one, vertex color channels will be created for all vertices
+// up to the index provided (e.g. VertexSelection.SetActiveColorChannel(3) will make it so that the mesh has at least four color channels - 0, 1, 2, and 3).
+func (vs VertexSelection) SetActiveColorChannel(channelIndex int) {
 
 	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
@@ -704,7 +750,7 @@ func (vs *VertexSelection) SetActiveColorChannel(channelIndex int) {
 }
 
 // ApplyMatrix applies a Matrix4 to the position of all vertices contained within the VertexSelection.
-func (vs *VertexSelection) ApplyMatrix(matrix Matrix4) {
+func (vs VertexSelection) ApplyMatrix(matrix Matrix4) {
 
 	for index := range vs.Indices {
 		vs.Mesh.VertexPositions[index] = matrix.MultVec(vs.Mesh.VertexPositions[index])
@@ -713,7 +759,7 @@ func (vs *VertexSelection) ApplyMatrix(matrix Matrix4) {
 }
 
 // Move moves all vertices contained within the VertexSelection by the provided x, y, and z values.
-func (vs *VertexSelection) Move(x, y, z float64) {
+func (vs VertexSelection) Move(x, y, z float64) {
 
 	for index := range vs.Indices {
 
@@ -726,7 +772,7 @@ func (vs *VertexSelection) Move(x, y, z float64) {
 }
 
 // Move moves all vertices contained within the VertexSelection by the provided 3D vector.
-func (vs *VertexSelection) MoveVec(vec Vector) {
+func (vs VertexSelection) MoveVec(vec Vector) {
 
 	for index := range vs.Indices {
 
@@ -739,7 +785,7 @@ func (vs *VertexSelection) MoveVec(vec Vector) {
 }
 
 // ForEachIndex calls the provided function for each index selected in the VertexSelection.
-func (vs *VertexSelection) ForEachIndex(forEach func(index int)) {
+func (vs VertexSelection) ForEachIndex(forEach func(index int)) {
 	for index := range vs.Indices {
 		forEach(index)
 	}
@@ -1198,9 +1244,11 @@ func NewTriangle(meshPart *MeshPart, id uint16, indices ...int) *Triangle {
 // Clone clones the Triangle, keeping a reference to the same Material.
 func (tri *Triangle) Clone() *Triangle {
 	newTri := NewTriangle(tri.MeshPart, tri.ID, tri.VertexIndices...)
-	newTri.MeshPart = tri.MeshPart
+	newTri.ID = tri.ID
+	newTri.MaxSpan = tri.MaxSpan
 	newTri.Center = tri.Center
 	newTri.Normal = tri.Normal
+	newTri.MeshPart = tri.MeshPart
 	return newTri
 }
 

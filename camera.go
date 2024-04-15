@@ -1579,9 +1579,18 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		colorPassOptions := &ebiten.DrawTrianglesOptions{}
 
+		textureFilterMode := 0
 		if mat != nil {
 			colorPassOptions.Filter = mat.TextureFilterMode
 			colorPassOptions.Address = mat.textureWrapMode
+
+			switch mat.TextureFilterMode {
+			case ebiten.FilterNearest:
+				textureFilterMode = 0
+			case ebiten.FilterLinear:
+				textureFilterMode = 1
+			}
+
 		}
 
 		hasFragShader := mat != nil && mat.fragmentShader != nil && mat.FragmentShaderOn
@@ -1613,6 +1622,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				"FogCurve":              float32(scene.World.FogCurve),
 				"BayerMatrix":           bayerMatrix,
 				"PerspectiveCorrection": perspectiveCorrection,
+				"TextureFilterMode":     textureFilterMode,
 			}
 
 		} else {

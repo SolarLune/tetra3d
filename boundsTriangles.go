@@ -196,7 +196,7 @@ var colPlane = newCollisionPlane()
 func closestPointOnTri(point, v0, v1, v2 Vector) Vector {
 
 	colPlane.Set(v0, v1, v2)
-	if planePoint := colPlane.ClosestPoint(point); colPlane.pointInsideTriangle(planePoint, v0, v1, v2) {
+	if planePoint := colPlane.ClosestPoint(point); isPointInsideTriangle(planePoint, v0, v1, v2) {
 		return planePoint
 	}
 
@@ -223,7 +223,12 @@ func closestPointOnTri(point, v0, v1, v2 Vector) Vector {
 
 }
 
-func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 Vector) bool {
+func isPointInsideTriangle(point, v0, v1, v2 Vector) bool {
+	u, v := pointInsideTriangle(point, v0, v1, v2)
+	return (u >= 0) && (v >= 0) && (u+v < 1)
+}
+
+func pointInsideTriangle(point, v0, v1, v2 Vector) (u, v float64) {
 
 	ca := v2.Sub(v0)
 	ba := v1.Sub(v0)
@@ -237,11 +242,12 @@ func (plane *collisionPlane) pointInsideTriangle(point, v0, v1, v2 Vector) bool 
 	dot12 := ba.Dot(pa)
 
 	invDenom := 1.0 / ((dot00 * dot11) - (dot01 * dot01))
-	u := ((dot11 * dot02) - (dot01 * dot12)) * invDenom
-	v := ((dot00 * dot12) - (dot01 * dot02)) * invDenom
+	u = ((dot11 * dot02) - (dot01 * dot12)) * invDenom
+	v = ((dot00 * dot12) - (dot01 * dot02)) * invDenom
 
-	return (u >= 0) && (v >= 0) && (u+v < 1)
+	// return (u >= 0) && (v >= 0) && (u+v < 1)
 
+	return
 }
 
 func (plane *collisionPlane) closestPointOnLine(point, start, end Vector) Vector {

@@ -8,6 +8,7 @@ var DitherSize float
 var FogCurve float
 var Fogless float
 var PerspectiveCorrection int
+var TextureFilterMode int
 
 var BayerMatrix [16]float
 
@@ -31,6 +32,29 @@ func unpackFloat(input float, precision float) vec2 {
 	return vec2(input / precision, mod(input, 1) / 0.05)
 }
 
+func bilinearFilter(srcPos vec2) vec4 {
+	
+	srcOrigin := imageSrc0Origin()
+	srcSize := imageSrc0Size()
+
+	s1 := imageSrc0UnsafeAt(mod(srcPos, srcSize) + srcOrigin)
+	s2 := imageSrc0UnsafeAt(mod(srcPos + vec2(1, 0), srcSize) + srcOrigin)
+	s3 := imageSrc0UnsafeAt(mod(srcPos + vec2(1, 1), srcSize) + srcOrigin)
+	s4 := imageSrc0UnsafeAt(mod(srcPos + vec2(0, 1), srcSize) + srcOrigin)
+
+	fu := fract((srcPos / srcSize) + 0.5) 
+
+	return mix(
+		mix(s1, s2, fu.x),
+		mix(s3, s4, fu.x),
+		fu.y,
+	)
+}
+
+func nearestFilter(srcPos vec2) vec4 {
+	return imageSrc0UnsafeAt(srcPos + imageSrc0Origin())
+}
+
 // tetra3d Custom Uniform Location //
 
 func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
@@ -52,23 +76,22 @@ func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
 		// This gives us the actual pixel coordinates.
 		tx := srcPos - srcOrigin
 
-		// Divide by the source image size to get the UV coordinates.
-		tx /= srcSize
-
 		if PerspectiveCorrection > 0 {
 			tx *= z
 			color.a = unpacked.x
 		}
-		
-		// Apply fract() to loop the UV coords around [0-1].
-		tx = fract(tx)
 
-		// Multiply by the size to get the pixel coordinates again.
-		tx *= srcSize
+		tx = mod(tx, srcSize) // Wrap the texture to the source texture's size
+		
+		var colorTex vec4
+		if TextureFilterMode == 0 {
+			colorTex = nearestFilter(tx) * color
+		} else {
+			colorTex = bilinearFilter(tx) * color
+		}
 
 		// tetra3d Custom Fragment Call Location //
-		colorTex := imageSrc0UnsafeAt(tx + srcOrigin) * color
-
+		
 		// We have to multiply the rgb component by a to fade out over time
 		colorTex.rgb *= color.a
 		

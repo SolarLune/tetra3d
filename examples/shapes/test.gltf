@@ -11,23 +11,13 @@
 		{
 			"name":"Another",
 			"nodes":[
-				0
+				2
 			]
 		},
 		{
 			"name":"Scene",
 			"nodes":[
-				1,
-				2,
-				3,
-				4,
-				5,
-				6,
-				7,
-				8,
-				9,
-				10,
-				11
+				15
 			]
 		}
 	],
@@ -41,6 +31,18 @@
 				0,
 				1.6292068494294654e-07
 			]
+		},
+		{
+			"children":[
+				0
+			],
+			"name":"Collection 1"
+		},
+		{
+			"children":[
+				1
+			],
+			"name":"Scene Collection"
 		},
 		{
 			"mesh":1,
@@ -115,21 +117,6 @@
 			]
 		},
 		{
-			"camera":0,
-			"name":"Camera",
-			"rotation":[
-				-0.18715742230415344,
-				0.04798436164855957,
-				0.009153532795608044,
-				0.9811145663261414
-			],
-			"translation":[
-				4.284424781799316,
-				4.78853178024292,
-				12.714475631713867
-			]
-		},
-		{
 			"mesh":9,
 			"name":"Cube.006",
 			"translation":[
@@ -139,24 +126,46 @@
 			]
 		},
 		{
+			"mesh":0,
+			"name":"Cube.005",
+			"rotation":[
+				0,
+				1,
+				0,
+				1.6292068494294654e-07
+			]
+		},
+		{
+			"children":[
+				12
+			],
 			"name":"Collection 1",
 			"translation":[
 				38,
 				12.5,
 				-12
 			]
-		}
-	],
-	"cameras":[
+		},
 		{
-			"name":"Camera",
-			"perspective":{
-				"aspectRatio":1.7777777777777777,
-				"yfov":1.5707963705062866,
-				"zfar":30,
-				"znear":0.10000000149011612
-			},
-			"type":"perspective"
+			"children":[
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				13
+			],
+			"name":"Collection"
+		},
+		{
+			"children":[
+				14
+			],
+			"name":"Scene Collection"
 		}
 	],
 	"materials":[
@@ -1170,7 +1179,7 @@
 	"buffers":[
 		{
 			"byteLength":270220,
-			"uri":"shapes.bin"
+			"uri":"test.bin"
 		}
 	]
 }

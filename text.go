@@ -14,19 +14,25 @@ import (
 	_ "embed"
 )
 
-type TextAlignment int
+type TextHorizontalAlignment int
+type TextVerticalAlignment int
 
 const (
-	TextAlignLeft   TextAlignment = iota // Left aligned text. The text hugs the left side of the texture.
-	TextAlignCenter                      // Center aligned text. All text lines are centered horizontally in the texture's width.
-	TextAlignRight                       // Right aligned text. The text hugs the right side of the texture.
+	TextAlignHorizontalLeft   TextHorizontalAlignment = iota // Left aligned text. The text hugs the left side of the texture.
+	TextAlignHorizontalCenter                                // Center aligned text. All text lines are centered horizontally in the texture's width.
+	TextAlignHorizontalRight                                 // Right aligned text. The text hugs the right side of the texture.
+
+	TextAlignVerticalTop    TextVerticalAlignment = iota // Top aligned text. The text hugs the top side of the texture.
+	TextAlignVerticalCenter                              // Center aligned text. All text lines are centered horizontally in the texture's width.
+	TextAlignVerticalBottom                              // Bottom aligned text. The text hugs the bottom side of the texture.
 )
 
 type TextStyle struct {
-	Font                 font.Face     // The font face to use for rendering the text. The size is customizeable, but the DPI should be 72.
-	Cursor               string        // A cursor string sequence is drawn at the end while typewriter-ing; defaults to a blank string ("").
-	LineHeightMultiplier float64       // The multiplier for line height changes.
-	AlignmentHorizontal  TextAlignment // How the text should be horizontally aligned in the Text texture.
+	Font                 font.Face               // The font face to use for rendering the text. The size is customizeable, but the DPI should be 72.
+	Cursor               string                  // A cursor string sequence is drawn at the end while typewriter-ing; defaults to a blank string ("").
+	LineHeightMultiplier float64                 // The multiplier for line height changes.
+	AlignmentHorizontal  TextHorizontalAlignment // How the text should be horizontally aligned in the Text texture.
+	AlignmentVertical    TextVerticalAlignment
 
 	BGColor Color // The Background color for the text. Defaults to black (0, 0, 0, 1).
 	FGColor Color // The Foreground color for the text. Defaults to white (1, 1, 1, 1).
@@ -42,6 +48,9 @@ type TextStyle struct {
 
 	// Margin (in pixels) of space to leave around the frame of the texture (left or right, depending on HorizontalAlignment, and from the top). Defaults to 0.
 	MarginHorizontal, MarginVertical int
+
+	// Manual offsets to positioning
+	OffsetX, OffsetY int
 }
 
 func NewDefaultTextStyle() TextStyle {
@@ -180,7 +189,7 @@ func NewTextAutoSize(meshPart *MeshPart, camera *Camera) (*Text, error) {
 
 	meshPartDimWidth, _ := meshPart.primaryDimensions()
 
-	texWidth := meshPartDimWidth / camera.OrthoScale() * float64(w)
+	texWidth := math.Round(meshPartDimWidth / camera.OrthoScale() * float64(w))
 
 	return NewText(meshPart, int(texWidth))
 }
@@ -294,11 +303,12 @@ func (textObj *Text) SetText(txt string, arguments ...interface{}) *Text {
 
 		textObj.parsedText = parsedText
 
-		textObj.UpdateTexture()
-
 		if textObj.typewriterIndex >= 0 {
 			textObj.typewriterIndex = 0
 		}
+
+		textObj.UpdateTexture()
+
 	}
 
 	return textObj
@@ -324,8 +334,9 @@ func (textObj *Text) UpdateTexture() {
 	}
 
 	textLineMargin := 2
-	lineHeight := int(float64(textObj.style.Font.Metrics().Height.Ceil()+textLineMargin) * textObj.style.LineHeightMultiplier)
-	dip := textObj.style.Font.Metrics().Ascent.Ceil()
+	lineHeight := int(float64(textObj.style.Font.Metrics().Height.Ceil() + textLineMargin))
+	multipliedLineHeight := int(float64(lineHeight) * textObj.style.LineHeightMultiplier)
+	ascent := textObj.style.Font.Metrics().Ascent.Ceil()
 
 	typing := true
 
@@ -336,6 +347,9 @@ func (textObj *Text) UpdateTexture() {
 	// }
 
 	textureWidth := textObj.Texture.Bounds().Dx()
+	textureHeight := textObj.Texture.Bounds().Dy()
+
+	blockHeight := max(len(textObj.parsedText)*multipliedLineHeight, lineHeight)
 
 	for lineIndex, line := range textObj.parsedText {
 
@@ -358,21 +372,30 @@ func (textObj *Text) UpdateTexture() {
 
 		x := -measure.Min.X
 
-		d := -measure.Min.Y + textObj.style.MarginVertical
-		if dip > d {
-			d = dip
-		}
+		y := -measure.Min.Y + (lineIndex * multipliedLineHeight)
 
-		y := d + (lineIndex * lineHeight)
-
-		if textObj.style.AlignmentHorizontal == TextAlignCenter {
+		if textObj.style.AlignmentHorizontal == TextAlignHorizontalCenter {
 			x = textureWidth/2 - measure.Dx()/2
-		} else if textObj.style.AlignmentHorizontal == TextAlignRight {
+		} else if textObj.style.AlignmentHorizontal == TextAlignHorizontalRight {
 			x = textureWidth - measure.Dx()
 			x -= textObj.style.MarginHorizontal
 		} else {
 			x += textObj.style.MarginHorizontal
 		}
+
+		if textObj.style.AlignmentVertical == TextAlignVerticalCenter {
+			// We add the minimum because the height shouldn't probably include parts of text
+			// that drop below the baseline (e.g. measure.Dy())
+			y += textureHeight/2 - blockHeight/2 + ascent/2
+		} else if textObj.style.AlignmentVertical == TextAlignVerticalBottom {
+			y += textureHeight - blockHeight
+			y -= textObj.style.MarginVertical
+		} else {
+			y += textObj.style.MarginVertical
+		}
+
+		x += textObj.style.OffsetX
+		y += textObj.style.OffsetY
 
 		if textObj.typewriterOn && (len(line) < len(textObj.parsedText[lineIndex]) || lineIndex == len(textObj.parsedText)-1) {
 			line += textObj.style.Cursor

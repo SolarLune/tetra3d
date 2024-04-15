@@ -20,7 +20,7 @@ type Game struct {
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
 
-	FlashingVertices *tetra3d.VertexSelection
+	FlashingVertices tetra3d.VertexSelection
 
 	Time float64
 
@@ -72,9 +72,17 @@ func (g *Game) Init() {
 	// Here, we'll select our vertices and store it in the Game struct.
 	mesh := g.Cube.Mesh
 
-	// VertexSelection.SelectInChannel selects all vertices that have a non-black color in a specified color channel.
-	// mesh.VertexColorChannelNames stores the various vertex color channel names with their related channel indices.
-	g.FlashingVertices = mesh.SelectVertices().SelectInChannel(mesh.VertexColorChannelNames["Flash"])
+	// VertexSelection.SelectInVertexColorChannel selects all vertices that have a non-black color in a specified color channel.
+	// mesh.VertexColorChannelNames stores the various vertex color channel names with their related channel indices, so that you
+	// can just use text to refer to them rather than indices.
+	vertices, err := mesh.SelectVertices().SelectInVertexColorChannel(mesh.VertexColorChannelNames["Flash"])
+
+	// An error could happen if the color channel index passed to SelectInChannel is too high to be beyond the vertex color channel count set on the Model.
+	if err != nil {
+		panic(err)
+	}
+
+	g.FlashingVertices = vertices
 
 	// Once we know which vertices are not black in the "Flash" channel in Blender, we're good to go.
 
