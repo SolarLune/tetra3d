@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"regexp"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -26,20 +27,22 @@ const (
 type NodeFilter struct {
 	Filters        []func(INode) bool // The slice of filters that are currently active on the NodeFilter.
 	Start          INode              // The start (root) of the filter.
-	StopOnFiltered bool               // If the filter should continue through to a node's children if the node itself doesn't pass the filter
+	stopOnFiltered bool               // If the filter should continue through to a node's children if the node itself doesn't pass the filter
 	MaxDepth       int                // How deep the node filter should search in the starting node's hierarchy; a value that is less than zero means the entire tree will be traversed.
 	depth          int
+	sortMode       int
+	reverseSort    bool
+	sortTo         Vector
 
-	sortMode    int
-	reverseSort bool
-	sortTo      Vector
+	multithreadingWG *sync.WaitGroup
 }
 
 func newNodeFilter(startingNode INode) *NodeFilter {
 	return &NodeFilter{
-		Start:    startingNode,
-		depth:    -1,
-		MaxDepth: -1,
+		Start:            startingNode,
+		depth:            -1,
+		MaxDepth:         -1,
+		multithreadingWG: &sync.WaitGroup{},
 	}
 }
 
@@ -61,7 +64,7 @@ func (nf *NodeFilter) execute(node INode) []INode {
 	}
 	if nf.MaxDepth < 0 || nf.depth <= nf.MaxDepth {
 
-		if !nf.StopOnFiltered || added {
+		if !nf.stopOnFiltered || added {
 
 			for _, child := range node.Children() {
 				out = append(out, nf.execute(child)...)
@@ -118,7 +121,10 @@ func (nf *NodeFilter) execute(node INode) []INode {
 	return out
 }
 
-func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool) bool {
+func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool, multithreading bool) bool {
+
+	// TODO: Append filtered nodes to an internal shared slice so sorting could be available
+	// while also not allocating memory constantly unnecessarily.
 
 	if nf.depth < 0 && nf.sortMode != nfSortModeNone {
 		log.Printf("Warning: NodeFilter executing on Node < %s > has sorting on it, but ForEach() cannot be used with sorting.\n", nf.Start.Path())
@@ -136,28 +142,52 @@ func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool) bool 
 			}
 		}
 		if ok {
-			if !execute(node) {
-				nf.depth--
-				return false
+			if multithreading {
+
+				nf.multithreadingWG.Add(1)
+				go func() {
+					defer nf.multithreadingWG.Done()
+					execute(node)
+				}()
+
+			} else {
+
+				if !execute(node) {
+					nf.depth--
+					return false
+				}
+
 			}
 		}
 	}
 
 	if nf.MaxDepth < 0 || nf.depth <= nf.MaxDepth {
 
-		if !nf.StopOnFiltered || successfulFilter {
+		if !nf.stopOnFiltered || successfulFilter {
 
-			for _, child := range node.Children() {
-				if !nf.executeFilters(child, execute) {
+			includeChild := true
+			node.ForEachChild(func(child INode) bool {
+				if !nf.executeFilters(child, execute, multithreading) {
+					includeChild = false
 					nf.depth--
 					return false
 				}
+				return true
+			})
+
+			if !includeChild {
+				return false
 			}
 
 		}
 
 	}
 	nf.depth--
+
+	if multithreading && node == nf.Start {
+		nf.multithreadingWG.Wait()
+	}
+
 	return true
 }
 
@@ -288,6 +318,12 @@ func (nf NodeFilter) Not(others ...INode) NodeFilter {
 	return nf
 }
 
+// StopOnFiltered allows you to specify that if a node doesn't pass a filter, none of its children will pass as well.
+func (nf NodeFilter) StopOnFiltered() NodeFilter {
+	nf.stopOnFiltered = true
+	return nf
+}
+
 func (nf NodeFilter) bySectors() NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		return node.Type() == NodeTypeModel && node.(*Model).sector != nil
@@ -295,12 +331,22 @@ func (nf NodeFilter) bySectors() NodeFilter {
 	return nf
 }
 
-// ForEach executes the provided function on each filtered Node, without allocating memory for a slice of the nodes.
+// ForEach executes the provided function on each filtered Node.
+// This is done to avoid allocating a slice for the filtered Nodes.
 // The function must return a boolean indicating whether to continue running on each node in the tree that fulfills the
 // filter set (true) or not (false).
 // ForEach does not work with any sorting, and will log a warning if you use sorting and ForEach on the same filter.
-func (nf NodeFilter) ForEach(f func(node INode) bool) {
-	nf.executeFilters(nf.Start, f)
+func (nf NodeFilter) ForEach(callback func(node INode) bool) {
+	nf.executeFilters(nf.Start, callback, false)
+}
+
+// ForEachMultithreaded executes the provided function on each filtered Node.
+// This is done to avoid allocating a slice for the filtered Nodes.
+// ForEachMultithreaded will filter each node on the main thread, but will execute the callback function for each node
+// on varying goroutines, syncing them all up once finished to resume execution on the main thread.
+// You should be careful to avoid race conditions when using this function.
+func (nf NodeFilter) ForEachMultithreaded(callback func(node INode)) {
+	nf.executeFilters(nf.Start, func(i INode) bool { callback(i); return true }, true)
 }
 
 // Count returns the number of Nodes that fit the filter set.
@@ -309,7 +355,7 @@ func (nf NodeFilter) Count() int {
 	nf.executeFilters(nf.Start, func(i INode) bool {
 		count++
 		return true
-	})
+	}, false)
 	return count
 }
 
@@ -318,8 +364,8 @@ func (nf NodeFilter) Contains(node INode) bool {
 	return nf.Index(node) > 0
 }
 
-// Index returns the index of the given INode in the NodeFilter; if it doesn't exist in the filter,
-// then this function returns -1.
+// Index returns the index of the given INode in the NodeFilter assuming the filter executes and results
+// in an []INode. If it doesn't exist in the filter, then this function returns -1.
 func (nf NodeFilter) Index(node INode) int {
 	out := nf.execute(nf.Start)
 	for index, child := range out {
@@ -330,8 +376,8 @@ func (nf NodeFilter) Index(node INode) int {
 	return -1
 }
 
-// Empty returns true if the NodeFilter contains no Nodes.
-func (nf NodeFilter) Empty() bool {
+// IsEmpty returns true if the NodeFilter contains no Nodes.
+func (nf NodeFilter) IsEmpty() bool {
 	return len(nf.execute(nf.Start)) == 0
 }
 

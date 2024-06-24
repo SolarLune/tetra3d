@@ -82,10 +82,10 @@ func (capsule *BoundingCapsule) Collision(other IBoundingObject) *Collision {
 }
 
 // CollisionTest performs a collision test using the provided collision test settings structure.
-// As a nicety, CollisionTest also returns a distance-sorted slice of all of the Collisions (but you should rather
-// handle collisions with intent using the OnCollision function of the CollisionTestSettings struct).
-func (capsule *BoundingCapsule) CollisionTest(settings CollisionTestSettings) []*Collision {
-	return CommonCollisionTest(capsule, settings)
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
+func (capsule *BoundingCapsule) CollisionTest(settings CollisionTestSettings) bool {
+	return commonCollisionTest(capsule, settings)
 }
 
 // PointInside returns true if the point provided is within the capsule.

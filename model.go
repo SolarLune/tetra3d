@@ -512,8 +512,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	// invertedCamPos := modelTransform.Inverted().MultVec(camPos)
 
 	// TODO: Review this, as it still seems problematic?
-	p, s, r := modelTransform.Inverted().Decompose()
-	invertedCamPos := r.MultVec(camPos).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 1}))
+	// p, s, r := modelTransform.Inverted().Decompose()
+	// invertedCamPos := r.MultVec(camPos).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 1}))
 
 	// invertedCamPos := camPos
 
@@ -562,7 +562,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	// There's pop-in for faces where the camera is looking at an object through the corner of the viewport
-	farSquared := (camera.far * camera.far) + (mesh.maxTriangleSpan * mesh.maxTriangleSpan)
+	// farSquared := (camera.far * camera.far) + (mesh.maxTriangleSpan * mesh.maxTriangleSpan)
 
 	var skinnedTriCenter Vector
 
@@ -585,11 +585,12 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			skinnedTriCenter.Z = 0
 		}
 
-		invertedCamDist := invertedCamPos.DistanceSquared(tri.Center)
+		// This was causing problems, so I axed it
+		// invertedCamDist := invertedCamPos.DistanceSquared(tri.Center)
 
-		if !model.skinned && invertedCamDist > farSquared {
-			continue
-		}
+		// if !model.skinned && invertedCamDist > farSquared {
+		// 	continue
+		// }
 
 		for i := 0; i < 3; i++ {
 
@@ -739,7 +740,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			if model.skinned {
 				meshPart.sortingTriangles[sortingTriIndex].depth = float32(camPos.DistanceSquared(skinnedTriCenter.Divide(3)))
 			} else {
-				meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamDist)
+				// meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamDist)
+				meshPart.sortingTriangles[sortingTriIndex].depth = float32(camPos.DistanceSquared(tri.Center))
 			}
 		}
 

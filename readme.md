@@ -307,7 +307,9 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [X] **Debug**
 - [X] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
 - [X] -- Wireframe debug rendering
+- [ ] -- TODO: Utilize depth testing and backface culling for wireframe rendering. Also replace ebitenutil.DrawLine() with the non-deprecated vector package usage.
 - [X] -- Normal debug rendering
+- [X] -- Bounding object debug rendering
 - [X] **Materials**
 - [X] -- Basic Texturing
 - [ ] -- Ability to use screen coordinates instead of just UV texturing (useful for repeating patterns)
@@ -415,6 +417,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- It might be possible to not have to write depth manually (5/22/23, SolarLune: Not sure what past me meant by this)
 - [ ] -- Minimize texture-swapping - should be possible to do now that Kage shaders can handle images of multiple sizes.
 - [X] -- Make NodeFilters work lazily, rather than gathering all nodes in the filter at once
+-- [x] -- Optimize NodeFilters to avoid creating slices unnecessarily by avoiding using Node.Children() and instead use callbacks
+-- [ ] -- Allow NodeFilters to append filtered nodes to a shared slice to have sorting available while still not allocating new memory unless the internal slice grows
 - [X] -- Reusing vertex indices for adjacent triangles
 - [ ] -- Multithreading (particularly for vertex transformations)
 - [X] -- Armature animation improvements?

@@ -19,8 +19,6 @@ type Game struct {
 	System examples.BasicSystemHandler
 
 	AnimatedTexture *tetra3d.TexturePlayer
-
-	Character *tetra3d.Model
 }
 
 //go:embed assets
@@ -53,20 +51,15 @@ func (g *Game) Init() {
 	g.Camera.Move(0, 5, 0)
 	g.System = examples.NewBasicSystemHandler(g)
 
-	g.Character = g.Scene.Root.Get("Character").(*tetra3d.Model)
-	clone := g.Character.Mesh.Clone()
-	clone.Name = "Cloned Character"
-	g.Character.Mesh = clone
-
 	// Firstly, we create a TexturePlayer, which animates a collection of vertices' UV values to
 	// animate a texture on them.
 
 	mesh := library.Meshes["Plane"]
 
-	// We can select all vertices:
+	// We can select all vertices...
 	selection := mesh.SelectVertices().SelectAll()
 
-	// And then create a TexturePlayer, which steps through all vertices and assigns their UV values according
+	// ...And then create a TexturePlayer, which steps through all vertices contained in the passed vertex selection and assigns their UV values according
 	// to the TexturePlayer's playing animation.
 	g.AnimatedTexture = tetra3d.NewTexturePlayer(selection)
 

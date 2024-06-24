@@ -61,6 +61,13 @@ materialBlendModes = [
     ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as BlendClear.", 0, 3),
 ]
 
+materialTransparencyModes = [
+    ("AUTO", "Auto", "The material is opaque until its material color has an alpha below 1; in this case, it switches to Transparent mode", 0, 0),
+    ("OPAQUE", "Opaque", "The material is wholly opaque", 0, 1),
+    ("ALPHA CLIP", "Alpha Clip", "Transparency is determined by the texture's alpha channel and is either wholly transparent or wholly opaque. Renders after all opaque objects and is sorted from back-to-front", 0, 2),
+    ("TRANSPARENT", "Transparent", "Partial transparency. Renders after all opaque objects and is sorted from back-to-front", 0, 3),
+]
+
 materialBillboardModes = [
     ("NONE", "None", "No billboarding - the (unskinned) object with this material does not rotate to face the camera.", 0, 0),
     ("FIXEDVERTICAL", "Fixed Vertical", "Fixed Vertical billboarding - the (unskinned) object with this material faces the camera, with up always pointing towards the camera's local up vector (+Y). Good for top-down games.", 0, 1),
@@ -248,6 +255,37 @@ class OBJECT_OT_tetra3dSetVector(bpy.types.Operator):
             target.t3dGameProperties__[self.index].valueVector3D = context.object.location
         elif self.buttonMode == "3D cursor":
             target.t3dGameProperties__[self.index].valueVector3D = context.scene.cursor.location
+
+        return {'FINISHED'}
+
+class OBJECT_OT_tetra3dFocusObject(bpy.types.Operator):
+
+    bl_idname = "object.t3dfocusobject"
+    bl_label = "" ## We don't want the label to show
+    bl_description= "Focuses the camera on the specified object"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    target : bpy.props.StringProperty()
+
+    def execute(self, context):
+
+        if self.target != "":
+
+            ob = bpy.data.objects[self.target]
+            bpy.ops.object.select_all(action='DESELECT')
+            context.window.scene = ob.users_scene[0]
+            context.window.view_layer = ob.users_scene[0].view_layers[0] 
+
+            override_window = context.window
+            override_screen = override_window.screen
+            override_area = [area for area in override_screen.areas if area.type == "VIEW_3D"]
+            override_region = [region for region in override_area[0].regions if region.type == 'WINDOW']
+
+            with context.temp_override(window=override_window, area=override_area[0], region=override_region[0]):
+                ob.select_set(True)
+                bpy.ops.view3d.view_selected()
+                context.region_data.view_distance += 25
+                # print(context.region_data)
 
         return {'FINISHED'}
 
@@ -810,6 +848,9 @@ def handleT3DProperty(index, box, prop, operatorType, enabled=True):
             row.prop_search(prop, "valueReference", prop.valueReferenceScene, "objects")
         else:
             row.prop(prop, "valueReference")
+        op = row.operator("object.t3dfocusobject", text="", icon="CAMERA_DATA")
+        if prop.valueReference:
+            op.target = prop.valueReference.name
     elif prop.valueType == "color":
         row.prop(prop, "valueColor")
     elif prop.valueType == "vector3d":
@@ -868,7 +909,7 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.prop(context.material, "t3dVisible__")
         row = self.layout.row()
         row.label(text="Transparency Mode:")
-        row.prop(context.material, "blend_method", text="")
+        row.prop(context.material, "t3dTransparencyMode__", text="")
         row = self.layout.row()
         row.label(text="Blend Mode:")
         row.prop(context.material, "t3dBlendMode__", text="")
@@ -1424,7 +1465,7 @@ def export():
 
     renderResolutionH = getRenderResolutionH(None)
 
-    depsgraph = bpy.context.evaluated_depsgraph_get()
+    bpy.context.evaluated_depsgraph_get()
 
     for area in bpy.context.screen.areas:
 
@@ -1464,7 +1505,7 @@ def export():
         export_lights=scene.t3dExportLights__, 
         export_keep_originals=not scene.t3dPackTextures__,
         
-        export_colors=True,
+        export_vertex_color='ACTIVE',
         export_attributes=True,
         
         export_current_frame=False,
@@ -1938,6 +1979,7 @@ def register():
     bpy.utils.register_class(t3dGamePropertyItem__)
     bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
     bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
+    bpy.utils.register_class(OBJECT_OT_tetra3dFocusObject)
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
@@ -2026,6 +2068,7 @@ def register():
     bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
     bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
     bpy.types.Material.t3dBlendMode__ = bpy.props.EnumProperty(items=materialBlendModes, name="Blend Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
+    bpy.types.Material.t3dTransparencyMode__ = bpy.props.EnumProperty(items=materialTransparencyModes, name="Transparency Mode", description="Transparency mode for this material", default="AUTO")
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
     bpy.types.Material.t3dCustomDepthOn__ = bpy.props.BoolProperty(name="Custom Depth", description="Whether custom depth offsetting should be enabled", default=False)
     bpy.types.Material.t3dCustomDepthValue__ = bpy.props.FloatProperty(name="Depth Offset Value", description="How far in world units the material should offset when rendering (negative values are closer to the camera, positive values are further)")
@@ -2105,6 +2148,7 @@ def unregister():
 
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dFocusObject)
     
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
@@ -2134,6 +2178,7 @@ def unregister():
     del bpy.types.Material.t3dMaterialFogless__
     del bpy.types.Material.t3dBlendMode__
     del bpy.types.Material.t3dBillboardMode__
+    del bpy.types.Material.t3dTransparencyMode__
     del bpy.types.Material.t3dMaterialLightingMode__
 
     del bpy.types.Material.t3dCustomDepthOn__

@@ -52,9 +52,9 @@ func (player *Player) Update() {
 
 		tetra3d.CollisionTestSettings{
 
-			Others: player.node.Root().SearchTree().IBoundingObjectsWithProps("solid"),
+			TestAgainst: player.node.Root().SearchTree().IBoundingObjectsWithProps("solid"),
 
-			HandleCollision: func(col *tetra3d.Collision) bool {
+			OnCollision: func(col *tetra3d.Collision) bool {
 
 				if col.BoundingObject.Parent().Properties().Has("death") {
 					player.node.Unparent() // Unparenting is the equivalent of destroying the node

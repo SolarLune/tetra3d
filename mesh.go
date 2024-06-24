@@ -700,6 +700,16 @@ func (vs VertexSelection) MoveUVs(dx, dy float64) {
 
 }
 
+// ScaleUVs scales the UV values by the percentages specified.
+func (vs VertexSelection) ScaleUVs(px, py float64) {
+
+	for index := range vs.Indices {
+		vs.Mesh.VertexUVs[index].X *= px
+		vs.Mesh.VertexUVs[index].Y *= py
+	}
+
+}
+
 // MoveUVsVec moves the UV values by the Vector values specified.
 func (vs *VertexSelection) MoveUVsVec(vec Vector) {
 	vs.MoveUVs(vec.X, vec.Y)

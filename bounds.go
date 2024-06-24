@@ -139,28 +139,21 @@ func (result *Collision) AverageContactPoint() Vector {
 
 // CollisionTestSettings controls how a CollisionTest() call evaluates.
 type CollisionTestSettings struct {
-	// HandleCollision is a callback function that is called when a valid collision test happens between the
+
+	// TestAgainst is a slice of IBoundingObjects to test against.
+	TestAgainst []IBoundingObject
+
+	// OnCollision is a callback function that is called when a valid collision test happens between the
 	// calling object and one of the valid INodes contained within the Others slice. The callback should return a boolean
 	// indicating if the test should continue after evaluating this collision (true) or not (false).
 	//
 	// Because this function is called whenever a Collision is found, anything done in this function will influence
 	// following possible Collisions. To illustrate this, let's say that you had object A that is colliding with objects B and C.
 	// If the collision with B is detected first, and you move A away so that it is no longer colliding with B or C, then the collision
-	// with C would not be detected (and HandleCollision would not be called in this case).
+	// with C would not be detected (and OnCollision would not be called in this case).
 	//
-	// This being the case, HandleCollision is not guaranteed to be called in any fixed order (so in the above example,
-	// it could detect a collision with B first, OR C first). If you need collisions to be checked in order of distance,
-	// step through them manually with the results of CollisionTest(), rather than handling them individually with HandleCollision.
-	HandleCollision func(col *Collision) bool
-
-	// Others is a slice of INodes to check for collision against.
-	// A Collision test tests against all recursive children of the Others slice, testing against specifically the
-	// BoundingObjects in those trees.
-	// To exemplify this, if you had a Model that had a BoundingObject child, and then added the Model to the Others slice,
-	// the Model's children would be tested for collision (which means the BoundingObject), and the Model would be the
-	// collided object. Of course, if you simply tested the BoundingObject directly, then it would return the BoundingObject as the collided
-	// object in the Collision object returned.
-	Others []IBoundingObject
+	// OnCollision is called in order of distance from calling IBoundingObject to colliding IBoundingObject(s).
+	OnCollision func(col *Collision) bool
 }
 
 // IBoundingObject represents a Node type that can be tested for collision. The exposed functions are essentially just
@@ -174,11 +167,8 @@ type IBoundingObject interface {
 	// no intersection is reported, Collision returns nil.
 	Collision(other IBoundingObject) *Collision
 
-	// CollisionTest performs a collision test using the provided collision test settings structure.
-	// As a nicety, CollisionTest also returns a distance-sorted slice of all of the Collisions (but you should rather
-	// handle collisions with intent using the OnCollision function of the CollisionTestSettings struct).
-	// The returned Collisions slice will be sorted in order of distance. If no Collisions occurred, it will return an empty slice.
-	CollisionTest(settings CollisionTestSettings) []*Collision
+	// CollisionTest performs a distance-ordered collision test using the provided collision test settings structure.
+	CollisionTest(settings CollisionTestSettings) bool
 }
 
 // The below set of bt functions are used to test for intersection between BoundingObject pairs.
@@ -815,35 +805,45 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 }
 
-func CommonCollisionTest(node INode, settings CollisionTestSettings) []*Collision {
+var internalCollisionList = []*Collision{}
 
-	collisions := []*Collision{}
+func commonCollisionTest(node INode, settings CollisionTestSettings) bool {
 
-	for _, checking := range settings.Others {
+	internalCollisionList = internalCollisionList[:0]
 
-		if node == checking || checking == nil {
+	for _, checking := range settings.TestAgainst {
+
+		if node == checking {
 			continue
 		}
 
 		if collision := node.(IBoundingObject).Collision(checking); collision != nil {
+			internalCollisionList = append(internalCollisionList, collision)
+		}
 
-			collisions = append(collisions, collision)
-
-			if settings.HandleCollision != nil && !settings.HandleCollision(collision) {
-				break
-			}
-
+		if settings.OnCollision == nil && len(internalCollisionList) > 0 {
+			return true
 		}
 
 	}
 
-	// Sort the IntersectionResults by distance (closer intersections come up "sooner").
-	sort.Slice(collisions, func(i, j int) bool {
-		return collisions[i].AverageContactPoint().DistanceSquared(collisions[i].Intersections[0].StartingPoint) >
-			collisions[j].AverageContactPoint().DistanceSquared(collisions[j].Intersections[0].StartingPoint)
-	})
+	if settings.OnCollision != nil {
 
-	return collisions
+		// Sort the IntersectionResults by distance (closer intersections come up "sooner").
+		sort.Slice(internalCollisionList, func(i, j int) bool {
+			return internalCollisionList[i].AverageContactPoint().DistanceSquared(internalCollisionList[i].Intersections[0].StartingPoint) >
+				internalCollisionList[j].AverageContactPoint().DistanceSquared(internalCollisionList[j].Intersections[0].StartingPoint)
+		})
+
+		for _, c := range internalCollisionList {
+			if !settings.OnCollision(c) {
+				break
+			}
+		}
+
+	}
+
+	return len(internalCollisionList) > 0
 
 }
 
@@ -895,19 +895,19 @@ var sphereTestObject = NewBoundingSphere("sphere check", 1)
 
 // CollisionTestSphere performs a quick bounding sphere check at the specified X, Y, and Z position with the radius given,
 // against the bounding objects provided in "others".
-// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
-// If no collisions were found, the function will return an empty slice.
-func CollisionTestSphere(x, y, z, radius float64, settings CollisionTestSettings) []*Collision {
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
+func CollisionTestSphere(x, y, z, radius float64, settings CollisionTestSettings) bool {
 	sphereTestObject.SetLocalPosition(x, y, z)
 	sphereTestObject.Radius = radius
-	return CommonCollisionTest(sphereTestObject, settings)
+	return commonCollisionTest(sphereTestObject, settings)
 }
 
 // CollisionTestSphereVec performs a quick bounding sphere check at the specified position with the radius given, against the
 // bounding objects provided in "others".
-// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
-// If no collisions were found, the function will return an empty slice.
-func CollisionTestSphereVec(position Vector, radius float64, settings CollisionTestSettings) []*Collision {
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
+func CollisionTestSphereVec(position Vector, radius float64, settings CollisionTestSettings) bool {
 	return CollisionTestSphere(position.X, position.Y, position.Z, radius, settings)
 }
 
@@ -915,39 +915,40 @@ var aabbTestObject = NewBoundingAABB("aabb check", 1, 1, 1)
 
 // CollisionTestAABB performs a quick bounding AABB check at the specified x, y, and z position using the collision settings
 // provided. The bounding AABB will have the provided width, height, and depth.
-// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
-// If no collisions were found, the function will return an empty slice.
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
 // Note that AABB tests with BoundingTriangles are currently buggy.
-func CollisionTestAABB(x, y, z, width, height, depth float64, settings CollisionTestSettings) []*Collision {
+func CollisionTestAABB(x, y, z, width, height, depth float64, settings CollisionTestSettings) bool {
 	aabbTestObject.SetLocalPosition(x, y, z)
 	aabbTestObject.SetDimensions(width, height, depth)
-	return CommonCollisionTest(aabbTestObject, settings)
+	return commonCollisionTest(aabbTestObject, settings)
 }
 
 // CollisionTestAABBVec places a bounding AABB at the position given with the specified size to perform a collision test.
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
 // Note that AABB tests with BoundingTriangles are currently buggy.
-// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
-// If no collisions were found, the function will return an empty slice.
-func CollisionTestAABBVec(position, size Vector, settings CollisionTestSettings) []*Collision {
+func CollisionTestAABBVec(position, size Vector, settings CollisionTestSettings) bool {
 	return CollisionTestAABB(position.X, position.Y, position.Z, size.X, size.Y, size.Z, settings)
 }
 
 var capsuleTestObject = NewBoundingCapsule("capsule check", 2, 1)
 
-// CollisionTestCapsule performs a quick bounding capsule check at the specified x, y, and z position using the collision settings
-// provided. The bounding capsule will have the provided radius and height.
-// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
-// If no collisions were found, the function will return an empty slice.
-func CollisionTestCapsule(x, y, z, radius, height float64, settings CollisionTestSettings) []*Collision {
+// CollisionTestCapsule performs a quick bounding capsule check at the specified position
+// and size using the collision settings provided.
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
+func CollisionTestCapsule(x, y, z, radius, height float64, settings CollisionTestSettings) bool {
 	capsuleTestObject.SetLocalPosition(x, y, z)
 	capsuleTestObject.Radius = radius
 	capsuleTestObject.Height = height
-	return CommonCollisionTest(capsuleTestObject, settings)
+	return commonCollisionTest(capsuleTestObject, settings)
 }
 
-// CollisionTestCapsuleVec places a bounding capsule at the position given with the specified radius and height to perform a collision test
-// The function will return a slice of successful Collisions, sorted by distance from closest to furthest.
-// If no collisions were found, the function will return an empty slice.
-func CollisionTestCapsuleVec(position Vector, radius, height float64, settings CollisionTestSettings) []*Collision {
+// CollisionTestCapsuleVec places a bounding capsule at the position given with the specified
+// radius and height to perform a collision test.
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
+func CollisionTestCapsuleVec(position Vector, radius, height float64, settings CollisionTestSettings) bool {
 	return CollisionTestCapsule(position.X, position.Y, position.Z, radius, height, settings)
 }

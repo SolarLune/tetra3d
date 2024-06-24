@@ -63,7 +63,7 @@ func (g *Game) Update() error {
 	gravity := 0.05
 
 	bounds := g.Controlling.Children()[0].(tetra3d.IBoundingObject)
-	solids := g.Scene.Root.SearchTree().ByType(tetra3d.NodeTypeBoundingObject).IBoundingObjects()
+	solids := g.Scene.Root.SearchTree().IBoundingObjects()
 
 	movement := g.Movement.Modify() // Modification Vector
 
@@ -106,14 +106,14 @@ func (g *Game) Update() error {
 
 	bounds.CollisionTest(tetra3d.CollisionTestSettings{
 
-		HandleCollision: func(col *tetra3d.Collision) bool {
+		OnCollision: func(col *tetra3d.Collision) bool {
 			mtv := col.AverageMTV()
 			mtv.Y = 0                                       // We don't want to move up to avoid collision
 			g.Controlling.MoveVec(mtv.Expand(margin, 0.01)) // Move out of the collision, but add a little margin
 			return true
 		},
 
-		Others: solids,
+		TestAgainst: solids,
 	})
 
 	// Vertical check (floors):
@@ -122,13 +122,13 @@ func (g *Game) Update() error {
 
 	bounds.CollisionTest(tetra3d.CollisionTestSettings{
 
-		HandleCollision: func(col *tetra3d.Collision) bool {
+		OnCollision: func(col *tetra3d.Collision) bool {
 			g.Controlling.Move(0, col.AverageMTV().Y+margin, 0) // Move the object up, so that it's on the ground, plus a little margin
 			g.VerticalSpeed = 0
 			return true
 		},
 
-		Others: solids,
+		TestAgainst: solids,
 	})
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {

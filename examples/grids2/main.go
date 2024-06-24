@@ -181,44 +181,48 @@ func (g *Game) Update() error {
 	cursor.Rotate(0, 1, 0, 0.04)
 
 	// See which grid point marker we're hovering over with the mouse.
-	ray := g.Camera.MouseRayTest(100, g.Scene.Root.SearchTree().IBoundingObjectsWithProps("gridPoint")...)
+	g.Camera.MouseRayTest(tetra3d.MouseRayTestOptions{
+		Depth: 100,
+		OnHit: func(hit tetra3d.RayHit, hitIndex int, hitCount int) bool {
 
-	if len(ray) > 0 {
+			// The bounding objects's parent (model)'s parent is the grid point node
+			targetPoint := hit.Object.Get("../../").(*tetra3d.GridPoint)
 
-		// The bounding objects's parent (model)'s parent is the grid point node
-		targetPoint := ray[0].Object.Get("../../").(*tetra3d.GridPoint)
+			cursor.SetLocalPositionVec(targetPoint.LocalPosition())
+			cursor.SetVisible(true, true)
 
-		cursor.SetLocalPositionVec(targetPoint.LocalPosition())
-		cursor.SetVisible(true, true)
-
-		if inpututil.IsKeyJustPressed(ebiten.KeyE) {
-			for _, c := range targetPoint.Connections {
-				c.Passable = !c.Passable
-			}
-		}
-
-		if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
-			for _, c := range targetPoint.Connections {
-				// c.Passable = !c.Passable
-				if c.Cost == 0 {
-					c.Cost = 100
-				} else {
-					c.Cost = 0
+			if inpututil.IsKeyJustPressed(ebiten.KeyE) {
+				for _, c := range targetPoint.Connections {
+					c.Passable = !c.Passable
 				}
 			}
-		}
 
-		if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-			from := g.Grid.ClosestGridPoint(g.Cube.Model.LocalPosition())
-			to := targetPoint
-			path := from.PathTo(to)
-
-			if path != nil {
-				g.Cube.PathStepper.SetPath(path)
+			if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
+				for _, c := range targetPoint.Connections {
+					// c.Passable = !c.Passable
+					if c.Cost == 0 {
+						c.Cost = 100
+					} else {
+						c.Cost = 0
+					}
+				}
 			}
-		}
 
-	}
+			if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+				from := g.Grid.ClosestGridPoint(g.Cube.Model.LocalPosition())
+				to := targetPoint
+				path := from.PathTo(to)
+
+				if path != nil {
+					g.Cube.PathStepper.SetPath(path)
+				}
+			}
+
+			return false // Don't continue stepping through ray hits beyond the first one
+
+		},
+		TestAgainst: g.Scene.Root.SearchTree().IBoundingObjectsWithProps("gridPoint"),
+	})
 
 	g.Camera.Update()
 

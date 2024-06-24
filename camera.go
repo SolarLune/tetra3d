@@ -749,6 +749,12 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 
 }
 
+// ModelInFrustum returns if a model is onscreen when viewed through a Camera.
+func (camera *Camera) ModelInFrustum(model *Model) bool {
+	model.Transform() // Make sure to update the transform of the Model as necessary.
+	return camera.SphereInFrustum(model.frustumCullingSphere)
+}
+
 // AspectRatio returns the camera's aspect ratio (width / height).
 func (camera *Camera) AspectRatio() float64 {
 	w, h := camera.resultColorTexture.Size()
@@ -778,7 +784,7 @@ func (camera *Camera) Clear() {
 // It also resets the debug values.
 func (camera *Camera) ClearWithColor(clear Color) {
 
-	rgba := clear.ToRGBA64()
+	rgba := clear.ToNRGBA64()
 
 	if camera.AccumulationColorMode != AccumulationColorModeNone {
 		camera.accumulatedBackBuffer.Clear()
@@ -1078,9 +1084,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			if model.FrustumCulling {
 
-				model.Transform()
-
-				if !camera.SphereInFrustum(model.frustumCullingSphere) {
+				if !camera.ModelInFrustum(model) {
 					continue
 				}
 				model.refreshVertexVisibility()
@@ -2021,7 +2025,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 						return
 					}
 
-					c := color.ToRGBA64()
+					c := color.ToNRGBA64()
 					ebitenutil.DrawLine(screen, float64(v0.X), float64(v0.Y), float64(v1.X), float64(v1.Y), c)
 					ebitenutil.DrawLine(screen, float64(v1.X), float64(v1.Y), float64(v2.X), float64(v2.Y), c)
 					ebitenutil.DrawLine(screen, float64(v2.X), float64(v2.Y), float64(v0.X), float64(v0.Y), c)
@@ -2039,7 +2043,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 			for i := 0; i < len(points)-1; i++ {
 				p1 := camera.WorldToScreenPixels(points[i].WorldPosition())
 				p2 := camera.WorldToScreenPixels(points[i+1].WorldPosition())
-				ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
+				ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToNRGBA64())
 			}
 
 		} else if grid, isGrid := m.(*Grid); isGrid {
@@ -2050,7 +2054,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 				ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, image.White)
 				for _, connection := range point.Connections {
 					p2 := camera.WorldToScreenPixels(connection.To.WorldPosition())
-					ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
+					ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToNRGBA64())
 				}
 
 			}
@@ -2154,7 +2158,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 
 				center := camera.WorldToScreenPixels(model.Transform().MultVecW(tri.Center))
 				transformedNormal := camera.WorldToScreenPixels(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(normalLength))))
-				ebitenutil.DrawLine(screen, center.X, center.Y, transformedNormal.X, transformedNormal.Y, color.ToRGBA64())
+				ebitenutil.DrawLine(screen, center.X, center.Y, transformedNormal.X, transformedNormal.Y, color.ToNRGBA64())
 
 			}
 
@@ -2169,7 +2173,7 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
-	c := color.ToRGBA64()
+	c := color.ToNRGBA64()
 
 	for _, node := range allModels {
 
@@ -2226,7 +2230,7 @@ func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, p
 	}
 
 	dr.ColorScale.Reset()
-	dr.ColorScale.ScaleWithColor(color.ToRGBA64())
+	dr.ColorScale.ScaleWithColor(color.ToNRGBA64())
 
 	dr.GeoM.Reset()
 	dr.GeoM.Translate(posX+4, posY+4+periodOffset)
@@ -2268,24 +2272,30 @@ func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
 	return camera.resultAccumulatedColorTexture
 }
 
+// DrawDebugBoundsColoredSettings is a struct used to define how to draw debug information showing the positions of IBoundingObjects
+// in a node tree.
 type DrawDebugBoundsColoredSettings struct {
-	RenderAABBs         bool
-	AABBColor           Color
-	RenderSpheres       bool
-	SphereColor         Color
-	RenderCapsules      bool
-	CapsuleColor        Color
-	RenderTriangles     bool
-	TrianglesColor      Color
-	RenderTrianglesAABB bool
-	TrianglesAABBColor  Color
-	RenderBroadphase    bool
-	BroadphaseColor     Color
+	RenderAABBs bool  // Whether BoundingAABBs should be rendered or not
+	AABBColor   Color // The color used to render BoundingAABBs
+
+	RenderSpheres bool  // Whether BoundingSpheres should be rendered or not
+	SphereColor   Color // The color used to render BoundingSpheres
+
+	RenderCapsules bool  // Whether BoundingCapsules should be rendered or not
+	CapsuleColor   Color // The color used to render BoundingSpheres
+
+	RenderTriangles bool  // Whether BoundingTriangles should be rendered or not
+	TrianglesColor  Color // The color used to render BoundingTriangles
+
+	RenderTrianglesAABB bool  // Whether the AABB surrounding BoundingTriangles should be rendered not
+	TrianglesAABBColor  Color // The color used to render the AABB surrounding BoundingTriangles
+
+	RenderBroadphases bool  // Whether the broadphase cells surrounding BoundingTriangles should be rendered or not
+	BroadphaseColor   Color // The color used to render broadphase cells
 }
 
 // DrawDebugBoundsColored will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
-// be drawn in the color provided for each kind of bounding object to the screen image provided. If the passed color is nil, that kind of shape
-// won't be debug-rendered.
+// be drawn in the color provided for each kind of bounding object to the screen image provided.
 func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, options DrawDebugBoundsColoredSettings) {
 
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
@@ -2343,7 +2353,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
-						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, options.CapsuleColor.ToRGBA64())
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, options.CapsuleColor.ToNRGBA64())
 
 					}
 
@@ -2380,7 +2390,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
-						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, options.AABBColor.ToRGBA64())
+						ebitenutil.DrawLine(screen, start.X, start.Y, end.X, end.Y, options.AABBColor.ToNRGBA64())
 
 					}
 
@@ -2388,12 +2398,12 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 			case *BoundingTriangles:
 
-				if options.RenderBroadphase {
+				if options.RenderBroadphases {
 
 					for _, b := range bounds.Broadphase.allAABBPositions() {
 						camera.DrawDebugBoundsColored(screen, b, DrawDebugBoundsColoredSettings{
 							RenderAABBs: true,
-							AABBColor:   options.AABBColor,
+							AABBColor:   options.BroadphaseColor,
 						})
 					}
 
@@ -2426,7 +2436,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 					}
 
-					triColor := options.TrianglesColor.ToRGBA64()
+					triColor := options.TrianglesColor.ToNRGBA64()
 
 					for i := 0; i < len(lines); i += 3 {
 
@@ -2450,7 +2460,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 				}
 
-				if options.RenderTriangles {
+				if options.RenderTrianglesAABB {
 					camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, DrawDebugBoundsColoredSettings{
 						RenderTrianglesAABB: true,
 						TrianglesAABBColor:  options.TrianglesAABBColor,
@@ -2472,15 +2482,15 @@ func DefaultDrawDebugBoundsSettings() DrawDebugBoundsColoredSettings {
 		RenderSpheres:       true,
 		RenderCapsules:      true,
 		RenderTriangles:     true,
-		RenderTrianglesAABB: true,
-		RenderBroadphase:    true,
+		RenderTrianglesAABB: false,
+		RenderBroadphases:   false,
 
 		AABBColor:          NewColor(0, 0.25, 1, 1),
 		SphereColor:        NewColor(0.5, 0.25, 1.0, 1),
 		CapsuleColor:       NewColor(0.25, 1, 0, 1),
 		TrianglesColor:     NewColor(0, 0, 0, 0.5),
 		TrianglesAABBColor: NewColor(1, 0.5, 0, 0.25),
-		BroadphaseColor:    NewColor(1, 0, 0, 0.25),
+		BroadphaseColor:    NewColor(1, 0, 0, 0.1),
 	}
 }
 

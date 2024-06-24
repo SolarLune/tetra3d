@@ -51,11 +51,11 @@ type TexturePlayer struct {
 	Playhead        float64
 	Speed           float64 // Speed indicates the playback speed and direction of the TexturePlayer, with a value of 1.0 being 100%.
 	Playing         bool    // Playing indicates whether the TexturePlayer is currently playing or not.
-	vertexSelection *VertexSelection
+	vertexSelection VertexSelection
 }
 
 // NewTexturePlayer returns a new TexturePlayer instance.
-func NewTexturePlayer(vertexSelection *VertexSelection) *TexturePlayer {
+func NewTexturePlayer(vertexSelection VertexSelection) *TexturePlayer {
 	player := &TexturePlayer{
 		Speed:           1,
 		vertexSelection: vertexSelection,
@@ -66,7 +66,7 @@ func NewTexturePlayer(vertexSelection *VertexSelection) *TexturePlayer {
 
 // Reset resets a TexturePlayer to be ready to run on a new selection of vertices. Note that this also resets the base UV offsets
 // to use the current values of the passed vertices in the slice.
-func (player *TexturePlayer) Reset(vertexSelection *VertexSelection) {
+func (player *TexturePlayer) Reset(vertexSelection VertexSelection) {
 	player.OriginalOffsets = map[int]Vector{}
 	mesh := vertexSelection.Mesh
 	for vert := range vertexSelection.Indices {

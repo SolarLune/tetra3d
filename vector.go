@@ -341,9 +341,15 @@ func (vec Vector) Angle(other Vector) float64 {
 	return math.Acos(float64(d))
 }
 
+// AngleSigned returns the signed angle between vec and other, with planeNormal indicating the plane that both vectors share.
+// In other words, if you want the signed angle between Vector A and Vector B, and the vectors differ only on two axes (say, X and Z),
+// then the planeNormal Vector would be the cross product of these two Vectors (a Vector pointing "up", or Y+).
+func (vec Vector) AngleSigned(other, planeNormal Vector) float64 {
+	return math.Atan2(other.Cross(vec).Dot(planeNormal.Unit()), vec.Dot(other))
+}
+
 // ClampAngle clamps the Vector such that it doesn't exceed the angle specified (in radians)
 // between it and the baseline Vector.
-// This function returns a normalized (unit) Vector.
 func (vec Vector) ClampAngle(baselineVec Vector, maxAngle float64) Vector {
 
 	mag := vec.Magnitude()
@@ -379,8 +385,8 @@ func (vec Vector) Dot(other Vector) float64 {
 	return vec.X*other.X + vec.Y*other.Y + vec.Z*other.Z
 }
 
-// Round rounds the Vector's components off to the given space in world units, returning a new Vector.
-// For example, Vector{0.1, 1.27, 3.33}.Round(0.25) will return Vector{0, 1.25, 3.25}.
+// Round rounds the Vector's components off to the given increments, returning a new Vector.
+// For example, Vector{0.1, 1.47, 3.33}.Round(0.25) will return Vector{0, 1.5, 3.25}.
 func (vec Vector) Round(roundToUnits float64) Vector {
 	vec.X = round(vec.X/roundToUnits) * roundToUnits
 	vec.Y = round(vec.Y/roundToUnits) * roundToUnits
@@ -389,7 +395,7 @@ func (vec Vector) Round(roundToUnits float64) Vector {
 }
 
 // Floor floors the Vector's components off, returning a new Vector.
-// For example, Vector{0.1, 1.27, 3.33}.Floor() will return Vector{0, 1, 3}.
+// For example, Vector{0.1, 1.87, 3.33}.Floor() will return Vector{0, 1, 3}.
 func (vec Vector) Floor() Vector {
 	vec.X = math.Floor(vec.X)
 	vec.Y = math.Floor(vec.Y)
@@ -418,7 +424,8 @@ func (vec Vector) Lerp(other Vector, percentage float64) Vector {
 
 // Slerp performs a spherical linear interpolation between the starting Vector and the provided
 // ending Vector, to the given percentage (ranging from 0 to 1).
-// This normalizes both Vectors.
+// A slerp rotates a Vector around to a desired end Vector, rather than linearly interpolating to it.
+// This normalizes the resulting Vector.
 func (vec Vector) Slerp(end Vector, percentage float64) Vector {
 
 	vec = vec.Unit()

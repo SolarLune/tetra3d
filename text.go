@@ -430,17 +430,16 @@ func (text *Text) SetStyle(style TextStyle) {
 			"OutlineRounded":   rounded,
 			"ShadowVector":     [2]float32{float32(shadowVec.X), float32(shadowVec.Y)},
 			"ShadowLength":     float32(style.ShadowLength),
+			"BGColor":          style.BGColor.ToFloat32Array(),
+			"FGColor":          style.FGColor.ToFloat32Array(),
+			"OutlineColor":     style.OutlineColor.ToFloat32Array(),
+			"ShadowColorNear":  style.ShadowColorNear.ToFloat32Array(),
+			"ShadowColorFar":   style.ShadowColorFar.ToFloat32Array(),
 		}
 
-		uniformMap["BGColor"] = style.BGColor.toFloat32Array()
-		uniformMap["FGColor"] = style.FGColor.toFloat32Array()
-
-		uniformMap["OutlineColor"] = style.OutlineColor.toFloat32Array()
-
-		uniformMap["ShadowColorNear"] = style.ShadowColorNear.toFloat32Array()
-
-		uniformMap["ShadowColorFar"] = style.ShadowColorFar.toFloat32Array()
-		uniformMap["ShadowColorFarSet"] = 1.0
+		if !style.ShadowColorFar.IsZero() {
+			uniformMap["ShadowColorFarSet"] = 1.0
+		}
 
 		text.meshPart.Material.FragmentShaderOptions = &ebiten.DrawTrianglesShaderOptions{
 			Images: [4]*ebiten.Image{

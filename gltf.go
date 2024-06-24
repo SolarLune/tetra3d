@@ -26,7 +26,6 @@ type GLTFLoadOptions struct {
 	// if the camera resolution isn't set there, cameras will load with a 1920x1080 camera size.
 	CameraWidth, CameraHeight int
 	CameraDepth               bool // If cameras should render depth or not
-	DefaultToAutoTransparency bool // If DefaultToAutoTransparency is true, then opaque materials become Auto transparent materials in Tetra3D.
 	// DependentLibraryResolver is a function that takes a relative path (string) to the blend file representing the dependent Library that the loading
 	// Library requires. This function should return a reference to the dependent Library; if it returns nil, the linked objects from the dependent Library
 	// will not be instantiated in the loading Library.
@@ -45,11 +44,10 @@ type GLTFLoadOptions struct {
 // DefaultGLTFLoadOptions creates an instance of GLTFLoadOptions with some sensible defaults.
 func DefaultGLTFLoadOptions() *GLTFLoadOptions {
 	return &GLTFLoadOptions{
-		CameraWidth:               -1,
-		CameraHeight:              -1,
-		CameraDepth:               true,
-		DefaultToAutoTransparency: true,
-		LoadExternalTextures:      true,
+		CameraWidth:          -1,
+		CameraHeight:         -1,
+		CameraDepth:          true,
+		LoadExternalTextures: true,
 	}
 }
 
@@ -207,6 +205,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			}
 
 			if cameras, exists := globalExporterSettings["t3dView3DCameraData__"]; exists {
+
+				t3dExport = true
 
 				for _, cameraEntry := range cameras.([]interface{}) {
 
@@ -383,6 +383,11 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 						newMat.LightingMode = LightingModeDoubleSided
 					}
 				}
+
+				if s, exists := dataMap["t3dTransparencyMode__"]; exists {
+					newMat.TransparencyMode = int(s.(float64))
+				}
+
 				if s, exists := dataMap["t3dVisible__"]; exists {
 					newMat.Visible = s.(float64) > 0
 				}
@@ -407,6 +412,17 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					}
 				}
 			}
+		} else if !t3dExport {
+
+			// Switch off of alpha mode if we don't have any
+			if gltfMat.AlphaMode == gltf.AlphaOpaque {
+				newMat.TransparencyMode = TransparencyModeOpaque
+			} else if gltfMat.AlphaMode == gltf.AlphaBlend {
+				newMat.TransparencyMode = TransparencyModeTransparent
+			} else { //if gltfMat.AlphaMode == gltf.AlphaMask
+				newMat.TransparencyMode = TransparencyModeAlphaClip
+			}
+
 		}
 
 		// If it's not exported through the Tetra addon, then just load the default GLTF material color value
@@ -419,18 +435,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		}
 
 		newMat.Color.ConvertTosRGB()
-
-		if gltfMat.AlphaMode == gltf.AlphaOpaque {
-			if gltfLoadOptions.DefaultToAutoTransparency {
-				newMat.TransparencyMode = TransparencyModeAuto
-			} else {
-				newMat.TransparencyMode = TransparencyModeOpaque
-			}
-		} else if gltfMat.AlphaMode == gltf.AlphaBlend {
-			newMat.TransparencyMode = TransparencyModeTransparent
-		} else { //if gltfMat.AlphaMode == gltf.AlphaMask
-			newMat.TransparencyMode = TransparencyModeAlphaClip
-		}
 
 		library.Materials[gltfMat.Name] = newMat
 

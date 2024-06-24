@@ -125,30 +125,174 @@ func sphereRayTest(center Vector, radius float64, from, to Vector) (RayHit, bool
 
 }
 
+func boundingAABBRayTest(from, to Vector, test *BoundingAABB) (RayHit, bool) {
+
+	rayLine := to.Sub(from)
+	rayLineUnit := rayLine.Unit()
+
+	pos := test.WorldPosition()
+
+	t1 := (test.Dimensions.Min.X + pos.X - from.X) / rayLineUnit.X
+	t2 := (test.Dimensions.Max.X + pos.X - from.X) / rayLineUnit.X
+	t3 := (test.Dimensions.Min.Y + pos.Y - from.Y) / rayLineUnit.Y
+	t4 := (test.Dimensions.Max.Y + pos.Y - from.Y) / rayLineUnit.Y
+	t5 := (test.Dimensions.Min.Z + pos.Z - from.Z) / rayLineUnit.Z
+	t6 := (test.Dimensions.Max.Z + pos.Z - from.Z) / rayLineUnit.Z
+
+	tmin := max(max(min(t1, t2), min(t3, t4)), min(t5, t6))
+	tmax := min(min(max(t1, t2), max(t3, t4)), max(t5, t6))
+
+	if math.IsNaN(tmin) || math.IsNaN(tmax) {
+		return RayHit{}, false
+	}
+
+	if tmin < 0 {
+		return RayHit{}, false
+	}
+
+	if tmin > tmax {
+		return RayHit{}, false
+	}
+
+	vecLength := tmin
+
+	if tmin < 0 {
+		vecLength = tmax
+	}
+
+	if vecLength*vecLength > rayLine.MagnitudeSquared() {
+		return RayHit{}, false
+	}
+
+	contact := from.Add(rayLineUnit.Scale(vecLength))
+
+	return RayHit{
+		Object:   test,
+		Position: contact,
+		Normal:   test.normalFromContactPoint(contact),
+		from:     from,
+	}, true
+
+}
+
+func boundingTrianglesRayTest(from, to Vector, test *BoundingTriangles, doublesided bool) (RayHit, bool) {
+
+	rayDistSquared := to.DistanceSquared(from)
+
+	check := false
+
+	if test.BoundingAABB.PointInside(from) || test.BoundingAABB.PointInside(to) {
+		check = true
+	} else {
+		if _, ok := boundingAABBRayTest(from, to, test.BoundingAABB); ok {
+			check = true
+		}
+	}
+
+	if check {
+
+		_, _, r := test.Transform().Decompose()
+
+		invertedTransform := test.Transform().Inverted()
+		invFrom := invertedTransform.MultVec(from)
+		invTo := invertedTransform.MultVec(to)
+		plane := newCollisionPlane()
+
+		for _, tri := range test.Mesh.Triangles {
+
+			// If the distance from the start point to the triangle is longer than the ray,
+			// then we know it can't be struck and we can bail early
+			if invFrom.DistanceSquared(tri.Center) > rayDistSquared+(tri.MaxSpan*tri.MaxSpan) {
+				continue
+			}
+
+			fs := tri.Normal.Dot(invFrom.Sub(tri.Center))
+			ts := tri.Normal.Dot(invTo.Sub(tri.Center))
+
+			// If the start and end points of the ray lie on the same side of the triangle,
+			// then we know the triangle can't be struck and we can bail early
+			if (fs > 0 && ts > 0) || (fs < 0 && ts < 0) {
+				continue
+			}
+
+			v0 := test.Mesh.VertexPositions[tri.VertexIndices[0]]
+			v1 := test.Mesh.VertexPositions[tri.VertexIndices[1]]
+			v2 := test.Mesh.VertexPositions[tri.VertexIndices[2]]
+
+			plane.Set(v0, v1, v2)
+
+			if vec, ok := plane.RayAgainstPlane(invFrom, invTo, doublesided); ok {
+
+				if isPointInsideTriangle(vec, v0, v1, v2) {
+
+					return RayHit{
+						Object:                test,
+						Position:              test.Transform().MultVec(vec),
+						untransformedPosition: vec,
+						from:                  from,
+						Triangle:              tri,
+						Normal:                r.MultVec(tri.Normal),
+					}, true
+
+					// break
+
+				}
+
+			}
+		}
+
+	}
+
+	return RayHit{}, false
+
+}
+
 var rayCylinder = NewBoundingTriangles("ray cylinder test", NewCylinderMesh(32, 1, false), 0)
 
+var internalRayTest = []RayHit{}
+
 // TODO: Add SphereCast?
+
+// RayTestOptions is a struct designed to control what options to use when performing a ray test.
+type RayTestOptions struct {
+	From, To Vector // From and To are the starting and ending points of the ray test.
+
+	// If cast rays can strike both sides of BoundingTriangles triangles or not.
+	// TODO: Implement this for all collision types, not just triangles.
+	Doublesided bool
+
+	// TestAgainst is a slice of IBoundingObject nodes to check for collision against.
+	TestAgainst []IBoundingObject
+
+	// OnHit is a callback called for each hit a cast Ray returns, sorted by distance from the starting point.
+	// OnHit is called for each object in order of distance to the starting point.
+	// OnHit is only called once for each object, apart from BoundingTriangles, as a single ray can hit multiple triangles of a BoundingTriangles mesh.
+	// hitIndex is the index of the hit out of the maximum number of hits found by the function (hitCount).
+	// The returned boolean indicates whether to keep iterating through all found rayhits, or to stop after the current one.
+	OnHit func(hit RayHit, hitIndex, hitCount int) bool
+}
 
 // RayTest casts a ray from the "from" world position to the "to" world position, testing against the provided
 // IBoundingObjects.
 // RayTest returns a slice of RayHit objects sorted from closest to furthest. Note that
 // each object can only be struck once by the raycast, with the exception of BoundingTriangles objects (since a
 // single ray may strike multiple triangles).
-func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
+func RayTest(options RayTestOptions) bool {
 
-	rays := []RayHit{}
+	// We re-use the internal raytest function to avoid reallocating a slice.
+	internalRayTest = internalRayTest[:0]
 
-	for _, i := range testAgainst {
+	for _, node := range options.TestAgainst {
 
-		i.Transform() // Make sure the transform is updated before the test
+		node.Transform() // Make sure the transform is updated before the test
 
-		switch test := i.(type) {
+		switch test := node.(type) {
 
 		case *BoundingSphere:
 
-			if result, ok := sphereRayTest(test.WorldPosition(), test.WorldRadius(), from, to); ok {
+			if result, ok := sphereRayTest(test.WorldPosition(), test.WorldRadius(), options.From, options.To); ok {
 				result.Object = test
-				rays = append(rays, result)
+				internalRayTest = append(internalRayTest, result)
 			}
 
 		case *BoundingCapsule:
@@ -160,7 +304,7 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 
 			// We want to check the pole that's closest to the casting from point first, but we have to check both, technically,
 			// since we don't know which pole the ray may pierce.
-			if from.Distance(first) > from.Distance(second) {
+			if options.From.Distance(first) > options.From.Distance(second) {
 				tmp := first
 				first = second
 				second = tmp
@@ -171,203 +315,85 @@ func RayTest(from, to Vector, testAgainst ...IBoundingObject) []RayHit {
 			rayCylinder.SetWorldTransform(test.Transform())
 			rayCylinder.SetLocalScale(radius, (test.Height/2)-radius, radius)
 
-			if results := RayTest(from, to, rayCylinder); len(results) > 0 {
-				for i := range results {
-					results[i].Object = test
-				}
-				rays = append(rays, results...)
-			} else if result, ok := sphereRayTest(first, radius, from, to); ok {
+			if result, ok := boundingTrianglesRayTest(options.From, options.To, rayCylinder, options.Doublesided); ok {
 				result.Object = test
-				rays = append(rays, result)
-			} else if result, ok := sphereRayTest(second, radius, from, to); ok {
+				internalRayTest = append(internalRayTest, result)
+			} else if result, ok := sphereRayTest(first, radius, options.From, options.To); ok {
 				result.Object = test
-				rays = append(rays, result)
+				internalRayTest = append(internalRayTest, result)
+			} else if result, ok := sphereRayTest(second, radius, options.From, options.To); ok {
+				result.Object = test
+				internalRayTest = append(internalRayTest, result)
 			}
-
-			// segment := to.Sub(from)
-
-			// pos := test.lineTop()
-			// bottom := test.lineBottom()
-
-			// if from.Distance(pos) > from.Distance(bottom) {
-			// 	pos = bottom
-			// }
-
-			// if from.Distance(pos) > from.Distance(test.WorldPosition()) {
-			// 	pos = test.WorldPosition()
-			// }
-
-			// t := pos.Sub(from).Dot(segment) / segment.Dot(segment)
-			// e := from.Add(segment.Scale(t))
-
-			// fmt.Println(pos, bottom, t)
-
-			// if t < 0 {
-			// 	continue
-			// }
-
-			// if t > 1 {
-			// 	continue
-			// }
-
-			// segment := to.Sub(from)
-
-			// t := pos.Dot(segment) / segment.Dot(segment)
-
-			// if t > 1 {
-			// 	t = 1
-			// } else if t < 0 {
-			// 	t = 0
-			// }
-
-			// fmt.Println(t)
-
-			// point := from
-			// point.X += segment.X * t
-			// point.Y += segment.Y * t
-			// point.Z += segment.Z * t
-
-			// point = point.Sub(start)
-			// t := point.Dot(segment) / segment.Dot(segment)
-			// if t > 1 {
-			// 	t = 1
-			// } else if t < 0 {
-			// 	t = 0
-			// }
-
-			// start.X += segment.X * t
-			// start.Y += segment.Y * t
-			// start.Z += segment.Z * t
-
-			// if result := sphereRayTest(test.ClosestPoint(e), test.WorldRadius(), from, to); result != nil {
-			// 	result.Object = test
-			// 	rays = append(rays, result)
-			// }
 
 		case *BoundingAABB:
 
-			line := to.Sub(from)
-			dir := line.Unit()
-
-			pos := test.WorldPosition()
-
-			t1 := (test.Dimensions.Min.X + pos.X - from.X) / dir.X
-			t2 := (test.Dimensions.Max.X + pos.X - from.X) / dir.X
-			t3 := (test.Dimensions.Min.Y + pos.Y - from.Y) / dir.Y
-			t4 := (test.Dimensions.Max.Y + pos.Y - from.Y) / dir.Y
-			t5 := (test.Dimensions.Min.Z + pos.Z - from.Z) / dir.Z
-			t6 := (test.Dimensions.Max.Z + pos.Z - from.Z) / dir.Z
-
-			tmin := max(max(min(t1, t2), min(t3, t4)), min(t5, t6))
-			tmax := min(min(max(t1, t2), max(t3, t4)), max(t5, t6))
-
-			if math.IsNaN(tmin) || math.IsNaN(tmax) {
-				continue
+			if result, ok := boundingAABBRayTest(options.From, options.To, test); ok {
+				internalRayTest = append(internalRayTest, result)
 			}
-
-			if tmin < 0 {
-				continue
-			}
-
-			if tmin > tmax {
-				continue
-			}
-
-			vecLength := tmin
-
-			if tmin < 0 {
-				vecLength = tmax
-			}
-
-			if vecLength*vecLength > line.MagnitudeSquared() {
-				continue
-			}
-
-			contact := from.Add(dir.Scale(vecLength))
-
-			rays = append(rays, RayHit{
-				Object:   test,
-				Position: contact,
-				Normal:   test.normalFromContactPoint(contact),
-				from:     from,
-			})
 
 		case *BoundingTriangles:
 
-			if test.BoundingAABB.PointInside(from) || test.BoundingAABB.PointInside(to) || len(RayTest(from, to, test.BoundingAABB)) > 0 {
-
-				_, _, r := test.Transform().Decompose()
-
-				invertedTransform := test.Transform().Inverted()
-				invFrom := invertedTransform.MultVec(from)
-				invTo := invertedTransform.MultVec(to)
-				plane := newCollisionPlane()
-				maxRayDist := to.DistanceSquared(from)
-
-				for _, tri := range test.Mesh.Triangles {
-
-					// If the distance from the start point to the triangle is longer than the ray,
-					// then we know it can't be struck and we can bail early
-					if invFrom.DistanceSquared(tri.Center) > maxRayDist+(tri.MaxSpan*tri.MaxSpan) {
-						continue
-					}
-
-					fs := tri.Normal.Dot(invFrom.Sub(tri.Center))
-					ts := tri.Normal.Dot(invTo.Sub(tri.Center))
-
-					// If the start and end points of the ray lie on the same side of the triangle,
-					// then we know the triangle can't be struck and we can bail early
-					if (fs > 0 && ts > 0) || (fs < 0 && ts < 0) {
-						continue
-					}
-
-					v0 := test.Mesh.VertexPositions[tri.VertexIndices[0]]
-					v1 := test.Mesh.VertexPositions[tri.VertexIndices[1]]
-					v2 := test.Mesh.VertexPositions[tri.VertexIndices[2]]
-
-					plane.Set(v0, v1, v2)
-
-					if vec, ok := plane.RayAgainstPlane(invFrom, invTo); ok {
-
-						if isPointInsideTriangle(vec, v0, v1, v2) {
-
-							rays = append(rays, RayHit{
-								Object:                test,
-								Position:              test.Transform().MultVec(vec),
-								untransformedPosition: vec,
-								from:                  from,
-								Triangle:              tri,
-								Normal:                r.MultVec(tri.Normal),
-							})
-
-							// break
-
-						}
-
-					}
-				}
-
+			if result, ok := boundingTrianglesRayTest(options.From, options.To, test, options.Doublesided); ok {
+				internalRayTest = append(internalRayTest, result)
 			}
 
 		}
 
+		// If we're not paying attention to the ray test results specifically, then we can bail after any valid
+		// ray test result.
+		if options.OnHit == nil && len(internalRayTest) > 0 {
+			return true
+		}
+
 	}
 
-	sort.Slice(rays, func(i, j int) bool {
-		return rays[i].Position.Distance(from) < rays[j].Position.Distance(from)
-	})
+	if options.OnHit != nil {
 
-	return rays
+		sort.Slice(internalRayTest, func(i, j int) bool {
+			return internalRayTest[i].Position.DistanceSquared(options.From) < internalRayTest[j].Position.DistanceSquared(options.From)
+		})
+
+		for i, r := range internalRayTest {
+			if !options.OnHit(r, i, len(internalRayTest)) {
+				break
+			}
+		}
+
+	}
+
+	return len(internalRayTest) > 0
 
 }
 
+// MouseRayTestOptions is a struct designed to control what options to use when
+// performing a ray test from the Camera towards the Mouse.
+type MouseRayTestOptions struct {
+	// Depth is the distance to extend the ray in world units; defaults to the Camera's far plane.
+	Depth float64
+	// If cast rays can strike both sides of BoundingTriangles triangles or not.
+	Doublesided bool
+	// TestAgainstNodes is used to specify a slice of IBoundingObjects to test against.
+	TestAgainst []IBoundingObject
+	// OnHit is a callback called for each hit a cast Ray returns, sorted by distance from the starting point (the camera's position).
+	// OnHit is called for each object in order of distance to the starting point.
+	// OnHit is only called once for each object, apart from BoundingTriangles, as a single ray can hit multiple triangles of a BoundingTriangles mesh.
+	// hitIndex is the index of the hit out of the maximum number of hits found by the function (hitCount).
+	// The returned boolean indicates whether to keep iterating through all found rayhits, or to stop after the current one.
+	OnHit func(hit RayHit, hitIndex int, hitCount int) bool
+}
+
 // MouseRayTest casts a ray forward from the mouse's position onscreen, testing against the provided
-// IBoundingObjects. depth indicates how far the cast ray should extend forwards in world units.
-// The function returns a slice of RayHit objects indicating objects struck by the ray, sorted from closest
-// to furthest.
+// IBoundingObjects found in the MouseRayTestOptions struct.
+// The function calls the callback found in the MouseRayTestOptions struct for each object struck by the ray.
+// The function returns a boolean indicating if any objects were struck at all.
 // Note that each object can only be struck once by the raycast, with the exception of BoundingTriangles
 // objects (since a single ray may strike multiple triangles).
-func (camera *Camera) MouseRayTest(depth float64, testAgainst ...IBoundingObject) []RayHit {
+func (camera *Camera) MouseRayTest(options MouseRayTestOptions) bool {
+
+	if options.Depth <= 0 {
+		options.Depth = camera.far
+	}
 
 	from := camera.WorldPosition()
 
@@ -378,8 +404,14 @@ func (camera *Camera) MouseRayTest(depth float64, testAgainst ...IBoundingObject
 		my = camera.ColorTexture().Bounds().Dy() / 2
 	}
 
-	to := camera.ScreenToWorldPixels(mx, my, depth)
+	to := camera.ScreenToWorldPixels(mx, my, options.Depth)
 
-	return RayTest(from, to, testAgainst...)
+	return RayTest(RayTestOptions{
+		From:        from,
+		To:          to,
+		OnHit:       options.OnHit,
+		TestAgainst: options.TestAgainst,
+		Doublesided: options.Doublesided,
+	})
 
 }

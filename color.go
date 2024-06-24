@@ -20,6 +20,20 @@ func NewColor(r, g, b, a float32) Color {
 	return Color{r, g, b, a}
 }
 
+// NewColorFromColor returns a new Color based on a provided color.Color.
+func NewColorFromColor(color color.Color) Color {
+
+	r, g, b, a := color.RGBA()
+
+	return NewColor(
+		float32(r)/65535,
+		float32(g)/65535,
+		float32(b)/65535,
+		float32(a)/65535,
+	)
+
+}
+
 // NewColorRandom creates a randomized color, with each component lying between the minimum and maximum values.
 func NewColorRandom(min, max float32, grayscale bool) Color {
 	color := NewColor(1, 1, 1, 1)
@@ -129,14 +143,24 @@ func (color Color) ToFloat64s() (float64, float64, float64, float64) {
 	return float64(color.R), float64(color.G), float64(color.B), float64(color.A)
 }
 
-// toFloat32Array returns a [4]float32 array for each channel in the Color in the order of R, G, B, and A.
-func (color Color) toFloat32Array() [4]float32 {
+// ToFloat32Array returns a [4]float32 array for each channel in the Color in the order of R, G, B, and A.
+func (color Color) ToFloat32Array() [4]float32 {
 	return [4]float32{float32(color.R), float32(color.G), float32(color.B), float32(color.A)}
 }
 
 // ToRGBA64 converts a color to a color.RGBA64 instance.
 func (c Color) ToRGBA64() color.RGBA64 {
 	return color.RGBA64{
+		c.capRGBA64(c.R),
+		c.capRGBA64(c.G),
+		c.capRGBA64(c.B),
+		c.capRGBA64(c.A),
+	}
+}
+
+// ToNRGBA64 converts a color to a color.NRGBA64 (non-alpha color multiplied) color instance.
+func (c Color) ToNRGBA64() color.NRGBA64 {
+	return color.NRGBA64{
 		c.capRGBA64(c.R),
 		c.capRGBA64(c.G),
 		c.capRGBA64(c.B),
@@ -413,6 +437,10 @@ func (color Color) SetValue(v float64) Color {
 	return NewColorFromHSV(color.Hue(), color.Saturation(), v)
 }
 
+func (c Color) IsZero() bool {
+	return c.R == 0 && c.G == 0 && c.B == 0 && c.A == 0
+}
+
 // ColorCurvePoint indicates an individual color point in a color curve.
 type ColorCurvePoint struct {
 	Color      Color
@@ -424,11 +452,22 @@ type ColorCurve struct {
 	Points []ColorCurvePoint
 }
 
-// NewColorCurve creats a new ColorCurve.
-func NewColorCurve() ColorCurve {
-	return ColorCurve{
+// NewColorCurve creats a new ColorCurve composed of the colors given, evenly spaced throughout the curve.
+// If no colors are given, the ColorCurve is still valid - it's just empty.
+func NewColorCurve(colors ...Color) ColorCurve {
+	cc := ColorCurve{
 		Points: []ColorCurvePoint{},
 	}
+
+	if len(colors) == 1 {
+		cc.Add(colors[0], 0)
+	} else if len(colors) > 1 {
+		for i, color := range colors {
+			cc.Add(color, float64(i)/float64(len(colors)-1))
+		}
+	}
+
+	return cc
 }
 
 // Clone creates a duplicate ColorCurve.
@@ -464,6 +503,7 @@ func (cc *ColorCurve) AddRGBA(r, g, b, a float32, percentage float64) {
 
 // Color returns the Color for the given percentage in the color curve. For example, if you have a curve composed of
 // the colors {0, 0, 0, 0} at 0 and {1, 1, 1, 1} at 1, then calling Curve.Color(0.5) would return {0.5, 0.5, 0.5, 0.5}.
+// If the curve doesn't have any color curve points, Color will return transparent.
 func (cc ColorCurve) Color(perc float64) Color {
 
 	if perc > 1 {

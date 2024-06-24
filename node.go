@@ -103,6 +103,10 @@ type INode interface {
 	// Children() returns the Node's children as an INode.
 	Children() []INode
 
+	// ForEachChild() runs a callback for each child in the Node's children set.
+	// If the callback returns false, then the execution stops with the current child.
+	ForEachChild(func(child INode) bool)
+
 	// SearchTree() returns a NodeFilter to search the given Node's hierarchical tree.
 	SearchTree() *NodeFilter
 
@@ -898,6 +902,17 @@ func (node *Node) Index() int {
 // Children returns the Node's children as a slice of INodes.
 func (node *Node) Children() []INode {
 	return append(make([]INode, 0, len(node.children)), node.children...)
+}
+
+// ForEachChild runs the provided callback function for each child in the node's children slice.
+// If the callback returns false, then it stops execution with the current child.
+// The function loops through the children list in reverse so removing children is non-problematic.
+func (node *Node) ForEachChild(forEach func(child INode) bool) {
+	for i := len(node.children) - 1; i >= 0; i-- {
+		if !forEach(node.children[i]) {
+			return
+		}
+	}
 }
 
 // SearchTree returns a NodeFilter to search through and filter a Node's hierarchy.

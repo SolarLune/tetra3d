@@ -246,10 +246,10 @@ func (box *BoundingAABB) Collision(other IBoundingObject) *Collision {
 }
 
 // CollisionTest performs a collision test using the provided collision test settings structure.
-// As a nicety, CollisionTest also returns a distance-sorted slice of all of the Collisions (but you should rather
-// handle collisions with intent using the OnCollision function of the CollisionTestSettings struct).
-func (box *BoundingAABB) CollisionTest(settings CollisionTestSettings) []*Collision {
-	return CommonCollisionTest(box, settings)
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
+func (box *BoundingAABB) CollisionTest(settings CollisionTestSettings) bool {
+	return commonCollisionTest(box, settings)
 }
 
 func (box *BoundingAABB) PointInside(point Vector) bool {

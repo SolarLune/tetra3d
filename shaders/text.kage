@@ -27,7 +27,7 @@ func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
     if ShadowLength > 0.0 && (ShadowVector.x != 0 || ShadowVector.y != 0) && res.a < 0.5 {
         shadowSet = true
 
-        shadowV := vec2(ShadowVector.x, ShadowVector.y)
+        shadowV := vec2(ShadowVector.x, -ShadowVector.y)
         check := srcPos
 
         for i := 1.0; i < 16.0; i++ {
@@ -113,6 +113,6 @@ func CustomFragment(dstPos vec4, srcPos vec2, col vec4) vec4 {
 
     // Alternate between the BG color and the FG color using the transparency of the original text image
     // as modulation
-    return mix(BGColor.rgba * col, color * col, transparency)
+    return mix(BGColor.rgba * col, color * col, transparency * color.a)
 
 }

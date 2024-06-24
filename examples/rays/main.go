@@ -50,33 +50,36 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	results := g.Camera.MouseRayTest(g.Camera.Far(), g.Scene.Root.SearchTree().IBoundingObjects()...)
-	if len(results) > 0 {
+	g.Camera.MouseRayTest(tetra3d.MouseRayTestOptions{
+		// Depth: g.Camera.Far(),
+		TestAgainst: g.Scene.Root.SearchTree().IBoundingObjects(),
 
-		marker := g.Scene.Root.Get("Marker")
+		OnHit: func(hit tetra3d.RayHit, hitIndex int, hitCount int) bool {
 
-		res := results[0]
+			marker := g.Scene.Root.Get("Marker")
 
-		// Here, we'll set the color of the marker.
-		vc, err := res.VertexColor(0)
+			// Here, we'll set the color of the marker.
+			vc, err := hit.VertexColor(0)
 
-		// If there's an error, it's because we're not colliding against a BoundingTriangles,
-		// so there's no triangle to pull UV or vertex color data from.
+			// If there's an error, it's because we're not colliding against a BoundingTriangles,
+			// so there's no triangle to pull UV or vertex color data from.
 
-		// If that's the case, we can just go with the material color instead.
-		if err != nil && err.Error() == tetra3d.ErrorObjectHitNotBoundingTriangles {
-			vc = res.Object.Parent().(*tetra3d.Model).Mesh.MeshParts[0].Material.Color
-		}
+			// If that's the case, we can just go with the material color instead.
+			if err != nil && err.Error() == tetra3d.ErrorObjectHitNotBoundingTriangles {
+				vc = hit.Object.Parent().(*tetra3d.Model).Mesh.MeshParts[0].Material.Color
+			}
 
-		marker.(*tetra3d.Model).Mesh.SelectVertices().SelectMeshPartByIndex(1).SetColor(0, vc)
+			marker.(*tetra3d.Model).Mesh.SelectVertices().SelectMeshPartByIndex(1).SetColor(0, vc)
 
-		marker.SetWorldPositionVec(res.Position.Add(res.Normal.Scale(0.5)))
+			marker.SetWorldPositionVec(hit.Position.Add(hit.Normal.Scale(0.5)))
 
-		mat := tetra3d.NewLookAtMatrix(marker.WorldPosition(), res.Position, tetra3d.WorldUp)
+			mat := tetra3d.NewLookAtMatrix(marker.WorldPosition(), hit.Position, tetra3d.WorldUp)
 
-		marker.SetWorldRotation(mat)
+			marker.SetWorldRotation(mat)
 
-	}
+			return false
+		},
+	})
 
 	g.Camera.Update()
 

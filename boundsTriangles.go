@@ -136,10 +136,10 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 }
 
 // CollisionTest performs a collision test using the provided collision test settings structure.
-// As a nicety, CollisionTest also returns a distance-sorted slice of all of the Collisions (but you should rather
-// handle collisions with intent using the OnCollision function of the CollisionTestSettings struct).
-func (bt *BoundingTriangles) CollisionTest(settings CollisionTestSettings) []*Collision {
-	return CommonCollisionTest(bt, settings)
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return if a collision was found with the sphere at the settings specified.
+func (bt *BoundingTriangles) CollisionTest(settings CollisionTestSettings) bool {
+	return commonCollisionTest(bt, settings)
 }
 
 type collisionPlane struct {
@@ -170,14 +170,15 @@ func (plane *collisionPlane) ClosestPoint(point Vector) Vector {
 
 }
 
-func (plane *collisionPlane) RayAgainstPlane(from, to Vector) (Vector, bool) {
+func (plane *collisionPlane) RayAgainstPlane(from, to Vector, doublesided bool) (Vector, bool) {
 
 	dir := to.Sub(from).Unit()
 
 	nd := dir.Dot(plane.Normal)
 	pn := from.Dot(plane.Normal)
 
-	if nd >= 0 {
+	if !doublesided && nd >= 0 {
+		// if !doublesided && nd <= 0 {
 		return Vector{}, false
 	}
 
