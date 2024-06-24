@@ -233,7 +233,7 @@ func (g *Game) Update() {
 	// Move the capsule 0.2 units to the right every frame.
 	g.Capsule.Move(0.2, 0, 0)
 
-	// Will print the result of the Collision, (or nil), if there was no intersection.
+	// Will print the result of the Collision, or nil, if there was no intersection.
 	fmt.Println(g.Capsule.Collision(g.Cube))
 
 }
