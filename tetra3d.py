@@ -163,8 +163,10 @@ class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
             target = context.object
         elif self.mode == "material":
             target = context.object.active_material
+        elif self.mode == "action":
+            target = context.active_action
 
-        target = getattr(context, self.mode)
+        # target = getattr(context, self.mode)
         target.t3dGameProperties__.add()
         target.t3dGameProperties__.move(len(target.t3dGameProperties__)-1, 0)
         return {'FINISHED'}
@@ -186,7 +188,9 @@ class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
             target = context.object
         elif self.mode == "material":
             target = context.object.active_material
-            
+        elif self.mode == "action":
+            target = context.active_action
+           
         prop = target.t3dGameProperties__[self.index]
 
         global currentlyPlayingAudioHandle, currentlyPlayingAudioName
@@ -217,6 +221,8 @@ class OBJECT_OT_tetra3dReorderProps(bpy.types.Operator):
             target = context.object
         elif self.mode == "material":
             target = context.object.active_material
+        elif self.mode == "action":
+            target = context.active_action
 
         if self.moveUp:
             target.t3dGameProperties__.move(self.index, self.index-1)
@@ -250,6 +256,8 @@ class OBJECT_OT_tetra3dSetVector(bpy.types.Operator):
             target = context.object
         elif self.mode == "material":
             target = context.object.active_material
+        elif self.mode == "action":
+            target = context.active_action
 
         if self.buttonMode == "object location":
             target.t3dGameProperties__[self.index].valueVector3D = context.object.location
@@ -271,6 +279,8 @@ class OBJECT_OT_tetra3dFocusObject(bpy.types.Operator):
 
         if self.target != "":
 
+            old_selected = bpy.context.selected_objects.copy()
+
             ob = bpy.data.objects[self.target]
             bpy.ops.object.select_all(action='DESELECT')
             context.window.scene = ob.users_scene[0]
@@ -278,14 +288,20 @@ class OBJECT_OT_tetra3dFocusObject(bpy.types.Operator):
 
             override_window = context.window
             override_screen = override_window.screen
-            override_area = [area for area in override_screen.areas if area.type == "VIEW_3D"]
-            override_region = [region for region in override_area[0].regions if region.type == 'WINDOW']
+            areas = [area for area in override_screen.areas if area.type == "VIEW_3D"]
+            
+            for area in areas:
+                override_region = [region for region in area.regions if region.type == 'WINDOW']
 
-            with context.temp_override(window=override_window, area=override_area[0], region=override_region[0]):
-                ob.select_set(True)
-                bpy.ops.view3d.view_selected()
-                context.region_data.view_distance += 25
-                # print(context.region_data)
+                with context.temp_override(window=override_window, area=area, region=override_region[0]):
+                    ob.select_set(True)
+                    bpy.ops.view3d.view_selected()
+                    context.region_data.view_distance += 25
+                    # print(context.region_data)
+
+            bpy.ops.object.select_all(action='DESELECT')
+            for obj in old_selected:
+                obj.select_set(True)
 
         return {'FINISHED'}
 
@@ -582,6 +598,62 @@ class MESH_PT_tetra3d(bpy.types.Panel):
                 row.enabled = meshData["t3dUniqueMesh__"]
             else:
                 row.enabled = False
+
+class ACTION_PT_tetra3d(bpy.types.Panel):
+
+    bl_idname = "ACTION_PT_tetra3d"
+    bl_label = "Tetra3d Action Properties"
+    bl_space_type = 'DOPESHEET_EDITOR'
+    bl_region_type = 'UI'
+    bl_context = "ANIMATION"
+    bl_category = "Action"
+
+    @classmethod
+    def poll(self,context):
+        return context.active_action is not None
+
+    def draw(self, context):
+
+        row = self.layout.row()
+        row.prop(context.active_action, "t3dRelativeMotion__")
+        
+        row = self.layout.row()
+
+        add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
+        add.mode = "action"
+
+        # row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
+
+        for index, prop in enumerate(context.active_action.t3dGameProperties__):
+            box = self.layout.box()
+
+            row = box.row()
+            row.prop(prop, "name")
+            
+            moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
+            moveUpOptions.index = index
+            moveUpOptions.moveUp = True
+            moveUpOptions.mode = "action"
+
+            moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
+            moveDownOptions.index = index
+            moveDownOptions.moveUp = False
+            moveDownOptions.mode = "action"
+
+            copy = row.operator(OBJECT_OT_tetra3dCopyOneProperty.bl_idname, text="", icon="COPYDOWN")
+            copy.index = index
+
+            deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
+            deleteOptions.index = index
+            deleteOptions.mode = "action"
+
+            handleT3DProperty(index, box, prop, "action")
+
+        row = self.layout.row()
+
+        # No scene equivalent for this, so there is no mode property for this class
+        clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+        clear.mode = "action"
 
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
@@ -1103,6 +1175,12 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
 
 def export():
     scene = bpy.context.scene
+
+    # Loop through all objects, see if there are any that are in a collection, but are deleted; if so, remove them from the collections.
+
+    for o in bpy.data.objects:
+        if len(o.users_scene) == 0: # If an object is in a collection but not a scene, we remove it.
+            bpy.data.objects.remove(o)
 
     was_edit_mode = False
     old_active = bpy.context.active_object
@@ -1949,6 +2027,7 @@ keymaps = []
 def register():
     
     bpy.utils.register_class(OBJECT_PT_tetra3d)
+    bpy.utils.register_class(ACTION_PT_tetra3d)
     bpy.utils.register_class(MESH_PT_tetra3d)
     bpy.utils.register_class(RENDER_PT_tetra3d)
     bpy.utils.register_class(CAMERA_PT_tetra3d)
@@ -1996,6 +2075,9 @@ def register():
     get=getSectorDetectionType, set=setSectorDetectionType)
 
     bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
+
+    bpy.types.Action.t3dGameProperties__ = objectProps["t3dGameProperties__"]
+    bpy.types.Action.t3dRelativeMotion__ = bpy.props.BoolProperty(name="Relative Motion", description="Whether the animation's movements happen relative to the starting position and orientation of the object or not", default=False)
 
     perspectiveDescription = ("Whether the game should be rendered with perspective-corrected "
     "texture mapping or not. When enabled, it will look more like modern 3D texturing; when disabled, "
@@ -2069,7 +2151,7 @@ def register():
     bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
     bpy.types.Material.t3dBlendMode__ = bpy.props.EnumProperty(items=materialBlendModes, name="Blend Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dTransparencyMode__ = bpy.props.EnumProperty(items=materialTransparencyModes, name="Transparency Mode", description="Transparency mode for this material", default="AUTO")
-    bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material", default="NONE")
+    bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material; doesn't take effect on armature skinned meshes", default="NONE")
     bpy.types.Material.t3dCustomDepthOn__ = bpy.props.BoolProperty(name="Custom Depth", description="Whether custom depth offsetting should be enabled", default=False)
     bpy.types.Material.t3dCustomDepthValue__ = bpy.props.FloatProperty(name="Depth Offset Value", description="How far in world units the material should offset when rendering (negative values are closer to the camera, positive values are further)")
     bpy.types.Material.t3dMaterialLightingMode__ = bpy.props.EnumProperty(items=materialLightingModes, name="Lighting mode", description="How materials should be lit", default="DEFAULT")
@@ -2113,6 +2195,7 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
+    bpy.utils.unregister_class(ACTION_PT_tetra3d)
     bpy.utils.unregister_class(MESH_PT_tetra3d)
     bpy.utils.unregister_class(RENDER_PT_tetra3d)
     bpy.utils.unregister_class(CAMERA_PT_tetra3d)
@@ -2154,6 +2237,8 @@ def unregister():
         delattr(bpy.types.Object, propName)
 
     del bpy.types.Scene.t3dGameProperties__
+    del bpy.types.Action.t3dGameProperties__
+    del bpy.types.Action.t3dRelativeMotion__
 
     del bpy.types.Scene.t3dSectorDetectionType__
     del bpy.types.Scene.t3dExportOnSave__

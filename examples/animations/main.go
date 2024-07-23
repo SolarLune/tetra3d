@@ -59,7 +59,7 @@ func (g *Game) Update() error {
 		if ap.Animation != nil && ap.Animation.Name == "ArmatureAction" {
 			ap.Playing = !ap.Playing
 		} else {
-			ap.Play("ArmatureAction")
+			ap.PlayByName("ArmatureAction")
 		}
 	}
 
@@ -70,10 +70,10 @@ func (g *Game) Update() error {
 	ap = table.AnimationPlayer()
 	ap.BlendTime = 0.1
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		ap.Play("SmoothRoll")
+		ap.PlayByName("SmoothRoll")
 	}
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		ap.Play("StepRoll")
+		ap.PlayByName("StepRoll")
 	}
 
 	ap.Update(1.0 / 60)

@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/tanema/gween/ease"
 )
 
 // Color represents a color, containing R, G, B, and A components, each expected to range from 0 to 1.
@@ -449,14 +451,16 @@ type ColorCurvePoint struct {
 
 // ColorCurve represents a range of colors that a value of 0 to 1 can interpolate between.
 type ColorCurve struct {
-	Points []ColorCurvePoint
+	Points         []ColorCurvePoint
+	EasingFunction ease.TweenFunc
 }
 
 // NewColorCurve creats a new ColorCurve composed of the colors given, evenly spaced throughout the curve.
 // If no colors are given, the ColorCurve is still valid - it's just empty.
 func NewColorCurve(colors ...Color) ColorCurve {
 	cc := ColorCurve{
-		Points: []ColorCurvePoint{},
+		Points:         []ColorCurvePoint{},
+		EasingFunction: ease.Linear,
 	}
 
 	if len(colors) == 1 {
@@ -473,9 +477,7 @@ func NewColorCurve(colors ...Color) ColorCurve {
 // Clone creates a duplicate ColorCurve.
 func (cc ColorCurve) Clone() ColorCurve {
 	ncc := NewColorCurve()
-	for _, point := range cc.Points {
-		ncc.Points = append(ncc.Points, point)
-	}
+	ncc.Points = append(ncc.Points, cc.Points...)
 	return ncc
 }
 
@@ -523,7 +525,10 @@ func (cc ColorCurve) Color(perc float64) Color {
 		}
 
 		if cc.Points[i].Percentage <= perc && cc.Points[i+1].Percentage >= perc {
-			c = cc.Points[i].Color.Mix(cc.Points[i+1].Color, float32((perc-cc.Points[i].Percentage)/(cc.Points[i+1].Percentage-cc.Points[i].Percentage)))
+			// c = cc.Points[i].Color.Mix(cc.Points[i+1].Color, float32((perc-cc.Points[i].Percentage)/(cc.Points[i+1].Percentage-cc.Points[i].Percentage)))
+			pp := (perc - cc.Points[i].Percentage)
+
+			c = cc.Points[i].Color.Mix(cc.Points[i+1].Color, cc.EasingFunction(float32(pp), 0, 1, float32(cc.Points[i+1].Percentage-cc.Points[i].Percentage)))
 			break
 		}
 
@@ -531,4 +536,65 @@ func (cc ColorCurve) Color(perc float64) Color {
 
 	return c
 
+}
+
+// ColorTween represents an object that tweens across a ColorCurve.
+type ColorTween struct {
+	ColorCurve ColorCurve // ColorCurve is the curve to use while tweening
+	Percent    float64    // Percent is the percentage through the tween the ColorTween is
+	Speed      float64    // Speed is the speed of the tween; if you want a
+	Duration   float64    // Duration is the duration of the tween in seconds
+	playing    bool
+}
+
+// ColorTween creates a new ColorTween object with the specified duration and curve.
+func NewColorTween(duration float64, curve ColorCurve) ColorTween {
+	ct := ColorTween{
+		ColorCurve: curve,
+		Speed:      1,
+		Duration:   duration,
+	}
+	return ct
+}
+
+// Update updates the ColorTween using the delta value provided in seconds.
+func (c *ColorTween) Update(dt float64) bool {
+	if c.playing {
+		c.Percent += dt / c.Duration * c.Speed
+		if (c.Percent >= 1 && c.Speed > 0) || (c.Percent <= 0 && c.Speed < 0) {
+			return true
+		}
+		c.Percent = clamp(c.Percent, 0, 1)
+	}
+	return false
+}
+
+// Play starts playing the ColorTween back.
+func (c *ColorTween) Play() {
+	c.playing = true
+}
+
+// Stop stops the ColorTween.
+func (c *ColorTween) Stop() {
+	c.playing = false
+}
+
+// IsPlaying returns if the ColorTween is playing.
+func (c *ColorTween) IsPlaying() bool {
+	return c.playing
+}
+
+// Reset resets the ColorTween.
+func (c *ColorTween) Reset() {
+	c.Percent = 0
+}
+
+// Color returns the current color from the internal ColorCurve.
+func (c *ColorTween) Color() Color {
+	return c.ColorCurve.Color(c.Percent)
+}
+
+// SetEasingFunction sets the easing function to be used by the tween and is present on the ColorCurve.
+func (c *ColorTween) SetEasingFunction(easingFunction ease.TweenFunc) {
+	c.ColorCurve.EasingFunction = easingFunction
 }

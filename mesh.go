@@ -574,8 +574,9 @@ func (mesh *Mesh) Properties() Properties {
 
 // VertexSelection represents a selection of vertices on a Mesh.
 type VertexSelection struct {
-	Indices Set[int]
-	Mesh    *Mesh
+	Indices   Set[int]
+	selectAll bool
+	Mesh      *Mesh
 }
 
 const ErrorVertexChannelOutsideRange = "error: vertex channel index provided too large; the mesh does not have this many vertex color channels"
@@ -610,10 +611,14 @@ func (vs VertexSelection) SelectInVertexColorChannel(channelIndex int) (VertexSe
 // SelectAll selects all vertices on the source Mesh.
 func (vs VertexSelection) SelectAll() VertexSelection {
 
-	for i := 0; i < len(vs.Mesh.VertexPositions); i++ {
-		vs.Indices.Add(i)
-	}
+	vs.Indices.Clear()
+	vs.selectAll = true
 
+	return vs
+}
+
+func (vs VertexSelection) Clear() VertexSelection {
+	vs.Indices.Clear()
 	return vs
 }
 
@@ -666,6 +671,39 @@ func (vs VertexSelection) SelectIndices(indices ...int) VertexSelection {
 	return vs
 }
 
+// SelectTriangles selects the vertex indices composing the triangles passed.
+func (vs VertexSelection) SelectTriangles(triangles ...*Triangle) VertexSelection {
+	for _, t := range triangles {
+		for _, i := range t.VertexIndices {
+			vs.Indices.Add(i)
+		}
+	}
+	return vs
+}
+
+// SelectTriangles selects shared vertex indices to vertices that are already selected.
+func (vs VertexSelection) SelectSharedVertices() VertexSelection {
+
+	for index := range vs.Indices {
+
+		for i, vp := range vs.Mesh.VertexPositions {
+
+			if index == i {
+				continue
+			}
+
+			if vp.Equals(vs.Mesh.VertexPositions[index]) {
+				vs.Indices.Add(i)
+			}
+
+		}
+
+	}
+
+	return vs
+
+}
+
 // SetColor sets the color of the specified channel in all vertices contained within the VertexSelection to the provided Color.
 // If the channelIndex provided is greater than the number of channels in the Mesh minus one, vertex color channels will be created for all vertices
 // up to the index provided (e.g. VertexSelection.SetColor(2, colors.White()) will make it so that the mesh has at least three color channels - 0, 1, and 2).
@@ -673,40 +711,40 @@ func (vs VertexSelection) SetColor(channelIndex int, color Color) {
 
 	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
-	for i := range vs.Indices {
+	vs.ForEachIndex(func(i int) {
 		vs.Mesh.VertexColors[i][channelIndex] = NewColor(color.ToFloat32s())
-	}
+	})
 
 }
 
 // SetNormal sets the normal of all vertices contained within the VertexSelection to the provided normal vector.
 func (vs VertexSelection) SetNormal(normal Vector) {
 
-	for i := range vs.Indices {
+	vs.ForEachIndex(func(i int) {
 		vs.Mesh.VertexNormals[i].X = normal.X
 		vs.Mesh.VertexNormals[i].Y = normal.Y
 		vs.Mesh.VertexNormals[i].Z = normal.Z
-	}
+	})
 
 }
 
 // MoveUVs moves the UV values by the values specified.
 func (vs VertexSelection) MoveUVs(dx, dy float64) {
 
-	for index := range vs.Indices {
+	vs.ForEachIndex(func(index int) {
 		vs.Mesh.VertexUVs[index].X += dx
 		vs.Mesh.VertexUVs[index].Y += dy
-	}
+	})
 
 }
 
 // ScaleUVs scales the UV values by the percentages specified.
 func (vs VertexSelection) ScaleUVs(px, py float64) {
 
-	for index := range vs.Indices {
+	vs.ForEachIndex(func(index int) {
 		vs.Mesh.VertexUVs[index].X *= px
 		vs.Mesh.VertexUVs[index].Y *= py
-	}
+	})
 
 }
 
@@ -719,12 +757,12 @@ func (vs *VertexSelection) MoveUVsVec(vec Vector) {
 // Note that for this to work, you would need to store and work with the same vertex selection over multiple frames.
 func (vs VertexSelection) SetUVOffset(x, y float64) {
 
-	for index := range vs.Indices {
+	vs.ForEachIndex(func(index int) {
 
 		vs.Mesh.VertexUVs[index].X = x + vs.Mesh.VertexUVOriginalValues[index].X
 		vs.Mesh.VertexUVs[index].Y = y + vs.Mesh.VertexUVOriginalValues[index].Y
 
-	}
+	})
 
 }
 
@@ -732,16 +770,16 @@ func (vs VertexSelection) SetUVOffset(x, y float64) {
 func (vs VertexSelection) RotateUVs(rotation float64) {
 	center := Vector{}
 
-	for index := range vs.Indices {
+	vs.ForEachIndex(func(index int) {
 		center = center.Add(vs.Mesh.VertexUVs[index])
-	}
+	})
 
 	center = center.Divide(float64(len(vs.Indices)))
 
-	for index := range vs.Indices {
+	vs.ForEachIndex(func(index int) {
 		diff := vs.Mesh.VertexUVs[index].Sub(center)
 		vs.Mesh.VertexUVs[index] = center.Add(diff.Rotate(0, 0, 1, rotation))
-	}
+	})
 
 }
 
@@ -753,51 +791,57 @@ func (vs VertexSelection) SetActiveColorChannel(channelIndex int) {
 
 	vs.Mesh.ensureEnoughVertexColorChannels(channelIndex)
 
-	for i := range vs.Indices {
+	vs.ForEachIndex(func(i int) {
 		vs.Mesh.VertexActiveColorChannel[i] = channelIndex
-	}
+	})
 
 }
 
 // ApplyMatrix applies a Matrix4 to the position of all vertices contained within the VertexSelection.
 func (vs VertexSelection) ApplyMatrix(matrix Matrix4) {
 
-	for index := range vs.Indices {
+	vs.ForEachIndex(func(index int) {
 		vs.Mesh.VertexPositions[index] = matrix.MultVec(vs.Mesh.VertexPositions[index])
-	}
+	})
 
 }
 
 // Move moves all vertices contained within the VertexSelection by the provided x, y, and z values.
 func (vs VertexSelection) Move(x, y, z float64) {
 
-	for index := range vs.Indices {
+	vs.ForEachIndex(func(index int) {
 
 		vs.Mesh.VertexPositions[index].X += x
 		vs.Mesh.VertexPositions[index].Y += y
 		vs.Mesh.VertexPositions[index].Z += z
 
-	}
+	})
 
 }
 
 // Move moves all vertices contained within the VertexSelection by the provided 3D vector.
 func (vs VertexSelection) MoveVec(vec Vector) {
 
-	for index := range vs.Indices {
+	vs.ForEachIndex(func(index int) {
 
 		vs.Mesh.VertexPositions[index].X += vec.X
 		vs.Mesh.VertexPositions[index].Y += vec.Y
 		vs.Mesh.VertexPositions[index].Z += vec.Z
 
-	}
+	})
 
 }
 
 // ForEachIndex calls the provided function for each index selected in the VertexSelection.
 func (vs VertexSelection) ForEachIndex(forEach func(index int)) {
-	for index := range vs.Indices {
-		forEach(index)
+	if vs.selectAll {
+		for i := range vs.Mesh.VertexPositions {
+			forEach(i)
+		}
+	} else {
+		for i := range vs.Indices {
+			forEach(i)
+		}
 	}
 }
 
@@ -1324,9 +1368,18 @@ func (tri *Triangle) RecalculateNormal() {
 	tri.Normal = calculateNormal(verts[tri.VertexIndices[0]], verts[tri.VertexIndices[1]], verts[tri.VertexIndices[2]])
 }
 
-// SharesVertexPosition returns 3 ints representing which indices the triangles have in common for the first, second, and third vertices
-// of the calling tri. If no vertices are shared, the indices are all -1.
-func (tri *Triangle) SharesVertexPositions(other *Triangle) (int, int, int) {
+// ResetVertexNormals sets all vertex normals associated with the triangle to the triangle's normal.
+func (tri *Triangle) ResetVertexNormals() {
+	mesh := tri.MeshPart.Mesh
+	mesh.VertexNormals[tri.VertexIndices[0]] = tri.Normal
+	mesh.VertexNormals[tri.VertexIndices[1]] = tri.Normal
+	mesh.VertexNormals[tri.VertexIndices[2]] = tri.Normal
+}
+
+// SharesVertexPosition returns the indices of the vertices of the other Triangle that share indices with the calling Triangle.
+// The last value returned is the count, the number of vertices shared (from 0 to 3).
+// If a vertex is not shared, the value returned for shareA, shareB, or shareC is -1.
+func (tri *Triangle) SharesVertexPositions(other *Triangle) (shareA, shareB, shareC, count int) {
 
 	triIndices := tri.VertexIndices
 	otherIndices := other.VertexIndices
@@ -1334,29 +1387,113 @@ func (tri *Triangle) SharesVertexPositions(other *Triangle) (int, int, int) {
 	mesh := tri.MeshPart.Mesh
 	otherMesh := other.MeshPart.Mesh
 
-	shareA := -1
-	shareB := -1
-	shareC := -1
+	shareA = -1
+	shareB = -1
+	shareC = -1
+	count = 0
 
-	for i, index := range triIndices {
-		for j, otherIndex := range otherIndices {
+	for _, index := range triIndices {
+		for i, otherIndex := range otherIndices {
 			if mesh.VertexPositions[index].Equals(otherMesh.VertexPositions[otherIndex]) {
 				switch i {
 				case 0:
-					shareA = j
+					shareA = otherIndex
+					count++
 				case 1:
-					shareB = j
+					shareB = otherIndex
+					count++
 				case 2:
-					shareC = j
+					shareC = otherIndex
+					count++
 				}
 				break
 			}
 		}
 	}
 
-	return shareA, shareB, shareC
+	return shareA, shareB, shareC, count
 
 }
+
+// type sharedTriangleSet struct {
+// 	Triangle               *Triangle
+// 	Index0, Index1, Index2 int
+// }
+
+// var sharedTriangles = []sharedTriangleSet{}
+
+// func (tri *Triangle) ForEachSharedTriangle(forEach func(sharedTriangle *Triangle, sharedVertexIndexA, sharedVertexIndexB, sharedVertexIndexC int)) {
+
+// 	sharedTriangles = sharedTriangles[:0]
+
+// 	for _, mp := range tri.MeshPart.Mesh.MeshParts {
+
+// 		mp.ForEachTri(func(t *Triangle) {
+
+// 			if t == tri {
+// 				return
+// 			}
+
+// 			v1, v2, v3 := tri.SharesVertexPositions(t)
+// 			if v1 >= 0 || v2 >= 0 || v3 >= 0 {
+// 				sharedTriangles = append(sharedTriangles, sharedTriangleSet{
+// 					Triangle: t,
+// 					Index0:   v1,
+// 					Index1:   v2,
+// 					Index2:   v3,
+// 				})
+// 			}
+
+// 		})
+
+// 	}
+
+// 	for _, set := range sharedTriangles {
+// 		forEach(set.Triangle, set.Index0, set.Index1, set.Index2)
+// 	}
+
+// }
+
+// var sharedVerticesSet Set[int] = Set[int]{}
+
+// func (tri *Triangle) ForEachSharedVertex(includeOwnVertices bool, forEach func(sharedVertexIndex int)) {
+
+// 	sharedVerticesSet.Clear()
+
+// 	if includeOwnVertices {
+// 		sharedVerticesSet.Add(tri.VertexIndices[0])
+// 		sharedVerticesSet.Add(tri.VertexIndices[1])
+// 		sharedVerticesSet.Add(tri.VertexIndices[2])
+// 	}
+
+// 	for _, mp := range tri.MeshPart.Mesh.MeshParts {
+
+// 		mp.ForEachTri(func(t *Triangle) {
+
+// 			if t == tri {
+// 				return
+// 			}
+
+// 			v1, v2, v3 := tri.SharesVertexPositions(t)
+// 			if v1 >= 0 {
+// 				sharedVerticesSet.Add(v1)
+// 			}
+// 			if v2 >= 0 {
+// 				sharedVerticesSet.Add(v2)
+// 			}
+// 			if v3 >= 0 {
+// 				sharedVerticesSet.Add(v3)
+// 			}
+
+// 		})
+
+// 	}
+
+// 	for index := range sharedVerticesSet {
+// 		forEach(index)
+// 	}
+
+// }
 
 func (tri *Triangle) ForEachVertexIndex(vertFunc func(vertexIndex int)) {
 	for _, vi := range tri.VertexIndices {

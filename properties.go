@@ -58,11 +58,11 @@ func (props Properties) Get(propName string) *Property {
 
 // Property represents a game property on a Node or other resource.
 type Property struct {
-	Value interface{}
+	Value any
 }
 
 // Set sets the property's value to the given value.
-func (prop *Property) Set(value interface{}) {
+func (prop *Property) Set(value any) {
 	prop.Value = value
 }
 

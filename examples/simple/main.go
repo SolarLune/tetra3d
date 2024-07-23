@@ -88,9 +88,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := `F1 to toggle this text
 This is a very simple example showing
 a simple 3D cube, created through code.
-F5: Toggle depth debug view
-F4: Toggle fullscreen
-ESC: Quit`
+
+(Note that the camera can't be moved
+in this example.)`
 		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 }

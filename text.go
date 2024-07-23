@@ -247,7 +247,7 @@ func splitWithSeparator(str string, seps string) []string {
 // Text objects handle automatically splitting newlines based on length to the owning plane mesh's size.
 // Setting the text to be blank clears the text, though Text.ClearText() also exists, and is just syntactic sugar for this purpose.
 // SetText accounts for the margin set in the Text object's active TextStyle, but if it is applied prior to calling SetText().
-func (textObj *Text) SetText(txt string, arguments ...interface{}) *Text {
+func (textObj *Text) SetText(txt string, arguments ...any) *Text {
 
 	if len(arguments) > 0 {
 		txt = fmt.Sprintf(txt, arguments...)
@@ -425,7 +425,7 @@ func (text *Text) SetStyle(style TextStyle) {
 
 		shadowVec := style.ShadowDirection.Unit().Invert()
 
-		uniformMap := map[string]interface{}{
+		uniformMap := map[string]any{
 			"OutlineThickness": float32(style.OutlineThickness),
 			"OutlineRounded":   rounded,
 			"ShadowVector":     [2]float32{float32(shadowVec.X), float32(shadowVec.Y)},

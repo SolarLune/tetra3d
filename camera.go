@@ -1619,7 +1619,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		if scene != nil && scene.World != nil {
 
-			colorPassShaderOptions.Uniforms = map[string]interface{}{
+			colorPassShaderOptions.Uniforms = map[string]any{
 				"Fog":                   scene.World.fogAsFloatSlice(),
 				"FogRange":              scene.World.FogRange,
 				"DitherSize":            scene.World.DitheredFogSize,
@@ -1631,7 +1631,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		} else {
 
-			colorPassShaderOptions.Uniforms = map[string]interface{}{
+			colorPassShaderOptions.Uniforms = map[string]any{
 				"Fog":                   []float32{0, 0, 0, 0},
 				"FogRange":              []float32{0, 1},
 				"PerspectiveCorrection": perspectiveCorrection,
@@ -1854,7 +1854,7 @@ func (camera *Camera) RenderSprite3D(screen *ebiten.Image, renderSettings ...Dra
 		shaderOptions := &ebiten.DrawTrianglesShaderOptions{}
 		shaderOptions.Images[0] = rs.Image
 		shaderOptions.Images[1] = camera.resultDepthTexture
-		shaderOptions.Uniforms = map[string]interface{}{
+		shaderOptions.Uniforms = map[string]any{
 			"SpriteDepth": depth,
 		}
 		screen.DrawTrianglesShader(spriteRender3DVerts, spriteRender3DIndices, camera.sprite3DShader, shaderOptions)

@@ -511,9 +511,9 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	// invertedCamPos := modelTransform.Inverted().MultVec(camPos)
 
-	// TODO: Review this, as it still seems problematic?
-	// p, s, r := modelTransform.Inverted().Decompose()
-	// invertedCamPos := r.MultVec(camPos).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 1}))
+	// TODO: Review this, as it still seems problematic when it comes to distance checks for pre-emptive culling?
+	p, s, r := modelTransform.Inverted().Decompose()
+	invertedCamPos := r.MultVec(camPos).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 1}))
 
 	// invertedCamPos := camPos
 
@@ -741,7 +741,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				meshPart.sortingTriangles[sortingTriIndex].depth = float32(camPos.DistanceSquared(skinnedTriCenter.Divide(3)))
 			} else {
 				// meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamDist)
-				meshPart.sortingTriangles[sortingTriIndex].depth = float32(camPos.DistanceSquared(tri.Center))
+				meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamPos.DistanceSquared(tri.Center))
 			}
 		}
 
@@ -848,7 +848,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 				continue
 			}
 
-			if sharedA, sharedB, sharedC := tri.SharesVertexPositions(other); sharedA >= 0 || sharedB >= 0 || sharedC >= 0 {
+			if sharedA, sharedB, sharedC, count := tri.SharesVertexPositions(other); count > 0 {
 
 				if sharedA >= 0 {
 					ao[0] = 1

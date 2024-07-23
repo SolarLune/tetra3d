@@ -76,7 +76,7 @@ func (g *Game) Update() error {
 
 	armature := g.Scene.Root.Get("Armature")
 	anim := armature.AnimationPlayer()
-	anim.Play("Run")
+	anim.PlayByName("Run")
 
 	anim.Update(1.0 / 60.0)
 

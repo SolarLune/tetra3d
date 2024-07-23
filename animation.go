@@ -21,7 +21,7 @@ const (
 )
 
 type Data struct {
-	contents interface{}
+	contents any
 }
 
 func (data *Data) AsVector() Vector {
@@ -53,7 +53,7 @@ type AnimationTrack struct {
 }
 
 // AddKeyframe adds a keyframe of the necessary data type to the AnimationTrack.
-func (track *AnimationTrack) AddKeyframe(time float64, data interface{}) {
+func (track *AnimationTrack) AddKeyframe(time float64, data any) {
 	track.Keyframes = append(track.Keyframes, newKeyframe(time, Data{data}))
 }
 
@@ -202,17 +202,28 @@ type Animation struct {
 	library *Library
 	Name    string
 	// A Channel represents a set of tracks (one for position, scale, and rotation) for the various nodes contained within the Animation.
-	Channels map[string]*AnimationChannel
-	Length   float64  // Length of the animation in seconds
-	Markers  []Marker // Markers as specified in the Animation from the modeler
+	Channels   map[string]*AnimationChannel
+	Length     float64    // Length of the animation in seconds
+	Markers    []Marker   // Markers as specified in the Animation from the modeler
+	properties Properties // Animation properties
+
+	// RelativeMotion indicates if an animation's motion happens relative to the object's starting
+	// position.
+	// When true, animations will play back relative to the node's transform prior to
+	// starting the animation. When false, the animation will play back in absolute space.
+	// For example, let's say an animation moved a cube from {0, 1, 2} to {10, 1, 2}.
+	// If RelativeMotion is on, then if the cube started at position {3, 3, 3}, it would end up at
+	// {13, 4, 5}. If RelativeMotion were off, it would teleport to {0, 1, 2} when the animation started.
+	RelativeMotion bool
 }
 
 // NewAnimation creates a new Animation of the name specified.
 func NewAnimation(name string) *Animation {
 	return &Animation{
-		Name:     name,
-		Channels: map[string]*AnimationChannel{},
-		Markers:  []Marker{},
+		Name:       name,
+		Channels:   map[string]*AnimationChannel{},
+		Markers:    []Marker{},
+		properties: NewProperties(),
 	}
 }
 
@@ -245,15 +256,22 @@ func (animation *Animation) FindMarker(markerName string) (Marker, bool) {
 	return Marker{}, false
 }
 
+func (animation *Animation) Properties() Properties {
+	return animation.properties
+}
+
 // AnimationValues indicate the current position, scale, and rotation for a Node.
 type AnimationValues struct {
-	Position       Vector
-	PositionExists bool
-	Scale          Vector
-	ScaleExists    bool
-	Rotation       Quaternion
-	RotationExists bool
-	channel        *AnimationChannel
+	Position              Vector
+	PositionExists        bool
+	PositionInterpolation int
+	Scale                 Vector
+	ScaleExists           bool
+	ScaleInterpolation    int
+	Rotation              Quaternion
+	RotationExists        bool
+	RotationInterpolation int
+	channel               *AnimationChannel
 }
 
 // AnimationPlayer is an object that allows you to play back an animation on a Node.
@@ -266,10 +284,10 @@ type AnimationPlayer struct {
 	prevPlayhead           float64
 	prevFinishedAnimation  string
 	justLooped             bool
-	PlaySpeed              float64    // Playback speed in percentage - defaults to 1 (100%)
-	Playing                bool       // Whether the player is playing back or not.
-	FinishMode             FinishMode // What to do when the player finishes playback. Defaults to looping.
-	OnFinish               func()     // Callback indicating the Animation has completed
+	PlaySpeed              float64                    // Playback speed in percentage - defaults to 1 (100%)
+	Playing                bool                       // Whether the player is playing back or not.
+	FinishMode             FinishMode                 // What to do when the player finishes playback. Defaults to looping.
+	OnFinish               func(animation *Animation) // Callback indicating the Animation has completed
 	finished               bool
 	OnMarkerTouch          func(marker Marker, animation *Animation) // Callback indicating when the AnimationPlayer has entered a marker
 	touchedMarkers         []Marker
@@ -284,14 +302,6 @@ type AnimationPlayer struct {
 	// The default for PlayLastFrame is false.
 	PlayLastFrame bool
 
-	// When true, animations will play back relative to the node's transform prior to
-	// starting the animation. When false, the animation will play back in absolute space.
-	// For example, let's say an animation moved a cube from {0, 1, 2} to {10, 1, 2}.
-	// If RelativeMotion is on, then if the cube started at position {3, 3, 3}, it would end up at
-	// {13, 4, 5}. If RelativeMotion were off, it would teleport to {0, 1, 2} when the animation started.
-	// This has to be set to true or false prior to beginning
-	// animation playback to properly take effect.
-	RelativeMotion   bool
 	startingPosition Vector
 	startingScale    Vector
 	startingRotation Matrix4
@@ -336,9 +346,13 @@ func (ap *AnimationPlayer) SetRoot(node INode) {
 	ap.ChannelsUpdated = false
 }
 
-// PlayAnim plays the specified animation back, resetting the playhead if the specified animation is not currently
+// Play plays the specified animation back, resetting the playhead if the specified animation is not currently
 // playing, or if the animation is paused. If the animation is already playing, Play() does nothing.
-func (ap *AnimationPlayer) PlayAnim(animation *Animation) {
+func (ap *AnimationPlayer) Play(animation *Animation) {
+
+	if animation == nil {
+		return
+	}
 
 	if ap.Animation == animation && ap.Playing {
 		return
@@ -371,15 +385,15 @@ func (ap *AnimationPlayer) PlayAnim(animation *Animation) {
 
 }
 
-// Play plays back an animation by name, accessing it through the AnimationPlayer's root node's library. If the animation isn't found,
+// PlayByName plays back an animation by name, accessing it through the AnimationPlayer's root node's library. If the animation isn't found,
 // it will return an error.
-func (ap *AnimationPlayer) Play(animationName string) error {
+func (ap *AnimationPlayer) PlayByName(animationName string) error {
 	anim, ok := ap.RootNode.Library().Animations[animationName]
 	if !ok {
-	  return errors.New("Animation named {" + animationName + "} not found in node's owning Library")
+		return errors.New("Animation named {" + animationName + "} not found in node's owning Library")
 	}
-  ap.PlayAnim(anim)
-  return nil
+	ap.Play(anim)
+	return nil
 }
 
 // Stop stops the AnimationPlayer's playback. Note that this is fundamentally the same as calling ap.Playing = false (for now).
@@ -467,6 +481,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 					if vec, exists := track.ValueAsVector(ap.Playhead); exists {
 						n.Position = vec
 						n.PositionExists = true
+						n.PositionInterpolation = track.Interpolation
 
 						// set the starting position for the animation; for relative motion, all
 						// movement is relative to this position
@@ -483,6 +498,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 					if vec, exists := track.ValueAsVector(ap.Playhead); exists {
 						n.Scale = vec
 						n.ScaleExists = true
+						n.ScaleInterpolation = track.Interpolation
 					}
 				}
 
@@ -491,6 +507,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 						// node.SetLocalRotation(NewMatrix4RotateFromQuaternion(quat))
 						n.Rotation = quat
 						n.RotationExists = true
+						n.RotationInterpolation = track.Interpolation
 					}
 				}
 
@@ -538,7 +555,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 			ap.justLooped = true
 
 			if ap.OnFinish != nil {
-				ap.OnFinish()
+				ap.OnFinish(ap.Animation)
 			}
 			ap.finished = true
 			ap.prevFinishedAnimation = ap.Animation.Name
@@ -558,7 +575,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 			if finishedLoop {
 				ap.justLooped = true
 				if ap.OnFinish != nil {
-					ap.OnFinish()
+					ap.OnFinish(ap.Animation)
 				}
 			}
 			ap.finished = true
@@ -575,7 +592,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 			}
 
 			if ap.OnFinish != nil {
-				ap.OnFinish()
+				ap.OnFinish(ap.Animation)
 			}
 			ap.finished = true
 			ap.prevFinishedAnimation = ap.Animation.Name
@@ -638,7 +655,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 
 			start := ap.prevAnimatedProperties[node]
 
-			if start.PositionExists && props.PositionExists {
+			if start.PositionExists && props.PositionExists && props.PositionInterpolation != InterpolationConstant {
 				diff := props.Position.Sub(start.Position)
 				targetPosition = start.Position.Add(diff.Scale(bp))
 				posSet = true
@@ -650,7 +667,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 				posSet = true
 			}
 
-			if start.ScaleExists && props.ScaleExists {
+			if start.ScaleExists && props.ScaleExists && props.ScaleInterpolation != InterpolationConstant {
 				diff := props.Scale.Sub(start.Scale)
 				targetScale = start.Scale.Add(diff.Scale(bp))
 				scaleSet = true
@@ -662,7 +679,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 				scaleSet = true
 			}
 
-			if start.RotationExists && props.RotationExists {
+			if start.RotationExists && props.RotationExists && props.RotationInterpolation != InterpolationConstant {
 				targetRotation = start.Rotation.Lerp(props.Rotation, bp).Normalized()
 				rotSet = true
 			} else if props.RotationExists {
@@ -726,7 +743,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 		}
 
 		if posSet {
-			if ap.RelativeMotion {
+			if ap.Animation.RelativeMotion {
 				node.SetLocalPositionVec(ap.startingPosition.Add(targetPosition.Sub(props.channel.startingPosition)))
 			} else {
 				node.SetLocalPositionVec(targetPosition)
@@ -734,7 +751,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 		}
 
 		if scaleSet {
-			if ap.RelativeMotion {
+			if ap.Animation.RelativeMotion {
 				node.SetLocalScaleVec(ap.startingScale.Mult(targetScale))
 			} else {
 				node.SetLocalScaleVec(targetScale)
@@ -742,7 +759,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 		}
 
 		if rotSet {
-			if ap.RelativeMotion {
+			if ap.Animation.RelativeMotion {
 				node.SetLocalRotation(ap.startingRotation.Mult(targetRotation.ToMatrix4()))
 			} else {
 				node.SetLocalRotation(targetRotation.ToMatrix4())
@@ -758,13 +775,13 @@ func (ap *AnimationPlayer) Finished() bool {
 	return ap.finished
 }
 
-// FinishedPlayingAnimation returns whether the AnimationPlayer just got finished playing an animation of the specified name.
-func (ap *AnimationPlayer) FinishedPlayingAnimation(animName string) bool {
+// FinishedPlayingByName returns whether the AnimationPlayer just got finished playing an animation of the specified name.
+func (ap *AnimationPlayer) FinishedPlayingByName(animName string) bool {
 	return ap.prevFinishedAnimation == animName && ap.Finished()
 }
 
-// IsPlaying returns if the AnimationPlayer is playing an animation of the given name.
-func (ap *AnimationPlayer) IsPlaying(animName string) bool {
+// IsPlayingByName returns if the AnimationPlayer is playing an animation of the given name.
+func (ap *AnimationPlayer) IsPlayingByName(animName string) bool {
 	return ap.Animation != nil && ap.Animation.Name == animName
 }
 

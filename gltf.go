@@ -15,7 +15,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/qmuntal/gltf"
-	"github.com/qmuntal/gltf/ext/lightspuntual"
+	"github.com/qmuntal/gltf/ext/lightspunctual"
 	"github.com/qmuntal/gltf/modeler"
 
 	_ "image/png"
@@ -154,11 +154,13 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		camDefaultSize = true
 	}
 
-	globalExporterSettings := doc.Scenes[0].Extras.(map[string]interface{})
+	var globalExporterSettings = map[string]any{}
 
 	if len(doc.Scenes) > 0 {
 
 		if doc.Scenes[0].Extras != nil {
+
+			globalExporterSettings = doc.Scenes[0].Extras.(map[string]any)
 
 			if camDefaultSize {
 
@@ -189,7 +191,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if col, exists := globalExporterSettings["t3dCollections__"]; exists {
 				t3dExport = true
-				data := col.(map[string]interface{})
+				data := col.(map[string]any)
 
 				jsonData, err := json.Marshal(data)
 				if err != nil {
@@ -208,21 +210,21 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				t3dExport = true
 
-				for _, cameraEntry := range cameras.([]interface{}) {
+				for _, cameraEntry := range cameras.([]any) {
 
-					ce := cameraEntry.(map[string]interface{})
+					ce := cameraEntry.(map[string]any)
 
 					clipStart := ce["clip_start"].(float64)
 					clipEnd := ce["clip_end"].(float64)
 					fovY := ce["fovY"].(float64)
 					perspective := ce["perspective"].(bool)
 
-					rotation := ce["rotation"].([]interface{})
-					location := ce["location"].([]interface{})
+					rotation := ce["rotation"].([]any)
+					location := ce["location"].([]any)
 					rotationMatrix := NewMatrix4()
 
 					for i := 0; i < 3; i++ {
-						rotRow := rotation[i].([]interface{})
+						rotRow := rotation[i].([]any)
 						rotationMatrix.SetColumn(i, NewVector(rotRow[0].(float64), rotRow[1].(float64), rotRow[2].(float64)))
 					}
 
@@ -289,33 +291,37 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		newMat.BackfaceCulling = !gltfMat.DoubleSided
 
-		if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
-			if exportedTextures {
-				newMat.Texture = images[*doc.Textures[texture.Index].Source]
-			} else {
-				newMat.TexturePath = doc.Images[*doc.Textures[texture.Index].Source].URI
-				if gltfLoadOptions.LoadExternalTextures && gltfLoadOptions.externalBufferFileSystem != nil {
-					if texture, ok := externalTextures[newMat.TexturePath]; ok {
-						newMat.Texture = texture
-					} else {
-						texture, _, err := ebitenutil.NewImageFromFileSystem(gltfLoadOptions.externalBufferFileSystem, baseDir+newMat.TexturePath)
-						if err != nil {
-							log.Println(err)
-						} else {
+		if gltfMat.PBRMetallicRoughness != nil {
+
+			if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
+				if exportedTextures {
+					newMat.Texture = images[*doc.Textures[texture.Index].Source]
+				} else {
+					newMat.TexturePath = doc.Images[*doc.Textures[texture.Index].Source].URI
+					if gltfLoadOptions.LoadExternalTextures && gltfLoadOptions.externalBufferFileSystem != nil {
+						if texture, ok := externalTextures[newMat.TexturePath]; ok {
 							newMat.Texture = texture
+						} else {
+							texture, _, err := ebitenutil.NewImageFromFileSystem(gltfLoadOptions.externalBufferFileSystem, baseDir+newMat.TexturePath)
+							if err != nil {
+								log.Println(err)
+							} else {
+								newMat.Texture = texture
+							}
+							externalTextures[newMat.TexturePath] = texture
 						}
-						externalTextures[newMat.TexturePath] = texture
+						// newMat.Texture =
 					}
-					// newMat.Texture =
 				}
 			}
+
 		}
 
 		if gltfMat.Extras != nil {
-			if dataMap, isMap := gltfMat.Extras.(map[string]interface{}); isMap {
+			if dataMap, isMap := gltfMat.Extras.(map[string]any); isMap {
 
 				if c, exists := dataMap["t3dMaterialColor__"]; exists {
-					color := c.([]interface{})
+					color := c.([]any)
 					newMat.Color.R = float32(color[0].(float64))
 					newMat.Color.G = float32(color[1].(float64))
 					newMat.Color.B = float32(color[2].(float64))
@@ -396,7 +402,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {
 
-					for _, p := range gameProps.([]interface{}) {
+					for _, p := range gameProps.([]any) {
 
 						name, value := handleGameProperties(p)
 
@@ -445,7 +451,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		// If t3dGrid__ is set on a mesh, then it can be skipped for loading
 		if mesh.Extras != nil {
 
-			if dataMap, isMap := mesh.Extras.(map[string]interface{}); isMap {
+			if dataMap, isMap := mesh.Extras.(map[string]any); isMap {
 
 				if _, exists := dataMap["t3dGrid__"]; exists {
 					continue
@@ -463,10 +469,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		if mesh.Extras != nil {
 
-			if dataMap, isMap := mesh.Extras.(map[string]interface{}); isMap {
+			if dataMap, isMap := mesh.Extras.(map[string]any); isMap {
 
 				if vcNames, exists := dataMap["t3dVertexColorNames__"]; exists {
-					for index, name := range vcNames.([]interface{}) {
+					for index, name := range vcNames.([]any) {
 						newMesh.VertexColorChannelNames[name.(string)] = index
 						colorChannelNames = append(colorChannelNames, name.(string))
 					}
@@ -554,7 +560,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if len(colorChannelNames) > 0 {
 
-				dataMap, _ := mesh.Extras.(map[string]interface{})
+				dataMap, _ := mesh.Extras.(map[string]any)
 				activeChannelIndex := int(dataMap["t3dActiveVertexColorIndex__"].(float64))
 
 				for _, name := range colorChannelNames {
@@ -666,7 +672,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		for _, channel := range gltfAnim.Channels {
 
-			sampler := gltfAnim.Samplers[*channel.Sampler]
+			sampler := gltfAnim.Samplers[channel.Sampler]
 
 			channelName := "root"
 			if channel.Target.Node != nil {
@@ -771,11 +777,31 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		}
 
 		if gltfAnim.Extras != nil {
-			m := gltfAnim.Extras.(map[string]interface{})
-			if markerData, exists := m["t3dMarkers__"]; exists {
-				for _, mData := range markerData.([]interface{}) {
 
-					marker := mData.(map[string]interface{})
+			if dataMap, isMap := gltfAnim.Extras.(map[string]any); isMap {
+
+				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {
+
+					for _, p := range gameProps.([]any) {
+
+						name, value := handleGameProperties(p)
+
+						anim.Properties().Add(name).Set(value)
+
+					}
+				}
+
+				if relativeMotion, exists := dataMap["t3dRelativeMotion__"]; exists {
+					anim.RelativeMotion = relativeMotion.(float64) > 0
+				}
+
+			}
+
+			m := gltfAnim.Extras.(map[string]any)
+			if markerData, exists := m["t3dMarkers__"]; exists {
+				for _, mData := range markerData.([]any) {
+
+					marker := mData.(map[string]any)
 
 					anim.Markers = append(anim.Markers, Marker{
 						Name: marker["name"].(string),
@@ -807,20 +833,20 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			return false
 		}
 
-		if _, exists := node.Extras.(map[string]interface{})[propName]; exists {
+		if _, exists := node.Extras.(map[string]any)[propName]; exists {
 			return true
 		}
 		return false
 
 	}
 
-	nodeGetProp := func(node *gltf.Node, propName string) interface{} {
+	nodeGetProp := func(node *gltf.Node, propName string) any {
 
 		if node.Extras == nil {
 			return nil
 		}
 
-		if value, exists := node.Extras.(map[string]interface{})[propName]; exists {
+		if value, exists := node.Extras.(map[string]any)[propName]; exists {
 			return value
 		}
 		return nil
@@ -847,7 +873,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			obj = NewModel(node.Name, mesh)
 
 			if node.Extras != nil && nodeHasProp(node, "t3dAutoBatch__") {
-				s := node.Extras.(map[string]interface{})["t3dAutoBatch__"].(float64)
+				s := node.Extras.(map[string]any)["t3dAutoBatch__"].(float64)
 				obj.(*Model).AutoBatchMode = int(s)
 			}
 
@@ -878,7 +904,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					return nil
 				}
 
-				if value, exists := cam.Extras.(map[string]interface{})[propName]; exists {
+				if value, exists := cam.Extras.(map[string]any)[propName]; exists {
 					return value
 				}
 				return nil
@@ -901,31 +927,33 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			obj = newCam
 
 		} else if lighting := node.Extensions["KHR_lights_punctual"]; lighting != nil {
-			lights := doc.Extensions["KHR_lights_punctual"].(lightspuntual.Lights)
-			lightData := lights[lighting.(lightspuntual.LightIndex)]
+			lights := doc.Extensions["KHR_lights_punctual"].(lightspunctual.Lights)
+			lightData := lights[lighting.(lightspunctual.LightIndex)]
 
-			if lightData.Type == lightspuntual.TypeDirectional {
-				directionalLight := NewDirectionalLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity) // Sun is in "energy"
+			color := *lightData.Color
+
+			if lightData.Type == lightspunctual.TypeDirectional {
+				directionalLight := NewDirectionalLight(node.Name, float32(color[0]), float32(color[1]), float32(color[2]), float32(*lightData.Intensity)) // Sun is in "energy"
 				obj = directionalLight
-			} else if lightData.Type == lightspuntual.TypePoint {
-				pointLight := NewPointLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/80) // Point lights have wattage energy
+			} else if lightData.Type == lightspunctual.TypePoint {
+				pointLight := NewPointLight(node.Name, float32(color[0]), float32(color[1]), float32(color[2]), float32(*lightData.Intensity)/80) // Point lights have wattage energy
 				if !math.IsInf(float64(*lightData.Range), 0) {
 					pointLight.Range = float64(*lightData.Range)
 				}
 				obj = pointLight
 			} else {
 				// Any unsupported light type just gets turned into an ambient light
-				pointLight := NewAmbientLight(node.Name, lightData.Color[0], lightData.Color[1], lightData.Color[2], *lightData.Intensity/80)
+				pointLight := NewAmbientLight(node.Name, float32(color[0]), float32(color[1]), float32(color[2]), float32(*lightData.Intensity)/80)
 				obj = pointLight
 			}
 
 		} else if node.Extras != nil && nodeHasProp(node, "t3dPathPoints__") {
 
 			points := []Vector{}
-			extraMap := node.Extras.(map[string]interface{})
+			extraMap := node.Extras.(map[string]any)
 
-			for _, p := range extraMap["t3dPathPoints__"].([]interface{}) {
-				pointData := p.([]interface{})
+			for _, p := range extraMap["t3dPathPoints__"].([]any) {
+				pointData := p.([]any)
 				points = append(points, Vector{pointData[0].(float64), pointData[2].(float64), -pointData[1].(float64), 0})
 			}
 
@@ -941,7 +969,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			obj = NewGrid(node.Name)
 
-			extraMap := node.Extras.(map[string]interface{})
+			extraMap := node.Extras.(map[string]any)
 
 			type gridPointPosition struct {
 				X, Y, Z float64
@@ -963,7 +991,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 			}
 
-			for _, k := range extraMap["t3dGridEntries__"].([]interface{}) {
+			for _, k := range extraMap["t3dGridEntries__"].([]any) {
 
 				key := parsePosition(k.(string))
 				gp := NewGridPoint("Grid Point")
@@ -973,10 +1001,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			}
 
-			for k, array := range extraMap["t3dGridConnections__"].(map[string]interface{}) {
+			for k, array := range extraMap["t3dGridConnections__"].(map[string]any) {
 
 				key, _ := strconv.Atoi(k)
-				for _, v := range array.([]interface{}) {
+				for _, v := range array.([]any) {
 					connectedID, _ := strconv.Atoi(v.(string))
 					creationOrder[key].Connect(creationOrder[connectedID])
 				}
@@ -996,7 +1024,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		}
 
 		if node.Extras != nil {
-			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
+			if dataMap, isMap := node.Extras.(map[string]any); isMap {
 
 				getOrDefaultBool := func(path string, defaultValue bool) bool {
 					if value, exists := dataMap[path]; exists {
@@ -1015,7 +1043,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				getOrDefaultFloatSlice := func(path string, defaultValues []float64) []float64 {
 					if value, exists := dataMap[path]; exists {
 						floats := []float64{}
-						for _, v := range value.([]interface{}) {
+						for _, v := range value.([]any) {
 							floats = append(floats, v.(float64))
 						}
 						return floats
@@ -1268,11 +1296,11 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 	for obj, node := range objToNode {
 
 		if node.Extras != nil {
-			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
+			if dataMap, isMap := node.Extras.(map[string]any); isMap {
 
 				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {
 
-					for _, p := range gameProps.([]interface{}) {
+					for _, p := range gameProps.([]any) {
 
 						name, value := handleGameProperties(p)
 
@@ -1306,7 +1334,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 	for obj, node := range objToNode {
 
 		if node.Extras != nil {
-			if dataMap, isMap := node.Extras.(map[string]interface{}); isMap {
+			if dataMap, isMap := node.Extras.(map[string]any); isMap {
 
 				if c, exists := dataMap["t3dInstanceCollection__"]; exists {
 
@@ -1380,20 +1408,20 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 	// Set up worlds
 	if len(doc.Scenes) > 0 && doc.Scenes[0].Extras != nil {
 
-		dataMap := doc.Scenes[0].Extras.(map[string]interface{})
+		dataMap := doc.Scenes[0].Extras.(map[string]any)
 
 		if wd, exists := dataMap["t3dWorlds__"]; exists {
 
-			worldData := wd.(map[string]interface{})
+			worldData := wd.(map[string]any)
 
 			for worldName, p := range worldData {
 
 				world := NewWorld(worldName)
 
-				props := p.(map[string]interface{})
+				props := p.(map[string]any)
 
 				if wc, exists := props["ambient color"]; exists {
-					wcc := wc.([]interface{})
+					wcc := wc.([]any)
 					worldColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1).ConvertTosRGB()
 					world.AmbientLight.color = worldColor
 				}
@@ -1403,7 +1431,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 
 				if cc, exists := props["clear color"]; exists {
-					wcc := cc.([]interface{})
+					wcc := cc.([]any)
 					clearColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64))).ConvertTosRGB()
 					world.ClearColor = clearColor
 				}
@@ -1442,7 +1470,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 
 				if v, exists := props["fog color"]; exists {
-					wcc := v.([]interface{})
+					wcc := v.([]any)
 					fogColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64))).ConvertTosRGB()
 					world.FogColor = fogColor
 				}
@@ -1477,14 +1505,14 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		}
 
 		if s.Extras != nil {
-			extras := s.Extras.(map[string]interface{})
+			extras := s.Extras.(map[string]any)
 			if wn, exists := extras["t3dCurrentWorld__"]; exists {
 				scene.World = library.Worlds[wn.(string)]
 			}
 
 			if gameProps, exists := extras["t3dGameProperties__"]; exists {
 
-				for _, p := range gameProps.([]interface{}) {
+				for _, p := range gameProps.([]any) {
 
 					name, value := handleGameProperties(p)
 
@@ -1594,47 +1622,47 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 }
 
-func handleGameProperties(p interface{}) (string, interface{}) {
+func handleGameProperties(p any) (string, any) {
 
-	getOrDefaultInt := func(propMap map[string]interface{}, key string, defaultValue int) int {
+	getOrDefaultInt := func(propMap map[string]any, key string, defaultValue int) int {
 		if value, keyExists := propMap[key]; keyExists {
 			return int(value.(float64))
 		}
 		return defaultValue
 	}
 
-	getOrDefaultString := func(propMap map[string]interface{}, key string, defaultValue string) string {
+	getOrDefaultString := func(propMap map[string]any, key string, defaultValue string) string {
 		if value, keyExists := propMap[key]; keyExists {
 			return value.(string)
 		}
 		return defaultValue
 	}
 
-	getOrDefaultFloat := func(propMap map[string]interface{}, key string, defaultValue float64) float64 {
+	getOrDefaultFloat := func(propMap map[string]any, key string, defaultValue float64) float64 {
 		if value, keyExists := propMap[key]; keyExists {
 			return value.(float64)
 		}
 		return defaultValue
 	}
 
-	getOrDefaultBool := func(propMap map[string]interface{}, key string, defaultValue bool) bool {
+	getOrDefaultBool := func(propMap map[string]any, key string, defaultValue bool) bool {
 		if value, keyExists := propMap[key]; keyExists {
 			return value.(float64) > 0
 		}
 		return defaultValue
 	}
 
-	getIfExistingMap := func(propMap map[string]interface{}, key string) map[string]interface{} {
+	getIfExistingMap := func(propMap map[string]any, key string) map[string]any {
 		if value, keyExists := propMap[key]; keyExists && value != nil {
-			return value.(map[string]interface{})
+			return value.(map[string]any)
 		}
 		return nil
 	}
 
-	getOrDefaultFloatArray := func(propMap map[string]interface{}, key string, defaultValue []float64) []float64 {
+	getOrDefaultFloatArray := func(propMap map[string]any, key string, defaultValue []float64) []float64 {
 		if value, keyExists := propMap[key]; keyExists {
-			values := make([]float64, 0, len(value.([]interface{})))
-			for _, v := range value.([]interface{}) {
+			values := make([]float64, 0, len(value.([]any)))
+			for _, v := range value.([]any) {
 				values = append(values, v.(float64))
 			}
 			return values
@@ -1642,7 +1670,7 @@ func handleGameProperties(p interface{}) (string, interface{}) {
 		return defaultValue
 	}
 
-	property := p.(map[string]interface{})
+	property := p.(map[string]any)
 
 	propType := getOrDefaultInt(property, "valueType", 0)
 
@@ -1651,7 +1679,7 @@ func handleGameProperties(p interface{}) (string, interface{}) {
 	// bool, int, float, string, reference (string)
 
 	name := getOrDefaultString(property, "name", "New Property")
-	var value interface{}
+	var value any
 
 	if propType == 0 {
 		value = getOrDefaultBool(property, "valueBool", false)

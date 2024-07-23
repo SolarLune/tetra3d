@@ -12,7 +12,7 @@ type Scene struct {
 	Root          *Node
 	World         *World
 	props         Properties
-	data          interface{}
+	data          any
 	View3DCameras []*Camera // Any 3D view cameras that were exported from Blender
 
 	updateAutobatch     bool
@@ -76,12 +76,12 @@ func (scene *Scene) Clone() *Scene {
 }
 
 // Data returns the Scene's user-customizeable data.
-func (scene *Scene) Data() interface{} {
+func (scene *Scene) Data() any {
 	return scene.data
 }
 
 // SetData sets the Scene's user-customizeable data pointer to whatever you specify (i.e. a backing "Level" instance or something, for example).
-func (scene *Scene) SetData(data interface{}) {
+func (scene *Scene) SetData(data any) {
 	scene.data = data
 }
 

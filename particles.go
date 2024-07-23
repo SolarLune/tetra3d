@@ -24,9 +24,9 @@ type Particle struct {
 	ScaleAdd    Vector // The growth of the Particle in world-space
 	RotationAdd Vector // The additive rotation of the Particle in local-space
 
-	Life     float64                // How long the particle has left to live
-	Lifetime float64                // How long the particle lives, maximum
-	Data     map[string]interface{} // A custom Data map for storing and retrieving data
+	Life     float64        // How long the particle has left to live
+	Lifetime float64        // How long the particle lives, maximum
+	Data     map[string]any // A custom Data map for storing and retrieving data
 }
 
 // NewParticle creates a new Particle for the given particle system, with the provided slice of particle factories to make particles from.

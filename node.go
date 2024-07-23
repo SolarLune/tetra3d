@@ -66,9 +66,9 @@ type INode interface {
 	// Clone returns a clone of the specified INode implementer.
 	Clone() INode
 	// SetData sets user-customizeable data that could be usefully stored on this node.
-	SetData(data interface{})
+	SetData(data any)
 	// Data returns a pointer to user-customizeable data that could be usefully stored on this node.
-	Data() interface{}
+	Data() any
 	// Type returns the NodeType for this object.
 	Type() NodeType
 	setLibrary(lib *Library)
@@ -81,6 +81,8 @@ type INode interface {
 	Parent() INode
 	// Unparent unparents the Node from its parent, removing it from the scenegraph.
 	Unparent()
+	// IsDescendantOf returns if a Node is a descendant child of a parent Node.
+	IsDescendantOf(parent INode) bool
 	// Scene looks for the Node's parents recursively to return what scene it exists in.
 	// If the node is not within a tree (i.e. unparented), this will return nil.
 	Scene() *Scene
@@ -272,7 +274,7 @@ type Node struct {
 	rotation          Matrix4
 	originalTransform Matrix4
 	visible           bool
-	data              interface{} // A place to store a pointer to something if you need it
+	data              any // A place to store a pointer to something if you need it
 	children          []INode
 	parent            INode
 	cachedTransform   Matrix4
@@ -391,12 +393,12 @@ func (node *Node) Clone() INode {
 }
 
 // SetData sets user-customizeable data that could be usefully stored on this node.
-func (node *Node) SetData(data interface{}) {
+func (node *Node) SetData(data any) {
 	node.data = data
 }
 
 // Data returns a pointer to user-customizeable data that could be usefully stored on this node.
-func (node *Node) Data() interface{} {
+func (node *Node) Data() any {
 	return node.data
 }
 
@@ -1150,8 +1152,21 @@ func (node *Node) Root() *Node {
 
 }
 
+// InSceneTree returns if a Node is connected to the scene's root node through hierarchy.
 func (node *Node) InSceneTree() bool {
 	return node.Root() != nil
+}
+
+// IsDescendantOf returns if a Node is a descendant of a parent Node.
+func (node *Node) IsDescendantOf(parent INode) bool {
+	p := node.Parent()
+	for p != nil {
+		if p == parent {
+			return true
+		}
+		p = p.Parent()
+	}
+	return false
 }
 
 // IsBone returns if the Node is a "bone" (a node that was a part of an armature and so can play animations back to influence a skinned mesh).
