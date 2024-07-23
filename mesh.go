@@ -1392,8 +1392,8 @@ func (tri *Triangle) SharesVertexPositions(other *Triangle) (shareA, shareB, sha
 	shareC = -1
 	count = 0
 
-	for _, index := range triIndices {
-		for i, otherIndex := range otherIndices {
+	for i, index := range triIndices {
+		for _, otherIndex := range otherIndices {
 			if mesh.VertexPositions[index].Equals(otherMesh.VertexPositions[otherIndex]) {
 				switch i {
 				case 0:
