@@ -259,6 +259,10 @@ type INode interface {
 	// DistanceSquared returns the squared distance between the given Nodes' centers.
 	// Quick syntactic sugar for Node.WorldPosition().DistanceSquared(otherNode.WorldPosition()).
 	DistanceSquaredTo(otherNode INode) float64
+
+	// VectorTo returns a vector from one Node to another.
+	// Quick syntactic sugar for other.WorldPosition().Sub(node.WorldPosition()).
+	VectorTo(otherNode INode) Vector
 }
 
 var nodeID uint64 = 0
@@ -1269,4 +1273,10 @@ func (node *Node) DistanceTo(other INode) float64 {
 // Quick syntactic sugar for Node.WorldPosition().DistanceSquared(otherNode.WorldPosition()).
 func (node *Node) DistanceSquaredTo(other INode) float64 {
 	return node.WorldPosition().DistanceSquared(other.WorldPosition())
+}
+
+// VectorTo returns a vector from one Node to another.
+// Quick syntactic sugar for other.WorldPosition().Sub(node.WorldPosition()).
+func (node *Node) VectorTo(other INode) Vector {
+	return other.WorldPosition().Sub(node.WorldPosition())
 }

@@ -20,6 +20,23 @@ const (
 	nfSortModeRandom
 )
 
+// NodeIterator is an interface that allows calling a callback for each node in a collection.
+type NodeIterator interface {
+	ForEach(forEachFunc func(node INode) bool)
+}
+
+// NodeCollection represents a collection of Nodes.
+type NodeCollection[E INode] []E
+
+// ForEach is a function that allows a NodeCollection to fulfill a NodeIterator interface.
+func (n NodeCollection[E]) ForEach(forEachFunc func(node INode) bool) {
+	for _, node := range n {
+		if !forEachFunc(node) {
+			break
+		}
+	}
+}
+
 // NodeFilter represents a chain of node filters, executed in sequence to collect the desired nodes
 // out of an entire hierarchy. The filters are executed lazily (so only one slice is allocated
 // in the process, and possibly one more for the end result, if you get the result as not just a
@@ -264,9 +281,24 @@ func (nf NodeFilter) ByProp(propName string, propValue any) NodeFilter {
 
 // ByParentProps allows you to filter a given selection of nodes if the node has a parent with the provided
 // set of property names.
+// If anyProp is true, then any matching Node will be added if it has any of the properties provided;
+// otherwise, the Node would have to have all of the properties provided.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByParentProps(propNames ...string) NodeFilter {
+func (nf NodeFilter) ByParentProps(anyProp bool, propNames ...string) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
+		if anyProp {
+
+			if node.Parent() != nil {
+				parent := node.Parent()
+				for _, p := range propNames {
+					if parent.Properties().Has(p) {
+						return true
+					}
+				}
+			}
+			return false
+
+		}
 		return node.Parent() != nil && node.Parent().Properties().Has(propNames...)
 	})
 	return nf
@@ -382,12 +414,12 @@ func (nf NodeFilter) IsEmpty() bool {
 }
 
 // INodes returns the NodeFilter's results as a slice of INodes.
-func (nf NodeFilter) INodes() []INode {
+func (nf NodeFilter) INodes() NodeCollection[INode] {
 	return nf.execute(nf.Start)
 }
 
 // IBoundingObjects returns a slice of the IBoundingObjects contained within the NodeFilter.
-func (nf NodeFilter) IBoundingObjects() []IBoundingObject {
+func (nf NodeFilter) IBoundingObjects() NodeCollection[IBoundingObject] {
 	out := nf.execute(nf.Start)
 	boundings := make([]IBoundingObject, 0, len(out))
 	for _, n := range out {
@@ -398,14 +430,8 @@ func (nf NodeFilter) IBoundingObjects() []IBoundingObject {
 	return boundings
 }
 
-// IBoundingObjectsWithProps is a helper function that returns a slice of IBoundingObjects who have parents
-// with the specified properties.
-func (nf NodeFilter) IBoundingObjectsWithProps(props ...string) []IBoundingObject {
-	return nf.ByParentProps(props...).IBoundingObjects()
-}
-
 // Models returns a slice of the Models contained within the NodeFilter.
-func (nf NodeFilter) Models() []*Model {
+func (nf NodeFilter) Models() NodeCollection[*Model] {
 	out := nf.execute(nf.Start)
 	models := make([]*Model, 0, len(out))
 	for _, n := range out {
@@ -416,8 +442,8 @@ func (nf NodeFilter) Models() []*Model {
 	return models
 }
 
-// Lights returns a slice of the ILights contained within the NodeFilter.
-func (nf NodeFilter) Lights() []ILight {
+// ILights returns a slice of the ILights contained within the NodeFilter.
+func (nf NodeFilter) ILights() NodeCollection[ILight] {
 	out := nf.execute(nf.Start)
 	lights := make([]ILight, 0, len(out))
 	for _, n := range out {
@@ -429,7 +455,7 @@ func (nf NodeFilter) Lights() []ILight {
 }
 
 // Grids returns a slice of the Grid nodes contained within the NodeFilter.
-func (nf NodeFilter) Grids() []*Grid {
+func (nf NodeFilter) Grids() NodeCollection[*Grid] {
 	out := nf.execute(nf.Start)
 	grids := make([]*Grid, 0, len(out))
 	for _, n := range out {

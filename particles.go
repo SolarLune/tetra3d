@@ -69,15 +69,13 @@ func (part *Particle) Update(dt float64) {
 		part.Velocity = part.Velocity.Add(part.VelocityAdd)
 	}
 
-	vel := part.Velocity
-
-	if !vel.IsZero() {
+	if !part.Velocity.IsZero() {
 
 		if friction := part.ParticleSystem.Settings.Friction; friction > 0 {
-			vel = vel.SubMagnitude(friction)
+			part.Velocity = part.Velocity.SubMagnitude(friction)
 		}
 
-		part.Model.MoveVec(vel)
+		part.Model.MoveVec(part.Velocity)
 
 	}
 
@@ -113,6 +111,7 @@ func (part *Particle) Update(dt float64) {
 }
 
 type ParticleSystemSettings struct {
+	SpawnOn     bool        // If the particle system should spawn particles at all
 	SpawnRate   FloatRange  // SpawnRate is how often a particle is spawned in seconds
 	SpawnCount  IntRange    // SpawnCount is how many particles are spawned at a time when a particle is spawned
 	Lifetime    FloatRange  // Lifetime is how long a particle lives in seconds
@@ -154,14 +153,13 @@ func NewParticleSystemSettings() *ParticleSystemSettings {
 	lifetime.Set(1, 1)
 
 	spawnRate := NewFloatRange()
-	spawnRate.Min = 1
-	spawnRate.Max = 1
+	spawnRate.Set(1, 1)
 
 	spawnCount := NewIntRange()
-	spawnCount.Min = 1
-	spawnCount.Max = 1
+	spawnCount.Set(1, 1)
 
 	return &ParticleSystemSettings{
+		SpawnOn:    true,
 		SpawnRate:  spawnRate,
 		SpawnCount: spawnCount,
 		Lifetime:   lifetime,
@@ -181,6 +179,8 @@ func NewParticleSystemSettings() *ParticleSystemSettings {
 func (pss *ParticleSystemSettings) Clone() *ParticleSystemSettings {
 
 	newPS := &ParticleSystemSettings{
+		SpawnOn: pss.SpawnOn,
+
 		SpawnRate:  pss.SpawnRate,
 		SpawnCount: pss.SpawnCount,
 		Lifetime:   pss.Lifetime,
@@ -198,6 +198,10 @@ func (pss *ParticleSystemSettings) Clone() *ParticleSystemSettings {
 
 		MovementFunction:    pss.MovementFunction,
 		SpawnOffsetFunction: pss.SpawnOffsetFunction,
+
+		LocalPosition:      pss.LocalPosition,
+		AllowNegativeScale: pss.AllowNegativeScale,
+		VertexSpawnModel:   pss.VertexSpawnModel,
 	}
 
 	return newPS
@@ -262,7 +266,7 @@ func NewParticleSystem(baseModel *Model, particles ...*Model) *ParticleSystem {
 func (ps *ParticleSystem) Clone() *ParticleSystem {
 
 	newPS := NewParticleSystem(ps.Root, ps.ParticleFactories...)
-	newPS.Settings = ps.Settings.Clone()
+	newPS.Settings = ps.Settings
 	return newPS
 
 }
@@ -303,15 +307,18 @@ func (ps *ParticleSystem) Update(dt float64) {
 		return
 	}
 
-	if ps.spawnTimer <= 0 {
-		spawnCount := int(ps.Settings.SpawnCount.Value())
-		for i := 0; i < spawnCount; i++ {
-			ps.Spawn()
-		}
-		ps.spawnTimer = ps.Settings.SpawnRate.Value()
-	}
+	if ps.Settings.SpawnOn {
 
-	ps.spawnTimer -= dt
+		if ps.spawnTimer <= 0 {
+			spawnCount := int(ps.Settings.SpawnCount.Value())
+			for i := 0; i < spawnCount; i++ {
+				ps.Spawn()
+			}
+			ps.spawnTimer = ps.Settings.SpawnRate.Value()
+		}
+
+		ps.spawnTimer -= dt
+	}
 
 	// if len(ps.Root.DynamicBatchModels) > 0 {
 	// 	ps.Root.SetVisible(true, true)

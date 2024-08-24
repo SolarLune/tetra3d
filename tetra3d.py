@@ -37,28 +37,28 @@ def listSectorTypes(self, context):
     return sectorTypes[::2]
 
 boundsTypes = [
-    ("NONE", "No Bounds", "No collision will be created for this object.", 0, 0),
-    ("AABB", "AABB", "An AABB (axis-aligned bounding box). If the size isn't customized, it will be big enough to fully contain the mesh of the current object. Currently buggy when resolving intersections between AABB or other Triangle Nodes.", 0, 1),
-    ("CAPSULE", "Capsule", "A capsule, which can rotate. If the radius and height are not set, it will have a radius and height to fully contain the current object.", 0, 2),
-    ("SPHERE", "Sphere", "A sphere. If the radius is not custom set, it will have a large enough radius to fully contain the provided object.", 0, 3),
-    ("TRIANGLES", "Triangle Mesh", "A triangle mesh bounds type. Only works on mesh-type objects (i.e. an Empty won't generate a BoundingTriangles). Accurate, but slow. Currently buggy when resolving intersections between AABB or other Triangle Nodes.", 0, 4),
+    ("NONE", "No Bounds", "No collision will be created for this object", 0, 0),
+    ("AABB", "AABB", "An AABB (axis-aligned bounding box). If the size isn't customized, it will be big enough to fully contain the mesh of the current object. Currently buggy when resolving intersections between AABB or other Triangle Nodes", 0, 1),
+    ("CAPSULE", "Capsule", "A capsule, which can rotate. If the radius and height are not set, it will have a radius and height to fully contain the current object", 0, 2),
+    ("SPHERE", "Sphere", "A sphere. If the radius is not custom set, it will have a large enough radius to fully contain the provided object", 0, 3),
+    ("TRIANGLES", "Triangle Mesh", "A triangle mesh bounds type. Only works on mesh-type objects (i.e. an Empty won't generate a BoundingTriangles). Accurate, but slow. Currently buggy when resolving intersections between AABB or other Triangle Nodes", 0, 4),
 ]
 
 gltfExportTypes = [
-    ("GLB", ".glb", "Exports a single file, with all data packed in binary form. Textures can be packed into the file. Most efficient and portable, but more difficult to edit later.", 0, 0),
-    ("GLTF_SEPARATE", ".gltf + .bin + external textures", "Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later.", 0, 1),
+    ("GLB", ".glb", "Exports a single file, with all data packed in binary form. Textures can be packed into the file. Most efficient and portable, but more difficult to edit later", 0, 0),
+    ("GLTF_SEPARATE", ".gltf + .bin + external textures", "Exports multiple files, with separate JSON, binary and texture data. Easiest to edit later", 0, 1),
 ]
 
 sectorDetectionType = [
-    ("VERTICES", "Vertices", "Sector neighborhood is determined by sectors sharing vertex positions. Accurate, but slower.", 0, 0),
-    ("AABB", "AABB", "Sector neighborhood is determined by AABB intersection. Fast, but inaccurate.", 0, 1),
+    ("VERTICES", "Vertices", "Sector neighborhood is determined by sectors sharing vertex positions. Accurate, but slower", 0, 0),
+    ("AABB", "AABB", "Sector neighborhood is determined by AABB intersection. Fast, but inaccurate", 0, 1),
 ]
 
 materialBlendModes = [
-    ("DEFAULT", "Default", "Blends the destination by the material's color modulated by the material's alpha value. The default alpha-blending composite mode. Also known as BlendSourceOver.", 0, 0),
-    ("ADDITIVE", "Additive", "Adds the material's color to the destination. Also known as BlendLighter.", 0, 1),
-    ("MULTIPLY", "Multiply", "Multiplies the material's color by the destination. Known as Multiply compositing using a custom Blend object.", 0, 2),
-    ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as BlendClear.", 0, 3),
+    ("DEFAULT", "Default", "Blends the destination by the material's color modulated by the material's alpha value. The default alpha-blending composite mode. Also known as BlendSourceOver", 0, 0),
+    ("ADDITIVE", "Additive", "Adds the material's color to the destination. Also known as BlendLighter", 0, 1),
+    ("MULTIPLY", "Multiply", "Multiplies the material's color by the destination. Known as Multiply compositing using a custom Blend object", 0, 2),
+    ("CLEAR", "Clear", "Anywhere the material draws is cleared instead; useful to 'punch through' a scene to show the blank alpha zero. Also known as BlendClear", 0, 3),
 ]
 
 materialTransparencyModes = [
@@ -1319,8 +1319,23 @@ def export():
                                     "edit": obj.data,
                                     "original": obj.data.copy(),
                                     "size": obj.t3dAutoSubdivideSize__,
-                                }   
+                                }
                         
+                        if len(obj.vertex_groups) > 0:
+                            vertexGroups = [group.name for group in obj.vertex_groups]
+                            obj.data["t3dVertexGroupNames__"] = vertexGroups
+
+                        # if len(obj.vertex_groups) > 0:
+                        #     groupsByNames = {}
+                        #     for group in obj.vertex_groups:
+                        #         groupsByNames[group.name] = []
+                        #         for i in range(vertexMaxCount):
+                        #             if group.weight(i) > 0:
+                        #                 groupsByNames[group.name].append(i)
+                        #     obj.data["t3dVertexGroups__"] = vertexGroups
+                            # vertexGroups = [group.name for group in obj.vertex_groups]
+                            # obj.data["t3dVertexGroupNames__"] = vertexGroups
+
                         if len(obj.data.color_attributes) > 0:
                             vertexColors = [layer.name for layer in obj.data.color_attributes]
                             obj.data["t3dVertexColorNames__"] = vertexColors

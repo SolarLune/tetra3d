@@ -72,10 +72,9 @@ func (g *Game) Init() {
 	// Here, we'll select our vertices and store it in the Game struct.
 	mesh := g.Cube.Mesh
 
-	// VertexSelection.SelectInVertexColorChannel selects all vertices that have a non-black color in a specified color channel.
-	// mesh.VertexColorChannelNames stores the various vertex color channel names with their related channel indices, so that you
-	// can just use text to refer to them rather than indices.
-	vertices, err := mesh.SelectVertices().SelectInVertexColorChannel(mesh.VertexColorChannelNames["Flash"])
+	// VertexSelection.SelectInVertexColorChannel selects all vertices that have greater than 0 influence to a particular vertex group.
+	// You can also use VertexSelection.SelectInVertexColorChannel() to select vertices that have non-black vertex color.
+	vertices, err := tetra3d.NewVertexSelection().SelectInVertexColorChannel(mesh, "Flash")
 
 	// An error could happen if the color channel index passed to SelectInChannel is too high to be beyond the vertex color channel count set on the Model.
 	if err != nil {
@@ -99,7 +98,7 @@ func (g *Game) Update() error {
 	// There are other functions to, for example, move or set the normal of the vertices, but if we wanted to do something else a
 	// bit more special, we could do so manually by looping through the indices in the *VertexSelection instance and modifying the
 	// mesh's vertex properties.
-	g.FlashingVertices.SetColor(0, glow)
+	g.FlashingVertices.SetColor(g.Cube.Mesh.VertexColorChannelNames["Color"], glow)
 
 	g.Camera.Update()
 

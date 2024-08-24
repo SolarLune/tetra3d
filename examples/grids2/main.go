@@ -221,7 +221,7 @@ func (g *Game) Update() error {
 			return false // Don't continue stepping through ray hits beyond the first one
 
 		},
-		TestAgainst: g.Scene.Root.SearchTree().IBoundingObjectsWithProps("gridPoint"),
+		TestAgainst: g.Scene.Root.SearchTree().ByParentProps(false, "gridPoint"),
 	})
 
 	g.Camera.Update()

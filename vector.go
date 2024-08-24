@@ -176,6 +176,15 @@ func (vec Vector) SubMagnitude(mag float64) Vector {
 
 }
 
+// MoveTowards moves a Vector towards another Vector given a specific magnitude. If the distance is less than that magnitude, it returns the target vector.
+func (vec Vector) MoveTowards(target Vector, magnitude float64) Vector {
+	diff := target.Sub(vec)
+	if diff.Magnitude() > magnitude {
+		return vec.Add(diff.Unit().Scale(magnitude))
+	}
+	return target
+}
+
 // Distance returns the distance from the calling Vector to the other Vector provided.
 func (vec Vector) Distance(other Vector) float64 {
 	return vec.Sub(other).Magnitude()
@@ -302,7 +311,7 @@ func (vec Vector) Equals(other Vector) bool {
 
 }
 
-// IsZero returns true if the values in the Vector are extremely close to 0 (excluding W).
+// IsZero returns true if all of the values in the Vector are extremely close to 0 (excluding W).
 func (vec Vector) IsZero() bool {
 
 	eps := 1e-4
@@ -317,6 +326,16 @@ func (vec Vector) IsZero() bool {
 
 	return true
 
+}
+
+// IsNaN returns if any of the values are NaN (not a number).
+func (vec Vector) IsNaN() bool {
+	return math.IsNaN(vec.X) || math.IsNaN(vec.Y) || math.IsNaN(vec.Z)
+}
+
+// IsInf returns if any of the values are infinite.
+func (vec Vector) IsInf() bool {
+	return math.IsInf(vec.X, 0) || math.IsInf(vec.Y, 0) || math.IsInf(vec.Z, 0)
 }
 
 // Rotate returns a copy of the Vector, rotated around the Vector axis provided by the angle provided (in radians).
@@ -336,8 +355,10 @@ func (vec Vector) Rotate(x, y, z, angle float64) Vector {
 
 // Angle returns the angle in radians between the calling Vector and the provided other Vector (ignoring the W component).
 func (vec Vector) Angle(other Vector) float64 {
-	d := vec.Unit().Dot(other.Unit())
-	d = clamp(d, -1, 1) // Acos returns NaN if value < -1 or > 1
+	// d := vec.Unit().Dot(other.Unit())
+	d := vec.Dot(other)
+	d /= vec.MagnitudeSquared() * other.MagnitudeSquared() // REVIEW
+	d = clamp(d, -1, 1)                                    // Acos returns NaN if value < -1 or > 1
 	return math.Acos(float64(d))
 }
 
@@ -488,6 +509,16 @@ func (ip ModVector) Sub(other Vector) ModVector {
 	return ip
 }
 
+// MoveTowards moves a Vector towards another Vector given a specific magnitude. If the distance is less than that magnitude, it returns the target vector.
+func (ip ModVector) MoveTowards(target Vector, magnitude float64) ModVector {
+	modified := (*ip.Vector).MoveTowards(target, magnitude)
+	ip.X = modified.X
+	ip.Y = modified.Y
+	ip.Z = modified.Z
+	return ip
+}
+
+// SetZero sets the Vector to zero.
 func (ip ModVector) SetZero() ModVector {
 	ip.X = 0
 	ip.Y = 0
@@ -721,6 +752,7 @@ func (ip ModVector) Clone() ModVector {
 	return v.Modify()
 }
 
+// ToVector returns a copy of the Vector that the ModVector is modifying.
 func (ip ModVector) ToVector() Vector {
 	return *ip.Vector
 }

@@ -71,6 +71,9 @@ func (col *Collision) AverageMTV() Vector {
 	greatestDist := 0.0
 	mtv := NewVectorZero()
 	for _, inter := range col.Intersections {
+		if inter.MTV.IsInf() || inter.MTV.IsNaN() {
+			continue
+		}
 		mag := inter.MTV.Magnitude()
 		if mag > greatestDist {
 			greatestDist = mag
@@ -140,8 +143,8 @@ func (result *Collision) AverageContactPoint() Vector {
 // CollisionTestSettings controls how a CollisionTest() call evaluates.
 type CollisionTestSettings struct {
 
-	// TestAgainst is a slice of IBoundingObjects to test against.
-	TestAgainst []IBoundingObject
+	// TestAgainst controls what objects to test against.
+	TestAgainst NodeIterator
 
 	// OnCollision is a callback function that is called when a valid collision test happens between the
 	// calling object and one of the valid INodes contained within the Others slice. The callback should return a boolean
@@ -152,8 +155,10 @@ type CollisionTestSettings struct {
 	// If the collision with B is detected first, and you move A away so that it is no longer colliding with B or C, then the collision
 	// with C would not be detected (and OnCollision would not be called in this case).
 	//
-	// OnCollision is called in order of distance from calling IBoundingObject to colliding IBoundingObject(s).
-	OnCollision func(col *Collision) bool
+	// OnCollision is called in order of distance to intersection points (so two objects might have the same distance to their respective intersection points of a larger object).
+	// This being the case, you may need to store and re-sort the collisions to fit your needs.
+	// index is the index of the collision out of the total number of collisions, which is the count.
+	OnCollision func(col *Collision, index, count int) bool
 }
 
 // IBoundingObject represents a Node type that can be tested for collision. The exposed functions are essentially just
@@ -811,21 +816,21 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) bool {
 
 	internalCollisionList = internalCollisionList[:0]
 
-	for _, checking := range settings.TestAgainst {
+	settings.TestAgainst.ForEach(func(checking INode) bool {
 
-		if node == checking {
-			continue
-		}
+		bounds, ok := checking.(IBoundingObject)
 
-		if collision := node.(IBoundingObject).Collision(checking); collision != nil {
-			internalCollisionList = append(internalCollisionList, collision)
-		}
-
-		if settings.OnCollision == nil && len(internalCollisionList) > 0 {
+		if !ok || node == checking || (settings.OnCollision == nil && len(internalCollisionList) > 0) {
 			return true
 		}
 
-	}
+		if collision := node.(IBoundingObject).Collision(bounds); collision != nil {
+			internalCollisionList = append(internalCollisionList, collision)
+		}
+
+		return true
+
+	})
 
 	if settings.OnCollision != nil {
 
@@ -835,8 +840,8 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) bool {
 				internalCollisionList[j].AverageContactPoint().DistanceSquared(internalCollisionList[j].Intersections[0].StartingPoint)
 		})
 
-		for _, c := range internalCollisionList {
-			if !settings.OnCollision(c) {
+		for i, c := range internalCollisionList {
+			if !settings.OnCollision(c, i, len(internalCollisionList)) {
 				break
 			}
 		}

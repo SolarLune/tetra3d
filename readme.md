@@ -426,6 +426,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- Move Vector and Matrix to external package for simplicity / resuability / create separate Vector types for 2D / 4D (?) Vectors. Maybe Colors as well?
 - [ ] -- -- Vector pools again? 
 - [ ] -- -- Move over to float32 for mathematics - seems like it should be faster? Should be possible with math32 : https://github.com/chewxy/math32
+- [ ] -- -- Maybe make Vectors generic, so you could have float32 / int Vectors? Or something like that?
 - [ ] -- Matrix pools?
 - [ ] -- Raytest optimization
 - [ ] -- -- Sphere?

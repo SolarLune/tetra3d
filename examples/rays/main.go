@@ -38,7 +38,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	g.Scene = library.FindScene("Scene")
+	g.Scene = library.SceneByName("Scene")
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
 	g.System = examples.NewBasicSystemHandler(g)
@@ -69,7 +69,7 @@ func (g *Game) Update() error {
 				vc = hit.Object.Parent().(*tetra3d.Model).Mesh.MeshParts[0].Material.Color
 			}
 
-			marker.(*tetra3d.Model).Mesh.SelectVertices().SelectMeshPartByIndex(1).SetColor(0, vc)
+			tetra3d.NewVertexSelection().SelectMeshPartByIndex(marker.(*tetra3d.Model).Mesh, 1).SetColor(0, vc)
 
 			marker.SetWorldPositionVec(hit.Position.Add(hit.Normal.Scale(0.5)))
 

@@ -478,6 +478,12 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					}
 				}
 
+				if groupNames, exists := dataMap["t3dVertexGroupNames__"]; exists {
+					for _, name := range groupNames.([]any) {
+						newMesh.VertexGroupNames = append(newMesh.VertexGroupNames, name.(string))
+					}
+				}
+
 				if unique, exists := dataMap["t3dUniqueMesh__"]; exists && unique.(float64) > 0 {
 					if uniqueMats, exists := dataMap["t3dUniqueMaterials__"]; exists && uniqueMats.(float64) > 0 {
 						newMesh.Unique = MeshUniqueMeshAndMaterials
@@ -1360,7 +1366,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							} else {
 
 								if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
-									if foundNode := library.FindNode(cloneName); foundNode != nil {
+									if foundNode := library.NodeByName(cloneName); foundNode != nil {
 										clone = foundNode.Clone()
 									} else {
 										panic("Error in instantiating linked element: " + cloneName + " as there is no such object in the returned library.")

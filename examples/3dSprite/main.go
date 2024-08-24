@@ -41,7 +41,7 @@ func (g *Game) Init() {
 	if err != nil {
 		panic(err)
 	}
-	g.Scene = scene.FindScene("Scene").Clone()
+	g.Scene = scene.SceneByName("Scene").Clone()
 
 	g.Camera = g.Scene.Root.Get("Camera").(*tetra3d.Camera)
 

@@ -43,7 +43,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	g.Scene = library.FindScene("Scene")
+	g.Scene = library.SceneByName("Scene")
 
 	g.Controlling = g.Scene.Root.Get("YellowCapsule").(*tetra3d.Model)
 
@@ -106,7 +106,7 @@ func (g *Game) Update() error {
 
 	bounds.CollisionTest(tetra3d.CollisionTestSettings{
 
-		OnCollision: func(col *tetra3d.Collision) bool {
+		OnCollision: func(col *tetra3d.Collision, index, count int) bool {
 			mtv := col.AverageMTV()
 			mtv.Y = 0                                       // We don't want to move up to avoid collision
 			g.Controlling.MoveVec(mtv.Expand(margin, 0.01)) // Move out of the collision, but add a little margin
@@ -122,7 +122,7 @@ func (g *Game) Update() error {
 
 	bounds.CollisionTest(tetra3d.CollisionTestSettings{
 
-		OnCollision: func(col *tetra3d.Collision) bool {
+		OnCollision: func(col *tetra3d.Collision, index, count int) bool {
 			g.Controlling.Move(0, col.AverageMTV().Y+margin, 0) // Move the object up, so that it's on the ground, plus a little margin
 			g.VerticalSpeed = 0
 			return true

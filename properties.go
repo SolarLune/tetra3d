@@ -8,6 +8,7 @@ func NewProperties() Properties {
 	return Properties{}
 }
 
+// Clone clones the Properties object.
 func (props Properties) Clone() Properties {
 	newTags := NewProperties()
 	for k, v := range props {
@@ -20,6 +21,14 @@ func (props Properties) Clone() Properties {
 func (props Properties) Clear() {
 	for k := range props {
 		delete(props, k)
+	}
+}
+
+// CopyFrom copies the properties from another Properties object.
+func (props Properties) CopyFrom(other Properties) {
+	props.Clear()
+	for key := range other {
+		props.Add(key).Set(other[key].Value)
 	}
 }
 

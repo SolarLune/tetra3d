@@ -557,14 +557,15 @@ func NewColorTween(duration float64, curve ColorCurve) ColorTween {
 	return ct
 }
 
-// Update updates the ColorTween using the delta value provided in seconds.
+// Update updates the ColorTween using the delta value provided in seconds and returns if the tween is finished or not.
 func (c *ColorTween) Update(dt float64) bool {
 	if c.playing {
 		c.Percent += dt / c.Duration * c.Speed
 		if (c.Percent >= 1 && c.Speed > 0) || (c.Percent <= 0 && c.Speed < 0) {
+			c.playing = false
+			c.Percent = clamp(c.Percent, 0, 1)
 			return true
 		}
-		c.Percent = clamp(c.Percent, 0, 1)
 	}
 	return false
 }

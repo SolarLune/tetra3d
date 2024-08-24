@@ -210,3 +210,14 @@ func (s Set[E]) ForEach(f func(element E)) {
 		f(element)
 	}
 }
+
+/////
+
+// ClosestPointOnLine returns the closest point along a line spanning from start to end.
+func ClosestPointOnLine(start, end, point Vector) Vector {
+
+	ab := end.Sub(start)
+	t := point.Sub(start).Dot(ab) / ab.Dot(ab)
+	return start.Add(ab.Scale(clamp(t, 0, 1)))
+
+}

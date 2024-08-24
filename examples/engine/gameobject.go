@@ -29,7 +29,7 @@ func NewPlayer(node tetra3d.INode) *Player {
 
 func (player *Player) Update() {
 
-	move := tetra3d.NewVectorZero()
+	move := tetra3d.Vector{}
 	moveSpd := 0.1
 
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
@@ -52,9 +52,9 @@ func (player *Player) Update() {
 
 		tetra3d.CollisionTestSettings{
 
-			TestAgainst: player.node.Root().SearchTree().IBoundingObjectsWithProps("solid"),
+			TestAgainst: player.node.Root().SearchTree().ByParentProps(false, "solid"),
 
-			OnCollision: func(col *tetra3d.Collision) bool {
+			OnCollision: func(col *tetra3d.Collision, index, count int) bool {
 
 				if col.BoundingObject.Parent().Properties().Has("death") {
 					player.node.Unparent() // Unparenting is the equivalent of destroying the node

@@ -40,7 +40,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	g.Scene = library.FindScene("Scene")
+	g.Scene = library.SceneByName("Scene")
 
 	g.Camera = g.Scene.Root.Get("Shallow").(*tetra3d.Camera)
 

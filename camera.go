@@ -977,7 +977,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	} else {
 		models := rootNode.SearchTree().Models()
-		lights = rootNode.SearchTree().Lights()
+		lights = rootNode.SearchTree().ILights()
 		for _, model := range models {
 			if model.DynamicBatchOwner == nil {
 				meshes = append(meshes, model)
@@ -1912,19 +1912,21 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 				model.SetWorldTransform(setting.Transform)
 			} else {
 				model.SetLocalPositionVec(setting.Position)
-				model.SetLocalScaleVec(setting.Scale.Scale(0.5))
-				model.SetLocalRotation(setting.Rotation)
+				model.SetLocalScaleVec(setting.Scale)
+				if !setting.Rotation.IsZero() {
+					model.SetLocalRotation(setting.Rotation)
+				}
 			}
 			model.Color = setting.Color
 			dynamicRenderOwner.DynamicBatchAdd(dynamicRenderOwner.Mesh.MeshParts[0], model)
 
 		}
 
-		lights := scene.Root.SearchTree().Lights()
+		lights := scene.Root.SearchTree().ILights()
 		camera.Render(scene, lights, dynamicRenderOwner)
 
 	} else {
-		return errors.New("camera is not in a scene; cannot render cubes")
+		return errors.New("camera is not in a scene; cannot render elements")
 	}
 
 	return nil
@@ -1957,7 +1959,8 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 	}
 
 	debugText := fmt.Sprintf(
-		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d\nCurrent Sector:%s",
+		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d"+
+			"\nWorld Position: %s\nCurrent Sector:%s",
 		ebiten.ActualTPS(),
 		ebiten.ActualFPS(),
 		ft,
@@ -1970,6 +1973,7 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 		camera.DebugInfo.TotalTris,
 		camera.DebugInfo.ActiveLightCount,
 		camera.DebugInfo.LightCount,
+		camera.WorldPosition(),
 		sectorName,
 	)
 

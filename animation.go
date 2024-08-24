@@ -609,7 +609,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 func (ap *AnimationPlayer) Update(dt float64) {
 
 	ap.finished = false
-	ap.touchedMarkers = []Marker{}
+	ap.touchedMarkers = ap.touchedMarkers[:0]
 
 	if !ap.Playing && !ap.blendStart.IsZero() {
 		ap.blendStart = time.Time{}

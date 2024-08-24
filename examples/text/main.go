@@ -49,7 +49,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	g.Scene = library.FindScene("Scene")
+	g.Scene = library.SceneByName("Scene")
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
 

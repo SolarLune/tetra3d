@@ -21,9 +21,9 @@ func NewLibrary() *Library {
 	}
 }
 
-// FindScene searches all scenes in a Library to find the one with the provided name. If a scene with the given name isn't found,
-// FindScene will return nil.
-func (lib *Library) FindScene(name string) *Scene {
+// SceneByName searches all scenes in a Library to find the one with the provided name. If a scene with the given name isn't found,
+// SceneByName will return nil.
+func (lib *Library) SceneByName(name string) *Scene {
 	for _, scene := range lib.Scenes {
 		if scene.Name == name {
 			return scene
@@ -39,9 +39,9 @@ func (lib *Library) AddScene(sceneName string) *Scene {
 	return newScene
 }
 
-// FindNode allows you to find a node by name by searching through each of a Library's scenes. If the Node with the given name isn't found,
-// FindNode will return nil.
-func (lib *Library) FindNode(objectName string) INode {
+// NodeByName allows you to find a node by name by searching through each of a Library's scenes. If the Node with the given name isn't found,
+// NodeByName will return nil.
+func (lib *Library) NodeByName(objectName string) INode {
 	for _, scene := range lib.Scenes {
 		if n := scene.Root.SearchTree().ByName(objectName).First(); n != nil {
 			return n

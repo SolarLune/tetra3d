@@ -68,10 +68,9 @@ func NewTexturePlayer(vertexSelection VertexSelection) *TexturePlayer {
 // to use the current values of the passed vertices in the slice.
 func (player *TexturePlayer) Reset(vertexSelection VertexSelection) {
 	player.OriginalOffsets = map[int]Vector{}
-	mesh := vertexSelection.Mesh
-	for vert := range vertexSelection.Indices {
-		player.OriginalOffsets[vert] = mesh.VertexUVs[vert]
-	}
+	vertexSelection.ForEachIndex(func(mesh *Mesh, index int) {
+		player.OriginalOffsets[index] = mesh.VertexUVs[index]
+	})
 }
 
 // Play plays the passed TextureAnimation, resetting the playhead if the TexturePlayer is not playing an animation. If the player is not playing, it will begin playing.
@@ -109,9 +108,10 @@ func (player *TexturePlayer) Update(dt float64) {
 // ApplyUVOffset applies a specified UV offset to all vertices a player is assigned to. This offset is not additive, but rather is
 // set once, regardless of how many times ApplyUVOffset is called.
 func (player *TexturePlayer) ApplyUVOffset(offsetX, offsetY float64) {
-	mesh := player.vertexSelection.Mesh
-	for vertIndex, ogOffset := range player.OriginalOffsets {
-		mesh.VertexUVs[vertIndex].X = ogOffset.X + offsetX
-		mesh.VertexUVs[vertIndex].Y = ogOffset.Y + offsetY
+	for mesh := range player.vertexSelection.SelectionSet {
+		for vertIndex, ogOffset := range player.OriginalOffsets {
+			mesh.VertexUVs[vertIndex].X = ogOffset.X + offsetX
+			mesh.VertexUVs[vertIndex].Y = ogOffset.Y + offsetY
+		}
 	}
 }
