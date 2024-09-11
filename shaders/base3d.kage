@@ -57,12 +57,9 @@ func nearestFilter(srcPos vec2) vec4 {
 
 // tetra3d Custom Uniform Location //
 
-func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
+func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 
 	color := vc
-	// We store the depth in the alpha channel
-	unpacked := unpackFloat(vc.a, 256)
-	z := 1.0 / unpacked.y
 
 	depth := imageSrc1UnsafeAt(dstPosToSrcPos(dstPos.xy))
 	
@@ -77,8 +74,7 @@ func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
 		tx := srcPos - srcOrigin
 
 		if PerspectiveCorrection > 0 {
-			tx *= z
-			color.a = unpacked.x
+			tx *= 1.0 / custom.x // depth is stored in ebiten.Vertex.Custom0
 		}
 
 		tx = mod(tx, srcSize) // Wrap the texture to the source texture's size

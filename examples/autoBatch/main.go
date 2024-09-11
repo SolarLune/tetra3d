@@ -82,7 +82,7 @@ this requires such objects to have the same material.
 In this example, the blue cubes are automatically
 dynamically batched (which is faster than rendering each individually),
 while the red cubes are statically merged (the fastest option).`
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

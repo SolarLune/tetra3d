@@ -98,7 +98,7 @@ func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
 	}
 
 	mat := NewMatrix4()
-	vector := Vector{x, y, z, 1}.Unit()
+	vector := Vector{X: x, Y: y, Z: z, W: 1}.Unit()
 	s := math.Sin(angle)
 	c := math.Cos(angle)
 	m := 1 - c
@@ -143,30 +143,30 @@ func (matrix Matrix4) ToQuaternion() Quaternion {
 // Right returns the right-facing rotational component of the Matrix4. For an identity matrix, this would be [1, 0, 0], or +X.
 func (matrix Matrix4) Right() Vector {
 	return Vector{
-		matrix[0][0],
-		matrix[0][1],
-		matrix[0][2],
-		1,
+		X: matrix[0][0],
+		Y: matrix[0][1],
+		Z: matrix[0][2],
+		W: 1,
 	}.Unit()
 }
 
 // Up returns the upward rotational component of the Matrix4. For an identity matrix, this would be [0, 1, 0], or +Y.
 func (matrix Matrix4) Up() Vector {
 	return Vector{
-		matrix[1][0],
-		matrix[1][1],
-		matrix[1][2],
-		1,
+		X: matrix[1][0],
+		Y: matrix[1][1],
+		Z: matrix[1][2],
+		W: 1,
 	}.Unit()
 }
 
 // Forward returns the forward rotational component of the Matrix4. For an identity matrix, this would be [0, 0, 1], or +Z (towards camera).
 func (matrix Matrix4) Forward() Vector {
 	return Vector{
-		matrix[2][0],
-		matrix[2][1],
-		matrix[2][2],
-		1,
+		X: matrix[2][0],
+		Y: matrix[2][1],
+		Z: matrix[2][2],
+		W: 1,
 	}.Unit()
 }
 
@@ -175,7 +175,7 @@ func (matrix Matrix4) Forward() Vector {
 // scales are not supported.
 func (matrix Matrix4) Decompose() (Vector, Vector, Matrix4) {
 
-	position := Vector{matrix[3][0], matrix[3][1], matrix[3][2], 1}
+	position := Vector{X: matrix[3][0], Y: matrix[3][1], Z: matrix[3][2], W: 1}
 
 	rotation := NewMatrix4()
 	rotation.SetRow(0, matrix.Row(0).Unit())
@@ -184,7 +184,7 @@ func (matrix Matrix4) Decompose() (Vector, Vector, Matrix4) {
 
 	in := matrix.Mult(rotation.Transposed())
 
-	scale := Vector{in.Row(0).Magnitude(), in.Row(1).Magnitude(), in.Row(2).Magnitude(), 1}
+	scale := Vector{X: in.Row(0).Magnitude(), Y: in.Row(1).Magnitude(), Z: in.Row(2).Magnitude(), W: 1}
 
 	return position, scale, rotation
 
@@ -452,10 +452,10 @@ func (matrix Matrix4) IsIdentity() bool {
 // Row returns the indiced row from the Matrix4 as a Vector.
 func (matrix Matrix4) Row(rowIndex int) Vector {
 	vec := Vector{
-		matrix[rowIndex][0],
-		matrix[rowIndex][1],
-		matrix[rowIndex][2],
-		matrix[rowIndex][3],
+		X: matrix[rowIndex][0],
+		Y: matrix[rowIndex][1],
+		Z: matrix[rowIndex][2],
+		W: matrix[rowIndex][3],
 	}
 	return vec
 }
@@ -463,10 +463,10 @@ func (matrix Matrix4) Row(rowIndex int) Vector {
 // Column returns the indiced column from the Matrix4 as a Vector.
 func (matrix Matrix4) Column(columnIndex int) Vector {
 	vec := Vector{
-		matrix[0][columnIndex],
-		matrix[1][columnIndex],
-		matrix[2][columnIndex],
-		matrix[3][columnIndex],
+		X: matrix[0][columnIndex],
+		Y: matrix[1][columnIndex],
+		Z: matrix[2][columnIndex],
+		W: matrix[3][columnIndex],
 	}
 	return vec
 }
@@ -530,10 +530,10 @@ func NewProjectionOrthographic(near, far, right, left, top, bottom float64) Matr
 func (matrix Matrix4) MultVec(vect Vector) Vector {
 
 	return Vector{
-		matrix[0][0]*vect.X + matrix[1][0]*vect.Y + matrix[2][0]*vect.Z + matrix[3][0],
-		matrix[0][1]*vect.X + matrix[1][1]*vect.Y + matrix[2][1]*vect.Z + matrix[3][1],
-		matrix[0][2]*vect.X + matrix[1][2]*vect.Y + matrix[2][2]*vect.Z + matrix[3][2],
-		1,
+		X: matrix[0][0]*vect.X + matrix[1][0]*vect.Y + matrix[2][0]*vect.Z + matrix[3][0],
+		Y: matrix[0][1]*vect.X + matrix[1][1]*vect.Y + matrix[2][1]*vect.Z + matrix[3][1],
+		Z: matrix[0][2]*vect.X + matrix[1][2]*vect.Y + matrix[2][2]*vect.Z + matrix[3][2],
+		W: 1,
 	}
 
 }
@@ -542,10 +542,10 @@ func (matrix Matrix4) MultVec(vect Vector) Vector {
 func (matrix Matrix4) MultVecW(vect Vector) Vector {
 
 	return Vector{
-		matrix[0][0]*vect.X + matrix[1][0]*vect.Y + matrix[2][0]*vect.Z + matrix[3][0],
-		matrix[0][1]*vect.X + matrix[1][1]*vect.Y + matrix[2][1]*vect.Z + matrix[3][1],
-		matrix[0][2]*vect.X + matrix[1][2]*vect.Y + matrix[2][2]*vect.Z + matrix[3][2],
-		matrix[0][3]*vect.X + matrix[1][3]*vect.Y + matrix[2][3]*vect.Z + matrix[3][3],
+		X: matrix[0][0]*vect.X + matrix[1][0]*vect.Y + matrix[2][0]*vect.Z + matrix[3][0],
+		Y: matrix[0][1]*vect.X + matrix[1][1]*vect.Y + matrix[2][1]*vect.Z + matrix[3][1],
+		Z: matrix[0][2]*vect.X + matrix[1][2]*vect.Y + matrix[2][2]*vect.Z + matrix[3][2],
+		W: matrix[0][3]*vect.X + matrix[1][3]*vect.Y + matrix[2][3]*vect.Z + matrix[3][3],
 	}
 
 }

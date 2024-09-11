@@ -166,7 +166,7 @@ have BoundingAABB nodes, while the capsule and sphere are,
 naturally, capsule and sphere BoundingObjects.
 Arrow keys: Move %s
 F: switch between capsule and sphere`, g.Controlling.Name())
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

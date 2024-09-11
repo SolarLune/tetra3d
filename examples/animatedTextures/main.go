@@ -119,7 +119,7 @@ The character faces the camera because his
 material has its BillboardMode set (so that
 it faces the camera, but doesn't tilt horizontally).
 1 key: Toggle playback`
-		g.Camera.DebugDrawText(screen, txt, 0, 204, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

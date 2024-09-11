@@ -147,7 +147,7 @@ navigate from point to point on Grids.
 Currently, navigation is calculated using
 number of hops, rather than overall
 distance to navigate.`
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.White())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.White())
 
 	}
 

@@ -94,7 +94,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 3: Change fog to black overwrite
 4: Change fog to white overwrite
 5: Turn off fog`
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

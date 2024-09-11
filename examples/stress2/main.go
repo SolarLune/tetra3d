@@ -199,7 +199,7 @@ They also can no longer intersect; rather, they
 will just draw in front of or behind each other.
 
 1 Key: Toggle batching cubes together`
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

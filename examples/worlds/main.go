@@ -91,7 +91,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 Each World can have its own clear color,
 fog color and range, and ambient color.`
 
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.White())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.White())
 
 	}
 

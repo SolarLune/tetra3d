@@ -114,7 +114,7 @@ angles (which is bad), but also show things
 underneath (which is, of course, good).
 1 Key: Toggle transparency, currently: %s`, transparencyOn)
 
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 
 	}
 }

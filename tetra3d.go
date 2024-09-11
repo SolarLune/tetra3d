@@ -10,15 +10,17 @@ import (
 
 var defaultImg = ebiten.NewImage(1, 1)
 
-var colorVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesCount)
-var normalVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesCount)
-var depthVertexList = make([]ebiten.Vertex, ebiten.MaxIndicesCount)
-var indexList = make([]uint16, ebiten.MaxIndicesCount)
+// const MaxTriangleCount = ebiten.MaxVertexCount / 3
+
+const MaxTriangleCount = 21845
+
+var colorVertexList = make([]ebiten.Vertex, MaxTriangleCount*3)
+var normalVertexList = make([]ebiten.Vertex, MaxTriangleCount*3)
+var depthVertexList = make([]ebiten.Vertex, MaxTriangleCount*3)
+var indexList = make([]uint16, MaxTriangleCount*3)
 var vertexListIndex = 0
 var indexListIndex = 0
 var indexListStart = 0
-
-const MaxTriangleCount = 21845
 
 func init() {
 	defaultImg.Fill(color.White)

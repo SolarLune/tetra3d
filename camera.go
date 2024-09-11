@@ -189,18 +189,9 @@ func NewCamera(w, h int) *Camera {
 			return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
 		}
 
-		func unpackFloat(input float, precision float) vec2 {
-			return vec2(input / precision, mod(input, precision) / 0.05)
-		}
-
-		func Fragment(dstPos vec4, srcPos vec2, vc vec4) vec4 {
+		func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 
 			color := vc
-			
-			// We store the depth in the alpha channel
-			unpacked := unpackFloat(vc.a, 256)
-			z := 1.0 / unpacked.y
-	
 			srcSize := imageSrc1Size()
 
 			// There's atlassing going on behind the scenes here, so:
@@ -212,8 +203,7 @@ func NewCamera(w, h int) *Camera {
 			tx /= srcSize
 
 			if PerspectiveCorrection > 0 {
-				tx *= z
-				color.a = unpacked.x
+				tx *= 1.0 / custom.x
 			}
 
 			// Apply fract() to loop the UV coords around [0-1].
@@ -492,7 +482,7 @@ func (camera *Camera) SetFar(far float64) {
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
 // does this by taking outVec, a vertex (Vector) that it stores the values in and returns, which avoids reallocation.
-func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width, height float64, limitW bool) Vector {
+func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width, height, halfWidth, halfHeight float64, limitW bool) Vector {
 
 	v3 := vert.W
 
@@ -516,8 +506,9 @@ func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width,
 
 	// Again, this function should only be called with pre-transformed 4D vertex arguments.
 
-	vert.X = (vert.X/v3)*width + (width / 2)
-	vert.Y = (vert.Y/v3*-1)*height + (height / 2)
+	// It's 1 frame faster on the stress test not to have to calculate the half screen width and height here.
+	vert.X = (vert.X/v3)*width + halfWidth
+	vert.Y = (vert.Y/-v3)*height + halfHeight
 	vert.Z = vert.Z / v3
 	vert.W = 1
 
@@ -532,7 +523,7 @@ func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width,
 // ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
 func (camera *Camera) ClipToScreen(vert Vector) Vector {
 	width, height := camera.Size()
-	return camera.clipToScreen(vert, 0, nil, float64(width), float64(height), false)
+	return camera.clipToScreen(vert, 0, nil, float64(width), float64(height), float64(width)/2, float64(height)/2, false)
 }
 
 // WorldToScreenPixels transforms a 3D position in the world to a position onscreen, with X and Y representing the pixels.
@@ -540,7 +531,7 @@ func (camera *Camera) ClipToScreen(vert Vector) Vector {
 func (camera *Camera) WorldToScreenPixels(vert Vector) Vector {
 	v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 	width, height := camera.Size()
-	return camera.clipToScreen(v.MultVecW(NewVectorZero()), 0, nil, float64(width), float64(height), false)
+	return camera.clipToScreen(v.MultVecW(NewVectorZero()), 0, nil, float64(width), float64(height), float64(width)/2, float64(height)/2, false)
 }
 
 // WorldToScreen transforms a 3D position in the world to a 2D vector, with X and Y ranging from -1 to 1.
@@ -592,7 +583,7 @@ func (camera *Camera) screenToWorldTransform(vec Vector, depth float64) Vector {
 	vecOut.Y /= vecOut.W
 	vecOut.Z /= vecOut.W
 
-	// This part shouldn't be necessary if the inverted projection matrix properly transformed the depth part
+	// TODO: This part shouldn't be necessary if the inverted projection matrix properly transformed the depth part
 	// back into the Vector, but for whatever reason, it's not working, so here I basically hack in a manual solution
 	diff := vecOut.Sub(camera.WorldPosition()).Unit()
 	vecOut = camera.WorldPosition().Add(diff.Scale(depth))
@@ -757,7 +748,7 @@ func (camera *Camera) ModelInFrustum(model *Model) bool {
 
 // AspectRatio returns the camera's aspect ratio (width / height).
 func (camera *Camera) AspectRatio() float64 {
-	w, h := camera.resultColorTexture.Size()
+	w, h := camera.Size()
 	return float64(w) / float64(h)
 }
 
@@ -812,13 +803,13 @@ func (camera *Camera) ClearWithColor(clear Color) {
 		camera.resultNormalTexture.Clear()
 	}
 
-	if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 1000 {
-
+	if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 		camera.DebugInfo.FrameTime = camera.DebugInfo.currentFrameTime
 		camera.DebugInfo.AnimationTime = camera.DebugInfo.currentAnimationTime
 		camera.DebugInfo.LightTime = camera.DebugInfo.currentLightTime
 		camera.DebugInfo.tickTime = time.Now()
 	}
+
 	camera.DebugInfo.currentFrameTime = 0
 	camera.DebugInfo.currentAnimationTime = 0
 	camera.DebugInfo.currentLightTime = 0
@@ -1307,28 +1298,17 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			sceneLights = sceneLights[:min(camera.MaxLightCount, len(sceneLights))]
 		}
 
+		halfCamWidth, halfCamHeight := float64(camWidth)/2, float64(camHeight)/2
+
 		// TODO: Implement PS1-style automatic tesselation
+
+		meshPartVertexIndexStart := meshPart.VertexIndexStart
 
 		meshPart.ForEachVertexIndex(
 
 			func(vertIndex int) {
 
-				// visible := true
-
-				// if !meshPart.sortingTriangles[t].rendered {
-				// 	visible = false
-				// }
-
-				// triIndex := meshPart.sortingTriangles[t].ID
-				// tri := meshPart.Mesh.Triangles[triIndex]
-
-				clipped := camera.clipToScreen(mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight), true)
-
-				// if visible {
-				// 	renderedAnything = trueForEachVertexIndex
-				// }
-
-				// meshPart.sortingTriangles[t].rendered = visible
+				clipped := camera.clipToScreen(mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
 
 				colorVertex.DstX = float32(clipped.X)
 				colorVertex.DstY = float32(clipped.Y)
@@ -1357,6 +1337,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				colorVertex.SrcX = uvU
 				colorVertex.SrcY = uvV
+
+				if camera.PerspectiveCorrectedTextureMapping {
+					colorVertex.Custom0 = 1.0 / float32(w) // Set the perspective divide here
+				}
 
 				depthVertex = colorVertex
 
@@ -1393,14 +1377,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					colorVertex.ColorB *= mesh.vertexLights[vertIndex].B
 				}
 
-				if camera.PerspectiveCorrectedTextureMapping {
-					// TODO: Replace this with custom vertex attributes when possible.
-					colorVertex.ColorA = float32(packFloat(colorVertex.ColorA, 1.0/float32(w), 256))
-				}
-
 				if camera.RenderDepth {
 
-					// 3/28/23, TODO: We currently use the transformed vertex positions for rendering the depth texture. Note
+					// 3/28/23, TODO: We used to use the transformed vertex positions for rendering the depth texture. Note
 					// that this makes fog shift aggressively as you turn the camera, more noticeably in first-person games
 					// (as points closer to the corners of the screen are mathematically closer to the camera because of projection).
 					// In an attempt to fix this, I used the below, now commented-out depth function. This attempt did fix the fog,
@@ -1433,11 +1412,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					depthVertex.ColorR = float32(depth)
 					depthVertex.ColorG = float32(depth)
 					depthVertex.ColorB = float32(depth)
-					if camera.PerspectiveCorrectedTextureMapping {
-						depthVertex.ColorA = colorVertex.ColorA
-					} else {
-						depthVertex.ColorA = 1
-					}
+					depthVertex.ColorA = 1
 
 				} else if scene.World != nil && scene.World.FogOn {
 
@@ -1489,7 +1464,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		for _, sortingTri := range sortingTris {
 
 			for _, index := range sortingTri.Triangle.VertexIndices {
-				indexList[indexListIndex] = uint16(index - sortingTri.Triangle.MeshPart.VertexIndexStart + indexListStart)
+				indexList[indexListIndex] = uint16(index - meshPartVertexIndexStart + indexListStart)
 				indexListIndex++
 			}
 
@@ -1991,6 +1966,8 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	camWidth, camHeight := camera.Size()
 
+	halfCamWidth, halfCamHeight := float64(camWidth)/2, float64(camHeight)/2
+
 	for _, m := range allModels {
 
 		if model, isModel := m.(*Model); isModel {
@@ -2018,9 +1995,9 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 				for _, tri := range model.ProcessVertices(vpMatrix, camera, meshPart, false) {
 
 					indices := tri.Triangle.VertexIndices
-					v0 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[0]], indices[0], model, float64(camWidth), float64(camHeight), true)
-					v1 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[1]], indices[1], model, float64(camWidth), float64(camHeight), true)
-					v2 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[2]], indices[2], model, float64(camWidth), float64(camHeight), true)
+					v0 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[0]], indices[0], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
+					v1 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[1]], indices[1], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
+					v2 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[2]], indices[2], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
 
 					if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 						(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
@@ -2421,13 +2398,15 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 					mesh := bounds.Mesh
 
+					halfCamWidth, halfCamHeight := float64(camWidth)/2, float64(camHeight)/2
+
 					for _, tri := range mesh.Triangles {
 
 						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
 
-						v0 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]), 0, nil, float64(camWidth), float64(camHeight), false)
-						v1 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]), 0, nil, float64(camWidth), float64(camHeight), false)
-						v2 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]), 0, nil, float64(camWidth), float64(camHeight), false)
+						v0 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]), 0, nil, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, false)
+						v1 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]), 0, nil, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, false)
+						v2 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]), 0, nil, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, false)
 
 						if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 							(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||

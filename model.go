@@ -464,12 +464,6 @@ func (model *Model) skinVertex(vertID int) (Vector, Vector) {
 
 }
 
-var transformedVertexPositions = [3]Vector{
-	{0, 0, 0, 0},
-	{0, 0, 0, 0},
-	{0, 0, 0, 0},
-}
-
 func (model *Model) refreshVertexVisibility() {
 	for i := range model.Mesh.visibleVertices {
 		model.Mesh.visibleVertices[i] = false
@@ -492,8 +486,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	modelTransform := model.Transform()
-
-	far := camera.far
 
 	sortingTriIndex := 0
 
@@ -562,17 +554,65 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	// There's pop-in for faces where the camera is looking at an object through the corner of the viewport
-	// farSquared := (camera.far * camera.far) + (mesh.maxTriangleSpan * mesh.maxTriangleSpan)
+
+	for vertexIndex := meshPart.VertexIndexStart; vertexIndex < meshPart.VertexIndexEnd; vertexIndex++ {
+
+		if model.skinned {
+
+			t := time.Now()
+
+			vertPos, vertNormal := model.skinVertex(vertexIndex)
+
+			if transformFunc != nil {
+				vertPos = transformFunc(vertPos, vertexIndex)
+			}
+			mesh.vertexSkinnedNormals[vertexIndex] = vertNormal
+			mesh.vertexSkinnedPositions[vertexIndex] = vertPos
+
+			mesh.vertexTransforms[vertexIndex] = vpMatrix.MultVecW(vertPos)
+
+			camera.DebugInfo.currentAnimationTime += time.Since(t)
+
+		} else {
+
+			v0 := mesh.VertexPositions[vertexIndex]
+
+			if transformFunc != nil {
+				v0 = transformFunc(v0, vertexIndex)
+			}
+
+			mesh.vertexTransforms[vertexIndex] = mvp.MultVecW(v0)
+
+		}
+
+		if camera.VertexSnapping > 0 {
+			mesh.vertexTransforms[vertexIndex] = mesh.vertexTransforms[vertexIndex].Round(camera.VertexSnapping)
+		}
+
+		if camera.RenderNormals {
+			mesh.vertexTransformedNormals[vertexIndex] = mvJustRForNormals.MultVecW(mesh.VertexNormals[vertexIndex])
+		}
+
+	}
 
 	var skinnedTriCenter Vector
+
+	var transformedVertexPositions = [3]Vector{}
 
 	for ti := meshPart.TriangleStart; ti <= meshPart.TriangleEnd; ti++ {
 
 		tri := mesh.Triangles[ti]
 
-		meshPart.sortingTriangles[sortingTriIndex].Triangle = tri
+		// Backface culling
+		if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
 
-		outOfBounds := true
+			if tri.Normal.Dot(invertedCamPos.Sub(tri.Center)) < 0 {
+				continue
+			}
+
+		}
+
+		meshPart.sortingTriangles[sortingTriIndex].Triangle = tri
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
 
@@ -592,44 +632,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		// 	continue
 		// }
 
+		// View clipping
+
+		outOfBounds := true
+
 		for i := 0; i < 3; i++ {
 
 			if model.skinned {
-
-				t := time.Now()
-
-				vertPos, vertNormal := model.skinVertex(tri.VertexIndices[i])
-
-				if transformFunc != nil {
-					vertPos = transformFunc(vertPos, tri.VertexIndices[i])
-				}
-				mesh.vertexSkinnedNormals[tri.VertexIndices[i]] = vertNormal
-				mesh.vertexSkinnedPositions[tri.VertexIndices[i]] = vertPos
-
-				mesh.vertexTransforms[tri.VertexIndices[i]] = vpMatrix.MultVecW(vertPos)
-
-				camera.DebugInfo.currentAnimationTime += time.Since(t)
-
-				skinnedTriCenter = skinnedTriCenter.Add(vertPos)
-
-			} else {
-
-				v0 := mesh.VertexPositions[tri.VertexIndices[i]]
-
-				if transformFunc != nil {
-					v0 = transformFunc(v0, tri.VertexIndices[i])
-				}
-
-				mesh.vertexTransforms[tri.VertexIndices[i]] = mvp.MultVecW(v0)
-
-			}
-
-			if camera.VertexSnapping > 0 {
-				mesh.vertexTransforms[tri.VertexIndices[i]] = mesh.vertexTransforms[tri.VertexIndices[i]].Round(camera.VertexSnapping)
-			}
-
-			if camera.RenderNormals {
-				mesh.vertexTransformedNormals[tri.VertexIndices[i]] = mvJustRForNormals.MultVecW(mesh.VertexNormals[tri.VertexIndices[i]])
+				skinnedTriCenter = skinnedTriCenter.Add(mesh.vertexSkinnedPositions[tri.VertexIndices[i]])
 			}
 
 			w := mesh.vertexTransforms[tri.VertexIndices[i]].W
@@ -643,7 +653,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			transformedVertexPositions[i].X = mesh.vertexTransforms[tri.VertexIndices[i]].X / w
 			transformedVertexPositions[i].Y = mesh.vertexTransforms[tri.VertexIndices[i]].Y / w
 
-			if mesh.vertexTransforms[tri.VertexIndices[i]].Z+1 >= camera.near && mesh.vertexTransforms[tri.VertexIndices[i]].Z < far {
+			if mesh.vertexTransforms[tri.VertexIndices[i]].Z+1 >= camera.near && mesh.vertexTransforms[tri.VertexIndices[i]].Z < camera.far {
 				outOfBounds = false
 			}
 
@@ -651,75 +661,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		if outOfBounds {
 			continue
-		}
-
-		// Backface culling
-
-		if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
-
-			v0 := transformedVertexPositions[0]
-			v1 := transformedVertexPositions[1]
-			v2 := transformedVertexPositions[2]
-
-			n0x := v0.X - v1.X
-			n0y := v0.Y - v1.Y
-
-			n1x := v1.X - v2.X
-			n1y := v1.Y - v2.Y
-
-			// Essentially calculating the cross product, but only for the important dimension (Z, which is "in / out" in this context)
-			nor := (n0x * n1y) - (n1x * n0y)
-
-			// We use this method of backface culling because it helps to ensure
-			// there's fewer graphical glitches when looking from very near a surface outwards; this
-			// doesn't help if a surface does not have backface culling, of course...
-			if nor < 0 {
-				continue
-			}
-
-			// Old methods of backface culling; performant, but causes graphical glitches.
-
-			// if backfaceCulling {
-
-			// 	camera.backfacePool.Reset()
-			// 	n0 := camera.backfacePool.Sub(p0, p1)
-			// 	n1 := camera.backfacePool.Sub(p1, p2)
-			// 	nor := camera.backfacePool.Cross(n0, n1)
-
-			// 	if nor.Z > 0 {
-			// 		continue
-			// 	}
-
-			// }
-			// if model.skinned {
-			// 	v0 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.X]
-			// 	v1 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.Y]
-			// 	v2 := model.Mesh.vertexSkinnedNormals[tri.VertexIndices.Z]
-
-			// 	backfaceTriNormal.X = (v0.X + v1.X + v2.X) / 3
-			// 	backfaceTriNormal.Y = (v0.Y + v1.Y + v2.Y) / 3
-			// 	backfaceTriNormal.Z = (v0.Z + v1.Z + v2.Z) / 3
-
-			// 	interimVec.X = camPos.X - model.Mesh.vertexSkinnedPositions[tri.VertexIndices.X].X
-			// 	interimVec.Y = camPos.Y - model.Mesh.vertexSkinnedPositions[tri.VertexIndices.X].Y
-			// 	interimVec.Z = camPos.Z - model.Mesh.vertexSkinnedPositions[tri.VertexIndices.X].Z
-
-			// 	if dot(backfaceTriNormal, interimVec) < 0 {
-			// 		continue
-			// 	}
-
-			// } else {
-
-			// 	interimVec.X = invertedCamPos.X - tri.Center.X
-			// 	interimVec.Y = invertedCamPos.Y - tri.Center.Y
-			// 	interimVec.Z = invertedCamPos.Z - tri.Center.Z
-
-			// 	if dot(tri.Normal, interimVec) < 0 {
-			// 		continue
-			// 	}
-
-			// }
-
 		}
 
 		// If all transformed vertices are wholly out of bounds to the right, left, top, or bottom of the screen, then we can assume

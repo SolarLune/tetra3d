@@ -258,7 +258,7 @@ The E key toggles passability >from< the selected Node.
 The Q key toggles increased costs from the selected Node.
 Left-click moves the cube to the selected Node.
 `
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.White())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.White())
 
 	}
 

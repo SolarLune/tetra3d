@@ -127,7 +127,7 @@ Collection instances can be used as prefabs,
 and properties set on a collection
 instance object get propagated to top-level objects
 in that collection.`
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

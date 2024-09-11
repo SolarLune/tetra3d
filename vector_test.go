@@ -85,13 +85,6 @@ func BenchmarkMathInternalVector(b *testing.B) {
 		}
 	}
 
-	// // Main point of benchmarking
-	// for z := 0; z < b.N; z++ {
-	// 	for i := 0; i < maxSize-1; i++ {
-	// 		vecs[i].Add(vecs[i+1]).CCross(vecs[i+1])
-	// 	}
-	// }
-
 }
 
 // Benchmark function for previous iteration of vectors, which were type definitions that just pointed to [4]float32.
@@ -132,3 +125,45 @@ func BenchmarkMathArrayF64(b *testing.B) {
 	}
 
 }
+
+// type testPaddedVector struct {
+// 	X, Y, Z, W float32
+// 	_          uint8
+// }
+
+// func BenchmarkPaddedVector(b *testing.B) {
+
+// 	maxSize := 1200
+
+// 	vecs := make([]testPaddedVector, 0, maxSize)
+
+// 	for i := 0; i < maxSize; i++ {
+// 		vecs = append(vecs, testPaddedVector{X: rand.Float32(), Y: rand.Float32(), Z: rand.Float32()})
+// 	}
+
+// 	b.StartTimer()
+
+// 	// Main point of benchmarking
+// 	for z := 0; z < b.N; z++ {
+// 		for i := 0; i < maxSize-1; i++ {
+// 			n := rand.Intn(maxSize - 1)
+// 			// Add
+// 			vecs[i].X += vecs[n].X
+// 			vecs[i].Y += vecs[n].Y
+// 			vecs[i].Z += vecs[n].Z
+
+// 			// Cross
+// 			ogVecY := vecs[n].Y
+// 			ogVecZ := vecs[n].Z
+
+// 			vecs[i].Z = vecs[i].X*vecs[n].Y - vecs[n].X*vecs[i].Y
+// 			vecs[i].Y = ogVecZ*vecs[n].Y - vecs[n].Z*vecs[i].X
+// 			vecs[i].X = ogVecY*vecs[n].Z - vecs[n].Y*ogVecZ
+// 		}
+// 	}
+
+// 	b.StopTimer()
+
+// 	b.ReportAllocs()
+
+// }

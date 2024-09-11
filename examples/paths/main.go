@@ -103,7 +103,7 @@ The cube will follow the path (which is invisible,
 as it is made up of Nodes).
 Left, Right keys: Step 1 unit forward or
 back through the path`
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)

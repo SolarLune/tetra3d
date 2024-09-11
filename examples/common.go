@@ -102,18 +102,28 @@ func (system *BasicSystemHandler) Draw(screen *ebiten.Image, camera *tetra3d.Cam
 	if system.DrawDebugText {
 		camera.DrawDebugRenderInfo(screen, 1, colors.White())
 		var txt string
+
+		pcOn := "On"
+		if !camera.PerspectiveCorrectedTextureMapping {
+			pcOn = "Off"
+		}
+
 		if system.UsingBasicFreeCam {
-			txt = `WASD: Move, Mouse: Look, Shift: move fast
+			txt = fmt.Sprintf(`WASD: Move, Mouse: Look, Shift: move fast
 Right Click to Lock / Unlock Mouse Cursor
 F1: Toggle help text - F2: Toggle depth debug,
 F3: Wireframe debug - F4: fullscreen - F5: node center debug
-ESC: Quit`
+F6: Toggle Perpsective Correction: %s
+ESC: Quit
+`, pcOn)
 		} else {
-			txt = `F1: Toggle help text - F2: Toggle depth debug,
+			txt = fmt.Sprintf(`F1: Toggle help text - F2: Toggle depth debug,
 F3: Wireframe debug - F4: fullscreen - F5: node center debug
-ESC: Quit`
+F6: Toggle Perpsective Correction: %s
+ESC: Quit
+`, pcOn)
 		}
-		camera.DebugDrawText(screen, txt, 0, 120, 1, colors.LightGray())
+		camera.DebugDrawText(screen, txt, 0, 130, 1, colors.LightGray())
 	}
 
 }
@@ -200,6 +210,10 @@ func (cc *BasicFreeCam) Update() {
 		}
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
+		cc.PerspectiveCorrectedTextureMapping = !cc.PerspectiveCorrectedTextureMapping
+	}
+
 	// Rotating the camera with the mouse
 
 	// Rotate and tilt the camera according to mouse movements
@@ -238,7 +252,7 @@ func StartProfiling() {
 	fmt.Println("Beginning CPU profiling...")
 	pprof.StartCPUProfile(outFile)
 	go func() {
-		time.Sleep(2 * time.Second)
+		time.Sleep(5 * time.Second)
 		pprof.StopCPUProfile()
 		fmt.Println("CPU profiling finished.")
 	}()

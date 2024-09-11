@@ -111,7 +111,7 @@ animations (as shown on the table).
 F Key: Play Animation on Skinned Mesh
 Note that the nodes move as well (as can be
 seen in the debug mode).`
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

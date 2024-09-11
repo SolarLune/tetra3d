@@ -114,7 +114,7 @@ pure Go and are executed on the CPU.
 
 The cube on the left is running a fragment shader,
 while the cube on the right runs a vertex program.`
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 }
 

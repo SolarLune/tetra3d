@@ -730,14 +730,16 @@ func (vs VertexSelection) SelectMeshPart(meshParts ...*MeshPart) VertexSelection
 // index.
 // If the MeshPart doesn't exist, this function will panic.
 func (vs VertexSelection) SelectMeshPartByIndex(mesh *Mesh, indexNumber int) VertexSelection {
+	vs.ensureSelectionSetExists(mesh)
 	vs.SelectMeshPart(mesh.MeshParts[indexNumber])
 	return vs
 
 }
 
-// SelectMaterialByName selects all vertices in the Mesh belonging to the specified material.
-func (vs VertexSelection) SelectMaterialByName(mesh *Mesh, materialNames ...string) VertexSelection {
+// SelectMeshpartByName selects all vertices in the Mesh belonging to the specified material.
+func (vs VertexSelection) SelectMeshpartByName(mesh *Mesh, materialNames ...string) VertexSelection {
 
+	vs.ensureSelectionSetExists(mesh)
 	for _, matName := range materialNames {
 		if mp := mesh.FindMeshPart(matName); mp != nil {
 			vs.SelectMeshPart(mp)
@@ -760,6 +762,7 @@ func (vs VertexSelection) SelectIndices(mesh *Mesh, indices ...int) VertexSelect
 
 // SelectTriangles selects the vertex indices composing the triangles passed.
 func (vs VertexSelection) SelectTriangles(mesh *Mesh, triangles ...*Triangle) VertexSelection {
+	vs.ensureSelectionSetExists(mesh)
 	for _, t := range triangles {
 		for _, i := range t.VertexIndices {
 			vs.SelectionSet[mesh].Indices.Add(i)
@@ -768,7 +771,7 @@ func (vs VertexSelection) SelectTriangles(mesh *Mesh, triangles ...*Triangle) Ve
 	return vs
 }
 
-// SelectTriangles selects shared vertex indices to vertices that are already selected.
+// SelectTriangles selects vertices that share positions with already-selected vertices.
 func (vs VertexSelection) SelectSharedVertices() VertexSelection {
 
 	for mesh, set := range vs.SelectionSet {
