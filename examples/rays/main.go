@@ -107,7 +107,7 @@ to match the object struck. If the mouse is locked
 to the game window, then the ray shoots directly forward
 from the center of the screen.
 `
-		g.Camera.DebugDrawText(screen, txt, 0, 200, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 200, 1, colors.LightGray())
 	}
 
 }

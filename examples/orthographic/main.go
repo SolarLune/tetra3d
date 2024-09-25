@@ -117,7 +117,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 W, S: Zoom in and Out
 Q, E: Rotate View
 R: Restart`
-		camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

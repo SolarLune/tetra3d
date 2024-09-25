@@ -1,11 +1,8 @@
 {
 	"asset":{
-		"generator":"Khronos glTF Blender I/O v4.0.44",
+		"generator":"Khronos glTF Blender I/O v4.3.9",
 		"version":"2.0"
 	},
-	"extensionsUsed":[
-		"KHR_materials_unlit"
-	],
 	"scene":0,
 	"scenes":[
 		{
@@ -28,6 +25,7 @@
 				"t3dAnimationSampling__":true,
 				"t3dAnimationInterpolation__":true,
 				"t3dSectorDetection__":0,
+				"t3dRenameInstancedObjects__":true,
 				"t3dCollections__":{
 					"Collection":{
 						"objects":[
@@ -129,25 +127,25 @@
 						"clip_start":0.009999999776482582,
 						"clip_end":1000.0,
 						"location":[
-							36.90446472167969,
-							26.1251277923584,
-							-7.349346160888672
+							24.094114303588867,
+							38.00319290161133,
+							65.12483215332031
 						],
 						"rotation":[
 							[
-								-0.19530971348285675,
-								-0.5593210458755493,
-								0.805614173412323
+								0.9378714561462402,
+								-0.1665840893983841,
+								0.30437949299812317
 							],
 							[
-								-5.245709644441376e-07,
-								0.8214337229728699,
-								0.5703040361404419
+								4.3636853774842166e-07,
+								0.8772181868553162,
+								0.48009201884269714
 							],
 							[
-								-0.9807416796684265,
-								0.1113855317234993,
-								-0.16043421626091003
+								-0.3469828963279724,
+								-0.45026448369026184,
+								0.8227179646492004
 							]
 						],
 						"fovY":39.597752709049864,
@@ -1142,9 +1140,6 @@
 	],
 	"materials":[
 		{
-			"extensions":{
-				"KHR_materials_unlit":{}
-			},
 			"extras":{
 				"t3dMaterialShadeless__":1
 			},
@@ -1154,20 +1149,17 @@
 					"index":0
 				},
 				"metallicFactor":0,
-				"roughnessFactor":0.9
+				"roughnessFactor":0.5
 			}
 		},
 		{
-			"extensions":{
-				"KHR_materials_unlit":{}
-			},
 			"extras":{
 				"t3dMaterialShadeless__":1
 			},
 			"name":"Plane",
 			"pbrMetallicRoughness":{
 				"metallicFactor":0,
-				"roughnessFactor":0.9
+				"roughnessFactor":0.5
 			}
 		}
 	],
@@ -1197,12 +1189,13 @@
 			"primitives":[
 				{
 					"attributes":{
-						"COLOR_0":4,
+						"_COL":4,
 						"POSITION":5,
 						"NORMAL":6,
-						"TEXCOORD_0":7
+						"TEXCOORD_0":7,
+						"COLOR_0":8
 					},
-					"indices":8,
+					"indices":9,
 					"material":1
 				}
 			]
@@ -1293,6 +1286,12 @@
 		},
 		{
 			"bufferView":8,
+			"componentType":5126,
+			"count":25,
+			"type":"VEC3"
+		},
+		{
+			"bufferView":9,
 			"componentType":5123,
 			"count":96,
 			"type":"SCALAR"
@@ -1349,20 +1348,26 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":192,
+			"byteLength":300,
 			"byteOffset":3240,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":192,
+			"byteOffset":3540,
 			"target":34963
 		}
 	],
 	"samplers":[
 		{
-			"magFilter":9728,
-			"minFilter":9984
+			"magFilter":9729,
+			"minFilter":9987
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":3432,
+			"byteLength":3732,
 			"uri":"orthographic.bin"
 		}
 	]

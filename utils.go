@@ -174,6 +174,11 @@ func (s Set[E]) Clone() Set[E] {
 	return newSet
 }
 
+func (s Set[E]) Set(other Set[E]) {
+	s.Clear()
+	s.Combine(other)
+}
+
 // Add adds the given elements to a set.
 func (s Set[E]) Add(element E) {
 	s[element] = struct{}{}

@@ -92,7 +92,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.System.Draw(screen, g.Camera.Camera)
 
 	if g.System.DrawDebugText {
-		g.Camera.DebugDrawText(screen,
+		g.Camera.DrawDebugText(screen,
 			`This demo shows how composite modes work.
 The blue plane is opaque.
 The red one is additive.

@@ -93,7 +93,7 @@ The cone is linked from another blend file (cone.blend) to the
 main one (collections.blend). They both are exported to GLTF files,
 and when the main scene is loaded in Tetra3D, the dependent library is
 also loaded.`
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

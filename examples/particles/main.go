@@ -196,7 +196,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := `This example shows how various particle systems work.`
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

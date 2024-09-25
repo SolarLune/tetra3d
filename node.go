@@ -263,6 +263,13 @@ type INode interface {
 	// VectorTo returns a vector from one Node to another.
 	// Quick syntactic sugar for other.WorldPosition().Sub(node.WorldPosition()).
 	VectorTo(otherNode INode) Vector
+
+	// RegisteredForSceneTreeCallbacks returns if an INode is registered for scene tree callbacks.
+	RegisteredForSceneTreeCallbacks() bool
+
+	// SetRegisteredForSceneTreeCallbacks registers an INode for reporting to a callback when its scene
+	// tree changes in some way.
+	SetRegisteredForSceneTreeCallbacks(registered bool)
 }
 
 var nodeID uint64 = 0
@@ -297,6 +304,8 @@ type Node struct {
 	cachedSceneRootNode *Node
 
 	cachedSector *Sector
+
+	registeredForSceneTreeCallbacks bool
 }
 
 // NewNode returns a new Node.
@@ -369,6 +378,8 @@ func (node *Node) Clone() INode {
 	newNode.props = node.props.Clone()
 	newNode.animationPlayer = node.animationPlayer.Clone()
 	newNode.library = node.library
+
+	newNode.registeredForSceneTreeCallbacks = node.registeredForSceneTreeCallbacks
 
 	if node.animationPlayer.RootNode == node {
 		newNode.animationPlayer.SetRoot(newNode)
@@ -826,12 +837,30 @@ func (node *Node) Scene() *Scene {
 func (node *Node) addChildren(parent INode, children ...INode) {
 	for _, child := range children {
 		// child.updateLocalTransform(parent)
-		if child.Parent() != nil {
-			child.Parent().RemoveChildren(child)
+		prevParent := child.Parent()
+		if prevParent != nil {
+			if prevParent == node {
+				continue
+			}
+			wasRegistered := child.RegisteredForSceneTreeCallbacks()
+			if wasRegistered {
+				child.SetRegisteredForSceneTreeCallbacks(false) // Override the on tree change rq
+			}
+
+			prevParent.RemoveChildren(child)
+
+			if wasRegistered {
+				child.SetRegisteredForSceneTreeCallbacks(true)
+			}
 		}
 		child.setParent(parent)
 		child.dirtyTransform()
 		node.children = append(node.children, child)
+
+		if child.RegisteredForSceneTreeCallbacks() && Callbacks.OnNodeReparent != nil {
+			Callbacks.OnNodeReparent(child, prevParent, parent)
+		}
+
 	}
 }
 
@@ -845,16 +874,23 @@ func (node *Node) AddChildren(children ...INode) {
 func (node *Node) RemoveChildren(children ...INode) {
 
 	for _, child := range children {
+
 		for i, c := range node.children {
+
 			if c == child {
 				// child.updateLocalTransform(nil)
+				prevParent := child.Parent()
 				child.setParent(nil)
 				child.dirtyTransform()
 				node.children[i] = nil
 				node.children = append(node.children[:i], node.children[i+1:]...)
+				if child.RegisteredForSceneTreeCallbacks() && Callbacks.OnNodeReparent != nil {
+					Callbacks.OnNodeReparent(child, prevParent, nil)
+				}
 				break
 			}
 		}
+
 	}
 
 }
@@ -869,26 +905,27 @@ func (node *Node) Unparent() {
 // ReindexChild moves the child in the calling Node's children slice to the specified newPosition.
 // The function returns the old index where the child Node was, or -1 if it wasn't a child of the calling Node.
 // The newPosition is clamped to the size of the node's children slice.
-func (node *Node) ReindexChild(child INode, newPosition int) int {
+func (node *Node) ReindexChild(child INode, newIndex int) int {
 
-	if oldIndex := child.Index(); oldIndex >= 0 {
+	oldIndex := child.Index()
 
-		if newPosition < 0 {
-			newPosition = 0
-		} else if newPosition > len(node.children)-1 {
-			newPosition = len(node.children) - 1
+	if oldIndex >= 0 {
+
+		if newIndex < 0 {
+			newIndex = 0
+		} else if newIndex > len(node.children)-1 {
+			newIndex = len(node.children) - 1
 		}
 
 		node.children = append(node.children[:oldIndex], node.children[oldIndex+1:]...)
 
 		node.children = append(node.children, nil)
-		copy(node.children[newPosition+1:], node.children[newPosition:])
-		node.children[newPosition] = child
+		copy(node.children[newIndex+1:], node.children[newIndex:])
+		node.children[newIndex] = child
 
-		return oldIndex
 	}
 
-	return -1
+	return oldIndex
 
 }
 
@@ -1279,4 +1316,15 @@ func (node *Node) DistanceSquaredTo(other INode) float64 {
 // Quick syntactic sugar for other.WorldPosition().Sub(node.WorldPosition()).
 func (node *Node) VectorTo(other INode) Vector {
 	return other.WorldPosition().Sub(node.WorldPosition())
+}
+
+// RegisteredForSceneTreeCallbacks returns if an INode is registered for scene tree callbacks.
+func (node *Node) RegisteredForSceneTreeCallbacks() bool {
+	return node.registeredForSceneTreeCallbacks
+}
+
+// SetRegisteredForSceneTreeCallbacks registers an INode for reporting to a callback when its scene
+// tree changes in some way.
+func (node *Node) SetRegisteredForSceneTreeCallbacks(registered bool) {
+	node.registeredForSceneTreeCallbacks = registered
 }

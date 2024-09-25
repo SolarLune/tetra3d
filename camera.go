@@ -512,10 +512,6 @@ func (camera *Camera) clipToScreen(vert Vector, vertID int, model *Model, width,
 	vert.Z = vert.Z / v3
 	vert.W = 1
 
-	if model != nil && model.VertexClipFunction != nil {
-		vert = model.VertexClipFunction(vert, vertID)
-	}
-
 	return vert
 
 }
@@ -1174,10 +1170,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 	camWidth := camera.resultColorTexture.Bounds().Dx()
 	camHeight := camera.resultColorTexture.Bounds().Dy()
 
-	colorVertex := ebiten.Vertex{}
-	depthVertex := colorVertex
-	normalVertex := colorVertex
-
 	render := func(rp renderPair) {
 
 		// startingVertexListIndex := vertexListIndex
@@ -1207,7 +1199,12 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			camera.DebugInfo.BatchedParts++
 		}
 
-		sortingTris := model.ProcessVertices(vpMatrix, camera, meshPart, true)
+		globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
+		if meshPart.Material != nil {
+			globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
+		}
+
+		model.ProcessVertices(vpMatrix, camera, meshPart, true)
 
 		srcW := 0.0
 		srcH := 0.0
@@ -1261,7 +1258,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			mpColor = mpColor.MultiplyRGBA(meshPart.Material.Color.ToFloat32s())
 		}
 
-		if lighting && len(sortingTris) > 0 {
+		if lighting && !globalSortingTriangleBucket.IsEmpty() {
 
 			t := time.Now()
 
@@ -1304,171 +1301,190 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		meshPartVertexIndexStart := meshPart.VertexIndexStart
 
-		meshPart.ForEachVertexIndex(
+		customDepthOffsetOn := mat != nil && mat.CustomDepthOffsetOn
+		customDepthFunctionSet := mat != nil && mat.CustomDepthFunction != nil
+		vertexClipFunctionOn := model != nil && model.VertexClipFunction != nil
 
-			func(vertIndex int) {
+		for vertIndex := meshPart.VertexIndexStart; vertIndex < meshPart.VertexIndexEnd; vertIndex++ {
 
-				clipped := camera.clipToScreen(mesh.vertexTransforms[vertIndex], vertIndex, model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
+			// We clip the vertices to the screen here manually because it wasn't being inlined previously.
 
-				colorVertex.DstX = float32(clipped.X)
-				colorVertex.DstY = float32(clipped.Y)
+			// CLIP SCREEN START
 
-				w := mesh.vertexTransforms[vertIndex].W
+			w := mesh.vertexTransforms[vertIndex].W
 
-				var uvU, uvV float32
+			if !camera.perspective {
+				w = 1.0
+			}
 
-				if camera.PerspectiveCorrectedTextureMapping {
+			// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
+			// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
+			if w < 0 {
+				w = 0.000001
+			}
 
-					uvU = float32((mesh.VertexUVs[vertIndex].X / w) * srcW)
-					uvV = float32(((1 - mesh.VertexUVs[vertIndex].Y) / w) * srcH)
+			// It's 1 frame faster on the stress test not to have to calculate the half screen width and height here.
+			mesh.vertexTransforms[vertIndex].X = (mesh.vertexTransforms[vertIndex].X/w)*float64(camWidth) + halfCamWidth
+			mesh.vertexTransforms[vertIndex].Y = (mesh.vertexTransforms[vertIndex].Y/-w)*float64(camHeight) + halfCamHeight
+			// mesh.vertexTransforms[vertIndex].Z /= w
 
-					// colorVertex.ColorA = 1.0 / float32(w)
-					// colorVertex.ColorA = colorVertex.ColorA*0.5 + ((1.0 / float32(w)) * 0.5) // Second half of alpha vertex color controls
+			if vertexClipFunctionOn {
+				model.VertexClipFunction(&mesh.vertexTransforms[vertIndex], vertIndex)
+			}
 
-				} else {
+			// CLIP SCREEN END
 
-					// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
-					uvU = float32(mesh.VertexUVs[vertIndex].X * srcW)
-					// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
-					// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
-					uvV = float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
+			colorVertexList[vertexListIndex].DstX = float32(mesh.vertexTransforms[vertIndex].X)
+			colorVertexList[vertexListIndex].DstY = float32(mesh.vertexTransforms[vertIndex].Y)
+			depthVertexList[vertexListIndex].DstX = float32(mesh.vertexTransforms[vertIndex].X)
+			depthVertexList[vertexListIndex].DstY = float32(mesh.vertexTransforms[vertIndex].Y)
 
+			var uvU, uvV float32
+
+			// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
+			// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
+			// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
+			if camera.PerspectiveCorrectedTextureMapping {
+				uvU = float32((mesh.VertexUVs[vertIndex].X / w) * srcW)
+				uvV = float32(((1 - mesh.VertexUVs[vertIndex].Y) / w) * srcH)
+			} else {
+				uvU = float32(mesh.VertexUVs[vertIndex].X * srcW)
+				uvV = float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
+			}
+
+			colorVertexList[vertexListIndex].SrcX = uvU
+			colorVertexList[vertexListIndex].SrcY = uvV
+
+			if camera.PerspectiveCorrectedTextureMapping {
+				d := 1.0 / float32(w)
+				colorVertexList[vertexListIndex].Custom0 = d // Set the perspective divide here
+				depthVertexList[vertexListIndex].Custom0 = d
+				// normalVertexList[vertexListIndex].Custom0 = d
+			}
+
+			depthVertexList[vertexListIndex].SrcX = uvU
+			depthVertexList[vertexListIndex].SrcY = uvV
+
+			if camera.RenderNormals {
+
+				normalVertexList[vertexListIndex].DstX = float32(mesh.vertexTransforms[vertIndex].X)
+				normalVertexList[vertexListIndex].DstY = float32(mesh.vertexTransforms[vertIndex].Y)
+
+				normalVertexList[vertexListIndex].SrcX = uvU
+				normalVertexList[vertexListIndex].SrcY = uvV
+
+				normalVertexList[vertexListIndex].ColorR = float32(mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
+				normalVertexList[vertexListIndex].ColorG = float32(mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
+				normalVertexList[vertexListIndex].ColorB = float32(mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
+
+			}
+
+			// Vertex colors
+
+			if activeChannel := mesh.VertexActiveColorChannel[vertIndex]; activeChannel >= 0 {
+				colorVertexList[vertexListIndex].ColorR = mesh.VertexColors[vertIndex][activeChannel].R * mpColor.R
+				colorVertexList[vertexListIndex].ColorG = mesh.VertexColors[vertIndex][activeChannel].G * mpColor.G
+				colorVertexList[vertexListIndex].ColorB = mesh.VertexColors[vertIndex][activeChannel].B * mpColor.B
+				colorVertexList[vertexListIndex].ColorA = mesh.VertexColors[vertIndex][activeChannel].A * mpColor.A
+			} else {
+				colorVertexList[vertexListIndex].ColorR = mpColor.R
+				colorVertexList[vertexListIndex].ColorG = mpColor.G
+				colorVertexList[vertexListIndex].ColorB = mpColor.B
+				colorVertexList[vertexListIndex].ColorA = mpColor.A
+			}
+
+			if lighting {
+				colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights[vertIndex].R
+				colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights[vertIndex].G
+				colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights[vertIndex].B
+			}
+
+			if camera.RenderDepth {
+
+				// 3/28/23, TODO: We used to use the transformed vertex positions for rendering the depth texture. Note
+				// that this makes fog shift aggressively as you turn the camera, more noticeably in first-person games
+				// (as points closer to the corners of the screen are mathematically closer to the camera because of projection).
+				// In an attempt to fix this, I used the below, now commented-out depth function. This attempt did fix the fog,
+				// but it also made depth sorting buggier, which is unacceptable. For now, I've reverted this change to have
+				// better depth sorting. This is currently fine, though the fog issue should be resolved at some point in the future.
+
+				// See this Discord conversation for the visualization of the issue:
+				// https://discord.com/channels/842049801528016967/844522898126536725/1090223569247674488
+
+				// p, s, r := model.Transform().Inverted().Decompose()
+				// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
+				// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
+
+				depth := (mesh.vertexTransforms[vertIndex].Z + depthMarginPercentage) / camSpread
+
+				if customDepthOffsetOn {
+					depth += depthOffsetValue
+				}
+				if customDepthFunctionSet {
+					depth = mat.CustomDepthFunction(depth)
 				}
 
-				colorVertex.SrcX = uvU
-				colorVertex.SrcY = uvV
-
-				if camera.PerspectiveCorrectedTextureMapping {
-					colorVertex.Custom0 = 1.0 / float32(w) // Set the perspective divide here
+				if depth < 0 {
+					depth = 0
+				} else if depth > 1 {
+					depth = 1
 				}
 
-				depthVertex = colorVertex
+				depthVertexList[vertexListIndex].ColorR = float32(depth)
+				depthVertexList[vertexListIndex].ColorG = float32(depth)
+				depthVertexList[vertexListIndex].ColorB = float32(depth)
+				depthVertexList[vertexListIndex].ColorA = 1
 
-				depthVertex.ColorR = 1
-				depthVertex.ColorG = 1
-				depthVertex.ColorB = 1
-				depthVertex.ColorA = 1
+			} else if scene.World != nil && scene.World.FogOn {
 
-				if camera.RenderNormals {
-					normalVertex = colorVertex
-					normalVertex.ColorR = float32(mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
-					normalVertex.ColorG = float32(mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
-					normalVertex.ColorB = float32(mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
-					normalVertexList[vertexListIndex] = normalVertex
-				}
-
-				// Vertex colors
-
-				if activeChannel := mesh.VertexActiveColorChannel[vertIndex]; activeChannel >= 0 {
-					colorVertex.ColorR = mesh.VertexColors[vertIndex][activeChannel].R * mpColor.R
-					colorVertex.ColorG = mesh.VertexColors[vertIndex][activeChannel].G * mpColor.G
-					colorVertex.ColorB = mesh.VertexColors[vertIndex][activeChannel].B * mpColor.B
-					colorVertex.ColorA = mesh.VertexColors[vertIndex][activeChannel].A * mpColor.A
-				} else {
-					colorVertex.ColorR = mpColor.R
-					colorVertex.ColorG = mpColor.G
-					colorVertex.ColorB = mpColor.B
-					colorVertex.ColorA = mpColor.A
-				}
-
-				if lighting {
-					colorVertex.ColorR *= mesh.vertexLights[vertIndex].R
-					colorVertex.ColorG *= mesh.vertexLights[vertIndex].G
-					colorVertex.ColorB *= mesh.vertexLights[vertIndex].B
-				}
-
-				if camera.RenderDepth {
-
-					// 3/28/23, TODO: We used to use the transformed vertex positions for rendering the depth texture. Note
-					// that this makes fog shift aggressively as you turn the camera, more noticeably in first-person games
-					// (as points closer to the corners of the screen are mathematically closer to the camera because of projection).
-					// In an attempt to fix this, I used the below, now commented-out depth function. This attempt did fix the fog,
-					// but it also made depth sorting buggier, which is unacceptable. For now, I've reverted this change to have
-					// better depth sorting. This is currently fine, though the fog issue should be resolved at some point in the future.
-
-					// See this Discord conversation for the visualization of the issue:
-					// https://discord.com/channels/842049801528016967/844522898126536725/1090223569247674488
-
-					// p, s, r := model.Transform().Inverted().Decompose()
-					// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
-					// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
-
-					depth := (mesh.vertexTransforms[vertIndex].Z + depthMarginPercentage) / camSpread
-					if mat != nil {
-						if mat.CustomDepthOffsetOn {
-							depth += depthOffsetValue
-						}
-						if mat.CustomDepthFunction != nil {
-							depth = mat.CustomDepthFunction(depth)
-						}
+				depth := (mesh.vertexTransforms[vertIndex].Z + depthMarginPercentage) / camSpread
+				if mat != nil {
+					if mat.CustomDepthOffsetOn {
+						depth += depthOffsetValue
 					}
-
-					if depth < 0 {
-						depth = 0
-					} else if depth > 1 {
-						depth = 1
+					if mat.CustomDepthFunction != nil {
+						depth = mat.CustomDepthFunction(depth)
 					}
-
-					depthVertex.ColorR = float32(depth)
-					depthVertex.ColorG = float32(depth)
-					depthVertex.ColorB = float32(depth)
-					depthVertex.ColorA = 1
-
-				} else if scene.World != nil && scene.World.FogOn {
-
-					depth := (mesh.vertexTransforms[vertIndex].Z + depthMarginPercentage) / camSpread
-					if mat != nil {
-						if mat.CustomDepthOffsetOn {
-							depth += depthOffsetValue
-						}
-						if mat.CustomDepthFunction != nil {
-							depth = mat.CustomDepthFunction(depth)
-						}
-					}
-
-					if depth < 0 {
-						depth = 0
-					} else if depth > 1 {
-						depth = 1
-					}
-
-					// depth = 1 - depth
-
-					depth = float64(scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - float32(depth)))
-
-					if scene.World.FogMode == FogAdd {
-						colorVertex.ColorR += scene.World.FogColor.R * float32(depth)
-						colorVertex.ColorG += scene.World.FogColor.G * float32(depth)
-						colorVertex.ColorB += scene.World.FogColor.B * float32(depth)
-					} else if scene.World.FogMode == FogSub {
-						colorVertex.ColorR *= scene.World.FogColor.R * float32(depth)
-						colorVertex.ColorG *= scene.World.FogColor.G * float32(depth)
-						colorVertex.ColorB *= scene.World.FogColor.B * float32(depth)
-					}
-
 				}
 
-				colorVertexList[vertexListIndex] = colorVertex
-				depthVertexList[vertexListIndex] = depthVertex
+				if depth < 0 {
+					depth = 0
+				} else if depth > 1 {
+					depth = 1
+				}
 
-				vertexListIndex++
+				// depth = 1 - depth
 
-			},
-			false,
-		)
+				depth = float64(scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - float32(depth)))
+
+				if scene.World.FogMode == FogAdd {
+					colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * float32(depth)
+					colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * float32(depth)
+					colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * float32(depth)
+				} else if scene.World.FogMode == FogSub {
+					colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * float32(depth)
+					colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * float32(depth)
+					colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * float32(depth)
+				}
+
+			}
+
+			vertexListIndex++
+
+		}
 
 		if vertexListIndex == 0 {
 			return
 		}
 
-		for _, sortingTri := range sortingTris {
+		globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
 
-			for _, index := range sortingTri.Triangle.VertexIndices {
+			for _, index := range vertexIndices {
 				indexList[indexListIndex] = uint16(index - meshPartVertexIndexStart + indexListStart)
 				indexListIndex++
 			}
 
-		}
+		})
 
 		indexListStart = vertexListIndex
 
@@ -1952,7 +1968,7 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 		sectorName,
 	)
 
-	camera.DebugDrawText(screen, debugText, 0, 0, textScale, color)
+	camera.DrawDebugText(screen, debugText, 0, 0, textScale, color)
 
 }
 
@@ -1992,12 +2008,18 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			for _, meshPart := range model.Mesh.MeshParts {
 
-				for _, tri := range model.ProcessVertices(vpMatrix, camera, meshPart, false) {
+				globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
+				if meshPart.Material != nil {
+					globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
+				}
 
-					indices := tri.Triangle.VertexIndices
-					v0 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[0]], indices[0], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
-					v1 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[1]], indices[1], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
-					v2 := camera.clipToScreen(model.Mesh.vertexTransforms[indices[2]], indices[2], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
+				model.ProcessVertices(vpMatrix, camera, meshPart, false)
+
+				globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
+
+					v0 := camera.clipToScreen(model.Mesh.vertexTransforms[vertexIndices[0]], vertexIndices[0], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
+					v1 := camera.clipToScreen(model.Mesh.vertexTransforms[vertexIndices[1]], vertexIndices[1], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
+					v2 := camera.clipToScreen(model.Mesh.vertexTransforms[vertexIndices[2]], vertexIndices[2], model, float64(camWidth), float64(camHeight), halfCamWidth, halfCamHeight, true)
 
 					if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 						(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
@@ -2011,7 +2033,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 					ebitenutil.DrawLine(screen, float64(v1.X), float64(v1.Y), float64(v2.X), float64(v2.Y), c)
 					ebitenutil.DrawLine(screen, float64(v2.X), float64(v2.Y), float64(v0.X), float64(v0.Y), c)
 
-				}
+				})
 
 			}
 
@@ -2069,15 +2091,20 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 			for _, meshPart := range model.Mesh.MeshParts {
 
+				globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
+				if meshPart.Material != nil {
+					globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
+				}
+
 				model.ProcessVertices(vpMatrix, camera, meshPart, false)
 
-				for triIndex, sortingTri := range meshPart.sortingTriangles {
+				globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
 
-					screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(sortingTri.Triangle.Center))
+					screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.Mesh.Triangles[triID].Center))
 
-					camera.DebugDrawText(screen, fmt.Sprintf("%d", triIndex), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+					camera.DrawDebugText(screen, fmt.Sprintf("%d", triIndex), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
-				}
+				})
 
 			}
 
@@ -2108,7 +2135,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 			screenPos := camera.WorldToScreenPixels(model.WorldPosition())
 
-			camera.DebugDrawText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+			camera.DrawDebugText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 		}
 
@@ -2176,7 +2203,7 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 }
 
-func (camera *Camera) DebugDrawText(screen *ebiten.Image, txtStr string, posX, posY, textScale float64, color Color) {
+func (camera *Camera) DrawDebugText(screen *ebiten.Image, txtStr string, posX, posY, textScale float64, color Color) {
 
 	size := text.BoundString(basicfont.Face7x13, txtStr).Size()
 

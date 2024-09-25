@@ -65,6 +65,11 @@ func (props Properties) Get(propName string) *Property {
 	return nil
 }
 
+// Count returns the number of properties in the Properties set.
+func (props Properties) Count() int {
+	return len(props)
+}
+
 // Property represents a game property on a Node or other resource.
 type Property struct {
 	Value any

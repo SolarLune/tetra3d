@@ -56,9 +56,8 @@ func (g *Game) Init() {
 
 	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
 
-	water.VertexTransformFunction = func(v tetra3d.Vector, vertID int) tetra3d.Vector {
+	water.VertexTransformFunction = func(v *tetra3d.Vector, vertID int) {
 		v.Y += math.Sin((g.Time*math.Pi)+(v.X*1.2)+(v.Z*0.739)) * 0.1
-		return v
 	}
 
 }
@@ -114,7 +113,7 @@ angles (which is bad), but also show things
 underneath (which is, of course, good).
 1 Key: Toggle transparency, currently: %s`, transparencyOn)
 
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 
 	}
 }

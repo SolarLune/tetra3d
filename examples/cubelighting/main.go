@@ -120,7 +120,7 @@ Up / Down Arrow Key: Increase / Decrease Bleed
 2 Key: Toggle all lighting
 `
 
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

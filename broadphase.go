@@ -9,13 +9,13 @@ package tetra3d
 // If so, it proceeds to the broadphase check, where it sees which set(s) of triangles the colliding
 // object could be colliding with, and then returns that set for finer examination.
 type Broadphase struct {
-	GridCellCount int            // The number of cells in the broadphase grid
-	cellSize      float64        // The size of each cell in the grid
-	center        *Node          // The center node of the broadphase
-	workingAABB   *BoundingAABB  // The working-process AABB used to determine which triangles belong in which cells
-	TriSets       [][][][]uint16 // The sets of triangles
-	allTriSet     Set[uint16]    // A set containing all triangles
-	mesh          *Mesh          // The mesh used for the Broadphase object
+	GridCellCount int           // The number of cells in the broadphase grid
+	cellSize      float64       // The size of each cell in the grid
+	center        *Node         // The center node of the broadphase
+	workingAABB   *BoundingAABB // The working-process AABB used to determine which triangles belong in which cells
+	TriSets       [][][][]int   // The sets of triangles
+	allTriSet     Set[int]      // A set containing all triangles
+	mesh          *Mesh         // The mesh used for the Broadphase object
 }
 
 // NewBroadphase returns a new Broadphase object.
@@ -48,14 +48,14 @@ func (b *Broadphase) Clone() *Broadphase {
 	newBroadphase.GridCellCount = b.GridCellCount
 	newBroadphase.cellSize = b.cellSize
 
-	ts := make([][][][]uint16, len(b.TriSets))
+	ts := make([][][][]int, len(b.TriSets))
 
 	for i := range b.TriSets {
-		ts[i] = make([][][]uint16, len(b.TriSets[i]))
+		ts[i] = make([][][]int, len(b.TriSets[i]))
 		for j := range b.TriSets[i] {
-			ts[i][j] = make([][]uint16, len(b.TriSets[i][j]))
+			ts[i][j] = make([][]int, len(b.TriSets[i][j]))
 			for k := range b.TriSets[i][j] {
-				ts[i][j][k] = make([]uint16, len(b.TriSets[i][j][k]))
+				ts[i][j][k] = make([]int, len(b.TriSets[i][j][k]))
 				copy(ts[i][j][k], b.TriSets[i][j][k])
 			}
 		}
@@ -84,18 +84,18 @@ func (b *Broadphase) Resize(gridSize int) {
 	b.workingAABB.internalSize.Z = cellSize
 	b.workingAABB.updateSize()
 
-	b.TriSets = make([][][][]uint16, gridSize)
-	b.allTriSet = newSet[uint16]()
+	b.TriSets = make([][][][]int, gridSize)
+	b.allTriSet = newSet[int]()
 
 	hg := float64(b.GridCellCount) / 2
 
 	for i := 0; i < gridSize; i++ {
-		b.TriSets[i] = make([][][]uint16, gridSize)
+		b.TriSets[i] = make([][][]int, gridSize)
 		for j := 0; j < gridSize; j++ {
-			b.TriSets[i][j] = make([][]uint16, gridSize)
+			b.TriSets[i][j] = make([][]int, gridSize)
 			for k := 0; k < gridSize; k++ {
 
-				b.TriSets[i][j][k] = []uint16{}
+				b.TriSets[i][j][k] = []int{}
 
 				b.workingAABB.SetLocalPositionVec(Vector{
 					(float64(i) - hg + 0.5) * b.cellSize,
@@ -106,16 +106,16 @@ func (b *Broadphase) Resize(gridSize int) {
 
 				center := b.workingAABB.WorldPosition()
 
-				for _, tri := range b.mesh.Triangles {
+				for triID, tri := range b.mesh.Triangles {
 
 					v0 := b.mesh.VertexPositions[tri.VertexIndices[0]]
 					v1 := b.mesh.VertexPositions[tri.VertexIndices[1]]
 					v2 := b.mesh.VertexPositions[tri.VertexIndices[2]]
 					closestOnTri := closestPointOnTri(center, v0, v1, v2)
 					if b.workingAABB.PointInside(closestOnTri) {
-						b.TriSets[i][j][k] = append(b.TriSets[i][j][k], tri.ID)
+						b.TriSets[i][j][k] = append(b.TriSets[i][j][k], triID)
 					}
-					b.allTriSet.Add(tri.ID)
+					b.allTriSet.Add(triID)
 
 				}
 
@@ -135,13 +135,14 @@ func (b *Broadphase) Mesh() *Mesh {
 // TrianglesFromBoundingObject returns a set of triangle IDs, based on where the BoundingObject is
 // in relation to the Broadphase owning BoundingTriangles instance. The returned set contains each triangle only
 // once, of course.
-func (b *Broadphase) TrianglesFromBoundingObject(boundingObject IBoundingObject) Set[uint16] {
+// TODO: Maybe replace this with something that doesn't need to allocate a new Set?
+func (b *Broadphase) TrianglesFromBoundingObject(boundingObject IBoundingObject) Set[int] {
 
 	if b.GridCellCount <= 1 {
 		return b.allTriSet
 	}
 
-	trianglesSet := make(Set[uint16], len(b.TriSets))
+	trianglesSet := make(Set[int], len(b.TriSets))
 
 	hg := float64(b.GridCellCount) / 2
 

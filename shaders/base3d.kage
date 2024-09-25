@@ -28,10 +28,6 @@ func dstPosToSrcPos(dstPos vec2) vec2 {
 	return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
 }
 
-func unpackFloat(input float, precision float) vec2 {
-	return vec2(input / precision, mod(input, 1) / 0.05)
-}
-
 func bilinearFilter(srcPos vec2) vec4 {
 	
 	srcOrigin := imageSrc0Origin()

@@ -187,12 +187,19 @@ func (vec Vector) MoveTowards(target Vector, magnitude float64) Vector {
 
 // Distance returns the distance from the calling Vector to the other Vector provided.
 func (vec Vector) Distance(other Vector) float64 {
-	return vec.Sub(other).Magnitude()
+	// return vec.Sub(other).Magnitude()
+	vec.X -= other.X
+	vec.Y -= other.Y
+	vec.Z -= other.Z
+	return math.Sqrt(vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z)
 }
 
-// Distance returns the squared distance from the calling Vector to the other Vector provided. This is faster than Distance(), as it avoids using math.Sqrt().
+// DistanceSquared returns the squared distance from the calling Vector to the other Vector provided. This is faster than Distance(), as it avoids using math.Sqrt().
 func (vec Vector) DistanceSquared(other Vector) float64 {
-	return vec.Sub(other).MagnitudeSquared()
+	vec.X -= other.X
+	vec.Y -= other.Y
+	vec.Z -= other.Z
+	return vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z
 }
 
 // Mult performs Hadamard (component-wise) multiplication on the calling Vector with the other Vector provided, returning a copy with the result (and ignoring the Vector's W component).

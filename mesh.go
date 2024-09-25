@@ -1378,16 +1378,8 @@ func NewCylinderMesh(sideCount int, radius, height float64, createCaps bool) *Me
 
 // }
 
-// sortingTriangle is used specifically for sorting triangles when rendering. Less data means more data fits in cache,
-// which means sorting is faster.
-type sortingTriangle struct {
-	Triangle *Triangle
-	depth    float32
-}
-
 // A Triangle represents the smallest renderable object in Tetra3D. A triangle contains very little data, and is mainly used to help identify triads of vertices.
 type Triangle struct {
-	ID            uint16
 	VertexIndices []int     // Vertex indices that compose the triangle
 	MaxSpan       float64   // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
 	Center        Vector    // The untransformed center of the Triangle.
@@ -1395,10 +1387,9 @@ type Triangle struct {
 	MeshPart      *MeshPart // The specific MeshPart this Triangle belongs to.
 }
 
-// NewTriangle creates a new Triangle, and requires a reference to its owning MeshPart, along with its id within that MeshPart.
-func NewTriangle(meshPart *MeshPart, id uint16, indices ...int) *Triangle {
+// NewTriangle creates a new Triangle, and requires a reference to its owning MeshPart.
+func NewTriangle(meshPart *MeshPart, indices ...int) *Triangle {
 	tri := &Triangle{
-		ID:            id,
 		MeshPart:      meshPart,
 		VertexIndices: []int{indices[0], indices[1], indices[2]},
 		Center:        Vector{0, 0, 0, 0},
@@ -1408,8 +1399,7 @@ func NewTriangle(meshPart *MeshPart, id uint16, indices ...int) *Triangle {
 
 // Clone clones the Triangle, keeping a reference to the same Material.
 func (tri *Triangle) Clone() *Triangle {
-	newTri := NewTriangle(tri.MeshPart, tri.ID, tri.VertexIndices...)
-	newTri.ID = tri.ID
+	newTri := NewTriangle(tri.MeshPart, tri.VertexIndices...)
 	newTri.MaxSpan = tri.MaxSpan
 	newTri.Center = tri.Center
 	newTri.Normal = tri.Normal
@@ -1630,31 +1620,24 @@ type MeshPart struct {
 	VertexIndexEnd   int
 	TriangleStart    int
 	TriangleEnd      int
-
-	sortingTriangles []sortingTriangle
 }
 
 // NewMeshPart creates a new MeshPart that renders using the specified Material.
 func NewMeshPart(mesh *Mesh, material *Material) *MeshPart {
-	return &MeshPart{
+	mp := &MeshPart{
 		Mesh:             mesh,
 		Material:         material,
-		sortingTriangles: []sortingTriangle{},
 		TriangleStart:    math.MaxInt,
 		VertexIndexStart: mesh.vertsAddStart,
 	}
+
+	return mp
 }
 
 // Clone clones the MeshPart, returning the copy.
 func (part *MeshPart) Clone() *MeshPart {
 
 	newMP := NewMeshPart(part.Mesh, part.Material)
-
-	for i := 0; i < len(part.sortingTriangles); i++ {
-		newMP.sortingTriangles = append(newMP.sortingTriangles, sortingTriangle{
-			Triangle: part.sortingTriangles[i].Triangle,
-		})
-	}
 
 	newMP.VertexIndexStart = part.VertexIndexStart
 	newMP.VertexIndexEnd = part.VertexIndexEnd
@@ -1673,23 +1656,11 @@ func (part *MeshPart) AssignToMesh(mesh *Mesh) {
 		}
 	}
 
-	newSorts := make([]sortingTriangle, 0, len(part.sortingTriangles))
-	for _, tri := range part.sortingTriangles {
-		newSorts = append(newSorts, sortingTriangle{
-			Triangle: part.Mesh.Triangles[tri.Triangle.ID],
-		})
-	}
-	part.sortingTriangles = newSorts
-
 	mesh.MeshParts = append(mesh.MeshParts, part)
 
 	part.Mesh = mesh
 
 }
-
-// func (part *MeshPart) allocateSortingBuffer(size int) {
-// 	part.sortingTriangles = make([]sortingTriangle, size)
-// }
 
 func (part *MeshPart) ForEachTri(triFunc func(tri *Triangle)) {
 	for i := part.TriangleStart; i <= part.TriangleEnd; i++ {
@@ -1752,12 +1723,9 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 			part.TriangleEnd = mesh.triIndex
 		}
 
-		newTri := NewTriangle(part, uint16(mesh.triIndex), indices[i]+part.VertexIndexStart, indices[i+1]+part.VertexIndexStart, indices[i+2]+part.VertexIndexStart)
+		newTri := NewTriangle(part, indices[i]+part.VertexIndexStart, indices[i+1]+part.VertexIndexStart, indices[i+2]+part.VertexIndexStart)
 		newTri.RecalculateCenter()
 		newTri.RecalculateNormal()
-		part.sortingTriangles = append(part.sortingTriangles, sortingTriangle{
-			Triangle: newTri,
-		})
 		mesh.Triangles = append(mesh.Triangles, newTri)
 		mesh.triIndex++
 		if mesh.maxTriangleSpan < newTri.MaxSpan {

@@ -106,7 +106,7 @@ Left and right cycle through the cameras.`
 		} else {
 			txt += fmt.Sprintf("\n\nName: %s\nType: Orthographic Camera\nOrtho-Scale: %s", g.Camera.Name(), strconv.FormatFloat(g.Camera.OrthoScale(), 'f', 1, 64))
 		}
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

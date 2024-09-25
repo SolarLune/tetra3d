@@ -37,6 +37,10 @@ func (n NodeCollection[E]) ForEach(forEachFunc func(node INode) bool) {
 	}
 }
 
+func (n *NodeCollection[E]) Add(node E) {
+	*n = append(*n, node)
+}
+
 // NodeFilter represents a chain of node filters, executed in sequence to collect the desired nodes
 // out of an entire hierarchy. The filters are executed lazily (so only one slice is allocated
 // in the process, and possibly one more for the end result, if you get the result as not just a
@@ -363,8 +367,8 @@ func (nf NodeFilter) bySectors() NodeFilter {
 	return nf
 }
 
-// ForEach executes the provided function on each filtered Node.
-// This is done to avoid allocating a slice for the filtered Nodes.
+// ForEach executes the provided function on each filtered Node on an internal slice; this is done to avoid allocating a slice for the
+// filtered Nodes.
 // The function must return a boolean indicating whether to continue running on each node in the tree that fulfills the
 // filter set (true) or not (false).
 // ForEach does not work with any sorting, and will log a warning if you use sorting and ForEach on the same filter.
@@ -372,8 +376,8 @@ func (nf NodeFilter) ForEach(callback func(node INode) bool) {
 	nf.executeFilters(nf.Start, callback, false)
 }
 
-// ForEachMultithreaded executes the provided function on each filtered Node.
-// This is done to avoid allocating a slice for the filtered Nodes.
+// ForEachMultithreaded executes the provided function on each filtered Node on an internal slice; this is done to avoid allocating a
+// slice for the filtered Nodes.
 // ForEachMultithreaded will filter each node on the main thread, but will execute the callback function for each node
 // on varying goroutines, syncing them all up once finished to resume execution on the main thread.
 // You should be careful to avoid race conditions when using this function.

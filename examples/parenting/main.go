@@ -144,7 +144,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := "Arrow Keys:Move parent\nO: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent and child"
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)

@@ -91,7 +91,7 @@ a simple 3D cube, created through code.
 
 (Note that the camera can't be moved
 in this example.)`
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 }
 

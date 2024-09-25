@@ -67,10 +67,9 @@ func (g *Game) Init() {
 
 	// ... And here we specify a "vertex program" - in truth, this operates on CPU, rather than the GPU, but it still is useful.
 	// Much like a Fragment shader, it operates on all vertices that render with the material.
-	model.VertexTransformFunction = func(v tetra3d.Vector, id int) tetra3d.Vector {
+	model.VertexTransformFunction = func(v *tetra3d.Vector, id int) {
 		waveHeight := 0.1
 		v.Y += math.Sin(g.Time*math.Pi+v.X)*waveHeight + (waveHeight / 2)
-		return v
 	}
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
@@ -114,7 +113,7 @@ pure Go and are executed on the CPU.
 
 The cube on the left is running a fragment shader,
 while the cube on the right runs a vertex program.`
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 }
 

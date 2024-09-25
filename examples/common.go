@@ -123,7 +123,7 @@ F6: Toggle Perpsective Correction: %s
 ESC: Quit
 `, pcOn)
 		}
-		camera.DebugDrawText(screen, txt, 0, 130, 1, colors.LightGray())
+		camera.DrawDebugText(screen, txt, 0, 130, 1, colors.LightGray())
 	}
 
 }

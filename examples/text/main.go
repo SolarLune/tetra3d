@@ -141,7 +141,7 @@ you can dynamically write text and scroll it.
 Note that Text objects work best when the displaying faces are not
 rotated and face a world axis directly (though the object can
 be rotated just fine).`
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

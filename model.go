@@ -2,7 +2,6 @@ package tetra3d
 
 import (
 	"errors"
-	"sort"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -43,13 +42,13 @@ type Model struct {
 	// a traditional GPU vertex shader, but is fine for simple / low-poly mesh transformations).
 	// This function is run after skinning the vertex if the material belongs to a mesh that is skinned by an armature.
 	// Note that the VertexTransformFunction must return the vector passed.
-	VertexTransformFunction func(vertexPosition Vector, vertexIndex int) Vector
+	VertexTransformFunction func(vertexPosition *Vector, vertexIndex int)
 
 	// VertexClipFunction is a function that runs on the clipped result of each vertex position rendered with the material.
 	// The function takes the vertex position along with the vertex index in the mesh.
 	// This program runs after the vertex position is clipped to screen coordinates.
 	// Note that the VertexClipFunction must return the vector passed.
-	VertexClipFunction func(vertexPosition Vector, vertexIndex int) Vector
+	VertexClipFunction func(vertexPosition *Vector, vertexIndex int)
 
 	// Automatic batching mode; when set and a Model changes parenting, it will be automatically batched as necessary according to
 	// the AutoBatchMode set.
@@ -472,14 +471,15 @@ func (model *Model) refreshVertexVisibility() {
 
 // ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
 // matrix, a camera, and the MeshPart being rendered.
-func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, processOnlyVisible bool) []sortingTriangle {
+func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, processOnlyVisible bool) {
+
+	globalSortingTriangleBucket.Clear()
 
 	if processOnlyVisible && ((model.Color.A == 0 && model.isTransparent(meshPart)) || !model.visible) {
-		meshPart.sortingTriangles = meshPart.sortingTriangles[:0]
-		return meshPart.sortingTriangles
+		return
 	}
 
-	var transformFunc func(vertPos Vector, index int) Vector
+	var transformFunc func(vertPos *Vector, index int)
 
 	if model.VertexTransformFunction != nil {
 		transformFunc = model.VertexTransformFunction
@@ -492,12 +492,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	mat := meshPart.Material
 	mesh := meshPart.Mesh
 	base := modelTransform
-
-	sortMode := TriangleSortModeBackToFront
-
-	if meshPart.Material != nil {
-		sortMode = meshPart.Material.TriangleSortMode
-	}
 
 	camPos := camera.WorldPosition()
 
@@ -545,40 +539,55 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	mvp := base.Mult(vpMatrix)
 
-	// Reslice to fill the capacity
-	meshPart.sortingTriangles = meshPart.sortingTriangles[:cap(meshPart.sortingTriangles)]
-
 	var mvJustRForNormals Matrix4
 	if camera.RenderNormals {
 		_, _, mvJustRForNormals = modelTransform.Mult(camera.ViewMatrix()).Decompose()
 	}
 
-	// There's pop-in for faces where the camera is looking at an object through the corner of the viewport
+	transformFuncExists := transformFunc != nil
+
+	minDepth := float32(0)
+	minDepthSet := false
+	maxDepth := float32(0)
+	maxDepthSet := false
+
+	camNear := camera.near
+	camFar := camera.far
+	modelSkinned := model.skinned
 
 	for vertexIndex := meshPart.VertexIndexStart; vertexIndex < meshPart.VertexIndexEnd; vertexIndex++ {
 
-		if model.skinned {
+		if modelSkinned {
 
 			t := time.Now()
 
 			vertPos, vertNormal := model.skinVertex(vertexIndex)
 
-			if transformFunc != nil {
-				vertPos = transformFunc(vertPos, vertexIndex)
+			if transformFuncExists {
+				transformFunc(&vertPos, vertexIndex)
 			}
+
 			mesh.vertexSkinnedNormals[vertexIndex] = vertNormal
 			mesh.vertexSkinnedPositions[vertexIndex] = vertPos
 
-			mesh.vertexTransforms[vertexIndex] = vpMatrix.MultVecW(vertPos)
+			// MultVecW() matrix multiplication, but faster to do it right here rather than using functions and pointers
+			mesh.vertexTransforms[vertexIndex].X = vpMatrix[0][0]*vertPos.X + vpMatrix[1][0]*vertPos.Y + vpMatrix[2][0]*vertPos.Z + vpMatrix[3][0]
+			mesh.vertexTransforms[vertexIndex].Y = vpMatrix[0][1]*vertPos.X + vpMatrix[1][1]*vertPos.Y + vpMatrix[2][1]*vertPos.Z + vpMatrix[3][1]
+			mesh.vertexTransforms[vertexIndex].Z = vpMatrix[0][2]*vertPos.X + vpMatrix[1][2]*vertPos.Y + vpMatrix[2][2]*vertPos.Z + vpMatrix[3][2]
+			mesh.vertexTransforms[vertexIndex].W = vpMatrix[0][3]*vertPos.X + vpMatrix[1][3]*vertPos.Y + vpMatrix[2][3]*vertPos.Z + vpMatrix[3][3]
 
 			camera.DebugInfo.currentAnimationTime += time.Since(t)
 
 		} else {
 
+			if transformFuncExists {
+				transformFunc(&mesh.VertexPositions[vertexIndex], vertexIndex)
+			}
+
 			v0 := mesh.VertexPositions[vertexIndex]
 
 			if transformFunc != nil {
-				v0 = transformFunc(v0, vertexIndex)
+				transformFunc(&v0, vertexIndex)
 			}
 
 			mesh.vertexTransforms[vertexIndex] = mvp.MultVecW(v0)
@@ -604,22 +613,22 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		tri := mesh.Triangles[ti]
 
 		// Backface culling
-		if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
+		// if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
 
-			if tri.Normal.Dot(invertedCamPos.Sub(tri.Center)) < 0 {
-				continue
-			}
+		// 	// For a perspective camera, we can use the inverted camera position to do a normal test against the triangle's center.
+		// 	// For an orthographic camera, we have to check the normal against the direction the camera's facing (inverted by the model's rotation).
+		// 	if (camera.perspective && tri.Normal.Dot(invertedCamPos.Sub(tri.Center)) < 0) || (!camera.perspective && tri.Normal.Dot(invertedCamForward) > 0) {
+		// 		continue
+		// 	}
 
-		}
-
-		meshPart.sortingTriangles[sortingTriIndex].Triangle = tri
+		// }
 
 		// If we're skinning a model, it will automatically copy the armature's position, scale, and rotation by copying its bones
 
 		// Skinned models transform vertices according to animations (and so the triangle center),
 		// so we have to keep track of the skinned center (which is done by averaging the vertex positions for the triangle),
 		// and then we can divide that by 3 to sort the triangles.
-		if model.skinned {
+		if modelSkinned {
 			skinnedTriCenter.X = 0
 			skinnedTriCenter.Y = 0
 			skinnedTriCenter.Z = 0
@@ -638,11 +647,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		for i := 0; i < 3; i++ {
 
-			if model.skinned {
-				skinnedTriCenter = skinnedTriCenter.Add(mesh.vertexSkinnedPositions[tri.VertexIndices[i]])
+			// It's faster to store the indices of the triangles in a variable than constanrtly dereference a pointer
+			vi := tri.VertexIndices[i]
+
+			if modelSkinned {
+				skinnedTriCenter = skinnedTriCenter.Add(mesh.vertexSkinnedPositions[vi])
 			}
 
-			w := mesh.vertexTransforms[tri.VertexIndices[i]].W
+			w := mesh.vertexTransforms[vi].W
 
 			// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
 			// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
@@ -650,10 +662,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				w = 0.000001
 			}
 
-			transformedVertexPositions[i].X = mesh.vertexTransforms[tri.VertexIndices[i]].X / w
-			transformedVertexPositions[i].Y = mesh.vertexTransforms[tri.VertexIndices[i]].Y / w
+			transformedVertexPositions[i].X = mesh.vertexTransforms[vi].X / w
+			transformedVertexPositions[i].Y = mesh.vertexTransforms[vi].Y / w
 
-			if mesh.vertexTransforms[tri.VertexIndices[i]].Z+1 >= camera.near && mesh.vertexTransforms[tri.VertexIndices[i]].Z < camera.far {
+			if mesh.vertexTransforms[vi].Z+1 >= camNear && mesh.vertexTransforms[vi].Z < camFar {
 				outOfBounds = false
 			}
 
@@ -672,19 +684,80 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			continue
 		}
 
+		// Going back to using the transformed vertex positions for backface culling as it works better when the camera is super close to the
+		// triangles.
+		if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
+
+			v0 := transformedVertexPositions[0]
+			v1 := transformedVertexPositions[1]
+			v2 := transformedVertexPositions[2]
+
+			n0x := v0.X - v1.X
+			n0y := v0.Y - v1.Y
+
+			n1x := v1.X - v2.X
+			n1y := v1.Y - v2.Y
+
+			// Essentially calculating the cross product, but only for the important dimension (Z, which is "in / out" in this context)
+			nor := (n0x * n1y) - (n1x * n0y)
+
+			// We use this method of backface culling because it helps to ensure
+			// there's fewer graphical glitches when looking from very near a surface outwards; this
+			// doesn't help if a surface does not have backface culling, of course...
+			if nor < 0 {
+				continue
+			}
+
+		}
+
 		// Previously, depth was compared using the lowest W value of all vertices in the triangle; after that, I tried
 		// averaging them out. Neither of these was completely satisfactory, and in addition, there was no depth sorting
 		// for orthographic triangles that overlapped using this method.
 
-		// I could substitute Z for W, but sorting by distance to the triangle center directly gives a better result overall, it seems.
-		if sortMode != TriangleSortModeNone {
-			if model.skinned {
-				meshPart.sortingTriangles[sortingTriIndex].depth = float32(camPos.DistanceSquared(skinnedTriCenter.Divide(3)))
-			} else {
-				// meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamDist)
-				meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamPos.DistanceSquared(tri.Center))
-			}
+		depth := float32(0)
+
+		// if modelSkinned {
+		// 	depth = float32(camPos.DistanceSquared(skinnedTriCenter.Divide(3)))
+		// } else {
+		// 	depth = float32(invertedCamPos.DistanceSquared(tri.Center))
+		// }
+
+		if modelSkinned {
+
+			dx := skinnedTriCenter.X / 3
+			dy := skinnedTriCenter.Y / 3
+			dz := skinnedTriCenter.Z / 3
+			depth = float32(dx*dx + dy*dy + dz*dz)
+
+		} else {
+
+			dx := invertedCamPos.X - tri.Center.X
+			dy := invertedCamPos.Y - tri.Center.Y
+			dz := invertedCamPos.Z - tri.Center.Z
+			depth = float32(dx*dx + dy*dy + dz*dz)
+
 		}
+
+		if depth < minDepth || !minDepthSet {
+			minDepth = depth
+			minDepthSet = true
+		}
+		if depth > maxDepth || !maxDepthSet {
+			maxDepth = depth
+			maxDepthSet = true
+		}
+
+		globalSortingTriangleBucket.AddTriangle(ti, depth, tri.VertexIndices)
+
+		// I could substitute depth for W, but sorting by distance to the triangle center directly gives a better result overall, it seems.
+		// if sortMode != TriangleSortModeNone {
+		// 	if model.skinned {
+		// 		meshPart.sortingTriangles[sortingTriIndex].depth = float32(camPos.DistanceSquared(skinnedTriCenter.Divide(3)))
+		// 	} else {
+		// 		// meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamDist)
+		// 		meshPart.sortingTriangles[sortingTriIndex].depth = float32(invertedCamPos.DistanceSquared(tri.Center))
+		// 	}
+		// }
 
 		mesh.visibleVertices[tri.VertexIndices[0]] = true
 		mesh.visibleVertices[tri.VertexIndices[1]] = true
@@ -694,19 +767,23 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	}
 
-	meshPart.sortingTriangles = meshPart.sortingTriangles[:sortingTriIndex]
+	// if model.name == "Suzanne" {
+	// 	fmt.Println(minDepth, maxDepth)
+	// }
 
-	if sortMode == TriangleSortModeBackToFront {
-		sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
-			return meshPart.sortingTriangles[i].depth > meshPart.sortingTriangles[j].depth
-		})
-	} else if sortMode == TriangleSortModeFrontToBack {
-		sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
-			return meshPart.sortingTriangles[i].depth < meshPart.sortingTriangles[j].depth
-		})
-	}
+	globalSortingTriangleBucket.Sort(minDepth, maxDepth)
 
-	return meshPart.sortingTriangles
+	// meshPart.sortingTriangles = meshPart.sortingTriangles[:sortingTriIndex]
+
+	// if sortMode == TriangleSortModeBackToFront {
+	// 	sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
+	// 		return meshPart.sortingTriangles[i].depth > meshPart.sortingTriangles[j].depth
+	// 	})
+	// } else if sortMode == TriangleSortModeFrontToBack {
+	// 	sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
+	// 		return meshPart.sortingTriangles[i].depth < meshPart.sortingTriangles[j].depth
+	// 	})
+	// }
 
 }
 

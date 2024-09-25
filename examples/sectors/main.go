@@ -97,7 +97,7 @@ Press 1 to toggle sector-based rendering. It is: `
 			txt += "Off"
 		}
 
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.White())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 
 	}
 

@@ -158,7 +158,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := "This example shows how lighting and primitive\nambient occlusion can be baked into vertex colors.\n1 Key: Switch to unlit channel\n2 Key: Switch to only AO\n3 key: Switch to only lighting\n4 Key: Switch to lighting+AO"
-		g.Camera.DebugDrawText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }
