@@ -305,6 +305,74 @@ class OBJECT_OT_tetra3dFocusObject(bpy.types.Operator):
 
         return {'FINISHED'}
 
+search_name = False
+
+def enum_search(scene, context):
+
+    options = set()
+
+    def check_properties(o):
+        global search_name
+        for p in o.t3dGameProperties__:
+            if search_name:
+                options.add((p.name, p.name, ""))
+            else:
+                if p.valueType == "string":
+                    options.add((p.valueString, p.valueString, ""))
+
+    for o in bpy.data.objects:
+        check_properties(o)
+    for o in bpy.data.materials:
+        check_properties(o)
+    for o in bpy.data.actions:
+        check_properties(o)
+    for o in bpy.data.scenes:
+        check_properties(o)
+
+    result = sorted(list(options), key=lambda x: x[0].lower())
+    
+    return result
+
+class OBJECT_OT_tetra3dSearchStringProperties(bpy.types.Operator):
+
+    bl_idname = "object.t3dsearchstringproperties"
+    bl_label = ""
+    bl_description = "Search for previously-used strings in the blend file"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_property = "search_options"
+
+    index : bpy.props.IntProperty()
+    search_options: bpy.props.EnumProperty(name="Search Options", items=enum_search)
+    mode : bpy.props.StringProperty()
+    search_name : bpy.props.BoolProperty()
+
+    def execute(self, context):
+
+        if self.mode == "scene":
+            target = context.scene
+        elif self.mode == "object":
+            target = context.object
+        elif self.mode == "material":
+            target = context.object.active_material
+        elif self.mode == "action":
+            target = context.active_action
+
+        if self.search_name:
+            target.t3dGameProperties__[self.index].name = self.search_options
+        else:
+            target.t3dGameProperties__[self.index].valueString = self.search_options
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        global search_name
+        if self.search_name:
+            search_name = True
+        else:
+            search_name = False
+        context.window_manager.invoke_search_popup(self)
+        return {'FINISHED'}
+
 def copyProp(fromProp, toProp):
     toProp.name = fromProp.name
     toProp.valueType = fromProp.valueType
@@ -624,30 +692,7 @@ class ACTION_PT_tetra3d(bpy.types.Panel):
 
         # row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
 
-        for index, prop in enumerate(context.active_action.t3dGameProperties__):
-            box = self.layout.box()
-
-            row = box.row()
-            row.prop(prop, "name")
-            
-            moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
-            moveUpOptions.index = index
-            moveUpOptions.moveUp = True
-            moveUpOptions.mode = "action"
-
-            moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
-            moveDownOptions.index = index
-            moveDownOptions.moveUp = False
-            moveDownOptions.mode = "action"
-
-            copy = row.operator(OBJECT_OT_tetra3dCopyOneProperty.bl_idname, text="", icon="COPYDOWN")
-            copy.index = index
-
-            deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
-            deleteOptions.index = index
-            deleteOptions.mode = "action"
-
-            handleT3DProperty(index, box, prop, "action")
+        handleT3DProperties(self, None, context.active_action.t3dGameProperties__, "action")
 
         row = self.layout.row()
 
@@ -759,20 +804,8 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                         box = row.box()
                         box.label(text="Object: " + object.name)
                         box.row().separator()
-
-                        for propIndex, prop in enumerate(object.t3dGameProperties__):
                             
-                            row = box.row()
-                            # row.label(text=prop.name)
-
-                            op = row.operator(OBJECT_OT_tetra3dOverrideProp.bl_idname, text="Override Game Property : < " + prop.name + " >")
-                            op.objectIndex = objectIndex
-                            op.propIndex = propIndex
-
-                            row = box.row()
-                            row.enabled = False
-                            row.prop(prop, "name")
-                            handleT3DProperty(propIndex, box, prop, "object", False)
+                        handleT3DProperties(self, box, object.t3dGameProperties__, "object", False)
 
         row = self.layout.row()
         row.label(text="Game Properties")
@@ -788,29 +821,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
 
             row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
 
-            for index, prop in enumerate(context.object.t3dGameProperties__):
-                box = self.layout.box()
-                row = box.row()
-                row.prop(prop, "name")
-                
-                moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
-                moveUpOptions.index = index
-                moveUpOptions.moveUp = True
-                moveUpOptions.mode = "object"
-
-                moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
-                moveDownOptions.index = index
-                moveDownOptions.moveUp = False
-                moveDownOptions.mode = "object"
-
-                copy = row.operator(OBJECT_OT_tetra3dCopyOneProperty.bl_idname, text="", icon="COPYDOWN")
-                copy.index = index
-
-                deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
-                deleteOptions.index = index
-                deleteOptions.mode = "object"
-
-                handleT3DProperty(index, box, prop, "object")
+            handleT3DProperties(self, None, context.active_object.t3dGameProperties__, "object")
 
             row = self.layout.row()
 
@@ -836,26 +847,7 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
         add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
         add.mode = "scene"
 
-        for index, prop in enumerate(context.scene.t3dGameProperties__):
-            box = self.layout.box()
-            row = box.row()
-            row.prop(prop, "name")
-            
-            moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
-            moveUpOptions.index = index
-            moveUpOptions.moveUp = True
-            moveUpOptions.mode = "scene"
-
-            moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
-            moveDownOptions.index = index
-            moveDownOptions.moveUp = False
-            moveDownOptions.mode = "scene"
-
-            deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
-            deleteOptions.index = index
-            deleteOptions.mode = "scene"
-
-            handleT3DProperty(index, box, prop, "scene")
+        handleT3DProperties(self, None, context.scene.t3dGameProperties__, "scene")
         
         row = self.layout.row()
         clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
@@ -900,61 +892,95 @@ class CAMERA_PT_tetra3d(bpy.types.Panel):
         row.prop(context.object.data, "t3dPerspectiveCorrectedTextureMapping__")
 
 
-def handleT3DProperty(index, box, prop, operatorType, enabled=True):
+def handleT3DProperties(self, box, props, operatorType, enabled=True):
 
-    row = box.row()
-    row.enabled = enabled
-    row.prop(prop, "valueType")
-    
-    if prop.valueType == "bool":
-        row.prop(prop, "valueBool")
-    elif prop.valueType == "int":
-        row.prop(prop, "valueInt")
-    elif prop.valueType == "float":
-        row.prop(prop, "valueFloat")
-    elif prop.valueType == "string":
-        row.prop(prop, "valueString")
-    elif prop.valueType == "reference":
-        row.prop(prop, "valueReferenceScene")
-        if prop.valueReferenceScene != None:
-            row.prop_search(prop, "valueReference", prop.valueReferenceScene, "objects")
-        else:
-            row.prop(prop, "valueReference")
-        op = row.operator("object.t3dfocusobject", text="", icon="CAMERA_DATA")
-        if prop.valueReference:
-            op.target = prop.valueReference.name
-    elif prop.valueType == "color":
-        row.prop(prop, "valueColor")
-    elif prop.valueType == "vector3d":
+    for index, prop in enumerate(props):
+
+        if box is None:
+            box = self.layout.box()
+
+        row = box.row()
+        row.prop(prop, "name")
+
+        op = row.operator(OBJECT_OT_tetra3dSearchStringProperties.bl_idname, text="", icon="VIEWZOOM")
+        op.search_name = True
+        op.index = index
+        op.mode = operatorType
+        
+        moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
+        moveUpOptions.index = index
+        moveUpOptions.moveUp = True
+        moveUpOptions.mode = operatorType
+
+        moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
+        moveDownOptions.index = index
+        moveDownOptions.moveUp = False
+        moveDownOptions.mode = operatorType
+
+        copy = row.operator(OBJECT_OT_tetra3dCopyOneProperty.bl_idname, text="", icon="COPYDOWN")
+        copy.index = index
+
+        deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
+        deleteOptions.index = index
+        deleteOptions.mode = operatorType
+        
         row = box.row()
         row.enabled = enabled
-        row.prop(prop, "valueVector3D")
+        row.prop(prop, "valueType")
+        
+        if prop.valueType == "bool":
+            row.prop(prop, "valueBool")
+        elif prop.valueType == "int":
+            row.prop(prop, "valueInt")
+        elif prop.valueType == "float":
+            row.prop(prop, "valueFloat")
+        elif prop.valueType == "string":
+            row.prop(prop, "valueString")
+            op = row.operator(OBJECT_OT_tetra3dSearchStringProperties.bl_idname, text="", icon="VIEWZOOM")
+            op.index = index
+            op.mode = operatorType
+            op.search_name = False
+        elif prop.valueType == "reference":
+            row.prop(prop, "valueReferenceScene")
+            if prop.valueReferenceScene != None:
+                row.prop_search(prop, "valueReference", prop.valueReferenceScene, "objects")
+            else:
+                row.prop(prop, "valueReference")
+            op = row.operator("object.t3dfocusobject", text="", icon="CAMERA_DATA")
+            if prop.valueReference:
+                op.target = prop.valueReference.name
+        elif prop.valueType == "color":
+            row.prop(prop, "valueColor")
+        elif prop.valueType == "vector3d":
+            row = box.row()
+            row.enabled = enabled
+            row.prop(prop, "valueVector3D")
 
-        if operatorType == "object" or operatorType == "material":
-            
-            setCur = row.operator("object.t3dsetvec", text="", icon="OBJECT_ORIGIN")
+            if operatorType == "object" or operatorType == "material":
+                
+                setCur = row.operator("object.t3dsetvec", text="", icon="OBJECT_ORIGIN")
+                setCur.index = index
+                setCur.mode = operatorType
+                setCur.buttonMode = "object location"
+
+            setCur = row.operator("object.t3dsetvec", text="", icon="PIVOT_CURSOR")
             setCur.index = index
             setCur.mode = operatorType
-            setCur.buttonMode = "object location"
+            setCur.buttonMode = "3D cursor"
+        elif prop.valueType == "file":
+            row.prop(prop, "valueFilepath")
+            ext = os.path.splitext(prop.valueFilepath)[1]
 
-        setCur = row.operator("object.t3dsetvec", text="", icon="PIVOT_CURSOR")
-        setCur.index = index
-        setCur.mode = operatorType
-        setCur.buttonMode = "3D cursor"
-    elif prop.valueType == "file":
-        row.prop(prop, "valueFilepath")
-        ext = os.path.splitext(prop.valueFilepath)[1]
+            if ext in bpy.path.extensions_audio:
+                global currentlyPlayingAudioHandle, audioPaused
 
-        if ext in bpy.path.extensions_audio:
-            global currentlyPlayingAudioHandle, audioPaused
-
-            if currentlyPlayingAudioHandle and not audioPaused:
-                playButton = row.operator("object.t3dpausesound", text="", icon="PAUSE")
-            else:
-                playButton = row.operator("object.t3dplaysound", text="", icon="PLAY")
-                playButton.filepath = prop.valueFilepath
-    elif prop.valueType == "directory":
-        row.prop(prop, "valueDirpath")
+                if currentlyPlayingAudioHandle and not audioPaused:
+                    playButton = row.operator("object.t3dpausesound", text="", icon="PAUSE")
+                else:
+                    playButton = row.operator("object.t3dplaysound", text="", icon="PLAY")
+                    playButton.filepath = prop.valueFilepath
+        elif prop.valueType == "directory":
+            row.prop(prop, "valueDirpath")
         
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"
@@ -1018,26 +1044,7 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
 
             row.operator("material.tetra3dcopyprops", icon="COPYDOWN")
             
-            for index, prop in enumerate(context.object.active_material.t3dGameProperties__):
-                box = self.layout.box()
-                row = box.row()
-                row.prop(prop, "name")
-                
-                moveUpOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_UP")
-                moveUpOptions.index = index
-                moveUpOptions.moveUp = True
-                moveUpOptions.mode = "material"
-
-                moveDownOptions = row.operator(OBJECT_OT_tetra3dReorderProps.bl_idname, text="", icon="TRIA_DOWN")
-                moveDownOptions.index = index
-                moveDownOptions.moveUp = False
-                moveDownOptions.mode = "material"
-
-                deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
-                deleteOptions.index = index
-                deleteOptions.mode = "material"
-
-                handleT3DProperty(index, box, prop, "material")
+            handleT3DProperties(self, None, context.object.active_material.t3dGameProperties__, "material")
 
             row = self.layout.row()
             clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
@@ -2074,6 +2081,7 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
     bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
     bpy.utils.register_class(OBJECT_OT_tetra3dFocusObject)
+    bpy.utils.register_class(OBJECT_OT_tetra3dSearchStringProperties)
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
@@ -2247,6 +2255,8 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dFocusObject)
+
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dSearchStringProperties)
     
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)

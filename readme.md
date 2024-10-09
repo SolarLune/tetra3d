@@ -430,6 +430,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- Maybe make Vectors generic, so you could have float32 / int Vectors? Or something like that?
 - [ ] -- Matrix pools?
 - [ ] -- Raytest optimization
+- [ ] -- -- Reduce memory allocation by not using functions that return new Vectors, but rather simply perform math within the Vectors themselves
 - [ ] -- -- Sphere?
 - [ ] -- -- AABB?
 - [ ] -- -- Capsule?

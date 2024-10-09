@@ -253,7 +253,7 @@ func boundingAABBRayTest(from, to Vector, test *BoundingAABB) (RayHit, bool) {
 
 }
 
-func boundingTrianglesRayTest(from, to Vector, test *BoundingTriangles, doublesided bool) (RayHit, bool) {
+func boundingTrianglesRayTest(from, to Vector, test *BoundingTriangles, doublesided bool) []RayHit {
 
 	rayDistSquared := to.DistanceSquared(from)
 
@@ -264,6 +264,8 @@ func boundingTrianglesRayTest(from, to Vector, test *BoundingTriangles, doublesi
 	} else if _, ok := boundingAABBRayTest(from, to, test.BoundingAABB); ok {
 		check = true
 	}
+
+	results := []RayHit{}
 
 	if check {
 
@@ -301,16 +303,14 @@ func boundingTrianglesRayTest(from, to Vector, test *BoundingTriangles, doublesi
 
 				if isPointInsideTriangle(vec, v0, v1, v2) {
 
-					return RayHit{
+					results = append(results, RayHit{
 						Object:                test,
 						Position:              test.Transform().MultVec(vec),
 						untransformedPosition: vec,
 						from:                  from,
 						Triangle:              tri,
 						Normal:                r.MultVec(tri.Normal),
-					}, true
-
-					// break
+					})
 
 				}
 
@@ -319,7 +319,7 @@ func boundingTrianglesRayTest(from, to Vector, test *BoundingTriangles, doublesi
 
 	}
 
-	return RayHit{}, false
+	return results
 
 }
 
@@ -386,9 +386,8 @@ func RayTest(options RayTestOptions) bool {
 
 		case *BoundingTriangles:
 
-			if result, ok := boundingTrianglesRayTest(options.From, options.To, test, options.Doublesided); ok {
-				internalRayTest = append(internalRayTest, result)
-			}
+			// Raycasting against triangles can hit multiple triangles, so we can't bail early and have to return all potential hits
+			internalRayTest = append(internalRayTest, boundingTrianglesRayTest(options.From, options.To, test, options.Doublesided)...)
 
 		}
 

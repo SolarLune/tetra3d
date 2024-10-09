@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	_ "embed"
 
@@ -80,12 +81,36 @@ func (g *Game) Update() error {
 	// objects are replaced in the scene tree by their children.
 	for _, o := range g.Scene.Root.Children() {
 
-		if o.Properties().Has("turn") {
-			o.Rotate(0, 1, 0, 0.02*o.Properties().Get("turn").AsFloat64())
+		props := o.Properties()
+
+		if props.Has("turn") {
+			o.Rotate(0, 1, 0, 0.02*props.Get("turn").AsFloat64())
 		}
 
-		if o.Properties().Has("wave") && o.Properties().Get("wave").AsBool() {
+		if props.Has("wave") && props.Get("wave").AsBool() {
 			o.Move(0, math.Sin(g.Time*math.Pi)*0.08, 0)
+		}
+
+		if props.Has("blink") {
+
+			if !props.Has("blink-start") {
+				props.Set("blink-start", time.Now())
+			}
+
+			blinkStart := props.Get("blink-start").Value.(time.Time)
+
+			dur, err := time.ParseDuration(props.Get("blink").AsString())
+
+			if err != nil {
+				panic(err)
+			}
+
+			if time.Since(blinkStart) > dur {
+				props.Set("blink-start", time.Now())
+				o.SetVisible(!o.Visible(), false)
+			}
+
+			// o.SetVisible()
 		}
 
 	}
@@ -120,8 +145,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `This demo shows how game properties work with
 the Tetra3D Blender add-on.
-Game properties are set in the blend file, and
-exported from there to a GLTF file.
+Game properties are set in Blender, and
+exported from there to a GLTF file.	
 
 Collection instances can be used as prefabs,
 and properties set on a collection

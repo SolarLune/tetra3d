@@ -65,6 +65,13 @@ func (props Properties) Get(propName string) *Property {
 	return nil
 }
 
+// Set sets the given value to the property name, creating it if it doesn't exist.
+func (props Properties) Set(propName string, value any) *Property {
+	prop := props.Add(propName)
+	prop.Set(value)
+	return prop
+}
+
 // Count returns the number of properties in the Properties set.
 func (props Properties) Count() int {
 	return len(props)
