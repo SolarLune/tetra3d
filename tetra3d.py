@@ -1783,6 +1783,7 @@ class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
                 obj.active_material_index = matIndex
                 bpy.ops.object.material_slot_select()
 
+                # TODO: Replace cube_project with maybe manually stretching the UV values to be able to handle walls that have fixed widths or heights better (e.g. walls with trim)?
                 bpy.ops.uv.cube_project(cube_size=mat.t3dAutoUVUnitSize__)
 
                 bpy.ops.mesh.select_all(action='DESELECT')

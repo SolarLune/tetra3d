@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -546,10 +547,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	transformFuncExists := transformFunc != nil
 
-	minDepth := float32(0)
-	minDepthSet := false
-	maxDepth := float32(0)
-	maxDepthSet := false
+	minDepth := float32(math.MaxFloat32)
+	maxDepth := -float32(math.MaxFloat32)
 
 	camNear := camera.near
 	camFar := camera.far
@@ -724,9 +723,9 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		if modelSkinned {
 
-			dx := skinnedTriCenter.X / 3
-			dy := skinnedTriCenter.Y / 3
-			dz := skinnedTriCenter.Z / 3
+			dx := camPos.X - (skinnedTriCenter.X / 3)
+			dy := camPos.Y - (skinnedTriCenter.Y / 3)
+			dz := camPos.Z - (skinnedTriCenter.Z / 3)
 			depth = float32(dx*dx + dy*dy + dz*dz)
 
 		} else {
@@ -738,13 +737,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		}
 
-		if depth < minDepth || !minDepthSet {
+		if depth < minDepth {
 			minDepth = depth
-			minDepthSet = true
 		}
-		if depth > maxDepth || !maxDepthSet {
+		if depth > maxDepth {
 			maxDepth = depth
-			maxDepthSet = true
 		}
 
 		globalSortingTriangleBucket.AddTriangle(ti, depth, tri.VertexIndices)

@@ -976,6 +976,34 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 }
 
+// RenderImageSequence runs a render function for each frame in an image sequence.
+// frameCount is the number of frames to render, and renderFunc is a callback to be called
+// for each frame; it should perform any rendering functions that would write to the returned image sequence textures each frame.
+// The size of each image in the returned sequence would be the size of the camera.
+//
+// Say you had a camera pointed at a model and wanted to make a 60 frame image sequence of it spinning.
+// An example would be something like:
+//
+//	camera.RenderImageSequence(60, func(frameIndex int){
+//		camera.Clear() 	// Clear the camera
+//		camera.RenderScene(scene) // Renders to the camera's color texture; gets copied to an image in the sequence
+//		model.Rotate(0, 1, 0, math.Pi * 2 / 60) // Rotates the model 2pi over 60 frames
+//	})
+func (camera *Camera) RenderImageSequence(frameCount int, renderFunc func(frameIndex int)) []*ebiten.Image {
+
+	images := []*ebiten.Image{}
+
+	for i := 0; i < frameCount; i++ {
+		img := ebiten.NewImage(camera.Size())
+		renderFunc(i)
+		img.DrawImage(camera.ColorTexture(), nil)
+		images = append(images, img)
+	}
+
+	return images
+
+}
+
 // CurrentSector returns the current sector the Camera is in, if sector-based rendering is enabled.
 func (camera *Camera) CurrentSector() *Sector { return camera.currentSector }
 
@@ -992,34 +1020,40 @@ var bayerMatrix = []float32{
 	16.0 / 17.0, 8.0 / 17.0, 14.0 / 17.0, 6.0 / 17.0,
 }
 
-// Render renders all of the models passed using the provided Scene's properties (fog, for example). Note that if Camera.RenderDepth
+var sceneLights []ILight
+
+// Render renders all of the models passed using the provided Scene's properties (fog, for example) and lights provided. Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
-// Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
+// Also, the function will automatically include the Scene's world ambient light, if there is a world.
 func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	scene.HandleAutobatch()
 
 	frametimeStart := time.Now()
 
-	sceneLights := make([]ILight, 0, len(lights))
+	sceneLights = sceneLights[:0]
 
-	if scene.World != nil && scene.World.LightingOn {
+	if scene.World != nil {
 
-		lights = append(lights, scene.World.AmbientLight)
-
-		for _, light := range lights {
-			if light.IsOn() {
-				camera.DebugInfo.ActiveLightCount++
-				light.beginRender()
-				sceneLights = append(sceneLights, light)
-			}
+		camera.DebugInfo.LightCount++
+		if scene.World.LightingOn && scene.World.AmbientLight.IsOn() {
+			camera.DebugInfo.ActiveLightCount++
+			scene.World.AmbientLight.beginRender()
+			sceneLights = append(sceneLights, scene.World.AmbientLight)
 		}
 
 	}
 
-	originalSceneLights := sceneLights
+	for _, light := range lights {
+		camera.DebugInfo.LightCount++
+		if (scene.World == nil || scene.World.LightingOn) && light.IsOn() {
+			camera.DebugInfo.ActiveLightCount++
+			light.beginRender()
+			sceneLights = append(sceneLights, light)
+		}
+	}
 
-	camera.DebugInfo.LightCount = len(lights)
+	originalSceneLights := sceneLights
 
 	// if scene.World == nil || scene.World.LightingOn {
 
@@ -1102,7 +1136,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				}
 
 				if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
-					camera.DebugInfo.TotalParts++
+					for _ = range model.Mesh.MeshParts {
+						camera.DebugInfo.TotalParts++
+					}
 				}
 
 			}
@@ -1496,7 +1532,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	flush := func(rp renderPair) {
 
-		if vertexListIndex == 0 {
+		if vertexListIndex == 0 || indexListIndex == 0 {
+			vertexListIndex = 0
+			indexListIndex = 0
+			indexListStart = 0
 			return
 		}
 

@@ -226,3 +226,27 @@ func ClosestPointOnLine(start, end, point Vector) Vector {
 	return start.Add(ab.Scale(clamp(t, 0, 1)))
 
 }
+
+// func alignmentCheck(s any) {
+
+// 	structType := reflect.TypeOf(s)
+
+// 	runningOffset := 0
+// 	for i := 0; i < structType.NumField(); i++ {
+// 		f := structType.Field(i)
+
+// 		if runningOffset != int(f.Offset) {
+// 			fmt.Println("<<PADDING>>")
+// 			runningOffset = int(f.Offset)
+// 		}
+
+// 		fmt.Println("Name:", f.Name)
+// 		fmt.Println("Offset:", f.Offset)
+// 		fmt.Println("Size:", f.Type.Size())
+// 		fmt.Println("Type:", f.Type)
+// 		fmt.Println("Ideal alignment:", unsafe.Alignof(f))
+// 		fmt.Println()
+// 		runningOffset += int(f.Type.Size())
+// 	}
+
+// }

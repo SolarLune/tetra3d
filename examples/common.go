@@ -142,8 +142,7 @@ type BasicFreeCam struct {
 func NewBasicFreeCam(scene *tetra3d.Scene) BasicFreeCam {
 
 	freecam := BasicFreeCam{
-		Locked: true,
-		Scene:  scene,
+		Scene: scene,
 	}
 
 	freecam.Camera = tetra3d.NewCamera(640, 360)
@@ -151,8 +150,6 @@ func NewBasicFreeCam(scene *tetra3d.Scene) BasicFreeCam {
 	freecam.Camera.SetLocalPosition(0, 0, 5)
 
 	scene.Root.AddChildren(freecam.Camera)
-
-	ebiten.SetCursorMode(ebiten.CursorModeCaptured)
 
 	return freecam
 

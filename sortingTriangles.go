@@ -4,25 +4,26 @@ package tetra3d
 // which means sorting is faster.
 type sortingTriangle struct {
 	// Triangle *Triangle
-	TriangleID    int
 	depth         float32
+	TriangleID    int
 	vertexIndices []int
 }
 
 type sortingTriangleBin struct {
-	triangles     []sortingTriangle
 	triangleIndex int
+	triangles     []sortingTriangle
 }
 
 type sortingTriangleBucket struct {
-	bins          []sortingTriangleBin
-	unsetTris     []sortingTriangle
 	unsetTriIndex int
 	sortMode      int
+	bins          []sortingTriangleBin
+	unsetTris     []sortingTriangle
 }
 
 func newSortingTriangleBucket() *sortingTriangleBucket {
 	bucket := &sortingTriangleBucket{}
+	bucket.unsetTris = make([]sortingTriangle, MaxTriangleCount)
 	return bucket
 }
 
@@ -62,12 +63,11 @@ func (s *sortingTriangleBucket) Sort(minRange, maxRange float32) {
 
 }
 
-func (s *sortingTriangleBucket) Initialize(binCount int) {
+func (s *sortingTriangleBucket) Resize(binCount int) {
 	s.bins = make([]sortingTriangleBin, binCount)
 	for i := range s.bins {
 		s.bins[i].triangles = make([]sortingTriangle, MaxTriangleCount)
 	}
-	s.unsetTris = make([]sortingTriangle, MaxTriangleCount)
 	s.Clear()
 }
 
@@ -152,5 +152,5 @@ func (s *sortingTriangleBucket) IsEmpty() bool {
 var globalSortingTriangleBucket = newSortingTriangleBucket()
 
 func init() {
-	globalSortingTriangleBucket.Initialize(512)
+	globalSortingTriangleBucket.Resize(512)
 }

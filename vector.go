@@ -87,7 +87,7 @@ func (vec Vector) StringW() string {
 	return fmt.Sprintf("{%.2f, %.2f, %.2f, %.2f}", vec.X, vec.Y, vec.Z, vec.W)
 }
 
-// Plus returns a copy of the calling vector, added together with the other Vector provided (ignoring the W component).
+// Add returns a copy of the calling vector, added together with the other Vector provided (ignoring the W component).
 func (vec Vector) Add(other Vector) Vector {
 	vec.X += other.X
 	vec.Y += other.Y

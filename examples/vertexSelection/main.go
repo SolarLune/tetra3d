@@ -61,22 +61,23 @@ func (g *Game) Init() {
 
 	// OK, so this demo is about selecting vertices.
 
-	// The easiest way to select vertices is to just use Mesh.SelectVertices() - it allows us to create a VertexSelection object, which is our
-	// current vertex capture. We can use it to select vertices that fulfill a set of criteria (and yes, it's method-chainable as well).
+	// The easiest way to select vertices reliably is to simply separate the desired vertices into another material slot; this separates them into
+	// another MeshPart, making them easy to select, at the cost of a slight penalty to render performance.
+	// Another way to select vertices is to use vertex colors.
+	// If the mesh is skinned to an armture, you could also select vertices using vertex groups.
 
-	// Internally for the VertexSelection object, the vertices are simply index numbers, with their properties (position, UV, normals, etc.)
-	// stored on the Mesh as a series of slices (i.e. Mesh.VertexPositions[], Mesh.VertexNormals[], Mesh.VertexUVs[], etc).
+	// This demo will use the second method.
 
-	// Oh, and by default, when we export a mesh with vertex colors, the first vertex color channel is active.
+	// (As an aside, by default, when we export a mesh with vertex colors, the first vertex color channel is active.)
 
 	// Here, we'll select our vertices and store it in the Game struct.
 	mesh := g.Cube.Mesh
 
-	// VertexSelection.SelectInVertexColorChannel selects all vertices that have greater than 0 influence to a particular vertex group.
-	// You can also use VertexSelection.SelectInVertexColorChannel() to select vertices that have non-black vertex color.
+	// Select vertices that have non-black vertex color in the specified vertex color channel.
 	vertices, err := tetra3d.NewVertexSelection().SelectInVertexColorChannel(mesh, "Flash")
 
 	// An error could happen if the color channel index passed to SelectInChannel is too high to be beyond the vertex color channel count set on the Model.
+	// If this happens, let's panic on it.
 	if err != nil {
 		panic(err)
 	}

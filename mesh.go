@@ -736,8 +736,9 @@ func (vs VertexSelection) SelectMeshPartByIndex(mesh *Mesh, indexNumber int) Ver
 
 }
 
-// SelectMeshpartByName selects all vertices in the Mesh belonging to the specified material.
-func (vs VertexSelection) SelectMeshpartByName(mesh *Mesh, materialNames ...string) VertexSelection {
+// SelectMeshPartByName selects all vertices in the Mesh belonging to materials with the specified
+// name.
+func (vs VertexSelection) SelectMeshPartByName(mesh *Mesh, materialNames ...string) VertexSelection {
 
 	vs.ensureSelectionSetExists(mesh)
 	for _, matName := range materialNames {
