@@ -1,5 +1,7 @@
 # Tetra3D
 
+[View the Examples Online](https://solarlune.github.io/tetra3d.site/)
+
 [Ebitengine Discord](https://discord.gg/fXM7VYASTu)
 
 [SolarLune's Discord](https://discord.gg/cepcpfV)
@@ -242,7 +244,7 @@ func (g *Game) Update() {
 
 If you wanted a deeper collision test with multiple objects, you can do so using `IBoundingObject.CollisionTest()`. Take a look at the [Wiki](https://github.com/SolarLune/tetra3d/wiki/Collision-Testing) and the `bounds` example for more info.
 
-That's basically it. Note that Tetra3D is, indeed, a work-in-progress and so will require time to get to a good state. But I feel like it works _pretty_ well as is. Feel free to examine all of the examples in the `examples` folder. Calling `go run .` from within their directories will run them - the mouse usually controls the view, and clicking locks and unlocks the view.
+That's basically it. Feel free to examine all of the examples in the `examples` folder. Calling `go run .` from within their directories will run them - the mouse usually controls the view, and clicking locks and unlocks the view. You can also view the examples online [here](https://solarlune.github.io/tetra3d.site/).
 
 There's a quick start project repo available [here](https://github.com/SolarLune/tetra3d-quickstart), as well to help with getting started.
 
