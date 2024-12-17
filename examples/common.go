@@ -147,7 +147,7 @@ func NewBasicFreeCam(scene *tetra3d.Scene) BasicFreeCam {
 
 	freecam.Camera = tetra3d.NewCamera(640, 360)
 	freecam.Camera.SetFieldOfView(60)
-	freecam.Camera.SetLocalPosition(0, 0, 5)
+	freecam.Camera.SetLocalPosition(0, 0, 10)
 
 	scene.Root.AddChildren(freecam.Camera)
 

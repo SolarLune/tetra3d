@@ -21,7 +21,7 @@ type Game struct {
 	Camera        examples.BasicFreeCam
 }
 
-//go:embed tetra3d.gltf
+//go:embed logo.glb
 var logoModel []byte
 
 func NewGame() *Game {
@@ -85,14 +85,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Camera.Clear()
 
 	// Render the logos first:
-	g.Camera.RenderNodes(g.Scene, g.Scene.Root.Get("LogoGroup"))
+	g.Camera.RenderNodes(g.Scene, g.Scene.Get("Logo"))
 
 	// Clear the Offscreen, then draw the camera's color texture output to it as well:
 	g.Offscreen.Fill(color.Black)
 	g.Offscreen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	// Render the screen objects individually after drawing the others; this way, we can ensure the TVs don't show up onscreen:
-	g.Camera.Render(g.Scene, g.Scene.Root.SearchTree().ILights(), g.Scene.Root.SearchTree().ByName("screen").Models()...)
+	g.Camera.Render(g.Scene, g.Scene.Root.SearchTree().ILights(), g.Scene.FindNode("Screen").(*tetra3d.Model))
 
 	// And then just draw the color texture output:
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
