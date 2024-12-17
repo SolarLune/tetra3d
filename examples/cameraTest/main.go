@@ -26,6 +26,8 @@ type Game struct {
 func NewGame() *Game {
 	game := &Game{}
 
+	game.System = examples.NewBasicSystemHandler(game)
+
 	game.Init()
 
 	return game
@@ -98,15 +100,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 designed to check out different camera
 field of view settings to ensure they
 match with Blender's output.
-
-Left and right cycle through the cameras.`
+The left and right arrow keys cycle through the cameras.`
 
 		if g.Camera.Perspective() {
 			txt += fmt.Sprintf("\n\nName: %s\nType: Perspective Camera\nFOV: %s", g.Camera.Name(), strconv.Itoa(int(g.Camera.FieldOfView())))
 		} else {
 			txt += fmt.Sprintf("\n\nName: %s\nType: Orthographic Camera\nOrtho-Scale: %s", g.Camera.Name(), strconv.FormatFloat(g.Camera.OrthoScale(), 'f', 1, 64))
 		}
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 210, 1, colors.LightGray())
 	}
 
 }
