@@ -3,3 +3,4 @@
 ignore
 settings.json
 *.blendoriginal
+.vscode
