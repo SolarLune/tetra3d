@@ -77,6 +77,8 @@ func (g *Game) Init() {
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
 	g.Camera.SetLocalPosition(0, 0, 10)
 
+	g.System = examples.NewBasicSystemHandler(g)
+
 }
 
 func (g *Game) Update() error {

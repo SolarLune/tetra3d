@@ -111,25 +111,25 @@ func (g *Game) Update() error {
 	// Change the active vertex color channels
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		for _, model := range g.Scene.Root.SearchTree().Models() {
-			tetra3d.NewVertexSelection().SelectAll(model.Mesh).SetActiveColorChannel(ChannelNone) // Switch to unlit
+			tetra3d.NewVertexSelection().SelectMeshes(model.Mesh).SetActiveColorChannel(ChannelNone) // Switch to unlit
 		}
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
 		for _, model := range g.Scene.Root.SearchTree().Models() {
-			tetra3d.NewVertexSelection().SelectAll(model.Mesh).SetActiveColorChannel(ChannelAO) // Switch to AO only
+			tetra3d.NewVertexSelection().SelectMeshes(model.Mesh).SetActiveColorChannel(ChannelAO) // Switch to AO only
 		}
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key3) {
 		for _, model := range g.Scene.Root.SearchTree().Models() {
-			tetra3d.NewVertexSelection().SelectAll(model.Mesh).SetActiveColorChannel(ChannelLight) // Switch to Lighting
+			tetra3d.NewVertexSelection().SelectMeshes(model.Mesh).SetActiveColorChannel(ChannelLight) // Switch to Lighting
 		}
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key4) {
 		for _, model := range g.Scene.Root.SearchTree().Models() {
-			tetra3d.NewVertexSelection().SelectAll(model.Mesh).SetActiveColorChannel(ChannelCombined) // Switch to lighting+AO
+			tetra3d.NewVertexSelection().SelectMeshes(model.Mesh).SetActiveColorChannel(ChannelCombined) // Switch to lighting+AO
 		}
 	}
 

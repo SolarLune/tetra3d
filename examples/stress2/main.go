@@ -192,11 +192,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := `Stress Test 2 - Here, cubes are moving. We can render them
 efficiently by dynamically batching them, though they
 will mimic the batching object (the character plane) visually - 
-they no longer have their own texture,
-blend mode, or texture filtering (as they all
-take these properties from the floating character plane).
-They also can no longer intersect; rather, they
-will just draw in front of or behind each other.
+they now share textures, blend modes, filtering, etc.
+They also can no longer intersect, now just drawing in front of or behind each other.
 
 1 Key: Toggle batching cubes together`
 		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())

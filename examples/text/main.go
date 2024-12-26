@@ -140,8 +140,10 @@ dynamically in Tetra3D. By using the Text type,
 you can dynamically write text and scroll it.
 Note that Text objects work best when the displaying faces are not
 rotated and face a world axis directly (though the object can
-be rotated just fine).`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+be rotated just fine).
+
+Press Q to reset the text.`
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 	}
 
 }

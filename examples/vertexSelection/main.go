@@ -64,7 +64,7 @@ func (g *Game) Init() {
 	// The easiest way to select vertices reliably is to simply separate the desired vertices into another material slot; this separates them into
 	// another MeshPart, making them easy to select, at the cost of a slight penalty to render performance.
 	// Another way to select vertices is to use vertex colors.
-	// If the mesh is skinned to an armture, you could also select vertices using vertex groups.
+	// If the mesh is skinned to an armature, you could also select vertices using vertex groups.
 
 	// This demo will use the second method.
 

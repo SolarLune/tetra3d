@@ -57,7 +57,7 @@ func (g *Game) Init() {
 	mesh := library.Meshes["Plane"]
 
 	// We can select all vertices...
-	selection := tetra3d.NewVertexSelection().SelectAll(mesh)
+	selection := tetra3d.NewVertexSelection().SelectMeshes(mesh)
 
 	// ...And then create a TexturePlayer, which steps through all vertices contained in the passed vertex selection and assigns their UV values according
 	// to the TexturePlayer's playing animation.

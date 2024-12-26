@@ -81,13 +81,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 		txt := `This example shows how sector-based rendering works.
 Sectors are essentially "map chunks", allowing you to control which
-part of a game scene is visible at any given time. In this example, 
-each colored room is a Sector.
+part of a game scene renders. Here, each colored room is a sector. 
 
-Sectors only render when either the camera is wholly within a Sector, or
-if the camera's sector is within a certain range of sector neighbors. In this example,
-the neighbor depth is 1, so the camera will render the current sector (room), 
-plus 1 neighboring room in any direction).
+Sectors only render when either the camera is wholly within a Sector or
+within range of a neighbor. In this example the neighbor depth is 1, 
+so the camera will render the current sector (room), + 1 neighboring room.
 
 Press 1 to toggle sector-based rendering. It is: `
 

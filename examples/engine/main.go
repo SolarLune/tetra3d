@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"image/color"
-	"slices"
 
 	_ "embed"
 
@@ -25,6 +24,7 @@ type Game struct {
 	System examples.BasicSystemHandler
 
 	GameObjects []GameObject
+	ToRemove    []GameObject
 }
 
 //go:embed engine.gltf
@@ -45,57 +45,40 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
+	// This example's focus is on creating an "engine" to easily update game objects.
+
 	// There's two ways to do this. One is to create data objects that represent our game objects, and then place our models in our scenes from there,
 	// or to go in the reverse direction and create models in our game scenes, and then create data objects to match. This example uses the latter approach.
 
-	// An easy way to do this is to treat the original scenes in our tetra3d.Library as "prototype" scenes that we clone to instantiate your game level / map.
-
-	// We register relevant objects as reporting callbacks so that when the scene they're in is cloned, or they are
-	// reparented, we handle this to add game object logic controls to our g.GameObjects slice.
+	// We will treat the original scenes in our tetra3d.Library as "prototype" scenes that we clone to instantiate your game level / map.
+	// We loop through objects that we have tagged to be game objects and simply set callbacks so that when they are cloned or altered, we add or remove
+	// them from a GameObjects slice. You could also just loop through the scene tree directly for a simpler approach, but you would be leaving performance
+	// on the table in that case.
 
 	for _, scene := range library.Scenes {
 
-		// Register nodes that have a "gameobject" property for scene tree callbacks. Now whenever it's reparented (or part of a Scene that is cloned),
-		// tetra3d.Callbacks.OnReparent will be called, allowing us to easily create the data object easily.
+		// Set up callbacks for each relevant node that creates the necessary data.
 		scene.Root.SearchTree().ByPropNameRegex("gameobject").ForEach(func(node tetra3d.INode) bool {
-			node.SetRegisteredForSceneTreeCallbacks(true)
-			return true
-		})
+			switch node.Properties().Get("gameobject").AsString() {
+			case "player":
 
-		// Called when a relevant gameobject node is reparented or in a scene that is cloned.
-		// In other words, whenever a node
-		tetra3d.Callbacks.OnNodeReparent = func(node tetra3d.INode, oldParent tetra3d.INode, newParent tetra3d.INode) {
+				node.Callbacks().OnClone = func(newNode tetra3d.INode) {
+					// When the Player node is cloned, we create a new Player object for its data holder.
+					p := NewPlayer(newNode)
+					newNode.SetData(p)
+					g.GameObjects = append(g.GameObjects, p)
+				}
 
-			if node.Properties().Has("gameobject") {
-
-				if newParent != nil && oldParent == nil && node.Data() == nil {
-					// Reparenting into scene tree
-
-					switch node.Properties().Get("gameobject").AsString() {
-
-					case "player":
-						player := NewPlayer(node)
-						g.GameObjects = append(g.GameObjects, player)
-						node.SetData(player)
+				node.Callbacks().OnReparent = func(node, oldParent, newParent tetra3d.INode) {
+					// When the Player node is unparented, we remove the Player game object from the GameObjects slice.
+					if newParent == nil {
+						g.ToRemove = append(g.ToRemove, node.Data().(GameObject))
 					}
-
-				} else if newParent == nil && oldParent != nil && node.Data() != nil {
-					// Reparenting out of scene tree (removing)
-
-					for i := len(g.GameObjects) - 1; i >= 0; i-- {
-						if g.GameObjects[i] == node.Data() {
-							// g.GameObjects[i] = nil
-							// g.GameObjects = append(g.GameObjects[:i], g.GameObjects[i+1:]...)
-							// break
-							g.GameObjects = slices.Delete(g.GameObjects, i, i+1)
-						}
-					}
-
 				}
 
 			}
-
-		}
+			return true
+		})
 
 	}
 
@@ -116,8 +99,7 @@ func (g *Game) Update() error {
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
 		// Cloning a Node is as simple as getting it (from any Scene), Cloning it, and adding it under the hierarchy of your target Scene.
 		player := g.Library.Scenes[0].Root.Get("Player")
-		newPlayer := player.Clone()
-		g.Scene.Root.AddChildren(newPlayer)
+		g.Scene.Root.AddChildren(player.Clone())
 	}
 
 	for i := len(g.GameObjects) - 1; i >= 0; i-- {
@@ -155,6 +137,15 @@ Arrow keys: Move player(s)
 Touch spikes to destroy player(s)`
 
 		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+	}
+
+	for _, r := range g.ToRemove {
+		for i, obj := range g.GameObjects {
+			if obj == r {
+				g.GameObjects[i] = nil
+				g.GameObjects = append(g.GameObjects[:i], g.GameObjects[i+1:]...)
+			}
+		}
 	}
 
 }
