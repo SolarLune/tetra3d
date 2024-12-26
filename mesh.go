@@ -439,12 +439,12 @@ func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, so
 
 // SetVertexColor sets the specified vertex color for all vertices in the mesh for the target color channel.
 func (mesh *Mesh) SetVertexColor(targetChannel int, color Color) {
-	NewVertexSelection().SelectAll(mesh).SetColor(targetChannel, color)
+	NewVertexSelection().SelectMeshes(mesh).SetColor(targetChannel, color)
 }
 
 // SetActiveColorChannel sets the active color channel for all vertices in the mesh to the specified channel index.
 func (mesh *Mesh) SetActiveColorChannel(targetChannel int) {
-	NewVertexSelection().SelectAll(mesh).SetActiveColorChannel(targetChannel)
+	NewVertexSelection().SelectMeshes(mesh).SetActiveColorChannel(targetChannel)
 }
 
 // Materials returns a slice of the materials present in the Mesh's MeshParts.
@@ -680,8 +680,8 @@ func (vs VertexSelection) SelectInVertexGroup(mesh *Mesh, vertexGroupNames ...st
 
 }
 
-// SelectAll selects all vertices on the target meshes.
-func (vs VertexSelection) SelectAll(meshes ...*Mesh) VertexSelection {
+// SelectMeshes selects all vertices on the target meshes.
+func (vs VertexSelection) SelectMeshes(meshes ...*Mesh) VertexSelection {
 
 	for _, mesh := range meshes {
 

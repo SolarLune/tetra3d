@@ -49,19 +49,21 @@ func NewGridPointFromNode(node *Node) *GridPoint {
 		Node:        node,
 		Connections: []*GridConnection{},
 	}
+	gridPoint.owner = gridPoint
 	return gridPoint
 }
 
 // Clone clones the given GridPoint.
 func (point *GridPoint) Clone() INode {
-	newPoint := &GridPoint{
-		Node:              point.Node.Clone().(*Node),
-		Connections:       append([]*GridConnection{}, point.Connections...),
-		sortedConnections: append([]*GridConnection{}, point.Connections...),
+	newPoint := &GridPoint{}
+	newPoint.Node = point.Node.clone(point).(*Node)
+	newPoint.Connections = append([]*GridConnection{}, point.Connections...)
+	newPoint.sortedConnections = append([]*GridConnection{}, point.Connections...)
+
+	if newPoint.Callbacks() != nil && newPoint.Callbacks().OnClone != nil {
+		newPoint.Callbacks().OnClone(newPoint)
 	}
-	for _, child := range newPoint.children {
-		child.setParent(newPoint)
-	}
+
 	return newPoint
 }
 
@@ -257,33 +259,6 @@ func (point *GridPoint) insertIntoSlice(slice []*GridPoint, index int, value *Gr
 
 ////////////
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (point *GridPoint) AddChildren(children ...INode) {
-	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
-	point.addChildren(point, children...)
-}
-
-// Unparent unparents the Model from its parent, removing it from the scenegraph.
-func (point *GridPoint) Unparent() {
-	if point.parent != nil {
-		point.parent.RemoveChildren(point)
-	}
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (point *GridPoint) Index() int {
-	if point.parent != nil {
-		for i, c := range point.parent.Children() {
-			if c == point {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
 // Type returns the NodeType for this object.
 func (point *GridPoint) Type() NodeType {
 	return NodeTypeGridPoint
@@ -297,14 +272,16 @@ type Grid struct {
 
 // NewGrid creates a new Grid.
 func NewGrid(name string) *Grid {
-	return &Grid{Node: NewNode(name)}
+	g := &Grid{Node: NewNode(name)}
+	g.owner = g
+	return g
 }
 
 // Clone creates a clone of this GridPoint.
 func (grid *Grid) Clone() INode {
 
 	newGrid := &Grid{}
-	newGrid.Node = grid.Node.Clone().(*Node)
+	newGrid.Node = grid.Node.clone(newGrid).(*Node)
 
 	for _, child := range newGrid.children {
 		child.setParent(newGrid)
@@ -322,6 +299,10 @@ func (grid *Grid) Clone() INode {
 			start.Connect(end)
 		}
 
+	}
+
+	if newGrid.Callbacks() != nil && newGrid.Callbacks().OnClone != nil {
+		newGrid.Callbacks().OnClone(newGrid)
 	}
 
 	return newGrid
@@ -573,39 +554,13 @@ func (grid *Grid) Dimensions() Dimensions {
 
 ////////
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (grid *Grid) AddChildren(children ...INode) {
-	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.NodeBase.
-	grid.addChildren(grid, children...)
-}
-
-// Unparent unparents the Model from its parent, removing it from the scenegraph.
-func (grid *Grid) Unparent() {
-	if grid.parent != nil {
-		grid.parent.RemoveChildren(grid)
-	}
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (grid *Grid) Index() int {
-	if grid.parent != nil {
-		for i, c := range grid.parent.Children() {
-			if c == grid {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
 // Type returns the NodeType for this object.
 func (grid *Grid) Type() NodeType {
 	return NodeTypeGrid
 }
 
 // GridPath represents a sequence of grid points, used to traverse a path.
+// GridPath implements IPath.
 type GridPath struct {
 	GridPoints []Vector
 }
@@ -660,3 +615,5 @@ func (gp *GridPath) DebugDraw(screen *ebiten.Image, camera *Camera, color Color)
 	}
 
 }
+
+var _ IPath = &GridPath{} // Sanity check to ensure GridPaths implement paths

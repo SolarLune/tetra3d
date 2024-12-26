@@ -125,6 +125,8 @@ func NewCamera(w, h int) *Camera {
 		SectorRenderDepth: 1,
 	}
 
+	cam.owner = cam
+
 	depthShaderText := []byte(
 		`package main
 
@@ -291,8 +293,7 @@ func NewCamera(w, h int) *Camera {
 // Clone clones the Camera and returns it.
 func (camera *Camera) Clone() INode {
 
-	w, h := camera.resultColorTexture.Size()
-	clone := NewCamera(w, h)
+	clone := NewCamera(camera.Size())
 
 	clone.RenderDepth = camera.RenderDepth
 	clone.near = camera.near
@@ -310,11 +311,12 @@ func (camera *Camera) Clone() INode {
 		clone.AccumulationDrawOptions = &newOptions
 	}
 
-	clone.Node = camera.Node.Clone().(*Node)
-	for _, child := range camera.children {
-		child.setParent(camera)
-	}
+	clone.Node = camera.Node.clone(clone).(*Node)
 	clone.MaxLightCount = camera.MaxLightCount
+
+	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
+	}
 
 	return clone
 
@@ -1136,7 +1138,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				}
 
 				if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
-					for _ = range model.Mesh.MeshParts {
+					for range model.Mesh.MeshParts {
 						camera.DebugInfo.TotalParts++
 					}
 				}
@@ -1982,7 +1984,7 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 	sectorName := "<Sector Rendering Off>"
 	if camera.SectorRendering {
 		if camera.currentSector == nil {
-			sectorName = "nil"
+			sectorName = "None"
 		} else {
 			sectorName = camera.currentSector.Model.name
 		}
@@ -1990,7 +1992,7 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float6
 
 	debugText := fmt.Sprintf(
 		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d"+
-			"\nWorld Position: %s\nCurrent Sector:%s",
+			"\nWorld Position: %s\nCurrent Sector: %s",
 		ebiten.ActualTPS(),
 		ebiten.ActualFPS(),
 		ft,
@@ -2576,32 +2578,6 @@ func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, c
 }
 
 /////
-
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (camera *Camera) AddChildren(children ...INode) {
-	camera.addChildren(camera, children...)
-}
-
-// Unparent unparents the Camera from its parent, removing it from the scenegraph.
-func (camera *Camera) Unparent() {
-	if camera.parent != nil {
-		camera.parent.RemoveChildren(camera)
-	}
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (camera *Camera) Index() int {
-	if camera.parent != nil {
-		for i, c := range camera.parent.Children() {
-			if c == camera {
-				return i
-			}
-		}
-	}
-	return -1
-}
 
 // Type returns the NodeType for this object.
 func (camera *Camera) Type() NodeType {

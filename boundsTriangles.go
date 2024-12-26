@@ -40,6 +40,8 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float64) *
 
 	bt.Broadphase = NewBroadphase(gridSize, bt.WorldPosition(), mesh)
 
+	bt.owner = bt
+
 	return bt
 }
 
@@ -73,8 +75,11 @@ func (bt *BoundingTriangles) UpdateTransform() {
 func (bt *BoundingTriangles) Clone() INode {
 	clone := NewBoundingTriangles(bt.name, bt.Mesh, 0) // Broadphase size is set to 0 so cloning doesn't create the broadphase triangle sets
 	clone.Broadphase = bt.Broadphase.Clone()
-	clone.Node = bt.Node.Clone().(*Node)
+	clone.Node = bt.Node.clone(clone).(*Node)
 	clone.Node.onTransformUpdate = clone.UpdateTransform
+	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
+	}
 	return clone
 }
 
@@ -268,32 +273,6 @@ func (plane *collisionPlane) closestPointOnLine(point, start, end Vector) Vector
 }
 
 /////
-
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (bt *BoundingTriangles) AddChildren(children ...INode) {
-	bt.addChildren(bt, children...)
-}
-
-// Unparent unparents the Camera from its parent, removing it from the scenegraph.
-func (bt *BoundingTriangles) Unparent() {
-	if bt.parent != nil {
-		bt.parent.RemoveChildren(bt)
-	}
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (bt *BoundingTriangles) Index() int {
-	if bt.parent != nil {
-		for i, c := range bt.parent.Children() {
-			if c == bt {
-				return i
-			}
-		}
-	}
-	return -1
-}
 
 // Type returns the NodeType for this object.
 func (bt *BoundingTriangles) Type() NodeType {

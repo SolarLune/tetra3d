@@ -72,6 +72,7 @@ func NewModel(name string, mesh *Mesh) *Model {
 		DynamicBatchModels:  map[*MeshPart][]*Model{},
 	}
 
+	model.owner = model
 	model.Node.onTransformUpdate = model.onTransformUpdate
 
 	radius := 0.0
@@ -113,11 +114,8 @@ func (model *Model) Clone() INode {
 		newModel.bones = append(newModel.bones, append([]*Node{}, model.bones[i]...))
 	}
 
-	newModel.Node = model.Node.Clone().(*Node)
+	newModel.Node = model.Node.clone(newModel).(*Node)
 	newModel.Node.onTransformUpdate = newModel.onTransformUpdate
-	for _, child := range newModel.children {
-		child.setParent(newModel)
-	}
 
 	if model.LightGroup != nil {
 		newModel.LightGroup = model.LightGroup.Clone()
@@ -129,6 +127,10 @@ func (model *Model) Clone() INode {
 	if model.sector != nil {
 		newModel.sector = model.sector.Clone()
 		newModel.sector.Model = newModel
+	}
+
+	if newModel.Callbacks() != nil && newModel.Callbacks().OnClone != nil {
+		newModel.Callbacks().OnClone(newModel)
 	}
 
 	return newModel
@@ -589,7 +591,12 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				transformFunc(&v0, vertexIndex)
 			}
 
-			mesh.vertexTransforms[vertexIndex] = mvp.MultVecW(v0)
+			// mesh.vertexTransforms[vertexIndex] = mvp.MultVecW(v0)
+
+			mesh.vertexTransforms[vertexIndex].X = mvp[0][0]*v0.X + mvp[1][0]*v0.Y + mvp[2][0]*v0.Z + mvp[3][0]
+			mesh.vertexTransforms[vertexIndex].Y = mvp[0][1]*v0.X + mvp[1][1]*v0.Y + mvp[2][1]*v0.Z + mvp[3][1]
+			mesh.vertexTransforms[vertexIndex].Z = mvp[0][2]*v0.X + mvp[1][2]*v0.Y + mvp[2][2]*v0.Z + mvp[3][2]
+			mesh.vertexTransforms[vertexIndex].W = mvp[0][3]*v0.X + mvp[1][3]*v0.Y + mvp[2][3]*v0.Z + mvp[3][3]
 
 		}
 
@@ -604,12 +611,13 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	var skinnedTriCenter Vector
-
 	var transformedVertexPositions = [3]Vector{}
 
 	for ti := meshPart.TriangleStart; ti <= meshPart.TriangleEnd; ti++ {
 
 		tri := mesh.Triangles[ti]
+
+		vertIndices := tri.VertexIndices
 
 		// Backface culling
 		// if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
@@ -646,14 +654,12 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		for i := 0; i < 3; i++ {
 
-			// It's faster to store the indices of the triangles in a variable than constanrtly dereference a pointer
-			vi := tri.VertexIndices[i]
-
+			// It's faster to store the indices of the triangles in a variable than constantly dereference a pointer
 			if modelSkinned {
-				skinnedTriCenter = skinnedTriCenter.Add(mesh.vertexSkinnedPositions[vi])
+				skinnedTriCenter = skinnedTriCenter.Add(mesh.vertexSkinnedPositions[vertIndices[i]])
 			}
 
-			w := mesh.vertexTransforms[vi].W
+			w := mesh.vertexTransforms[vertIndices[i]].W
 
 			// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
 			// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
@@ -661,10 +667,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				w = 0.000001
 			}
 
-			transformedVertexPositions[i].X = mesh.vertexTransforms[vi].X / w
-			transformedVertexPositions[i].Y = mesh.vertexTransforms[vi].Y / w
+			transformedVertexPositions[i].X = mesh.vertexTransforms[vertIndices[i]].X / w
+			transformedVertexPositions[i].Y = mesh.vertexTransforms[vertIndices[i]].Y / w
 
-			if mesh.vertexTransforms[vi].Z+1 >= camNear && mesh.vertexTransforms[vi].Z < camFar {
+			if mesh.vertexTransforms[vertIndices[i]].Z+1 >= camNear && mesh.vertexTransforms[vertIndices[i]].Z < camFar {
 				outOfBounds = false
 			}
 
@@ -744,7 +750,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			maxDepth = depth
 		}
 
-		globalSortingTriangleBucket.AddTriangle(ti, depth, tri.VertexIndices)
+		globalSortingTriangleBucket.AddTriangle(ti, depth, vertIndices)
 
 		// I could substitute depth for W, but sorting by distance to the triangle center directly gives a better result overall, it seems.
 		// if sortMode != TriangleSortModeNone {
@@ -756,9 +762,9 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		// 	}
 		// }
 
-		mesh.visibleVertices[tri.VertexIndices[0]] = true
-		mesh.visibleVertices[tri.VertexIndices[1]] = true
-		mesh.visibleVertices[tri.VertexIndices[2]] = true
+		mesh.visibleVertices[vertIndices[0]] = true
+		mesh.visibleVertices[vertIndices[1]] = true
+		mesh.visibleVertices[vertIndices[2]] = true
 
 		sortingTriIndex++
 
@@ -1031,13 +1037,6 @@ func (model *Model) isTransparent(meshPart *MeshPart) bool {
 
 ////////
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (model *Model) AddChildren(children ...INode) {
-	// We do this manually so that addChildren() parents the children to the Model, rather than to the Model.Node.
-	model.addChildren(model, children...)
-}
-
 func (model *Model) setParent(parent INode) {
 
 	prevScene := model.Scene()
@@ -1059,9 +1058,7 @@ func (model *Model) setParent(parent INode) {
 
 		}
 
-	}
-
-	if batched {
+	} else {
 
 		if prevScene != nil {
 			prevScene.updateAutobatch = true
@@ -1075,30 +1072,9 @@ func (model *Model) setParent(parent INode) {
 
 }
 
-// Unparent unparents the Model from its parent, removing it from the scenegraph.
-func (model *Model) Unparent() {
-	if model.parent != nil {
-		model.parent.RemoveChildren(model)
-	}
-	model.autoBatched = false
-}
-
 // Type returns the NodeType for this object.
 func (model *Model) Type() NodeType {
 	return NodeTypeModel
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (model *Model) Index() int {
-	if model.parent != nil {
-		for i, c := range model.parent.Children() {
-			if c == model {
-				return i
-			}
-		}
-	}
-	return -1
 }
 
 func (model *Model) Sector() *Sector {

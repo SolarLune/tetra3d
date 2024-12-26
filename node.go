@@ -81,6 +81,7 @@ type INode interface {
 	Parent() INode
 	// Unparent unparents the Node from its parent, removing it from the scenegraph.
 	Unparent()
+	getOwner() INode
 	// IsDescendantOf returns if a Node is a descendant child of a parent Node.
 	IsDescendantOf(parent INode) bool
 	// Scene looks for the Node's parents recursively to return what scene it exists in.
@@ -107,7 +108,7 @@ type INode interface {
 
 	// ForEachChild() runs a callback for each child in the Node's children set.
 	// If the callback returns false, then the execution stops with the current child.
-	ForEachChild(func(child INode) bool)
+	ForEachChild(func(child INode, index, size int) bool)
 
 	// SearchTree() returns a NodeFilter to search the given Node's hierarchical tree.
 	SearchTree() *NodeFilter
@@ -264,12 +265,11 @@ type INode interface {
 	// Quick syntactic sugar for other.WorldPosition().Sub(node.WorldPosition()).
 	VectorTo(otherNode INode) Vector
 
-	// RegisteredForSceneTreeCallbacks returns if an INode is registered for scene tree callbacks.
-	RegisteredForSceneTreeCallbacks() bool
+	// Callbacks returns a Node's callbacks object. This object represents the callbacks that a Node has access to when events happen.
+	Callbacks() *Callbacks
 
-	// SetRegisteredForSceneTreeCallbacks registers an INode for reporting to a callback when its scene
-	// tree changes in some way.
-	SetRegisteredForSceneTreeCallbacks(registered bool)
+	getRunCallbacks() bool
+	setRunCallbacks(bool)
 }
 
 var nodeID uint64 = 0
@@ -279,6 +279,7 @@ var nodeID uint64 = 0
 
 type Node struct {
 	id                uint64 // Unique ID for this node
+	owner             INode  // The owner; nil if this is a Node, set to the "owning" node type otherwise (e.g. node.owner = nil, model.owner (or model.Node.owner) = model)
 	name              string
 	position          Vector
 	scale             Vector
@@ -305,7 +306,8 @@ type Node struct {
 
 	cachedSector *Sector
 
-	registeredForSceneTreeCallbacks bool
+	runCallbacks bool
+	callbacks    *Callbacks
 }
 
 // NewNode returns a new Node.
@@ -323,6 +325,8 @@ func NewNode(name string) *Node {
 		props:            NewProperties(),
 		// We set this just in case we call a transform property getter before setting it and caching anything
 		cachedTransform: NewMatrix4(),
+		runCallbacks:    true,
+		callbacks:       &Callbacks{},
 		// originalLocalPosition: NewVectorZero(),
 		// sectorType: NewBitMask(0 + 1 + 2 + 3 + 4 + 5 + 6 + 7),
 	}
@@ -332,6 +336,19 @@ func NewNode(name string) *Node {
 	nb.animationPlayer = NewAnimationPlayer(nb)
 
 	return nb
+}
+
+// Callbacks returns a Node's callbacks object. This object represents the callbacks that a Node has access to when events happen.
+func (node *Node) Callbacks() *Callbacks {
+	return node.callbacks
+}
+
+func (node *Node) getRunCallbacks() bool {
+	return node.runCallbacks
+}
+
+func (node *Node) setRunCallbacks(run bool) {
+	node.runCallbacks = run
 }
 
 // ID returns the object's unique ID.
@@ -365,21 +382,30 @@ func (node *Node) setLibrary(library *Library) {
 
 // Clone returns a new Node.
 func (node *Node) Clone() INode {
+	return node.clone(nil)
+}
+
+func (node *Node) clone(newOwner INode) INode {
 	newNode := NewNode(node.name)
+	newNode.owner = newOwner
+	newNode.scene = node.scene
 	newNode.position = node.position
 	newNode.scale = node.scale
 	newNode.rotation = node.rotation.Clone()
+	newNode.setOriginalTransform()
 	newNode.visible = node.visible
 	newNode.data = node.data
 	newNode.sectorType = node.sectorType
-	newNode.setOriginalTransform()
 	newNode.cachedSector = node.cachedSector
+	newNode.library = node.library
+	newNode.runCallbacks = node.runCallbacks
+
+	// Clone the callbacks as well.
+	newCallbacks := *node.callbacks
+	newNode.callbacks = &newCallbacks
 
 	newNode.props = node.props.Clone()
 	newNode.animationPlayer = node.animationPlayer.Clone()
-	newNode.library = node.library
-
-	newNode.registeredForSceneTreeCallbacks = node.registeredForSceneTreeCallbacks
 
 	if node.animationPlayer.RootNode == node {
 		newNode.animationPlayer.SetRoot(newNode)
@@ -402,6 +428,10 @@ func (node *Node) Clone() INode {
 	newNode.isBone = node.isBone
 	if newNode.isBone {
 		newNode.inverseBindMatrix = node.inverseBindMatrix.Clone()
+	}
+
+	if newOwner == nil && newNode.Callbacks() != nil && newNode.Callbacks().OnClone != nil {
+		newNode.Callbacks().OnClone(newOwner)
 	}
 
 	return newNode
@@ -798,16 +828,20 @@ func (node *Node) GrowVec(vec Vector) {
 
 // Parent returns the Node's parent. If the Node has no parent, this will return nil.
 func (node *Node) Parent() INode {
-	return node.parent
+	if node.parent != nil {
+		return node.parent.getOwner()
+	}
+	return nil
 }
 
 // setParent sets the Node's parent.
 func (node *Node) setParent(parent INode) {
-	node.parent = parent
 	// fmt.Println(node, "parent:", parent, parent != nil)
 	if parent != nil {
+		node.parent = parent.getOwner()
 		node.cachedSceneRootNode = parent.Root()
 	} else {
+		node.parent = nil
 		node.cachedSceneRootNode = nil
 	}
 	node.SearchTree().ForEach(func(child INode) bool { child.setCachedSceneRoot(node.cachedSceneRootNode); return true })
@@ -831,61 +865,72 @@ func (node *Node) Scene() *Scene {
 	return nil
 }
 
-// addChildren adds the children to the parent node, but sets their parent to be the parent node passed. This is done so children have the
-// correct, specific Node as parent (because I can't really think of a better way to do this rn). Basically, without this approach,
-// after parent.AddChildren(child), child.Parent() wouldn't be parent, but rather parent.Node, which is no good.
-func (node *Node) addChildren(parent INode, children ...INode) {
-	for _, child := range children {
-		// child.updateLocalTransform(parent)
-		prevParent := child.Parent()
-		if prevParent != nil {
-			if prevParent == node {
-				continue
-			}
-			wasRegistered := child.RegisteredForSceneTreeCallbacks()
-			if wasRegistered {
-				child.SetRegisteredForSceneTreeCallbacks(false) // Override the on tree change rq
-			}
-
-			prevParent.RemoveChildren(child)
-
-			if wasRegistered {
-				child.SetRegisteredForSceneTreeCallbacks(true)
-			}
-		}
-		child.setParent(parent)
-		child.dirtyTransform()
-		node.children = append(node.children, child)
-
-		if child.RegisteredForSceneTreeCallbacks() && Callbacks.OnNodeReparent != nil {
-			Callbacks.OnNodeReparent(child, prevParent, parent)
-		}
-
-	}
-}
-
 // AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 // hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
 func (node *Node) AddChildren(children ...INode) {
-	node.addChildren(node, children...)
+
+	me := node.getOwner()
+
+	for _, child := range children {
+
+		prevParent := child.Parent()
+		if prevParent != nil {
+
+			if prevParent == me {
+				continue
+			}
+
+			runCallbacks := child.getRunCallbacks()
+
+			child.setRunCallbacks(false) // Override the on tree change rq
+			prevParent.RemoveChildren(child.getOwner())
+			child.setRunCallbacks(runCallbacks) // Override the on tree change rq
+		}
+
+		child.setParent(me)
+		child.dirtyTransform()
+		node.children = append(node.children, child.getOwner())
+
+		if child.Callbacks() != nil && child.Callbacks().OnReparent != nil {
+			child.Callbacks().OnReparent(child, prevParent, me)
+		}
+
+	}
+
+}
+
+// getOwner returns either this Node or the Node that owns the Node, in cases where it is embedded (e.g. Model, Camera, etc).
+// We do this so that parenting works as expected (parenting to and from the owning Node (the Model, camera, etc)
+// rather than the Node that it embeds (e.g. Model.Node, Camera.Node, etc)).
+func (node *Node) getOwner() INode {
+	if node.owner != nil {
+		return node.owner
+	}
+	return node
 }
 
 // RemoveChildren removes the provided children from this object.
 func (node *Node) RemoveChildren(children ...INode) {
 
-	for _, child := range children {
+	for _, c1 := range children {
 
-		for i, c := range node.children {
+		child1 := c1.getOwner()
 
-			if c == child {
+		for i, c2 := range node.children {
+
+			child2 := c2.getOwner()
+
+			if child2 == child1 {
 				// child.updateLocalTransform(nil)
-				prevParent := child.Parent()
-				child.setParent(nil)
-				child.dirtyTransform()
+				prevParent := child1.Parent()
+				child1.setParent(nil)
+				child1.dirtyTransform()
+
 				node.children[i] = nil
 				node.children = append(node.children[:i], node.children[i+1:]...)
-				if child.RegisteredForSceneTreeCallbacks() && Callbacks.OnNodeReparent != nil {
-					Callbacks.OnNodeReparent(child, prevParent, nil)
+
+				if child1.Callbacks() != nil && child1.Callbacks().OnReparent != nil {
+					child1.Callbacks().OnReparent(child1, prevParent, nil)
 				}
 				break
 			}
@@ -895,7 +940,7 @@ func (node *Node) RemoveChildren(children ...INode) {
 
 }
 
-// Unparent unparents the Node from its parent, removing it from the scenegraph. Note that this needs to be overridden for objects that embed Node.
+// Unparent unparents the Node from its parent, removing it from the scenegraph.
 func (node *Node) Unparent() {
 	if node.parent != nil {
 		node.parent.RemoveChildren(node)
@@ -932,14 +977,17 @@ func (node *Node) ReindexChild(child INode, newIndex int) int {
 // Index returns the index of the Node in its parent's children list.
 // If the node doesn't have a parent, its index will be -1.
 func (node *Node) Index() int {
+	var index = -1
 	if node.parent != nil {
-		for i, c := range node.parent.Children() {
-			if c == node {
-				return i
+		node.parent.ForEachChild(func(child INode, i, size int) bool {
+			if child == node {
+				index = i
+				return false
 			}
-		}
+			return true
+		})
 	}
-	return -1
+	return index
 }
 
 // Children returns the Node's children as a slice of INodes.
@@ -950,9 +998,10 @@ func (node *Node) Children() []INode {
 // ForEachChild runs the provided callback function for each child in the node's children slice.
 // If the callback returns false, then it stops execution with the current child.
 // The function loops through the children list in reverse so removing children is non-problematic.
-func (node *Node) ForEachChild(forEach func(child INode) bool) {
+func (node *Node) ForEachChild(forEach func(child INode, index, size int) bool) {
+	size := len(node.children)
 	for i := len(node.children) - 1; i >= 0; i-- {
-		if !forEach(node.children[i]) {
+		if !forEach(node.children[i], i, size) {
 			return
 		}
 	}
@@ -1316,15 +1365,4 @@ func (node *Node) DistanceSquaredTo(other INode) float64 {
 // Quick syntactic sugar for other.WorldPosition().Sub(node.WorldPosition()).
 func (node *Node) VectorTo(other INode) Vector {
 	return other.WorldPosition().Sub(node.WorldPosition())
-}
-
-// RegisteredForSceneTreeCallbacks returns if an INode is registered for scene tree callbacks.
-func (node *Node) RegisteredForSceneTreeCallbacks() bool {
-	return node.registeredForSceneTreeCallbacks
-}
-
-// SetRegisteredForSceneTreeCallbacks registers an INode for reporting to a callback when its scene
-// tree changes in some way.
-func (node *Node) SetRegisteredForSceneTreeCallbacks(registered bool) {
-	node.registeredForSceneTreeCallbacks = registered
 }

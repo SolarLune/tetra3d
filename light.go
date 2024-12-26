@@ -40,12 +40,14 @@ type AmbientLight struct {
 
 // NewAmbientLight returns a new AmbientLight.
 func NewAmbientLight(name string, r, g, b, energy float32) *AmbientLight {
-	return &AmbientLight{
+	amb := &AmbientLight{
 		Node:   NewNode(name),
 		color:  NewColor(r, g, b, 1),
 		energy: energy,
 		on:     true,
 	}
+	amb.owner = amb
+	return amb
 }
 
 func (amb *AmbientLight) Clone() INode {
@@ -53,9 +55,10 @@ func (amb *AmbientLight) Clone() INode {
 	clone := NewAmbientLight(amb.name, amb.color.R, amb.color.G, amb.color.B, amb.energy)
 	clone.on = amb.on
 
-	clone.Node = amb.Node.Clone().(*Node)
-	for _, child := range amb.children {
-		child.setParent(clone)
+	clone.Node = amb.Node.clone(clone).(*Node)
+
+	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
 	}
 
 	return clone
@@ -73,19 +76,6 @@ func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []
 	meshPart.ForEachVertexIndex(func(vertIndex int) {
 		targetColors[vertIndex] = targetColors[vertIndex].AddRGBA(amb.result[0], amb.result[1], amb.result[2], 0)
 	}, onlyVisible)
-}
-
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (amb *AmbientLight) AddChildren(children ...INode) {
-	amb.addChildren(amb, children...)
-}
-
-// Unparent unparents the AmbientLight from its parent, removing it from the scenegraph.
-func (amb *AmbientLight) Unparent() {
-	if amb.parent != nil {
-		amb.parent.RemoveChildren(amb)
-	}
 }
 
 func (amb *AmbientLight) IsOn() bool {
@@ -117,19 +107,6 @@ func (amb *AmbientLight) Type() NodeType {
 	return NodeTypeAmbientLight
 }
 
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (amb *AmbientLight) Index() int {
-	if amb.parent != nil {
-		for i, c := range amb.parent.Children() {
-			if c == amb {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
 //---------------//
 
 // PointLight represents a point light (naturally).
@@ -153,12 +130,14 @@ type PointLight struct {
 
 // NewPointLight creates a new Point light.
 func NewPointLight(name string, r, g, b, energy float32) *PointLight {
-	return &PointLight{
+	point := &PointLight{
 		Node:   NewNode(name),
 		energy: energy,
 		color:  NewColor(r, g, b, 1),
 		On:     true,
 	}
+	point.owner = point
+	return point
 }
 
 // Clone returns a new clone of the given point light.
@@ -168,9 +147,10 @@ func (p *PointLight) Clone() INode {
 	clone.On = p.On
 	clone.Range = p.Range
 
-	clone.Node = p.Node.Clone().(*Node)
-	for _, child := range p.children {
-		child.setParent(p)
+	clone.Node = p.Node.clone(clone).(*Node)
+
+	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
 	}
 
 	return clone
@@ -286,19 +266,6 @@ func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Colo
 
 }
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (p *PointLight) AddChildren(children ...INode) {
-	p.addChildren(p, children...)
-}
-
-// Unparent unparents the PointLight from its parent, removing it from the scenegraph.
-func (p *PointLight) Unparent() {
-	if p.parent != nil {
-		p.parent.RemoveChildren(p)
-	}
-}
-
 func (p *PointLight) IsOn() bool {
 	return p.On && p.energy > 0
 }
@@ -323,19 +290,6 @@ func (p *PointLight) SetEnergy(energy float32) {
 	p.energy = energy
 }
 
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (p *PointLight) Index() int {
-	if p.parent != nil {
-		for i, c := range p.parent.Children() {
-			if c == p {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
 // Type returns the NodeType for this object.
 func (p *PointLight) Type() NodeType {
 	return NodeTypePointLight
@@ -358,12 +312,14 @@ type DirectionalLight struct {
 
 // NewDirectionalLight creates a new Directional Light with the specified RGB color and energy (assuming 1.0 energy is standard / "100%" lighting).
 func NewDirectionalLight(name string, r, g, b, energy float32) *DirectionalLight {
-	return &DirectionalLight{
+	sun := &DirectionalLight{
 		Node:   NewNode(name),
 		color:  NewColor(r, g, b, 1),
 		energy: energy,
 		On:     true,
 	}
+	sun.owner = sun
+	return sun
 }
 
 // Clone returns a new DirectionalLight clone from the given DirectionalLight.
@@ -373,9 +329,9 @@ func (sun *DirectionalLight) Clone() INode {
 
 	clone.On = sun.On
 
-	clone.Node = sun.Node.Clone().(*Node)
-	for _, child := range sun.children {
-		child.setParent(clone)
+	clone.Node = sun.Node.clone(clone).(*Node)
+	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
 	}
 
 	return clone
@@ -430,19 +386,6 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 
 }
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (sun *DirectionalLight) AddChildren(children ...INode) {
-	sun.addChildren(sun, children...)
-}
-
-// Unparent unparents the DirectionalLight from its parent, removing it from the scenegraph.
-func (sun *DirectionalLight) Unparent() {
-	if sun.parent != nil {
-		sun.parent.RemoveChildren(sun)
-	}
-}
-
 func (sun *DirectionalLight) IsOn() bool {
 	return sun.On && sun.energy > 0
 }
@@ -465,19 +408,6 @@ func (d *DirectionalLight) Energy() float32 {
 
 func (d *DirectionalLight) SetEnergy(energy float32) {
 	d.energy = energy
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (sun *DirectionalLight) Index() int {
-	if sun.parent != nil {
-		for i, c := range sun.parent.Children() {
-			if c == sun {
-				return i
-			}
-		}
-	}
-	return -1
 }
 
 // Type returns the NodeType for this object.
@@ -512,6 +442,7 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 		On:            true,
 		LightingAngle: Vector{0, -1, 0, 0},
 	}
+	cube.owner = cube
 	return cube
 }
 
@@ -534,9 +465,9 @@ func (cube *CubeLight) Clone() INode {
 	newCube.Bleed = cube.Bleed
 	newCube.LightingAngle = cube.LightingAngle
 	newCube.SetWorldTransform(cube.Transform())
-	newCube.Node = cube.Node.Clone().(*Node)
-	for _, child := range newCube.children {
-		child.setParent(newCube)
+	newCube.Node = cube.Node.clone(newCube).(*Node)
+	if newCube.Callbacks() != nil && newCube.Callbacks().OnClone != nil {
+		newCube.Callbacks().OnClone(newCube)
 	}
 	return newCube
 }
@@ -764,31 +695,7 @@ func (cube *CubeLight) SetEnergy(energy float32) {
 	cube.energy = energy
 }
 
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (cube *CubeLight) AddChildren(children ...INode) {
-	cube.addChildren(cube, children...)
-}
-
-// Unparent unparents the CubeLight from its parent, removing it from the scenegraph.
-func (cube *CubeLight) Unparent() {
-	if cube.parent != nil {
-		cube.parent.RemoveChildren(cube)
-	}
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (cube *CubeLight) Index() int {
-	if cube.parent != nil {
-		for i, c := range cube.parent.Children() {
-			if c == cube {
-				return i
-			}
-		}
-	}
-	return -1
-}
+/////
 
 // Type returns the type of INode this is (NodeTypeCubeLight).
 func (cube *CubeLight) Type() NodeType {

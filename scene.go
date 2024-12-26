@@ -71,13 +71,6 @@ func (scene *Scene) Clone() *Scene {
 
 	newScene.data = scene.data
 
-	newScene.Root.SearchTree().ForEach(func(node INode) bool {
-		if node.RegisteredForSceneTreeCallbacks() && Callbacks.OnSceneClone != nil {
-			Callbacks.OnSceneClone(node, newScene)
-		}
-		return true
-	})
-
 	return newScene
 
 }
@@ -192,12 +185,3 @@ func (scene *Scene) Get(nodePath string) INode {
 func (scene *Scene) FindNode(nodeName string) INode {
 	return scene.Root.SearchTree().ByName(nodeName).First()
 }
-
-//////////////
-
-type SceneTreeCallbacks struct {
-	OnNodeReparent func(node, oldParent, newParent INode) // A callback to be called whenever a Node is reparented.
-	OnSceneClone   func(node INode, newScene *Scene)      // A callback function to be called whenever a Node is registered and is part of a Scene that is cloned.
-}
-
-var Callbacks = SceneTreeCallbacks{}

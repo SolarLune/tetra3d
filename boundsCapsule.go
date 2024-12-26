@@ -15,18 +15,23 @@ type BoundingCapsule struct {
 // NewBoundingCapsule returns a new BoundingCapsule instance. Name is the name of the underlying Node for the Capsule, height is the total
 // height of the Capsule, and radius is how big around the capsule is. Height has to be at least radius (otherwise, it would no longer be a capsule).
 func NewBoundingCapsule(name string, height, radius float64) *BoundingCapsule {
-	return &BoundingCapsule{
+	cap := &BoundingCapsule{
 		Node:           NewNode(name),
 		Height:         math.Max(radius, height),
 		Radius:         radius,
 		internalSphere: NewBoundingSphere("internal capsule sphere", 0),
 	}
+	cap.owner = cap
+	return cap
 }
 
 // Clone returns a new BoundingCapsule.
 func (capsule *BoundingCapsule) Clone() INode {
 	clone := NewBoundingCapsule(capsule.name, capsule.Height, capsule.Radius)
-	clone.Node = capsule.Node.Clone().(*Node)
+	clone.Node = capsule.Node.clone(clone).(*Node)
+	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
+	}
 	return clone
 }
 
@@ -508,32 +513,6 @@ func (capsule *BoundingCapsule) Bottom() Vector {
 }
 
 /////
-
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (capsule *BoundingCapsule) AddChildren(children ...INode) {
-	capsule.addChildren(capsule, children...)
-}
-
-// Unparent unparents the Camera from its parent, removing it from the scenegraph.
-func (capsule *BoundingCapsule) Unparent() {
-	if capsule.parent != nil {
-		capsule.parent.RemoveChildren(capsule)
-	}
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (capsule *BoundingCapsule) Index() int {
-	if capsule.parent != nil {
-		for i, c := range capsule.parent.Children() {
-			if c == capsule {
-				return i
-			}
-		}
-	}
-	return -1
-}
 
 // Type returns the NodeType for this object.
 func (capsule *BoundingCapsule) Type() NodeType {

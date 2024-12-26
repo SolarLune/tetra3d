@@ -31,6 +31,7 @@ func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
 	}
 	bounds.Node.onTransformUpdate = bounds.updateSize
 	bounds.updateSize()
+	bounds.owner = bounds
 	return bounds
 }
 
@@ -118,8 +119,11 @@ func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float64) {
 // Clone returns a new BoundingAABB.
 func (box *BoundingAABB) Clone() INode {
 	clone := NewBoundingAABB(box.name, box.internalSize.X, box.internalSize.Y, box.internalSize.Z)
-	clone.Node = box.Node.Clone().(*Node)
+	clone.Node = box.Node.clone(clone).(*Node)
 	clone.Node.onTransformUpdate = clone.updateSize
+	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
+	}
 	return clone
 }
 
@@ -266,32 +270,6 @@ func (box *BoundingAABB) PointInside(point Vector) bool {
 	}
 
 	return false
-}
-
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (box *BoundingAABB) AddChildren(children ...INode) {
-	box.addChildren(box, children...)
-}
-
-// Unparent unparents the Camera from its parent, removing it from the scenegraph.
-func (box *BoundingAABB) Unparent() {
-	if box.parent != nil {
-		box.parent.RemoveChildren(box)
-	}
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (box *BoundingAABB) Index() int {
-	if box.parent != nil {
-		for i, c := range box.parent.Children() {
-			if c == box {
-				return i
-			}
-		}
-	}
-	return -1
 }
 
 // Type returns the NodeType for this object.

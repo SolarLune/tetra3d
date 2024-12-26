@@ -12,16 +12,21 @@ type BoundingSphere struct {
 
 // NewBoundingSphere returns a new BoundingSphere instance.
 func NewBoundingSphere(name string, radius float64) *BoundingSphere {
-	return &BoundingSphere{
+	sphere := &BoundingSphere{
 		Node:   NewNode(name),
 		Radius: radius,
 	}
+	sphere.owner = sphere
+	return sphere
 }
 
 // Clone returns a new BoundingSphere instance.
 func (sphere *BoundingSphere) Clone() INode {
 	clone := NewBoundingSphere(sphere.name, sphere.Radius)
-	clone.Node = sphere.Node.Clone().(*Node)
+	clone.Node = sphere.Node.clone(clone).(*Node)
+	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
+	}
 	return clone
 }
 
@@ -84,32 +89,6 @@ func (sphere *BoundingSphere) PointInside(point Vector) bool {
 }
 
 /////
-
-// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
-// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
-func (sphere *BoundingSphere) AddChildren(children ...INode) {
-	sphere.addChildren(sphere, children...)
-}
-
-// Unparent unparents the Camera from its parent, removing it from the scenegraph.
-func (sphere *BoundingSphere) Unparent() {
-	if sphere.parent != nil {
-		sphere.parent.RemoveChildren(sphere)
-	}
-}
-
-// Index returns the index of the Node in its parent's children list.
-// If the node doesn't have a parent, its index will be -1.
-func (sphere *BoundingSphere) Index() int {
-	if sphere.parent != nil {
-		for i, c := range sphere.parent.Children() {
-			if c == sphere {
-				return i
-			}
-		}
-	}
-	return -1
-}
 
 // Type returns the NodeType for this object.
 func (sphere *BoundingSphere) Type() NodeType {

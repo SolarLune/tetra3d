@@ -187,7 +187,7 @@ func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool, multi
 		if !nf.stopOnFiltered || successfulFilter {
 
 			includeChild := true
-			node.ForEachChild(func(child INode) bool {
+			node.ForEachChild(func(child INode, index int, size int) bool {
 				if !nf.executeFilters(child, execute, multithreading) {
 					includeChild = false
 					nf.depth--
