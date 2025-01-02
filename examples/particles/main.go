@@ -3,13 +3,13 @@ package main
 import (
 	"bytes"
 	"image/color"
-	"math"
 
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"
+	"github.com/solarlune/tetra3d/math32"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -24,7 +24,7 @@ type Game struct {
 	FieldParticleSystem *tetra3d.ParticleSystem
 	RingParticleSystem  *tetra3d.ParticleSystem
 
-	Time float64
+	Time float32
 }
 
 func NewGame() *Game {
@@ -126,12 +126,12 @@ func (g *Game) Init() {
 	// Similarly to the field system, the ring system spawns particles in a different manner - we want them to spawn in a ring that spins.
 	// To do this, we'll make use of a vector that controls how far out the particles spawn, and then rotate that ring after each spawn.
 
-	ring := tetra3d.NewVector(4, 0, 0)
+	ring := tetra3d.NewVector3(4, 0, 0)
 
 	settings.SpawnOffsetFunction = func(particle *tetra3d.Particle) {
 		particle.Model.MoveVec(ring)
 		// 181 degrees here because 1: we're slowly spinning the ring by 1 degree, and 2: we're spawning two rings (so we spin the ring by 180 degrees)
-		ring = ring.RotateVec(tetra3d.WorldUp, tetra3d.ToRadians(181))
+		ring = ring.RotateVec(tetra3d.WorldUp, math32.ToRadians(181))
 	}
 
 	settings.SpawnOffset.SetRanges(-0.1, 0.1)
@@ -161,7 +161,7 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	dt := 1.0 / 60.0
+	dt := float32(1.0 / 60.0)
 
 	g.Time += dt
 
@@ -170,7 +170,7 @@ func (g *Game) Update() error {
 	g.FieldParticleSystem.Update(dt)
 	g.RingParticleSystem.Update(dt)
 
-	g.Scene.Root.Get("Fire").Move(math.Sin(g.Time)*0.05, 0, 0)
+	g.Scene.Root.Get("Fire").Move(math32.Sin(g.Time)*0.05, 0, 0)
 
 	g.Camera.Update()
 

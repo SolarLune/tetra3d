@@ -1,13 +1,12 @@
 package main
 
 import (
-	"math"
-
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"
+	"github.com/solarlune/tetra3d/math32"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -18,7 +17,7 @@ type Game struct {
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
 
-	Time float64
+	Time float32
 }
 
 func NewGame() *Game {
@@ -69,9 +68,9 @@ func (g *Game) Init() {
 
 	// ... And here we specify a "vertex program" - in truth, this operates on CPU, rather than the GPU, but it still is useful.
 	// Much like a Fragment shader, it operates on all vertices that render with the material.
-	model.VertexTransformFunction = func(v *tetra3d.Vector, id int) {
-		waveHeight := 0.01
-		v.Y += math.Sin(g.Time*math.Pi+(v.X*10)) * waveHeight
+	model.VertexTransformFunction = func(v *tetra3d.Vector3, id int) {
+		waveHeight := float32(0.04)
+		v.Y += math32.Sin(g.Time*math32.Pi+(v.X*10)) * waveHeight
 	}
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
@@ -110,14 +109,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := `This demo shows how custom shaders work.
 
 There are two kinds of shader programs: 
-fragment shaders and vertex programs.
-Fragment shaders are written in Kage and run
-on the GPU, while vertex programs are written in 
-pure Go and are executed on the CPU.
+Fragment shaders (which shade models' pixels), and
+Vertex programs (which move models' vertices).
 
-The cube on the left is running a fragment shader,
-while the sphere on the right runs a vertex program.`
-		g.Camera.DrawDebugText(screen, txt, 0, 200, 1, colors.LightGray())
+The cube on the left is running a fragment shader written in Kage,
+while the sphere on the right runs a vertex program written in Go.`
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 	}
 }
 

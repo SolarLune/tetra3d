@@ -5,58 +5,59 @@ import (
 	"fmt"
 	"log"
 	"math"
+
+	"github.com/solarlune/tetra3d/math32"
 )
 
 // Dimensions represents the minimum and maximum spatial dimensions of a Mesh arranged in a 2-space Vector slice.
 type Dimensions struct {
-	Min, Max Vector
+	Min, Max Vector3
 }
 
 func NewEmptyDimensions() Dimensions {
 	return Dimensions{
-		Vector{math.MaxFloat64, math.MaxFloat64, math.MaxFloat64, 0},
-		Vector{-math.MaxFloat64, -math.MaxFloat64, -math.MaxFloat64, 0},
+		Vector3{float32(math.MaxFloat32), float32(math.MaxFloat32), float32(math.MaxFloat32)},
+		Vector3{-float32(math.MaxFloat32), -float32(math.MaxFloat32), -float32(math.MaxFloat32)},
 	}
 }
 
 // MaxDimension returns the maximum value from all of the axes in the Dimensions. For example, if the Dimensions have a min of [-1, -2, -2],
 // and a max of [6, 1.5, 1], Max() will return 7 for the X axis, as it's the largest distance between all axes.
-func (dim Dimensions) MaxDimension() float64 {
-	return math.Max(math.Max(dim.Width(), dim.Height()), dim.Depth())
+func (dim Dimensions) MaxDimension() float32 {
+	return math32.Max(math32.Max(dim.Width(), dim.Height()), dim.Depth())
 }
 
 // MaxSpan returns the maximum span between the corners of the dimension set.
-func (dim Dimensions) MaxSpan() float64 {
+func (dim Dimensions) MaxSpan() float32 {
 	return dim.Max.Sub(dim.Min).Magnitude()
 }
 
 // Center returns the center point inbetween the two corners of the dimension set.
-func (dim Dimensions) Center() Vector {
-	return Vector{
+func (dim Dimensions) Center() Vector3 {
+	return Vector3{
 		(dim.Max.X + dim.Min.X) / 2,
 		(dim.Max.Y + dim.Min.Y) / 2,
 		(dim.Max.Z + dim.Min.Z) / 2,
-		0,
 	}
 }
 
 // Width returns the total difference between the minimum and maximum X values.
-func (dim Dimensions) Width() float64 {
+func (dim Dimensions) Width() float32 {
 	return dim.Max.X - dim.Min.X
 }
 
 // Height returns the total difference between the minimum and maximum Y values.
-func (dim Dimensions) Height() float64 {
+func (dim Dimensions) Height() float32 {
 	return dim.Max.Y - dim.Min.Y
 }
 
 // Depth returns the total difference between the minimum and maximum Z values.
-func (dim Dimensions) Depth() float64 {
+func (dim Dimensions) Depth() float32 {
 	return dim.Max.Z - dim.Min.Z
 }
 
 // Clamp limits the provided position vector to be within the dimensions set.
-func (dim Dimensions) Clamp(position Vector) Vector {
+func (dim Dimensions) Clamp(position Vector3) Vector3 {
 
 	if position.X < dim.Min.X {
 		position.X = dim.Min.X
@@ -80,7 +81,7 @@ func (dim Dimensions) Clamp(position Vector) Vector {
 }
 
 // Inside returns if a position is inside a set of dimensions.
-func (dim Dimensions) Inside(position Vector) bool {
+func (dim Dimensions) Inside(position Vector3) bool {
 
 	if position.X < dim.Min.X ||
 		position.X > dim.Max.X ||
@@ -94,8 +95,8 @@ func (dim Dimensions) Inside(position Vector) bool {
 	return true
 }
 
-func (dim Dimensions) Size() Vector {
-	return Vector{dim.Width(), dim.Height(), dim.Depth(), 0}
+func (dim Dimensions) Size() Vector3 {
+	return Vector3{dim.Width(), dim.Height(), dim.Depth()}
 }
 
 // func (dim Dimensions) reform() {
@@ -117,7 +118,7 @@ func (dim Dimensions) Size() Vector {
 // }
 
 // NewDimensionsFromPoints creates a new Dimensions struct from the given series of positions.
-func NewDimensionsFromPoints(points ...Vector) Dimensions {
+func NewDimensionsFromPoints(points ...Vector3) Dimensions {
 
 	if len(points) == 0 {
 		panic("error: no points passed to NewDimensionsFromPoints()")
@@ -164,6 +165,10 @@ const (
 	MeshUniqueMeshAndMaterials
 )
 
+// VertexColorChannel represents the colors of vertices in a channel.
+// Each value in the color channel is a color for the vertex in the associated index.
+type VertexColorChannel []Color
+
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one
 // manually if you want to construct a Mesh via code).
 type Mesh struct {
@@ -177,21 +182,21 @@ type Mesh struct {
 	// Vertices are stored as a struct-of-arrays for simplified and faster rendering.
 	// Each vertex property (position, normal, UV, colors, weights, bones, etc) is stored
 	// here and indexed in order of vertex index.
-	vertexTransforms         []Vector
-	VertexPositions          []Vector
-	VertexNormals            []Vector
-	vertexSkinnedNormals     []Vector
-	vertexSkinnedPositions   []Vector
-	vertexTransformedNormals []Vector
-	VertexUVs                []Vector // The UV values for each vertex
-	VertexUVOriginalValues   []Vector // The original UV values for each vertex
-	VertexColors             [][]Color
-	VertexActiveColorChannel []int       // VertexActiveColorChannel is the active vertex color used for coloring the vertex in the index given.
+	vertexTransforms         []Vector4
+	VertexPositions          []Vector3
+	VertexNormals            []Vector3
+	vertexSkinnedNormals     []Vector3
+	vertexSkinnedPositions   []Vector3
+	vertexTransformedNormals []Vector3
+	VertexUVs                []Vector2 // The UV values for each vertex
+	VertexUVOriginalValues   []Vector2 // The original UV values for each vertex
+	VertexColors             []VertexColorChannel
 	VertexGroupNames         []string    // The names of the vertex groups applies to the Mesh; this is only populated if the Mesh is affected by an armature
 	VertexWeights            [][]float32 // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
 	VertexBones              [][]uint16  // TODO: Replace this with [][8]uint16 (or however many the maximum number of bones affecting a single vertex is for GLTF)
 	visibleVertices          []bool
-	maxTriangleSpan          float64
+	maxTriangleSpan          float32
+	VertexActiveColorChannel int // VertexActiveColorChannel is the active vertex color used for coloring the mesh
 
 	vertexLights  []Color
 	vertsAddStart int
@@ -213,23 +218,23 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 	mesh := &Mesh{
 		Name:                    name,
 		MeshParts:               []*MeshPart{},
-		Dimensions:              Dimensions{Vector{0, 0, 0, 0}, Vector{0, 0, 0, 0}},
+		Dimensions:              Dimensions{Vector3{0, 0, 0}, Vector3{0, 0, 0}},
 		VertexColorChannelNames: map[string]int{},
 		properties:              NewProperties(),
 
-		vertexTransforms:         []Vector{},
-		VertexPositions:          []Vector{},
+		vertexTransforms:         []Vector4{},
+		VertexPositions:          []Vector3{},
 		visibleVertices:          []bool{},
-		VertexNormals:            []Vector{},
-		vertexSkinnedNormals:     []Vector{},
-		vertexSkinnedPositions:   []Vector{},
-		vertexTransformedNormals: []Vector{},
+		VertexNormals:            []Vector3{},
+		vertexSkinnedNormals:     []Vector3{},
+		vertexSkinnedPositions:   []Vector3{},
+		vertexTransformedNormals: []Vector3{},
 		vertexLights:             []Color{},
-		VertexUVs:                []Vector{},
-		VertexColors:             [][]Color{},
-		VertexActiveColorChannel: []int{},
+		VertexUVs:                []Vector2{},
+		VertexColors:             []VertexColorChannel{},
 		VertexBones:              [][]uint16{},
 		VertexWeights:            [][]float32{},
+		VertexActiveColorChannel: -1,
 	}
 
 	if len(verts) > 0 {
@@ -249,6 +254,8 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	newMesh.allocateVertexBuffers(len(mesh.VertexPositions))
 
+	// TODO: Replace these with copy() calls?
+
 	for i := range mesh.VertexPositions {
 		newMesh.VertexPositions = append(newMesh.VertexPositions, mesh.VertexPositions[i])
 		newMesh.visibleVertices = append(newMesh.visibleVertices, false)
@@ -267,16 +274,14 @@ func (mesh *Mesh) Clone() *Mesh {
 		newMesh.VertexUVOriginalValues = append(newMesh.VertexUVOriginalValues, mesh.VertexUVs[i])
 	}
 
-	for i := range mesh.VertexColors {
-		newMesh.VertexColors = append(newMesh.VertexColors, make([]Color, len(mesh.VertexColors[i])))
-		for channelIndex := range mesh.VertexColors[i] {
-			newMesh.VertexColors[i][channelIndex] = mesh.VertexColors[i][channelIndex]
+	newMesh.VertexColors = append(newMesh.VertexColors, make(VertexColorChannel, len(mesh.VertexColors)))
+	for channelIndex, channel := range mesh.VertexColors {
+		for vertIndex := range channel {
+			channel = append(channel, mesh.VertexColors[channelIndex][vertIndex])
 		}
 	}
 
-	for c := range mesh.VertexActiveColorChannel {
-		newMesh.VertexActiveColorChannel = append(newMesh.VertexActiveColorChannel, mesh.VertexActiveColorChannel[c])
-	}
+	newMesh.VertexActiveColorChannel = mesh.VertexActiveColorChannel
 
 	for c := range mesh.VertexBones {
 		newMesh.VertexBones = append(newMesh.VertexBones, []uint16{})
@@ -356,41 +361,45 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 		return
 	}
 
-	mesh.VertexPositions = append(make([]Vector, 0, vertexCount), mesh.VertexPositions...)
+	mesh.VertexPositions = append(make([]Vector3, 0, vertexCount), mesh.VertexPositions...)
 	if len(mesh.visibleVertices) < vertexCount {
 		mesh.visibleVertices = make([]bool, vertexCount)
 	}
 
-	mesh.VertexNormals = append(make([]Vector, 0, vertexCount), mesh.VertexNormals...)
+	mesh.VertexNormals = append(make([]Vector3, 0, vertexCount), mesh.VertexNormals...)
 
 	mesh.vertexLights = append(make([]Color, 0, vertexCount), mesh.vertexLights...)
 
-	mesh.VertexUVs = append(make([]Vector, 0, vertexCount), mesh.VertexUVs...)
-	mesh.VertexUVOriginalValues = append(make([]Vector, 0, vertexCount), mesh.VertexUVs...)
+	mesh.VertexUVs = append(make([]Vector2, 0, vertexCount), mesh.VertexUVs...)
+	mesh.VertexUVOriginalValues = append(make([]Vector2, 0, vertexCount), mesh.VertexUVs...)
 
-	mesh.VertexColors = append(make([][]Color, 0, vertexCount), mesh.VertexColors...)
-
-	mesh.VertexActiveColorChannel = append(make([]int, 0, vertexCount), mesh.VertexActiveColorChannel...)
+	for ci := range mesh.VertexColors {
+		mesh.VertexColors[ci] = append(make(VertexColorChannel, 0, vertexCount), mesh.VertexColors[ci]...)
+	}
 
 	mesh.VertexBones = append(make([][]uint16, 0, vertexCount), mesh.VertexBones...)
 
 	mesh.VertexWeights = append(make([][]float32, 0, vertexCount), mesh.VertexWeights...)
 
-	mesh.vertexTransforms = append(make([]Vector, 0, vertexCount), mesh.vertexTransforms...)
+	mesh.vertexTransforms = append(make([]Vector4, 0, vertexCount), mesh.vertexTransforms...)
 
-	mesh.vertexSkinnedNormals = append(make([]Vector, 0, vertexCount), mesh.vertexSkinnedNormals...)
+	mesh.vertexSkinnedNormals = append(make([]Vector3, 0, vertexCount), mesh.vertexSkinnedNormals...)
 
-	mesh.vertexTransformedNormals = append(make([]Vector, 0, vertexCount), mesh.vertexTransformedNormals...)
+	mesh.vertexTransformedNormals = append(make([]Vector3, 0, vertexCount), mesh.vertexTransformedNormals...)
 
-	mesh.vertexSkinnedPositions = append(make([]Vector, 0, vertexCount), mesh.vertexSkinnedPositions...)
+	mesh.vertexSkinnedPositions = append(make([]Vector3, 0, vertexCount), mesh.vertexSkinnedPositions...)
 
 }
 
 func (mesh *Mesh) ensureEnoughVertexColorChannels(channelIndex int) {
 
-	for i := range mesh.VertexColors {
-		for len(mesh.VertexColors[i]) <= channelIndex {
-			mesh.VertexColors[i] = append(mesh.VertexColors[i], NewColor(1, 1, 1, 1))
+	for len(mesh.VertexColors) <= channelIndex+1 {
+		mesh.VertexColors = append(mesh.VertexColors, VertexColorChannel{})
+	}
+
+	for ci := range mesh.VertexColors {
+		for len(mesh.VertexColors[ci]) < len(mesh.VertexPositions) {
+			mesh.VertexColors[ci] = append(mesh.VertexColors[ci], Color{1, 1, 1, 1})
 		}
 	}
 
@@ -403,35 +412,37 @@ func (mesh *Mesh) ensureEnoughVertexColorChannels(channelIndex int) {
 // then those indices will be skipped.
 func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, sourceChannels ...int) {
 
-	if len(sourceChannels) == 0 {
-		return
-	}
+	mesh.ensureEnoughVertexColorChannels(targetChannel)
 
-	for i := range mesh.VertexColors {
+	base := NewColor(1, 1, 1, 1)
 
-		base := NewColor(0, 0, 0, 1)
+	for vertexIndex := 0; vertexIndex < len(mesh.VertexColors[targetChannel]); vertexIndex++ {
+
+		base.R = 0
+		base.G = 0
+		base.B = 0
 
 		if multiplicative {
-			base = NewColor(1, 1, 1, 1)
+			base.R = 1
+			base.G = 1
+			base.B = 1
 		}
 
-		for _, c := range sourceChannels {
-
-			if len(mesh.VertexColors[i]) <= c {
-				continue
-			}
+		for _, channelIndex := range sourceChannels {
 
 			if multiplicative {
-				base = base.Multiply(mesh.VertexColors[i][c])
+				base.R *= mesh.VertexColors[channelIndex][vertexIndex].R
+				base.G *= mesh.VertexColors[channelIndex][vertexIndex].G
+				base.B *= mesh.VertexColors[channelIndex][vertexIndex].B
 			} else {
-				base = base.Add(mesh.VertexColors[i][c])
+				base.R += mesh.VertexColors[channelIndex][vertexIndex].R
+				base.G += mesh.VertexColors[channelIndex][vertexIndex].G
+				base.B += mesh.VertexColors[channelIndex][vertexIndex].B
 			}
 
 		}
 
-		mesh.ensureEnoughVertexColorChannels(targetChannel)
-
-		mesh.VertexColors[i][targetChannel] = base
+		mesh.VertexColors[targetChannel][vertexIndex] = base
 
 	}
 
@@ -445,6 +456,12 @@ func (mesh *Mesh) SetVertexColor(targetChannel int, color Color) {
 // SetActiveColorChannel sets the active color channel for all vertices in the mesh to the specified channel index.
 func (mesh *Mesh) SetActiveColorChannel(targetChannel int) {
 	NewVertexSelection().SelectMeshes(mesh).SetActiveColorChannel(targetChannel)
+}
+
+// Select allows you to easily select the vertices associated with the Mesh.
+// Select is just syntactic sugar for tetra3d.NewVertexSelection().SelectMeshes(mesh).
+func (mesh *Mesh) Select() VertexSelection {
+	return NewVertexSelection().SelectMeshes(mesh)
 }
 
 // Materials returns a slice of the materials present in the Mesh's MeshParts.
@@ -492,20 +509,25 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 	for i := 0; i < len(verts); i++ {
 
 		vertInfo := verts[i]
-		mesh.VertexPositions = append(mesh.VertexPositions, Vector{vertInfo.X, vertInfo.Y, vertInfo.Z, 0})
-		mesh.VertexNormals = append(mesh.VertexNormals, Vector{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ, 0})
-		mesh.VertexUVs = append(mesh.VertexUVs, Vector{vertInfo.U, vertInfo.V, 0, 0})
-		mesh.VertexUVOriginalValues = append(mesh.VertexUVOriginalValues, Vector{vertInfo.U, vertInfo.V, 0, 0})
-		mesh.VertexColors = append(mesh.VertexColors, vertInfo.Colors)
-		mesh.VertexActiveColorChannel = append(mesh.VertexActiveColorChannel, vertInfo.ActiveColorChannel)
+		mesh.VertexPositions = append(mesh.VertexPositions, Vector3{vertInfo.X, vertInfo.Y, vertInfo.Z})
+		mesh.VertexNormals = append(mesh.VertexNormals, Vector3{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ})
+		mesh.VertexUVs = append(mesh.VertexUVs, Vector2{vertInfo.U, vertInfo.V})
+		mesh.VertexUVOriginalValues = append(mesh.VertexUVOriginalValues, Vector2{vertInfo.U, vertInfo.V})
+
+		mesh.ensureEnoughVertexColorChannels(len(vertInfo.Colors) - 1)
+
+		for channelIndex := 0; channelIndex < len(vertInfo.Colors); channelIndex++ {
+			mesh.VertexColors[channelIndex][mesh.vertsAddStart+i] = vertInfo.Colors[channelIndex]
+		}
+
 		mesh.VertexBones = append(mesh.VertexBones, vertInfo.Bones)
 		mesh.VertexWeights = append(mesh.VertexWeights, vertInfo.Weights)
 
 		mesh.vertexLights = append(mesh.vertexLights, NewColor(0, 0, 0, 1))
-		mesh.vertexTransforms = append(mesh.vertexTransforms, Vector{0, 0, 0, 0}) // x, y, z, w
-		mesh.vertexSkinnedNormals = append(mesh.vertexSkinnedNormals, Vector{0, 0, 0, 0})
-		mesh.vertexTransformedNormals = append(mesh.vertexTransformedNormals, Vector{0, 0, 0, 0})
-		mesh.vertexSkinnedPositions = append(mesh.vertexSkinnedPositions, Vector{0, 0, 0, 0})
+		mesh.vertexTransforms = append(mesh.vertexTransforms, Vector4{}) // x, y, z, w
+		mesh.vertexSkinnedNormals = append(mesh.vertexSkinnedNormals, Vector3{})
+		mesh.vertexTransformedNormals = append(mesh.vertexTransformedNormals, Vector3{})
+		mesh.vertexSkinnedPositions = append(mesh.vertexSkinnedPositions, Vector3{})
 
 	}
 
@@ -616,9 +638,9 @@ func (vs VertexSelection) SelectInVertexColorChannel(mesh *Mesh, channelNames ..
 
 		if channelIndex, ok := mesh.VertexColorChannelNames[groupName]; ok {
 
-			for vertexIndex := range mesh.VertexColors {
+			for vertexIndex := range mesh.VertexColors[channelIndex] {
 
-				color := mesh.VertexColors[vertexIndex][channelIndex]
+				color := mesh.VertexColors[channelIndex][vertexIndex]
 
 				if color.R > 0.01 || color.G > 0.01 || color.B > 0.01 {
 					vs.SelectionSet[mesh].Indices.Add(vertexIndex)
@@ -700,6 +722,10 @@ func (vs VertexSelection) Clear() VertexSelection {
 		delete(vs.SelectionSet, m)
 	}
 	return vs
+}
+
+func (vs VertexSelection) IsEmpty() bool {
+	return len(vs.SelectionSet) == 0
 }
 
 // SelectMeshPart selects all vertices in the Mesh belonging to any of the specified MeshParts.
@@ -809,13 +835,16 @@ func (vs VertexSelection) SetColor(channelIndex int, color Color) {
 	}
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
-		mesh.VertexColors[index][channelIndex] = NewColor(color.ToFloat32s())
+		mesh.VertexColors[channelIndex][index].R = color.R
+		mesh.VertexColors[channelIndex][index].G = color.G
+		mesh.VertexColors[channelIndex][index].B = color.B
+		mesh.VertexColors[channelIndex][index].A = color.A
 	})
 
 }
 
 // SetNormal sets the normal of all vertices contained within the VertexSelection to the provided normal vector.
-func (vs VertexSelection) SetNormal(normal Vector) {
+func (vs VertexSelection) SetNormal(normal Vector3) {
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 		mesh.VertexNormals[index].X = normal.X
@@ -826,7 +855,7 @@ func (vs VertexSelection) SetNormal(normal Vector) {
 }
 
 // MoveUVs moves the UV values by the values specified.
-func (vs VertexSelection) MoveUVs(dx, dy float64) {
+func (vs VertexSelection) MoveUVs(dx, dy float32) {
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 		mesh.VertexUVs[index].X += dx
@@ -836,7 +865,7 @@ func (vs VertexSelection) MoveUVs(dx, dy float64) {
 }
 
 // ScaleUVs scales the UV values by the percentages specified.
-func (vs VertexSelection) ScaleUVs(px, py float64) {
+func (vs VertexSelection) ScaleUVs(px, py float32) {
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 		mesh.VertexUVs[index].X *= px
@@ -846,13 +875,13 @@ func (vs VertexSelection) ScaleUVs(px, py float64) {
 }
 
 // MoveUVsVec moves the UV values by the Vector values specified.
-func (vs *VertexSelection) MoveUVsVec(vec Vector) {
+func (vs *VertexSelection) MoveUVsVec(vec Vector3) {
 	vs.MoveUVs(vec.X, vec.Y)
 }
 
 // SetUVOffset moves all UV values for vertices selected to be offset by the values specified, with [0, 0] being their original locations.
 // Note that for this to work, you would need to store and work with the same vertex selection over multiple frames.
-func (vs VertexSelection) SetUVOffset(x, y float64) {
+func (vs VertexSelection) SetUVOffset(x, y float32) {
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 
@@ -864,18 +893,18 @@ func (vs VertexSelection) SetUVOffset(x, y float64) {
 }
 
 // RotateUVs rotates the UV values around the center of the UV values for the mesh in radians
-func (vs VertexSelection) RotateUVs(rotation float64) {
-	center := Vector{}
+func (vs VertexSelection) RotateUVs(rotation float32) {
+	center := Vector2{}
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 		center = center.Add(mesh.VertexUVs[index])
 	})
 
-	center = center.Divide(float64(vs.Count()))
+	center = center.Divide(float32(vs.Count()))
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 		diff := mesh.VertexUVs[index].Sub(center)
-		mesh.VertexUVs[index] = center.Add(diff.Rotate(0, 0, 1, rotation))
+		mesh.VertexUVs[index] = center.Add(diff.Rotate(rotation))
 	})
 
 }
@@ -887,13 +916,8 @@ func (vs VertexSelection) RotateUVs(rotation float64) {
 func (vs VertexSelection) SetActiveColorChannel(channelIndex int) {
 
 	for mesh := range vs.SelectionSet {
-
 		mesh.ensureEnoughVertexColorChannels(channelIndex)
-
-		vs.ForEachIndex(func(mesh *Mesh, i int) {
-			mesh.VertexActiveColorChannel[i] = channelIndex
-		})
-
+		mesh.VertexActiveColorChannel = channelIndex
 	}
 
 }
@@ -908,7 +932,7 @@ func (vs VertexSelection) ApplyMatrix(matrix Matrix4) {
 }
 
 // Move moves all vertices contained within the VertexSelection by the provided x, y, and z values.
-func (vs VertexSelection) Move(x, y, z float64) {
+func (vs VertexSelection) Move(x, y, z float32) {
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 
@@ -921,7 +945,7 @@ func (vs VertexSelection) Move(x, y, z float64) {
 }
 
 // Move moves all vertices contained within the VertexSelection by the provided 3D vector.
-func (vs VertexSelection) MoveVec(vec Vector) {
+func (vs VertexSelection) MoveVec(vec Vector3) {
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 
@@ -1097,7 +1121,7 @@ func NewIcosphereMesh(detailLevel int) *Mesh {
 
 	mesh := NewMesh("Icosphere")
 
-	t := (1.0 + math.Sqrt(5)) / 2
+	t := (1.0 + math32.Sqrt(5)) / 2
 
 	v0 := NewVertex(-1, t, 0, 0, 0)
 	v1 := NewVertex(1, t, 0, 0, 0)
@@ -1156,8 +1180,8 @@ func NewIcosphereMesh(detailLevel int) *Mesh {
 			return v
 		}
 
-		a := Vector{vertices[index0].X, vertices[index0].Y, vertices[index0].Z, 0}
-		b := Vector{vertices[index1].X, vertices[index1].Y, vertices[index1].Z, 0}
+		a := Vector3{vertices[index0].X, vertices[index0].Y, vertices[index0].Z}
+		b := Vector3{vertices[index1].X, vertices[index1].Y, vertices[index1].Z}
 		midA := a.Add(b).Divide(2)
 		// midA := a.Add(b.Sub(a).Scale(0.5))
 		vertices = append(vertices, NewVertex(midA.X, midA.Y, midA.Z, 0, 0))
@@ -1196,7 +1220,7 @@ func NewIcosphereMesh(detailLevel int) *Mesh {
 
 	for i := range vertices {
 
-		v := Vector{vertices[i].X, vertices[i].Y, vertices[i].Z, 0}.Unit() // Make it spherical
+		v := Vector3{vertices[i].X, vertices[i].Y, vertices[i].Z}.Unit() // Make it spherical
 		vertices[i].X = v.X
 		vertices[i].Y = v.Y
 		vertices[i].Z = v.Z
@@ -1242,8 +1266,8 @@ func NewPlaneMesh(vertexCountX, vertexCountZ int) *Mesh {
 
 		for x := 0; x < vertexCountX; x++ {
 
-			tx := float64(x) / float64(vertexCountX-1) * 2
-			tz := float64(z) / float64(vertexCountZ-1) * 2
+			tx := float32(x) / float32(vertexCountX-1) * 2
+			tz := float32(z) / float32(vertexCountZ-1) * 2
 			verts = append(verts, NewVertex(-0.5+tx, 0, -0.5+tz, tx, -tz))
 
 		}
@@ -1281,7 +1305,7 @@ func NewPlaneMesh(vertexCountX, vertexCountZ int) *Mesh {
 // NewCylinderMesh creates a new cylinder Mesh and gives it a new material (suitably named "Cylinder").
 // sideCount is how many sides the cylinder should have, while radius is the radius of the cylinder in world units.
 // if createCaps is true, then the cylinder will have triangle caps.
-func NewCylinderMesh(sideCount int, radius, height float64, createCaps bool) *Mesh {
+func NewCylinderMesh(sideCount int, radius, height float32, createCaps bool) *Mesh {
 
 	if sideCount < 3 {
 		sideCount = 3
@@ -1293,16 +1317,16 @@ func NewCylinderMesh(sideCount int, radius, height float64, createCaps bool) *Me
 
 	for i := 0; i < sideCount; i++ {
 
-		pos := NewVector(radius, height/2, 0)
-		pos = pos.Rotate(0, 1, 0, float64(i)/float64(sideCount)*math.Pi*2)
+		pos := NewVector3(radius, height/2, 0)
+		pos = pos.Rotate(0, 1, 0, float32(i)/float32(sideCount)*math.Pi*2)
 		verts = append(verts, NewVertex(pos.X, pos.Y, pos.Z, 0, 0))
 
 	}
 
 	for i := 0; i < sideCount; i++ {
 
-		pos := NewVector(radius, -height/2, 0)
-		pos = pos.Rotate(0, 1, 0, float64(i)/float64(sideCount)*math.Pi*2)
+		pos := NewVector3(radius, -height/2, 0)
+		pos = pos.Rotate(0, 1, 0, float32(i)/float32(sideCount)*math.Pi*2)
 		verts = append(verts, NewVertex(pos.X, pos.Y, pos.Z, 0, 0))
 
 	}
@@ -1382,9 +1406,9 @@ func NewCylinderMesh(sideCount int, radius, height float64, createCaps bool) *Me
 // A Triangle represents the smallest renderable object in Tetra3D. A triangle contains very little data, and is mainly used to help identify triads of vertices.
 type Triangle struct {
 	VertexIndices []int     // Vertex indices that compose the triangle
-	MaxSpan       float64   // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
-	Center        Vector    // The untransformed center of the Triangle.
-	Normal        Vector    // The physical normal of the triangle (i.e. the direction the triangle is facing). This is different from the visual normals of a triangle's vertices (i.e. a selection of vertices can have inverted normals to be see through, for example).
+	MaxSpan       float32   // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
+	Center        Vector3   // The untransformed center of the Triangle.
+	Normal        Vector3   // The physical normal of the triangle (i.e. the direction the triangle is facing). This is different from the visual normals of a triangle's vertices (i.e. a selection of vertices can have inverted normals to be see through, for example).
 	MeshPart      *MeshPart // The specific MeshPart this Triangle belongs to.
 }
 
@@ -1393,7 +1417,7 @@ func NewTriangle(meshPart *MeshPart, indices ...int) *Triangle {
 	tri := &Triangle{
 		MeshPart:      meshPart,
 		VertexIndices: []int{indices[0], indices[1], indices[2]},
-		Center:        Vector{0, 0, 0, 0},
+		Center:        Vector3{0, 0, 0},
 	}
 	return tri
 }
@@ -1427,8 +1451,8 @@ func (tri *Triangle) RecalculateCenter() {
 	// Determine the maximum span of the triangle; this is done for bounds checking, since we can reject triangles early if we
 	// can easily tell we're too far away from them.
 	dim := Dimensions{
-		Min: Vector{0, 0, 0, 0},
-		Max: Vector{0, 0, 0, 0},
+		Min: Vector3{0, 0, 0},
+		Max: Vector3{0, 0, 0},
 	}
 
 	for i := 0; i < 3; i++ {
@@ -1603,7 +1627,7 @@ func (tri *Triangle) ForEachVertexIndex(vertFunc func(vertexIndex int)) {
 	}
 }
 
-func calculateNormal(p1, p2, p3 Vector) Vector {
+func calculateNormal(p1, p2, p3 Vector3) Vector3 {
 
 	v0 := p2.Sub(p1)
 	v1 := p3.Sub(p2)
@@ -1768,9 +1792,9 @@ func (part *MeshPart) ApplyMatrix(matrix Matrix4) {
 
 // This is supposed to return the primary two dimensions of the points constructing the MeshPart.
 // TODO: Make this work regardless of orientation of the vertices?
-func (part *MeshPart) primaryDimensions() (float64, float64) {
+func (part *MeshPart) primaryDimensions() (float32, float32) {
 
-	points := make([]Vector, 0, len(part.Mesh.VertexPositions))
+	points := make([]Vector3, 0, len(part.Mesh.VertexPositions))
 
 	part.ForEachVertexIndex(func(vertIndex int) { points = append(points, part.Mesh.VertexPositions[vertIndex]) }, false)
 
@@ -1780,7 +1804,7 @@ func (part *MeshPart) primaryDimensions() (float64, float64) {
 	y := dimensions.Height()
 	z := dimensions.Depth()
 
-	w, h := 0.0, 0.0
+	w, h := float32(0), float32(0)
 
 	if z < y && z < x {
 		w = x
@@ -1806,12 +1830,11 @@ func (p *MeshPart) isVisible() bool {
 
 type VertexInfo struct {
 	ID                        int
-	X, Y, Z                   float64
-	U, V                      float64
-	NormalX, NormalY, NormalZ float64
+	X, Y, Z                   float32
+	U, V                      float32
+	NormalX, NormalY, NormalZ float32
 	Weights                   []float32
 	Colors                    []Color
-	ActiveColorChannel        int
 	Bones                     []uint16
 }
 
@@ -1819,20 +1842,26 @@ type VertexInfo struct {
 func (mesh *Mesh) GetVertexInfo(vertexIndex int) VertexInfo {
 
 	v := VertexInfo{
-		ID:                 vertexIndex,
-		X:                  mesh.VertexPositions[vertexIndex].X,
-		Y:                  mesh.VertexPositions[vertexIndex].Y,
-		Z:                  mesh.VertexPositions[vertexIndex].Z,
-		U:                  mesh.VertexUVs[vertexIndex].X,
-		V:                  mesh.VertexUVs[vertexIndex].Y,
-		NormalX:            mesh.VertexNormals[vertexIndex].X,
-		NormalY:            mesh.VertexNormals[vertexIndex].Y,
-		NormalZ:            mesh.VertexNormals[vertexIndex].Z,
-		Colors:             mesh.VertexColors[vertexIndex],
-		ActiveColorChannel: mesh.VertexActiveColorChannel[vertexIndex],
-		Bones:              mesh.VertexBones[vertexIndex],
-		Weights:            mesh.VertexWeights[vertexIndex],
+		ID:      vertexIndex,
+		X:       mesh.VertexPositions[vertexIndex].X,
+		Y:       mesh.VertexPositions[vertexIndex].Y,
+		Z:       mesh.VertexPositions[vertexIndex].Z,
+		U:       mesh.VertexUVs[vertexIndex].X,
+		V:       mesh.VertexUVs[vertexIndex].Y,
+		NormalX: mesh.VertexNormals[vertexIndex].X,
+		NormalY: mesh.VertexNormals[vertexIndex].Y,
+		NormalZ: mesh.VertexNormals[vertexIndex].Z,
+		Bones:   mesh.VertexBones[vertexIndex],
+		Weights: mesh.VertexWeights[vertexIndex],
 	}
+
+	colors := []Color{}
+
+	for _, channel := range mesh.VertexColors {
+		colors = append(colors, channel[vertexIndex])
+	}
+
+	v.Colors = colors
 
 	return v
 
@@ -1841,16 +1870,15 @@ func (mesh *Mesh) GetVertexInfo(vertexIndex int) VertexInfo {
 // NewVertex creates a new vertex information struct, which is used to create new Triangles. VertexInfo is purely for getting data into
 // Meshes' vertex buffers, so after creating the Triangle, VertexInfos can be safely discarded (i.e. the VertexInfo doesn't hold "power"
 // over the vertex it represents after creation).
-func NewVertex(x, y, z, u, v float64) VertexInfo {
+func NewVertex(x, y, z, u, v float32) VertexInfo {
 	return VertexInfo{
-		X:                  x,
-		Y:                  y,
-		Z:                  z,
-		U:                  u,
-		V:                  v,
-		Weights:            []float32{},
-		Colors:             make([]Color, 0, 8),
-		ActiveColorChannel: -1,
-		Bones:              []uint16{},
+		X:       x,
+		Y:       y,
+		Z:       z,
+		U:       u,
+		V:       v,
+		Weights: []float32{},
+		Colors:  make([]Color, 0, 8),
+		Bones:   []uint16{},
 	}
 }

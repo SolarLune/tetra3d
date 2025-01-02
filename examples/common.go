@@ -12,6 +12,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
+	"github.com/solarlune/tetra3d/math32"
 )
 
 type GameI interface {
@@ -48,7 +49,7 @@ func (system *BasicSystemHandler) Update() error {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyR) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
 		system.Game.Init()
 	}
 
@@ -132,9 +133,11 @@ ESC: Quit
 type BasicFreeCam struct {
 	*tetra3d.Camera
 	Scene             *tetra3d.Scene
-	CameraTilt        float64
-	CameraRotate      float64
-	PrevMousePosition tetra3d.Vector
+	CameraTilt        float32
+	CameraRotate      float32
+	CameraTiltSpeed   float32
+	CameraRotateSpeed float32
+	PrevMousePosition tetra3d.Vector3
 	Locked            bool
 }
 
@@ -160,7 +163,7 @@ func (cc *BasicFreeCam) Update() {
 
 	// Moving the Camera
 
-	moveSpd := 0.075
+	moveSpd := float32(0.075)
 
 	if ebiten.IsKeyPressed(ebiten.KeyShift) {
 		moveSpd *= 3
@@ -216,22 +219,36 @@ func (cc *BasicFreeCam) Update() {
 	// Rotate and tilt the camera according to mouse movements
 	mx, my := ebiten.CursorPosition()
 
-	mv := tetra3d.NewVector(float64(mx), float64(my), 0)
+	mv := tetra3d.NewVector3(float32(mx), float32(my), 0)
 
 	if cc.Locked {
 
+		// Divide by camera size to get hopefully screen size-independent movements;
+		// Note that using ebiten.WindowSize() may not work for this because it returns 0,0 on unsupported platforms (WASM, for example).
+		w, h := cc.Camera.Size()
+
 		diff := mv.Sub(cc.PrevMousePosition)
+		diff.X /= float32(w)
+		diff.Y /= float32(h)
 
-		cc.CameraTilt -= diff.Y * 0.005
-		cc.CameraRotate -= diff.X * 0.005
+		accel := float32(3)
+		friction := float32(0.6)
 
-		cc.CameraTilt = math.Max(math.Min(cc.CameraTilt, math.Pi/2-0.1), -math.Pi/2+0.1)
+		cc.CameraTiltSpeed *= friction
+		cc.CameraRotateSpeed *= friction
 
-		tilt := tetra3d.NewMatrix4Rotate(1, 0, 0, cc.CameraTilt)
-		rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, cc.CameraRotate)
+		cc.CameraTiltSpeed -= diff.Y * accel
+		cc.CameraRotateSpeed -= diff.X * accel
+
+		cc.CameraTilt += cc.CameraTiltSpeed
+		cc.CameraRotate += cc.CameraRotateSpeed
+
+		cc.CameraTilt = math32.Clamp(cc.CameraTilt, -math.Pi/2+0.1, math.Pi/2-0.1)
 
 		// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
-		cc.Node.SetLocalRotation(tilt.Mult(rotate))
+		rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, cc.CameraRotate).Rotated(1, 0, 0, cc.CameraTilt)
+
+		cc.Node.SetLocalRotation(rotate)
 
 	}
 
@@ -268,8 +285,8 @@ func StartProfiling() {
 // 	Width, Height int
 
 // 	Camera       *tetra3d.Camera
-// 	CameraTilt   float64
-// 	CameraRotate float64
+// 	CameraTilt   float32
+// 	CameraRotate float32
 
 // 	DrawDebugText     bool
 // 	DrawDebugDepth    bool
@@ -335,7 +352,7 @@ func StartProfiling() {
 // 	// Rotate and tilt the camera according to mouse movements
 // 	mx, my := ebiten.CursorPosition()
 
-// 	mv := tetra3d.NewVector(float64(mx), float64(my), 0)
+// 	mv := tetra3d.NewVector(float32(mx), float32(my), 0)
 
 // 	diff := mv.Sub(base.PrevMousePosition)
 

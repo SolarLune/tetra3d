@@ -155,56 +155,56 @@ type INode interface {
 	SetLocalRotation(rotation Matrix4)
 
 	// LocalPosition returns the object's local position as a Vector.
-	LocalPosition() Vector
+	LocalPosition() Vector3
 	// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 	// relative to world origin (0, 0, 0).
-	SetLocalPositionVec(position Vector)
+	SetLocalPositionVec(position Vector3)
 	// SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 	// relative to world origin (0, 0, 0).
-	SetLocalPosition(x, y, z float64)
+	SetLocalPosition(x, y, z float32)
 
 	// LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
-	LocalScale() Vector
+	LocalScale() Vector3
 	// SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
 	// scale should be a 3D vector (i.e. X, Y, and Z components).
-	SetLocalScaleVec(scale Vector)
-	SetLocalScale(w, h, d float64)
+	SetLocalScaleVec(scale Vector3)
+	SetLocalScale(w, h, d float32)
 
 	// WorldRotation returns an absolute rotation Matrix4 representing the object's rotation.
 	WorldRotation() Matrix4
 	// SetWorldRotation sets an object's global, world rotation to the provided rotation Matrix4.
 	SetWorldRotation(rotation Matrix4)
 	// WorldPosition returns the node's world position, taking into account its parenting hierarchy.
-	WorldPosition() Vector
+	WorldPosition() Vector3
 	// SetWorldPositionVec sets the world position of the given object using the provided position vector.
 	// Note that this isn't as performant as setting the position locally.
-	SetWorldPositionVec(position Vector)
+	SetWorldPositionVec(position Vector3)
 	// SetWorldPosition sets the world position of the given object using the provided position arguments.
 	// Note that this isn't as performant as setting the position locally.
-	SetWorldPosition(x, y, z float64)
+	SetWorldPosition(x, y, z float32)
 	// SetWorldX sets the x component of the Node's world position.
-	SetWorldX(x float64)
+	SetWorldX(x float32)
 	// SetWorldY sets the y component of the Node's world position.
-	SetWorldY(x float64)
+	SetWorldY(x float32)
 	// SetWorldZ sets the z component of the Node's world position.
-	SetWorldZ(x float64)
+	SetWorldZ(x float32)
 	// WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components).
-	WorldScale() Vector
+	WorldScale() Vector3
 	// SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
-	SetWorldScaleVec(scale Vector)
+	SetWorldScaleVec(scale Vector3)
 
 	// Move moves a Node in local space by the x, y, and z values provided.
-	Move(x, y, z float64)
+	Move(x, y, z float32)
 	// MoveVec moves a Node in local space using the vector provided.
-	MoveVec(moveVec Vector)
+	MoveVec(moveVec Vector3)
 	// Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
-	Rotate(x, y, z, angle float64)
+	Rotate(x, y, z, angle float32)
 	// RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
-	RotateVec(vec Vector, angle float64)
+	RotateVec(vec Vector3, angle float32)
 	// Grow scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
-	Grow(x, y, z float64)
+	Grow(x, y, z float32)
 	// GrowVec scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
-	GrowVec(vec Vector)
+	GrowVec(vec Vector3)
 
 	// Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
 	// If there's no change between the previous Transform() call and this one, Transform() will return a cached version of the
@@ -255,15 +255,15 @@ type INode interface {
 
 	// DistanceTo returns the distance between the given Nodes' centers.
 	// Quick syntactic sugar for Node.WorldPosition().Distance(otherNode.WorldPosition()).
-	DistanceTo(otherNode INode) float64
+	DistanceTo(otherNode INode) float32
 
 	// DistanceSquared returns the squared distance between the given Nodes' centers.
 	// Quick syntactic sugar for Node.WorldPosition().DistanceSquared(otherNode.WorldPosition()).
-	DistanceSquaredTo(otherNode INode) float64
+	DistanceSquaredTo(otherNode INode) float32
 
 	// VectorTo returns a vector from one Node to another.
 	// Quick syntactic sugar for other.WorldPosition().Sub(node.WorldPosition()).
-	VectorTo(otherNode INode) Vector
+	VectorTo(otherNode INode) Vector3
 
 	// Callbacks returns a Node's callbacks object. This object represents the callbacks that a Node has access to when events happen.
 	Callbacks() *Callbacks
@@ -281,8 +281,8 @@ type Node struct {
 	id                uint64 // Unique ID for this node
 	owner             INode  // The owner; nil if this is a Node, set to the "owning" node type otherwise (e.g. node.owner = nil, model.owner (or model.Node.owner) = model)
 	name              string
-	position          Vector
-	scale             Vector
+	position          Vector3
+	scale             Vector3
 	rotation          Matrix4
 	originalTransform Matrix4
 	visible           bool
@@ -317,7 +317,7 @@ func NewNode(name string) *Node {
 		id:   nodeID,
 		name: name,
 		// position:         NewVectorZero(),
-		scale:            Vector{1, 1, 1, 0},
+		scale:            Vector3{1, 1, 1},
 		rotation:         NewMatrix4(),
 		children:         []INode{},
 		visible:          true,
@@ -556,7 +556,7 @@ func (node *Node) dirtyTransform() {
 
 // LocalPosition returns a 3D Vector consisting of the object's local position (position relative to its parent). If this object has no parent, the position will be
 // relative to world origin (0, 0, 0).
-func (node *Node) LocalPosition() Vector {
+func (node *Node) LocalPosition() Vector3 {
 	return node.position
 }
 
@@ -611,14 +611,14 @@ func (node *Node) setOriginalTransform() {
 }
 
 // WorldPosition returns a 3D Vector consisting of the object's world position (position relative to the world origin point of {0, 0, 0}).
-func (node *Node) WorldPosition() Vector {
+func (node *Node) WorldPosition() Vector3 {
 	position := node.Transform().Row(3) // We don't want to have to decompose if we don't have to
-	return position
+	return position.To3D()
 }
 
 // SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 // relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetLocalPosition(x, y, z float64) {
+func (node *Node) SetLocalPosition(x, y, z float32) {
 	node.position.X = x
 	node.position.Y = y
 	node.position.Z = z
@@ -627,13 +627,13 @@ func (node *Node) SetLocalPosition(x, y, z float64) {
 
 // SetLocalPositionVec sets the object's local position (position relative to its parent). If this object has no parent, the position should be
 // relative to world origin (0, 0, 0). position should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetLocalPositionVec(position Vector) {
+func (node *Node) SetLocalPositionVec(position Vector3) {
 	node.SetLocalPosition(position.X, position.Y, position.Z)
 }
 
 // SetWorldPositionVec sets the object's world position (position relative to the world origin point of {0, 0, 0}).
 // position needs to be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetWorldPositionVec(position Vector) {
+func (node *Node) SetWorldPositionVec(position Vector3) {
 
 	if node.parent != nil {
 
@@ -658,44 +658,44 @@ func (node *Node) SetWorldPositionVec(position Vector) {
 }
 
 // SetWorldPosition sets the object's world position (position relative to the world origin point of {0, 0, 0}).
-func (node *Node) SetWorldPosition(x, y, z float64) {
-	node.SetWorldPositionVec(Vector{x, y, z, 0})
+func (node *Node) SetWorldPosition(x, y, z float32) {
+	node.SetWorldPositionVec(Vector3{x, y, z})
 }
 
 // SetWorldX sets the X component of the object's world position.
-func (node *Node) SetWorldX(x float64) {
+func (node *Node) SetWorldX(x float32) {
 	v := node.WorldPosition()
 	v.X = x
 	node.SetWorldPositionVec(v)
 }
 
 // SetWorldY sets the Y component of the object's world position.
-func (node *Node) SetWorldY(y float64) {
+func (node *Node) SetWorldY(y float32) {
 	v := node.WorldPosition()
 	v.Y = y
 	node.SetWorldPositionVec(v)
 }
 
 // SetWorldZ sets the Z component of the object's world position.
-func (node *Node) SetWorldZ(z float64) {
+func (node *Node) SetWorldZ(z float32) {
 	v := node.WorldPosition()
 	v.Z = z
 	node.SetWorldPositionVec(v)
 }
 
 // LocalScale returns the object's local scale (scale relative to its parent). If this object has no parent, the scale will be absolute.
-func (node *Node) LocalScale() Vector {
+func (node *Node) LocalScale() Vector3 {
 	return node.scale
 }
 
 // SetLocalScaleVec sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
 // scale should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetLocalScaleVec(scale Vector) {
+func (node *Node) SetLocalScaleVec(scale Vector3) {
 	node.SetLocalScale(scale.X, scale.Y, scale.Z)
 }
 
 // SetLocalScale sets the object's local scale (scale relative to its parent). If this object has no parent, the scale would be absolute.
-func (node *Node) SetLocalScale(w, h, d float64) {
+func (node *Node) SetLocalScale(w, h, d float32) {
 	node.scale.X = w
 	node.scale.Y = h
 	node.scale.Z = d
@@ -704,29 +704,28 @@ func (node *Node) SetLocalScale(w, h, d float64) {
 
 // WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components). Note that this is a bit slow as it
 // requires decomposing the node's world transform, so you want to use node.LocalScale() if you can and performacne is a concern.
-func (node *Node) WorldScale() Vector {
+func (node *Node) WorldScale() Vector3 {
 	_, scale, _ := node.Transform().Decompose()
 	return scale
 }
 
 // SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetWorldScaleVec(scale Vector) {
+func (node *Node) SetWorldScaleVec(scale Vector3) {
 	node.SetWorldScale(scale.X, scale.Y, scale.Z)
 }
 
 // SetWorldScale sets the object's absolute world scale.
-func (node *Node) SetWorldScale(w, h, d float64) {
+func (node *Node) SetWorldScale(w, h, d float32) {
 
 	if node.parent != nil {
 
 		parentTransform := node.parent.Transform()
 		_, parentScale, _ := parentTransform.Decompose()
 
-		node.scale = Vector{
+		node.scale = Vector3{
 			w / parentScale.X,
 			h / parentScale.Y,
 			d / parentScale.Z,
-			0,
 		}
 
 	} else {
@@ -777,7 +776,7 @@ func (node *Node) SetWorldRotation(rotation Matrix4) {
 }
 
 // Move moves a Node in local space by the x, y, and z values provided.
-func (node *Node) Move(x, y, z float64) {
+func (node *Node) Move(x, y, z float32) {
 	if x == 0 && y == 0 && z == 0 {
 		return
 	}
@@ -788,12 +787,12 @@ func (node *Node) Move(x, y, z float64) {
 }
 
 // MoveVec moves a Node in local space using the vector provided.
-func (node *Node) MoveVec(vec Vector) {
+func (node *Node) MoveVec(vec Vector3) {
 	node.Move(vec.X, vec.Y, vec.Z)
 }
 
 // Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
-func (node *Node) Rotate(x, y, z, angle float64) {
+func (node *Node) Rotate(x, y, z, angle float32) {
 	if x == 0 && y == 0 && z == 0 {
 		return
 	}
@@ -803,13 +802,13 @@ func (node *Node) Rotate(x, y, z, angle float64) {
 }
 
 // RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
-func (node *Node) RotateVec(vec Vector, angle float64) {
+func (node *Node) RotateVec(vec Vector3, angle float32) {
 	node.Rotate(vec.X, vec.Y, vec.Z, angle)
 }
 
 // Grow scales the object additively using the x, y, and z arguments provided (i.e. calling
 // Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
-func (node *Node) Grow(x, y, z float64) {
+func (node *Node) Grow(x, y, z float32) {
 	if x == 0 && y == 0 && z == 0 {
 		return
 	}
@@ -822,7 +821,7 @@ func (node *Node) Grow(x, y, z float64) {
 
 // GrowVec scales the object additively using the scaling vector provided (i.e. calling
 // Node.GrowVec(Vector{1, 0, 0}) will scale it +1 on the X-axis).
-func (node *Node) GrowVec(vec Vector) {
+func (node *Node) GrowVec(vec Vector3) {
 	node.Grow(vec.X, vec.Y, vec.Z)
 }
 
@@ -1108,7 +1107,7 @@ func (node *Node) HierarchyAsString() string {
 
 		wp := node.WorldPosition()
 		floatTruncation := 2
-		wpStr := "[" + strconv.FormatFloat(wp.X, 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp.Y, 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(wp.Z, 'f', floatTruncation, 64) + "]"
+		wpStr := "[" + strconv.FormatFloat(float64(wp.X), 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(float64(wp.Y), 'f', floatTruncation, 64) + ", " + strconv.FormatFloat(float64(wp.Z), 'f', floatTruncation, 64) + "]"
 
 		if level > 0 {
 			str += "-"
@@ -1351,18 +1350,18 @@ func (node *Node) SetSectorType(sectorType SectorType) {
 
 // DistanceTo returns the distance between the given Nodes' centers.
 // Quick syntactic sugar for Node.WorldPosition().Distance(otherNode.WorldPosition()).
-func (node *Node) DistanceTo(other INode) float64 {
+func (node *Node) DistanceTo(other INode) float32 {
 	return node.WorldPosition().Distance(other.WorldPosition())
 }
 
 // DistanceSquaredTo returns the squared distance between the given Nodes' centers.
 // Quick syntactic sugar for Node.WorldPosition().DistanceSquared(otherNode.WorldPosition()).
-func (node *Node) DistanceSquaredTo(other INode) float64 {
+func (node *Node) DistanceSquaredTo(other INode) float32 {
 	return node.WorldPosition().DistanceSquared(other.WorldPosition())
 }
 
 // VectorTo returns a vector from one Node to another.
 // Quick syntactic sugar for other.WorldPosition().Sub(node.WorldPosition()).
-func (node *Node) VectorTo(other INode) Vector {
+func (node *Node) VectorTo(other INode) Vector3 {
 	return other.WorldPosition().Sub(node.WorldPosition())
 }

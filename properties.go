@@ -115,18 +115,18 @@ func (prop *Property) AsString() string {
 	return prop.Value.(string)
 }
 
-// IsFloat returns true if the Property is a float64.
-func (prop *Property) IsFloat64() bool {
-	if _, ok := prop.Value.(float64); ok {
+// IsFloat returns true if the Property is a float32.
+func (prop *Property) IsFloat32() bool {
+	if _, ok := prop.Value.(float32); ok {
 		return true
 	}
 	return false
 }
 
-// AsFloat returns the value associated with the Property as a float64.
-// Note that this does not sanity check to ensure the Property is a float64 first.
-func (prop *Property) AsFloat64() float64 {
-	return prop.Value.(float64)
+// AsFloat returns the value associated with the Property as a float32.
+// Note that this does not sanity check to ensure the Property is a float32 first.
+func (prop *Property) AsFloat32() float32 {
+	return prop.Value.(float32)
 }
 
 // IsInt returns true if the Property is an int.
@@ -157,18 +157,18 @@ func (prop *Property) AsColor() Color {
 	return prop.Value.(Color)
 }
 
-// IsVector returns true if the Property is a vector.
-func (prop *Property) IsVector() bool {
-	if _, ok := prop.Value.(Vector); ok {
+// IsVector3 returns true if the Property is a vector.
+func (prop *Property) IsVector3() bool {
+	if _, ok := prop.Value.(Vector3); ok {
 		return true
 	}
 	return false
 }
 
-// AsVector returns the value associated with the Property as a 3D position Vector clone.
+// AsVector3 returns the value associated with the Property as a 3D position Vector clone.
 // The axes are corrected to account for the difference between Blender's axis order and Tetra3D's (i.e.
 // Blender's +X, +Y, +Z becomes Tetra3D's +X, +Z, +Y).
 // Note that this does not sanity check to ensure the Property is a vector first.
-func (prop *Property) AsVector() Vector {
-	return prop.Value.(Vector)
+func (prop *Property) AsVector3() Vector3 {
+	return prop.Value.(Vector3)
 }

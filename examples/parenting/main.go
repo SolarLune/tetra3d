@@ -57,10 +57,10 @@ func (g *Game) Init() {
 	mat.Texture = loadImage(testImageData)
 
 	parent := tetra3d.NewModel("parent", cubeMesh)
-	parent.SetLocalPositionVec(tetra3d.NewVector(0, -3, 0))
+	parent.SetLocalPositionVec(tetra3d.NewVector3(0, -3, 0))
 
 	child := tetra3d.NewModel("child", cubeMesh)
-	child.SetLocalPositionVec(tetra3d.NewVector(10, 2, 0))
+	child.SetLocalPositionVec(tetra3d.NewVector3(10, 2, 0))
 
 	g.Scene.Root.AddChildren(parent, child)
 
@@ -81,7 +81,7 @@ func (g *Game) Update() error {
 	child := g.Scene.Root.SearchTree().ByName("child").First()
 	position := parent.LocalPosition()
 
-	moveSpd := 0.1
+	moveSpd := float32(0.1)
 
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
 		position.X -= moveSpd
@@ -143,7 +143,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	if g.System.DrawDebugText {
-		txt := "Arrow Keys:Move parent\nO: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent and child"
+		txt := "Arrow Keys:Move parent\nO: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent recursively"
 		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 

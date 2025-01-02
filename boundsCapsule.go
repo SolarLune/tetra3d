@@ -1,23 +1,21 @@
 package tetra3d
 
-import (
-	"math"
-)
+import "github.com/solarlune/tetra3d/math32"
 
 // BoundingCapsule represents a 3D capsule, whose primary purpose is to perform intersection testing between itself and other Bounding Nodes.
 type BoundingCapsule struct {
 	*Node
-	Height         float64
-	Radius         float64
+	Height         float32
+	Radius         float32
 	internalSphere *BoundingSphere
 }
 
 // NewBoundingCapsule returns a new BoundingCapsule instance. Name is the name of the underlying Node for the Capsule, height is the total
 // height of the Capsule, and radius is how big around the capsule is. Height has to be at least radius (otherwise, it would no longer be a capsule).
-func NewBoundingCapsule(name string, height, radius float64) *BoundingCapsule {
+func NewBoundingCapsule(name string, height, radius float32) *BoundingCapsule {
 	cap := &BoundingCapsule{
 		Node:           NewNode(name),
-		Height:         math.Max(radius, height),
+		Height:         math32.Max(radius, height),
 		Radius:         radius,
 		internalSphere: NewBoundingSphere("internal capsule sphere", 0),
 	}
@@ -36,11 +34,11 @@ func (capsule *BoundingCapsule) Clone() INode {
 }
 
 // WorldRadius is the radius of the Capsule in world units, after taking into account its scale.
-func (capsule *BoundingCapsule) WorldRadius() float64 {
-	maxScale := 1.0
+func (capsule *BoundingCapsule) WorldRadius() float32 {
+	maxScale := float32(1.0)
 	if capsule.Node != nil {
 		scale := capsule.Node.LocalScale()
-		maxScale = math.Max(math.Max(math.Abs(scale.X), math.Abs(scale.Y)), math.Abs(scale.Z))
+		maxScale = math32.Max(math32.Max(math32.Abs(scale.X), math32.Abs(scale.Y)), math32.Abs(scale.Z))
 	}
 	return capsule.Radius * maxScale
 }
@@ -94,13 +92,13 @@ func (capsule *BoundingCapsule) CollisionTest(settings CollisionTestSettings) bo
 }
 
 // PointInside returns true if the point provided is within the capsule.
-func (capsule *BoundingCapsule) PointInside(point Vector) bool {
+func (capsule *BoundingCapsule) PointInside(point Vector3) bool {
 	return capsule.ClosestPoint(point).Sub(point).Magnitude() < capsule.WorldRadius()
 }
 
 // ClosestPoint returns the closest point on the capsule's "central line" to the point provided. Essentially, ClosestPoint returns a point
 // along the capsule's line in world coordinates, capped between its bottom and top.
-func (capsule *BoundingCapsule) ClosestPoint(point Vector) Vector {
+func (capsule *BoundingCapsule) ClosestPoint(point Vector3) Vector3 {
 
 	return ClosestPointOnLine(capsule.Bottom(), capsule.Top(), point)
 
@@ -135,7 +133,7 @@ func (capsule *BoundingCapsule) ClosestPoint(point Vector) Vector {
 
 }
 
-func (capsule *BoundingCapsule) closestPointCapsules(other *BoundingCapsule) Vector {
+func (capsule *BoundingCapsule) closestPointCapsules(other *BoundingCapsule) Vector3 {
 
 	aNormal := capsule.Top().Sub(capsule.Bottom())
 	aOffset := aNormal.Scale(capsule.Radius)
@@ -157,7 +155,7 @@ func (capsule *BoundingCapsule) closestPointCapsules(other *BoundingCapsule) Vec
 	d2 := v2.Dot(v2)
 	d3 := v3.Dot(v3)
 
-	var bestA Vector
+	var bestA Vector3
 
 	if d2 < d0 || d2 < d1 || d3 < d0 || d3 < d1 {
 		bestA = aEnd
@@ -217,9 +215,9 @@ func (capsule *BoundingCapsule) closestPointCapsules(other *BoundingCapsule) Vec
 }
 
 // Returns the closest point on the capsule and the closest point on the given line.
-func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector) (Vector, Vector) {
+func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector3) (Vector3, Vector3) {
 
-	eps := 1e-6
+	eps := float32(1e-6)
 
 	up := capsule.Node.WorldRotation().Up()
 	heightScale := (capsule.Height / 2) - capsule.WorldRadius()
@@ -240,19 +238,19 @@ func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector) (
 	vv := v.Dot(v)
 
 	det := uu*vv - uv*uv
-	var t float64
-	var s float64
+	var t float32
+	var s float32
 
 	if det < eps*uu*vv {
-		s = clamp(ru/uu, 0, 1)
+		s = math32.Clamp(ru/uu, 0, 1)
 		t = 0
 	} else {
-		s = clamp((ru*vv-rv*uv)/det, 0, 1)
-		t = clamp((ru*uv-rv*uu)/det, 0, 1)
+		s = math32.Clamp((ru*vv-rv*uv)/det, 0, 1)
+		t = math32.Clamp((ru*uv-rv*uu)/det, 0, 1)
 	}
 
-	S := clamp((t*uv+ru)/uu, 0, 1)
-	T := clamp((s*uv-rv)/vv, 0, 1)
+	S := math32.Clamp((t*uv+ru)/uu, 0, 1)
+	T := math32.Clamp((s*uv-rv)/vv, 0, 1)
 
 	closestCapsulePoint := capStart.Add(u.Scale(S))
 	closestRayPoint := lineStart.Add(v.Scale(T))
@@ -286,7 +284,7 @@ func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector) (
 	// h := b*b - a*c
 
 	// if h >= 0 {
-	// 	t := (-b - math.Sqrt(h)) / a
+	// 	t := (-b - Sqrt(h)) / a
 	// 	y := baoa + t*bard
 
 	// 	if y > 0 && y < baba {
@@ -307,7 +305,7 @@ func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector) (
 	// 	h = b*b - c
 
 	// 	if h > 0 {
-	// 		return pa.Add(ba.Scale(-b - math.Sqrt(h))), true
+	// 		return pa.Add(ba.Scale(-b - Sqrt(h))), true
 	// 	}
 
 	// }
@@ -389,7 +387,7 @@ func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector) (
 
 	// denom := d2121*d4343 - d4321*d4321
 
-	// if math.Abs(denom) < eps {
+	// if Abs(denom) < eps {
 	// 	return Vector{}, false
 	// }
 
@@ -488,26 +486,26 @@ func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector) (
 
 // lineTop returns the world position of the internal top end of the BoundingCapsule's line (i.e. this subtracts the
 // capsule's radius).
-func (capsule *BoundingCapsule) lineTop() Vector {
+func (capsule *BoundingCapsule) lineTop() Vector3 {
 	up := capsule.Node.WorldRotation().Up()
 	return capsule.Node.WorldPosition().Add(up.Scale(capsule.Height/2 - capsule.Radius))
 }
 
 // Top returns the world position of the top of the BoundingCapsule.
-func (capsule *BoundingCapsule) Top() Vector {
+func (capsule *BoundingCapsule) Top() Vector3 {
 	up := capsule.Node.WorldRotation().Up()
 	return capsule.Node.WorldPosition().Add(up.Scale(capsule.Height / 2))
 }
 
 // lineBottom returns the world position of the internal bottom end of the BoundingCapsule's line (i.e. this subtracts the
 // capsule's radius).
-func (capsule *BoundingCapsule) lineBottom() Vector {
+func (capsule *BoundingCapsule) lineBottom() Vector3 {
 	up := capsule.Node.WorldRotation().Up()
 	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height/2 + capsule.Radius))
 }
 
 // Bottom returns the world position of the bottom of the BoundingCapsule.
-func (capsule *BoundingCapsule) Bottom() Vector {
+func (capsule *BoundingCapsule) Bottom() Vector3 {
 	up := capsule.Node.WorldRotation().Up()
 	return capsule.Node.WorldPosition().Add(up.Scale(-capsule.Height / 2))
 }

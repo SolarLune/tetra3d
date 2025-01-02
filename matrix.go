@@ -1,12 +1,13 @@
 package tetra3d
 
 import (
-	"math"
 	"strconv"
+
+	"github.com/solarlune/tetra3d/math32"
 )
 
 // Matrix4 represents a 4x4 matrix for translation, scale, and rotation. A Matrix4 in Tetra3D is row-major (i.e. the X axis is matrix[0]).
-type Matrix4 [4][4]float64
+type Matrix4 [4][4]float32
 
 // NewMatrix4 returns a new identity Matrix4. A Matrix4 in Tetra3D is row-major (i.e. the X axis for a rotation Matrix4 is matrix[0][0], matrix[0][1], matrix[0][2]).
 func NewMatrix4() Matrix4 {
@@ -70,7 +71,7 @@ func (matrix Matrix4) BlenderToTetra() Matrix4 {
 }
 
 // NewMatrix4Scale returns a new identity Matrix4, but with the x, y, and z translation components set as provided.
-func NewMatrix4Translate(x, y, z float64) Matrix4 {
+func NewMatrix4Translate(x, y, z float32) Matrix4 {
 	mat := NewMatrix4()
 	mat[3][0] = x
 	mat[3][1] = y
@@ -79,7 +80,7 @@ func NewMatrix4Translate(x, y, z float64) Matrix4 {
 }
 
 // NewMatrix4Scale returns a new identity Matrix4, but with the scale components set as provided. 1, 1, 1 is the default.
-func NewMatrix4Scale(x, y, z float64) Matrix4 {
+func NewMatrix4Scale(x, y, z float32) Matrix4 {
 	mat := NewMatrix4()
 	mat[0][0] = x
 	mat[1][1] = y
@@ -90,7 +91,7 @@ func NewMatrix4Scale(x, y, z float64) Matrix4 {
 // NewMatrix4Rotate returns a new Matrix4 designed to rotate by the angle given (in radians) along the axis given [x, y, z].
 // This rotation works as though you pierced the object utilizing the matrix through by the axis, and then rotated it
 // counter-clockwise by the angle in radians.
-func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
+func NewMatrix4Rotate(x, y, z, angle float32) Matrix4 {
 
 	// Default to spinning on +Y axis if there is no valid axis
 	if x == 0 && y == 0 && z == 0 {
@@ -98,9 +99,9 @@ func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
 	}
 
 	mat := NewMatrix4()
-	vector := Vector{X: x, Y: y, Z: z, W: 1}.Unit()
-	s := math.Sin(angle)
-	c := math.Cos(angle)
+	vector := Vector3{X: x, Y: y, Z: z}.Unit()
+	s := math32.Sin(angle)
+	c := math32.Cos(angle)
 	m := 1 - c
 
 	mat[0][0] = m*vector.X*vector.X + c
@@ -122,7 +123,7 @@ func NewMatrix4Rotate(x, y, z, angle float64) Matrix4 {
 // ToQuaternion returns a Quaternion representative of the Matrix4's rotation (assuming it is just a purely rotational Matrix4).
 func (matrix Matrix4) ToQuaternion() Quaternion {
 
-	sqrt := math.Sqrt(1 + matrix[0][0] + matrix[1][1] + matrix[2][2])
+	sqrt := math32.Sqrt(1 + matrix[0][0] + matrix[1][1] + matrix[2][2])
 
 	if sqrt != 0 {
 		qw := sqrt / 2
@@ -141,41 +142,38 @@ func (matrix Matrix4) ToQuaternion() Quaternion {
 }
 
 // Right returns the right-facing rotational component of the Matrix4. For an identity matrix, this would be [1, 0, 0], or +X.
-func (matrix Matrix4) Right() Vector {
-	return Vector{
+func (matrix Matrix4) Right() Vector3 {
+	return Vector3{
 		X: matrix[0][0],
 		Y: matrix[0][1],
 		Z: matrix[0][2],
-		W: 1,
 	}.Unit()
 }
 
 // Up returns the upward rotational component of the Matrix4. For an identity matrix, this would be [0, 1, 0], or +Y.
-func (matrix Matrix4) Up() Vector {
-	return Vector{
+func (matrix Matrix4) Up() Vector3 {
+	return Vector3{
 		X: matrix[1][0],
 		Y: matrix[1][1],
 		Z: matrix[1][2],
-		W: 1,
 	}.Unit()
 }
 
 // Forward returns the forward rotational component of the Matrix4. For an identity matrix, this would be [0, 0, 1], or +Z (towards camera).
-func (matrix Matrix4) Forward() Vector {
-	return Vector{
+func (matrix Matrix4) Forward() Vector3 {
+	return Vector3{
 		X: matrix[2][0],
 		Y: matrix[2][1],
 		Z: matrix[2][2],
-		W: 1,
 	}.Unit()
 }
 
 // Decompose decomposes the Matrix4 and returns three components - the position (a 3D Vector), scale (another 3D Vector), and rotation (a Matrix4)
 // indicated by the Matrix4. Note that this is mainly used when loading a mesh from a 3D modeler - this being the case, it may not be the most precise, and negative
 // scales are not supported.
-func (matrix Matrix4) Decompose() (Vector, Vector, Matrix4) {
+func (matrix Matrix4) Decompose() (Vector3, Vector3, Matrix4) {
 
-	position := Vector{X: matrix[3][0], Y: matrix[3][1], Z: matrix[3][2], W: 1}
+	position := Vector3{X: matrix[3][0], Y: matrix[3][1], Z: matrix[3][2]}
 
 	rotation := NewMatrix4()
 	rotation.SetRow(0, matrix.Row(0).Unit())
@@ -184,7 +182,7 @@ func (matrix Matrix4) Decompose() (Vector, Vector, Matrix4) {
 
 	in := matrix.Mult(rotation.Transposed())
 
-	scale := Vector{X: in.Row(0).Magnitude(), Y: in.Row(1).Magnitude(), Z: in.Row(2).Magnitude(), W: 1}
+	scale := Vector3{X: in.Row(0).Magnitude(), Y: in.Row(1).Magnitude(), Z: in.Row(2).Magnitude()}
 
 	return position, scale, rotation
 
@@ -418,11 +416,11 @@ func (matrix Matrix4) Inverted() Matrix4 {
 
 // }
 
-func (matrix *Matrix4) setIndex(index int, value float64) {
+func (matrix *Matrix4) setIndex(index int, value float32) {
 	matrix[index/4][index%4] = value
 }
 
-func (matrix *Matrix4) Index(index int) float64 {
+func (matrix *Matrix4) Index(index int) float32 {
 	y := index / 4
 	x := index % 4
 	return matrix[y][x]
@@ -431,10 +429,10 @@ func (matrix *Matrix4) Index(index int) float64 {
 // Equals returns true if the matrix equals the same values in the provided Other Matrix4.
 func (matrix Matrix4) Equals(other Matrix4) bool {
 
-	eps := 0.0001 // epsilon floating point error value
+	eps := float32(0.0001) // epsilon floating point error value
 	for i := 0; i < len(matrix); i++ {
 		for j := 0; j < len(matrix[i]); j++ {
-			if math.Abs(matrix[i][j]-other[i][j]) > eps {
+			if math32.Abs(matrix[i][j]-other[i][j]) > eps {
 				return false
 			}
 		}
@@ -449,9 +447,9 @@ func (matrix Matrix4) IsIdentity() bool {
 	return matrix.Equals(identityMatrix)
 }
 
-// Row returns the indiced row from the Matrix4 as a Vector.
-func (matrix Matrix4) Row(rowIndex int) Vector {
-	vec := Vector{
+// Row returns the indiced row from the Matrix4 as a Vector4.
+func (matrix Matrix4) Row(rowIndex int) Vector4 {
+	vec := Vector4{
 		X: matrix[rowIndex][0],
 		Y: matrix[rowIndex][1],
 		Z: matrix[rowIndex][2],
@@ -460,9 +458,9 @@ func (matrix Matrix4) Row(rowIndex int) Vector {
 	return vec
 }
 
-// Column returns the indiced column from the Matrix4 as a Vector.
-func (matrix Matrix4) Column(columnIndex int) Vector {
-	vec := Vector{
+// Column returns the indiced column from the Matrix4 as a Vector4.
+func (matrix Matrix4) Column(columnIndex int) Vector4 {
+	vec := Vector4{
 		X: matrix[0][columnIndex],
 		Y: matrix[1][columnIndex],
 		Z: matrix[2][columnIndex],
@@ -472,7 +470,7 @@ func (matrix Matrix4) Column(columnIndex int) Vector {
 }
 
 // SetRow sets the Matrix4 with the row in rowIndex set to the 4D vector passed.
-func (matrix *Matrix4) SetRow(rowIndex int, vec Vector) {
+func (matrix *Matrix4) SetRow(rowIndex int, vec Vector4) {
 	matrix[rowIndex][0] = vec.X
 	matrix[rowIndex][1] = vec.Y
 	matrix[rowIndex][2] = vec.Z
@@ -480,7 +478,7 @@ func (matrix *Matrix4) SetRow(rowIndex int, vec Vector) {
 }
 
 // SetColumn sets the Matrix4 with the column in columnIndex set to the 4D vector passed.
-func (matrix *Matrix4) SetColumn(columnIndex int, vec Vector) {
+func (matrix *Matrix4) SetColumn(columnIndex int, vec Vector4) {
 	matrix[0][columnIndex] = vec.X
 	matrix[1][columnIndex] = vec.Y
 	matrix[2][columnIndex] = vec.Z
@@ -490,17 +488,17 @@ func (matrix *Matrix4) SetColumn(columnIndex int, vec Vector) {
 // Rotated returns a clone of the Matrix4 rotated along the local axis by the angle given (in radians). This rotation works as though
 // you pierced the object through by the axis, and then rotated it counter-clockwise by the angle
 // in radians. The axis is relative to any existing rotation contained in the matrix.
-func (matrix Matrix4) Rotated(x, y, z, angle float64) Matrix4 {
+func (matrix Matrix4) Rotated(x, y, z, angle float32) Matrix4 {
 	return NewMatrix4Rotate(x, y, z, angle).Mult(matrix)
 }
 
 // NewProjectionPerspective generates a perspective frustum Matrix4. fovy is the vertical field of view in degrees, near and far are the near and far clipping plane,
 // while viewWidth and viewHeight is the width and height of the backing texture / camera. Generally, you won't need to use this directly.
-func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float64) Matrix4 {
+func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float32) Matrix4 {
 
 	aspect := viewWidth / viewHeight
 
-	t := math.Tan(fovy * math.Pi / 360)
+	t := math32.Tan(fovy * math32.Pi / 360)
 	b := -t
 	r := t * aspect
 	l := -r
@@ -517,7 +515,7 @@ func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float64) Ma
 // NewProjectionOrthographic generates an orthographic frustum Matrix4. near and far are the near and far clipping plane. right, left, top, and bottom
 // are the right, left, top, and bottom planes (usually 1 and -1 for right and left, and the aspect ratio of the window and negative for top and bottom).
 // Generally, you won't need to use this directly.
-func NewProjectionOrthographic(near, far, right, left, top, bottom float64) Matrix4 {
+func NewProjectionOrthographic(near, far, right, left, top, bottom float32) Matrix4 {
 	return Matrix4{
 		{2 / (right - left), 0, 0, 0},
 		{0, 2 / (top - bottom), 0, 0},
@@ -527,21 +525,20 @@ func NewProjectionOrthographic(near, far, right, left, top, bottom float64) Matr
 }
 
 // MultVec multiplies the vector provided by the Matrix4, giving a vector that has been rotated, scaled, or translated as desired.
-func (matrix Matrix4) MultVec(vect Vector) Vector {
+func (matrix Matrix4) MultVec(vect Vector3) Vector3 {
 
-	return Vector{
+	return Vector3{
 		X: matrix[0][0]*vect.X + matrix[1][0]*vect.Y + matrix[2][0]*vect.Z + matrix[3][0],
 		Y: matrix[0][1]*vect.X + matrix[1][1]*vect.Y + matrix[2][1]*vect.Z + matrix[3][1],
 		Z: matrix[0][2]*vect.X + matrix[1][2]*vect.Y + matrix[2][2]*vect.Z + matrix[3][2],
-		W: 1,
 	}
 
 }
 
 // MultVecW multiplies the vector provided by the Matrix4, including the fourth (W) component, giving a vector that has been rotated, scaled, or translated as desired.
-func (matrix Matrix4) MultVecW(vect Vector) Vector {
+func (matrix Matrix4) MultVecW(vect Vector3) Vector4 {
 
-	return Vector{
+	return Vector4{
 		X: matrix[0][0]*vect.X + matrix[1][0]*vect.Y + matrix[2][0]*vect.Z + matrix[3][0],
 		Y: matrix[0][1]*vect.X + matrix[1][1]*vect.Y + matrix[2][1]*vect.Z + matrix[3][1],
 		Z: matrix[0][2]*vect.X + matrix[1][2]*vect.Y + matrix[2][2]*vect.Z + matrix[3][2],
@@ -591,7 +588,7 @@ func (matrix Matrix4) Add(other Matrix4) Matrix4 {
 
 }
 
-func (matrix Matrix4) ScaleByScalar(scalar float64) Matrix4 {
+func (matrix Matrix4) ScaleByScalar(scalar float32) Matrix4 {
 
 	for i := 0; i < len(matrix); i++ {
 		for j := 0; j < len(matrix[i]); j++ {
@@ -616,14 +613,14 @@ func (matrix Matrix4) Sub(other Matrix4) Matrix4 {
 }
 
 // Lerping matrices is not very useful, so I'm hesitant to add it in
-// func (matrix Matrix4) Lerp(other Matrix4, perc float64) Matrix4 {
+// func (matrix Matrix4) Lerp(other Matrix4, perc float32) Matrix4 {
 // 	return matrix.Add(other.Sub(matrix).ScaleByScalar(perc))
 // }
 
-// Columns returns the Matrix4 as a slice of []float64, in column-major order (so it's transposed from the row-major default).
-func (matrix Matrix4) Columns() [][]float64 {
+// Columns returns the Matrix4 as a slice of []float32, in column-major order (so it's transposed from the row-major default).
+func (matrix Matrix4) Columns() [][]float32 {
 
-	columns := [][]float64{
+	columns := [][]float32{
 		{0, 0, 0, 0},
 		{0, 0, 0, 0},
 		{0, 0, 0, 0},
@@ -664,7 +661,7 @@ func (matrix Matrix4) String() string {
 	s := "{"
 	for i, y := range matrix {
 		for _, x := range y {
-			s += strconv.FormatFloat(x, 'f', -1, 64) + ", "
+			s += strconv.FormatFloat(float64(x), 'f', -1, 32) + ", "
 		}
 		if i < len(matrix)-1 {
 			s += "\n"
@@ -682,34 +679,34 @@ func (matrix Matrix4) String() string {
 // 	vec := NewVectorZero()
 
 // 	if matrix[1][0] > eps {
-// 		vec.Y = math.Atan2(matrix[0][2], matrix[2][2])
-// 		vec.Z = math.Pi / 2
+// 		vec.Y = Atan2(matrix[0][2], matrix[2][2])
+// 		vec.Z = Pi / 2
 // 		vec.X = 0
 // 	} else if matrix[1][0] < -eps {
-// 		vec.Y = math.Atan2(matrix[0][2], matrix[2][2])
-// 		vec.Z = -math.Pi / 2
+// 		vec.Y = Atan2(matrix[0][2], matrix[2][2])
+// 		vec.Z = -Pi / 2
 // 		vec.X = 0
 // 	} else {
-// 		vec.Y = math.Atan2(-matrix[2][0], matrix[0][0])
-// 		vec.X = math.Atan2(-matrix[1][2], matrix[1][1])
-// 		vec.Z = math.Asin(matrix[1][0])
+// 		vec.Y = Atan2(-matrix[2][0], matrix[0][0])
+// 		vec.X = Atan2(-matrix[1][2], matrix[1][1])
+// 		vec.Z = Asin(matrix[1][0])
 // 	}
 // 	return vec
 // }
 
 // NewMatrix4RotateFromEuler creates a rotation Matrix4 from the euler values contained within the
 // Vector.
-func NewMatrix4RotateFromEuler(euler Vector) Matrix4 {
+func NewMatrix4RotateFromEuler(euler Vector3) Matrix4 {
 	mat := NewMatrix4()
 
-	ch := math.Cos(euler.Y)
-	sh := math.Sin(euler.Y)
+	ch := math32.Cos(euler.Y)
+	sh := math32.Sin(euler.Y)
 
-	ca := math.Cos(euler.Z)
-	sb := math.Sin(euler.Z)
+	ca := math32.Cos(euler.Z)
+	sb := math32.Sin(euler.Z)
 
-	caa := math.Cos(euler.X)
-	saa := math.Sin(euler.X)
+	caa := math32.Cos(euler.X)
+	saa := math32.Sin(euler.X)
 
 	mat[0][0] = ch * ca
 	mat[0][1] = sh*saa - ch*sb*caa
@@ -728,7 +725,7 @@ func NewMatrix4RotateFromEuler(euler Vector) Matrix4 {
 
 // NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. to is the target's world position,
 // from is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
-func NewLookAtMatrix(from, to, up Vector) Matrix4 {
+func NewLookAtMatrix(from, to, up Vector3) Matrix4 {
 
 	// If from and to are the same, then an identity Matrix4 should be a sensible default
 	if from.Equals(to) {
@@ -759,7 +756,7 @@ func NewLookAtMatrix(from, to, up Vector) Matrix4 {
 
 // Lerp lerps a matrix to another, destination Matrix by the percent given. It does this by converting both
 // Matrices to Quaternions, lerping them, then converting the result back to a Matrix4.
-func (mat Matrix4) Lerp(other Matrix4, percent float64) Matrix4 {
+func (mat Matrix4) Lerp(other Matrix4, percent float32) Matrix4 {
 	q1 := mat.ToQuaternion()
 	q2 := other.ToQuaternion()
 	return q1.Lerp(q2, percent).ToMatrix4()

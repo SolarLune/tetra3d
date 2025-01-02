@@ -24,8 +24,8 @@ type Data struct {
 	contents any
 }
 
-func (data *Data) AsVector() Vector {
-	return data.contents.(Vector)
+func (data *Data) AsVector() Vector3 {
+	return data.contents.(Vector3)
 }
 
 func (data *Data) AsQuaternion() Quaternion {
@@ -34,11 +34,11 @@ func (data *Data) AsQuaternion() Quaternion {
 
 // Keyframe represents a single keyframe in an animation for an AnimationTrack.
 type Keyframe struct {
-	Time float64
+	Time float32
 	Data Data
 }
 
-func newKeyframe(time float64, data Data) *Keyframe {
+func newKeyframe(time float32, data Data) *Keyframe {
 	return &Keyframe{
 		Time: time,
 		Data: data,
@@ -53,17 +53,17 @@ type AnimationTrack struct {
 }
 
 // AddKeyframe adds a keyframe of the necessary data type to the AnimationTrack.
-func (track *AnimationTrack) AddKeyframe(time float64, data any) {
+func (track *AnimationTrack) AddKeyframe(time float32, data any) {
 	track.Keyframes = append(track.Keyframes, newKeyframe(time, Data{data}))
 }
 
 // ValueAsVector returns a Vector associated with the current time in seconds, as well as a boolean indicating if
 // the Vector exists (i.e. if the AnimationTrack has location or scale data in the animation). The Vector will be
 // interpolated according to time between keyframes.
-func (track *AnimationTrack) ValueAsVector(time float64) (Vector, bool) {
+func (track *AnimationTrack) ValueAsVector(time float32) (Vector3, bool) {
 
 	if len(track.Keyframes) == 0 {
-		return Vector{}, false
+		return Vector3{}, false
 	}
 
 	if first := track.Keyframes[0]; time <= first.Time {
@@ -113,7 +113,7 @@ func (track *AnimationTrack) ValueAsVector(time float64) (Vector, bool) {
 
 // ValueAsQuaternion returns the Quaternion associated with this AnimationTrack using the given time in seconds,
 // and a boolean indicating if the Quaternion exists (i.e. if this is track has rotation animation data).
-func (track *AnimationTrack) ValueAsQuaternion(time float64) (Quaternion, bool) {
+func (track *AnimationTrack) ValueAsQuaternion(time float32) (Quaternion, bool) {
 
 	if len(track.Keyframes) == 0 {
 		return Quaternion{}, false
@@ -175,7 +175,7 @@ type AnimationChannel struct {
 	Name                string
 	Tracks              map[string]*AnimationTrack
 	startingPositionSet bool
-	startingPosition    Vector
+	startingPosition    Vector3
 }
 
 func NewAnimationChannel(name string) *AnimationChannel {
@@ -193,7 +193,7 @@ func (channel *AnimationChannel) AddTrack(trackType string) *AnimationTrack {
 
 // Marker represents a tag as placed in an Animation in a 3D modeler.
 type Marker struct {
-	Time float64 // Time of the marker in seconds in the Animation.
+	Time float32 // Time of the marker in seconds in the Animation.
 	Name string  // Name of the marker.
 }
 
@@ -203,7 +203,7 @@ type Animation struct {
 	Name    string
 	// A Channel represents a set of tracks (one for position, scale, and rotation) for the various nodes contained within the Animation.
 	Channels   map[string]*AnimationChannel
-	Length     float64    // Length of the animation in seconds
+	Length     float32    // Length of the animation in seconds
 	Markers    []Marker   // Markers as specified in the Animation from the modeler
 	properties Properties // Animation properties
 
@@ -262,10 +262,10 @@ func (animation *Animation) Properties() Properties {
 
 // AnimationValues indicate the current position, scale, and rotation for a Node.
 type AnimationValues struct {
-	Position              Vector
+	Position              Vector3
 	PositionExists        bool
 	PositionInterpolation int
-	Scale                 Vector
+	Scale                 Vector3
 	ScaleExists           bool
 	ScaleInterpolation    int
 	Rotation              Quaternion
@@ -280,11 +280,11 @@ type AnimationPlayer struct {
 	ChannelsToNodes        map[*AnimationChannel]INode
 	ChannelsUpdated        bool
 	Animation              *Animation
-	Playhead               float64 // Playhead of the animation. Setting this to 0 restarts the animation.
-	prevPlayhead           float64
+	Playhead               float32 // Playhead of the animation. Setting this to 0 restarts the animation.
+	prevPlayhead           float32
 	prevFinishedAnimation  string
 	justLooped             bool
-	PlaySpeed              float64                    // Playback speed in percentage - defaults to 1 (100%)
+	PlaySpeed              float32                    // Playback speed in percentage - defaults to 1 (100%)
 	Playing                bool                       // Whether the player is playing back or not.
 	FinishMode             FinishMode                 // What to do when the player finishes playback. Defaults to looping.
 	OnFinish               func(animation *Animation) // Callback indicating the Animation has completed
@@ -294,7 +294,7 @@ type AnimationPlayer struct {
 	AnimatedProperties     map[INode]AnimationValues // The properties that have been animated
 	currentProperties      map[INode]AnimationValues
 	prevAnimatedProperties map[INode]AnimationValues // The previous properties that have been animated from the previously Play()'d animation
-	BlendTime              float64                   // How much time in seconds to blend between two animations
+	BlendTime              float32                   // How much time in seconds to blend between two animations
 	blendStart             time.Time                 // The time that the blend started
 	// If the AnimationPlayer should play the last frame or not. For example, if you have an animation that starts on frame 1 and goes to frame 10,
 	// then if PlayLastFrame is on, it will play all frames, INCLUDING frame 10, and only then repeat (if it's set to repeat).
@@ -302,8 +302,8 @@ type AnimationPlayer struct {
 	// The default for PlayLastFrame is false.
 	PlayLastFrame bool
 
-	startingPosition Vector
-	startingScale    Vector
+	startingPosition Vector3
+	startingScale    Vector3
 	startingRotation Matrix4
 }
 
@@ -460,7 +460,7 @@ func (ap *AnimationPlayer) assignChannels() {
 
 }
 
-func (ap *AnimationPlayer) updateValues(dt float64) {
+func (ap *AnimationPlayer) updateValues(dt float32) {
 
 	if ap.Animation != nil {
 
@@ -487,7 +487,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 						// movement is relative to this position
 						if !channel.startingPositionSet {
 							channel.startingPositionSet = true
-							channel.startingPosition, _ = track.ValueAsVector(-math.MaxFloat64)
+							channel.startingPosition, _ = track.ValueAsVector(-math.MaxFloat32)
 						}
 
 					}
@@ -606,7 +606,7 @@ func (ap *AnimationPlayer) updateValues(dt float64) {
 }
 
 // Update updates the animation player by the delta specified in seconds (usually 1/FPS or 1/TARGET FPS), animating the transformation properties of the root node's tree.
-func (ap *AnimationPlayer) Update(dt float64) {
+func (ap *AnimationPlayer) Update(dt float32) {
 
 	ap.finished = false
 	ap.touchedMarkers = ap.touchedMarkers[:0]
@@ -626,12 +626,12 @@ func (ap *AnimationPlayer) Update(dt float64) {
 
 // SetPlayhead sets the playhead of the animation player to the specified time in seconds, and
 // also performs an update of the animated nodes.
-func (ap *AnimationPlayer) SetPlayhead(time float64) {
+func (ap *AnimationPlayer) SetPlayhead(time float32) {
 	ap.Playhead = time
 	ap.forceUpdate(0)
 }
 
-func (ap *AnimationPlayer) forceUpdate(dt float64) {
+func (ap *AnimationPlayer) forceUpdate(dt float32) {
 
 	ap.updateValues(dt)
 
@@ -639,16 +639,16 @@ func (ap *AnimationPlayer) forceUpdate(dt float64) {
 
 		_, prevExists := ap.prevAnimatedProperties[node]
 
-		var targetPosition Vector
+		var targetPosition Vector3
 		var posSet bool
-		var targetScale Vector
+		var targetScale Vector3
 		var scaleSet bool
 		var targetRotation Quaternion
 		var rotSet bool
 
 		if !ap.blendStart.IsZero() && prevExists {
 
-			bp := float64(time.Since(ap.blendStart).Milliseconds()) / (ap.BlendTime * 1000)
+			bp := float32(time.Since(ap.blendStart).Milliseconds()) / (ap.BlendTime * 1000)
 			if bp > 1 {
 				bp = 1
 			}

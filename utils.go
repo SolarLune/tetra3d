@@ -2,13 +2,13 @@ package tetra3d
 
 import (
 	"image"
-	"math"
 	"strings"
 
-	"github.com/hajimehoshi/ebiten/v2"
-	"golang.org/x/image/font"
-
 	_ "embed"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/solarlune/tetra3d/math32"
+	"golang.org/x/image/font"
 )
 
 type FinishMode int
@@ -19,58 +19,12 @@ const (
 	FinishModeStop                       // Stop on animation completion
 )
 
-// ToRadians is a helper function to easily convert degrees to radians (which is what the rotation-oriented functions in Tetra3D use).
-func ToRadians(degrees float64) float64 {
-	return math.Pi * degrees / 180
-}
+// ClosestPointOnLine returns the closest point along a line spanning from start to end.
+func ClosestPointOnLine(start, end, point Vector3) Vector3 {
 
-// ToDegrees is a helper function to easily convert radians to degrees for human readability.
-func ToDegrees(radians float64) float64 {
-	return radians / math.Pi * 180
-}
-
-func min[V float64 | int](a, b V) V {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max[V float64 | int](a, b V) V {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func clamp[V float64 | float32 | int](value, min, max V) V {
-	if value < min {
-		return min
-	} else if value > max {
-		return max
-	}
-	return value
-}
-
-func pow(value float64, power int) float64 {
-	x := value
-	for i := 0; i < power; i++ {
-		x += x
-	}
-	return x
-}
-
-func round(value float64) float64 {
-
-	iv := float64(int(value))
-
-	if value > iv+0.5 {
-		return iv + 1
-	} else if value < iv-0.5 {
-		return iv - 1
-	}
-
-	return iv
+	ab := end.Sub(start)
+	t := point.Sub(start).Dot(ab) / ab.Dot(ab)
+	return start.Add(ab.Scale(math32.Clamp(t, 0, 1)))
 
 }
 
@@ -217,15 +171,6 @@ func (s Set[E]) ForEach(f func(element E)) {
 }
 
 /////
-
-// ClosestPointOnLine returns the closest point along a line spanning from start to end.
-func ClosestPointOnLine(start, end, point Vector) Vector {
-
-	ab := end.Sub(start)
-	t := point.Sub(start).Dot(ab) / ab.Dot(ab)
-	return start.Add(ab.Scale(clamp(t, 0, 1)))
-
-}
 
 // func alignmentCheck(s any) {
 

@@ -73,7 +73,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	// Draw BG
 	opt := &ebiten.DrawImageOptions{}
-	w, h := g.BG.Size()
+	w := g.BG.Bounds().Dx()
+	h := g.BG.Bounds().Dy()
 	camW, camH := g.Camera.Size()
 	opt.GeoM.Scale(float64(camW)/float64(w), float64(camH)/float64(h))
 	screen.DrawImage(g.BG, opt)

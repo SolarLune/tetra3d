@@ -13,7 +13,7 @@ import (
 
 type Game struct {
 	Library *tetra3d.Library
-	Time    float64
+	Time    float32
 
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler

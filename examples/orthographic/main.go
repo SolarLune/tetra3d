@@ -2,14 +2,15 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"image/color"
-	"math"
 
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"
+	"github.com/solarlune/tetra3d/math32"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -42,7 +43,7 @@ func (g *Game) Init() {
 
 	g.Scene = library.Scenes[0]
 
-	g.CamHandle = g.Scene.Root.Get("CameraHandle")
+	g.CamHandle = g.Scene.Root.Get("CamHandle")
 
 	g.System = examples.NewBasicSystemHandler(g)
 
@@ -50,24 +51,29 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	moveSpd := 0.1
+	moveSpd := float32(0.1)
 
 	camera := g.CamHandle.Get("Camera").(*tetra3d.Camera)
 
 	// Moving the Camera
 
+	forward := g.CamHandle.WorldRotation().Forward().Scale(-moveSpd)
+	right := g.CamHandle.WorldRotation().Right().Scale(moveSpd)
+
+	fmt.Println(g.CamHandle.WorldRotation().Forward())
+
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		g.CamHandle.Move(0, 0, -moveSpd)
+		g.CamHandle.MoveVec(forward)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		g.CamHandle.Move(moveSpd, 0, 0)
+		g.CamHandle.MoveVec(right)
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		g.CamHandle.Move(0, 0, moveSpd)
+		g.CamHandle.MoveVec(forward.Invert())
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		g.CamHandle.Move(-moveSpd, 0, 0)
+		g.CamHandle.MoveVec(right.Invert())
 	}
 
 	scale := camera.OrthoScale()
@@ -80,7 +86,7 @@ func (g *Game) Update() error {
 	}
 
 	// Limit orthoscale size.
-	camera.SetOrthoScale(math.Max(math.Min(scale, 80), 10))
+	camera.SetOrthoScale(math32.Clamp(scale, 10, 80))
 	camera.SetPerspective(false)
 
 	if ebiten.IsKeyPressed(ebiten.KeyE) {
@@ -113,7 +119,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		camera.DrawDebugRenderInfo(screen, 1, colors.White())
-		txt := `Arrow Keys: Pan in cardinal directions
+		txt := `Arrow Keys: Pan
 W, S: Zoom in and Out
 Q, E: Rotate View
 R: Restart`

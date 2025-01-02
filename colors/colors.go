@@ -1,6 +1,5 @@
-package colors
-
 // package colors contains functions to quickly and easily generate tetra3d.Color instances by name (i.e. "White()", "Blue()", "Green()", etc).
+package colors
 
 import "github.com/solarlune/tetra3d"
 

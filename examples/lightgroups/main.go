@@ -22,7 +22,7 @@ type Game struct {
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
 
-	Time float64
+	Time float32
 }
 
 func NewGame() *Game {

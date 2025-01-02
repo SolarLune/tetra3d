@@ -1,17 +1,15 @@
 package tetra3d
 
-import (
-	"math"
-)
+import "github.com/solarlune/tetra3d/math32"
 
 // BoundingSphere represents a 3D sphere.
 type BoundingSphere struct {
 	*Node
-	Radius float64
+	Radius float32
 }
 
 // NewBoundingSphere returns a new BoundingSphere instance.
-func NewBoundingSphere(name string, radius float64) *BoundingSphere {
+func NewBoundingSphere(name string, radius float32) *BoundingSphere {
 	sphere := &BoundingSphere{
 		Node:   NewNode(name),
 		Radius: radius,
@@ -31,15 +29,15 @@ func (sphere *BoundingSphere) Clone() INode {
 }
 
 // WorldRadius returns the radius of the BoundingSphere in world units, after taking into account its scale.
-func (sphere *BoundingSphere) WorldRadius() float64 {
-	var scale Vector
-	maxScale := 1.0
+func (sphere *BoundingSphere) WorldRadius() float32 {
+	var scale Vector3
+	maxScale := float32(1.0)
 	if sphere.Node.Parent() != nil {
 		scale = sphere.Node.WorldScale() // We don't want to have to decompose the transform if we can help it
 	} else {
 		scale = sphere.Node.scale // We don't want to have to make a memory duplicate if we don't have to
 	}
-	maxScale = math.Max(math.Max(math.Abs(scale.X), math.Abs(scale.Y)), math.Abs(scale.Z))
+	maxScale = math32.Max(math32.Max(math32.Abs(scale.X), math32.Abs(scale.Y)), math32.Abs(scale.Z))
 	return sphere.Radius * maxScale
 }
 
@@ -84,7 +82,7 @@ func (sphere *BoundingSphere) CollisionTest(settings CollisionTestSettings) bool
 }
 
 // PointInside returns whether the given point is inside of the sphere or not.
-func (sphere *BoundingSphere) PointInside(point Vector) bool {
+func (sphere *BoundingSphere) PointInside(point Vector3) bool {
 	return sphere.Node.WorldPosition().Sub(point).Magnitude() < sphere.WorldRadius()
 }
 

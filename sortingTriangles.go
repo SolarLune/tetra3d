@@ -1,5 +1,7 @@
 package tetra3d
 
+import "github.com/solarlune/tetra3d/math32"
+
 // sortingTriangle is used specifically for sorting triangles when rendering. Less data means more data fits in cache,
 // which means sorting is faster.
 type sortingTriangle struct {
@@ -50,7 +52,7 @@ func (s *sortingTriangleBucket) Sort(minRange, maxRange float32) {
 
 		if s.sortMode != TriangleSortModeNone && binCount > 1 {
 			depth := (s.unsetTris[i].depth - minRange) / rangeDiff * float32(binCount)
-			t := clamp(depth, 0, float32(binCount-1))
+			t := math32.Clamp(depth, 0, float32(binCount-1))
 			targetBin = int(t)
 		}
 

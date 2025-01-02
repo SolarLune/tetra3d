@@ -1,21 +1,19 @@
 package tetra3d
 
-import (
-	"math"
-)
+import "github.com/solarlune/tetra3d/math32"
 
 // BoundingAABB represents a 3D AABB (Axis-Aligned Bounding Box), a 3D cube of varying width, height, and depth that cannot rotate.
 // The primary purpose of a BoundingAABB is, like the other Bounding* Nodes, to perform intersection testing between itself and other
 // BoundingObject Nodes.
 type BoundingAABB struct {
 	*Node
-	internalSize Vector
+	internalSize Vector3
 	Dimensions   Dimensions // Dimensions represents the size of the AABB after transformation.
 }
 
 // NewBoundingAABB returns a new BoundingAABB Node.
-func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
-	min := 0.0001
+func NewBoundingAABB(name string, width, height, depth float32) *BoundingAABB {
+	min := float32(0.0001)
 	if width <= 0 {
 		width = min
 	}
@@ -27,7 +25,7 @@ func NewBoundingAABB(name string, width, height, depth float64) *BoundingAABB {
 	}
 	bounds := &BoundingAABB{
 		Node:         NewNode(name),
-		internalSize: Vector{width, height, depth, 0},
+		internalSize: Vector3{width, height, depth},
 	}
 	bounds.Node.onTransformUpdate = bounds.updateSize
 	bounds.updateSize()
@@ -41,7 +39,7 @@ func (box *BoundingAABB) updateSize() {
 
 	_, s, r := box.Node.Transform().Decompose()
 
-	corners := [][]float64{
+	corners := [][]float32{
 		{1, 1, 1},
 		{1, -1, 1},
 		{-1, 1, 1},
@@ -56,11 +54,10 @@ func (box *BoundingAABB) updateSize() {
 
 	for _, c := range corners {
 
-		position := r.MultVec(Vector{
+		position := r.MultVec(Vector3{
 			box.internalSize.X * c[0] * s.X / 2,
 			box.internalSize.Y * c[1] * s.Y / 2,
 			box.internalSize.Z * c[2] * s.Z / 2,
-			0,
 		})
 
 		if dimensions.Min.X > position.X {
@@ -94,9 +91,9 @@ func (box *BoundingAABB) updateSize() {
 }
 
 // SetDimensions sets the BoundingAABB's internal dimensions (prior to resizing or rotating the Node).
-func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float64) {
+func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float32) {
 
-	min := 0.00001
+	min := float32(0.00001)
 	if newWidth <= 0 {
 		newWidth = min
 	}
@@ -129,7 +126,7 @@ func (box *BoundingAABB) Clone() INode {
 
 // ClosestPoint returns the closest point, to the point given, on the inside or surface of the BoundingAABB
 // in world space.
-func (box *BoundingAABB) ClosestPoint(point Vector) Vector {
+func (box *BoundingAABB) ClosestPoint(point Vector3) Vector3 {
 	out := point
 	pos := box.WorldPosition()
 
@@ -158,30 +155,29 @@ func (box *BoundingAABB) ClosestPoint(point Vector) Vector {
 
 // normalFromContactPoint guesses which normal to return for an AABB given an MTV vector. Basically, if you have an MTV vector indicating a sphere, for example,
 // moves up by 0.1 when colliding with an AABB, it must be colliding with the top, and so the returned normal would be [0, 1, 0].
-func (box *BoundingAABB) normalFromContactPoint(contactPoint Vector) Vector {
+func (box *BoundingAABB) normalFromContactPoint(contactPoint Vector3) Vector3 {
 
 	if contactPoint.Equals(box.WorldPosition()) {
-		return NewVectorZero()
+		return Vector3{}
 	}
 
 	p := contactPoint.Sub(box.WorldPosition())
-	d := Vector{
+	d := Vector3{
 		box.Dimensions.Width() / 2,
 		box.Dimensions.Height() / 2,
 		box.Dimensions.Depth() / 2,
-		0,
 	}
 
 	nx := p.X / d.X
 	ny := p.Y / d.Y
 	nz := p.Z / d.Z
 
-	if math.Abs(nx) > math.Abs(ny) && math.Abs(nx) > math.Abs(nz) {
-		return Vector{nx, 0, 0, 0}.Unit()
-	} else if math.Abs(ny) > math.Abs(nx) && math.Abs(ny) > math.Abs(nz) {
-		return Vector{0, ny, 0, 0}.Unit()
+	if math32.Abs(nx) > math32.Abs(ny) && math32.Abs(nx) > math32.Abs(nz) {
+		return Vector3{nx, 0, 0}.Unit()
+	} else if math32.Abs(ny) > math32.Abs(nx) && math32.Abs(ny) > math32.Abs(nz) {
+		return Vector3{0, ny, 0}.Unit()
 	}
-	return Vector{0, 0, nz, 0}.Unit()
+	return Vector3{0, 0, nz}.Unit()
 
 }
 
@@ -256,12 +252,12 @@ func (box *BoundingAABB) CollisionTest(settings CollisionTestSettings) bool {
 	return commonCollisionTest(box, settings)
 }
 
-func (box *BoundingAABB) PointInside(point Vector) bool {
+func (box *BoundingAABB) PointInside(point Vector3) bool {
 
 	position := box.WorldPosition()
 	min := box.Dimensions.Min.Add(position)
 	max := box.Dimensions.Max.Add(position)
-	margin := 0.01
+	margin := float32(0.01)
 
 	if point.X >= min.X-margin && point.X <= max.X+margin &&
 		point.Y >= min.Y-margin && point.Y <= max.Y+margin &&

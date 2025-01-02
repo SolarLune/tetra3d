@@ -6,15 +6,15 @@ import (
 	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // A GridConnection represents a one-way connection from one GridPoint to another.
 type GridConnection struct {
 	To       *GridPoint
 	Passable bool    // Whether the connection should be considered as passable when performing pathfinding.
-	Cost     float64 // The cost of the jump, from one grid point to another. Defaults to 0.
-	length   float64 // the length of the jump from one GridPoint to another.
+	Cost     float32 // The cost of the jump, from one grid point to another. Defaults to 0.
+	length   float32 // the length of the jump from one GridPoint to another.
 }
 
 // Clone the GridConnection.
@@ -35,7 +35,7 @@ type GridPoint struct {
 	Connections       []*GridConnection
 	sortedConnections []*GridConnection
 	prevLink          *GridPoint
-	costSoFar         float64
+	costSoFar         float32
 }
 
 // NewGridPoint creates a new GridPoint.
@@ -183,7 +183,7 @@ func (point *GridPoint) PathTo(goal *GridPoint) *GridPath {
 
 	if point == goal {
 		return &GridPath{
-			GridPoints: []Vector{point.WorldPosition()},
+			GridPoints: []Vector3{point.WorldPosition()},
 		}
 	}
 
@@ -193,7 +193,7 @@ func (point *GridPoint) PathTo(goal *GridPoint) *GridPath {
 	})
 
 	path := &GridPath{
-		GridPoints: []Vector{},
+		GridPoints: []Vector3{},
 	}
 
 	toCheck := []*GridPoint{point}
@@ -335,7 +335,7 @@ func (grid *Grid) DisconnectAllPoints() {
 	}
 }
 
-func (grid *Grid) MergeDuplicatePoints(margin float64) {
+func (grid *Grid) MergeDuplicatePoints(margin float32) {
 	grid.ForEachPoint(func(point *GridPoint) {
 
 		grid.ForEachPoint(func(point2 *GridPoint) {
@@ -370,7 +370,7 @@ type HopCount struct {
 
 // HopCounts returns the number of hops from the closest grid point to the starting position (from)
 // to the closest grid points to all other provided positions.
-func (grid *Grid) HopCounts(from Vector, targetPositions ...Vector) []HopCount {
+func (grid *Grid) HopCounts(from Vector3, targetPositions ...Vector3) []HopCount {
 
 	start := grid.ClosestGridPoint(from)
 
@@ -395,13 +395,13 @@ func (grid *Grid) HopCounts(from Vector, targetPositions ...Vector) []HopCount {
 
 // ClosestPositionOnGrid returns the nearest world position on the Grid to the given world position.
 // This position can be directly on a GridPoint, or on a connection between GridPoints.
-func (grid *Grid) ClosestPositionOnGrid(position Vector) Vector {
+func (grid *Grid) ClosestPositionOnGrid(position Vector3) Vector3 {
 
 	nearestPoint := grid.ClosestGridPoint(position)
 
 	start := nearestPoint.WorldPosition()
 
-	dist := math.MaxFloat64
+	dist := float32(math.MaxFloat32)
 	endPos := position
 
 	for _, connection := range nearestPoint.Connections {
@@ -433,7 +433,7 @@ func (grid *Grid) ClosestPositionOnGrid(position Vector) Vector {
 }
 
 // ClosestGridPoint returns the nearest grid point to the given world position.
-func (grid *Grid) ClosestGridPoint(position Vector) *GridPoint {
+func (grid *Grid) ClosestGridPoint(position Vector3) *GridPoint {
 
 	points := grid.Points()
 
@@ -446,7 +446,7 @@ func (grid *Grid) ClosestGridPoint(position Vector) *GridPoint {
 }
 
 // FurthestGridPoint returns the furthest grid point to the given world position.
-func (grid *Grid) FurthestGridPoint(position Vector) *GridPoint {
+func (grid *Grid) FurthestGridPoint(position Vector3) *GridPoint {
 
 	points := grid.Points()
 
@@ -531,21 +531,21 @@ func (grid *Grid) Combine(others ...*Grid) {
 }
 
 // Center returns the center point of the Grid, given the positions of its GridPoints.
-func (grid *Grid) Center() Vector {
-	pos := Vector{0, 0, 0, 0}
+func (grid *Grid) Center() Vector3 {
+	pos := Vector3{0, 0, 0}
 	points := grid.Points()
 	for _, p := range points {
 		pos = pos.Add(p.WorldPosition())
 	}
 
-	pos = pos.Divide(float64(len(points)))
+	pos = pos.Divide(float32(len(points)))
 	return pos
 }
 
 // Dimensions returns a Dimensions struct, indicating the overall "spread" of the GridPoints composing the Grid.
 func (grid *Grid) Dimensions() Dimensions {
 	gridPoints := grid.Points()
-	points := make([]Vector, 0, len(gridPoints))
+	points := make([]Vector3, 0, len(gridPoints))
 	for _, p := range gridPoints {
 		points = append(points, p.WorldPosition())
 	}
@@ -562,13 +562,13 @@ func (grid *Grid) Type() NodeType {
 // GridPath represents a sequence of grid points, used to traverse a path.
 // GridPath implements IPath.
 type GridPath struct {
-	GridPoints []Vector
+	GridPoints []Vector3
 }
 
 // Length returns the length of the overall path.
-func (gp *GridPath) Length() float64 {
+func (gp *GridPath) Length() float32 {
 
-	dist := 0.0
+	dist := float32(0)
 
 	if len(gp.GridPoints) <= 1 {
 		return 0
@@ -587,8 +587,8 @@ func (gp *GridPath) Length() float64 {
 }
 
 // Points returns the points of the GridPath in a slice.
-func (gp *GridPath) Points() []Vector {
-	points := append(make([]Vector, 0, len(gp.GridPoints)), gp.GridPoints...)
+func (gp *GridPath) Points() []Vector3 {
+	points := append(make([]Vector3, 0, len(gp.GridPoints)), gp.GridPoints...)
 	return points
 }
 
@@ -607,10 +607,10 @@ func (gp *GridPath) DebugDraw(screen *ebiten.Image, camera *Camera, color Color)
 	for i := 0; i < len(points)-1; i++ {
 		p1 := camera.WorldToScreenPixels(points[i])
 		p2 := camera.WorldToScreenPixels(points[i+1])
-		ebitenutil.DrawLine(screen, p1.X, p1.Y, p2.X, p2.Y, color.ToRGBA64())
-		ebitenutil.DrawCircle(screen, p1.X, p1.Y, 8, color.ToRGBA64())
+		vector.StrokeLine(screen, p1.X, p1.Y, p2.X, p2.Y, 1, color.ToRGBA64(), false)
+		vector.StrokeCircle(screen, p1.X, p1.Y, 8, 1, color.ToRGBA64(), false)
 		if i == len(points)-2 {
-			ebitenutil.DrawCircle(screen, p2.X, p2.Y, 8, color.ToRGBA64())
+			vector.StrokeCircle(screen, p2.X, p2.Y, 8, 1, color.ToRGBA64(), false)
 		}
 	}
 

@@ -46,7 +46,7 @@ func newCubeElement(root tetra3d.INode) *CubeElement {
 
 func (cube *CubeElement) Update() {
 
-	moveSpd := 0.05
+	moveSpd := float32(0.05)
 
 	currentPos := cube.PathStepper.CurrentWorldPosition()
 	diff := currentPos.Sub(cube.Model.WorldPosition()).ClampMagnitude(moveSpd)

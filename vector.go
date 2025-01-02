@@ -5,123 +5,115 @@ import (
 	"math"
 	"math/rand"
 	"strings"
+
+	"github.com/solarlune/tetra3d/math32"
 )
 
 // Much of the harder code taken with HEAVY appreciation from quartercastle: https://github.com/quartercastle/vector
 
 // WorldRight represents a unit vector in the global direction of WorldRight on the right-handed OpenGL / Tetra3D's coordinate system (+X).
-var WorldRight = NewVector(1, 0, 0)
+var WorldRight = NewVector3(1, 0, 0)
 
 // WorldLeft represents a unit vector in the global direction of WorldLeft on the right-handed OpenGL / Tetra3D's coordinate system (-X).
 var WorldLeft = WorldRight.Invert()
 
 // WorldUp represents a unit vector in the global direction of WorldUp on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
-var WorldUp = NewVector(0, 1, 0)
+var WorldUp = NewVector3(0, 1, 0)
 
 // WorldDown represents a unit vector in the global direction of WorldDown on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
 var WorldDown = WorldUp.Invert()
 
 // WorldBackward represents a unit vector in the global direction of WorldBackward on the right-handed OpenGL / Tetra3D's coordinate system (+Z).
-var WorldBackward = NewVector(0, 0, 1)
+var WorldBackward = NewVector3(0, 0, 1)
 
 // WorldForward represents a unit vector in the global direction of WorldForward on the right-handed OpenGL / Tetra3D's coordinate system (-Z).
 var WorldForward = WorldBackward.Invert()
 
-// Vector represents a 3D Vector, which can be used for usual 3D applications (position, direction, velocity, etc).
+// Vector3 represents a 3D Vector3, which can be used for usual 3D applications (position, direction, velocity, etc).
 // The fourth component, W, can be ignored and is used for internal Tetra3D usage.
-// Any Vector functions that modify the calling Vector return copies of the modified Vector, meaning you can do method-chaining easily.
+// Any Vector3 functions that modify the calling Vector3 return copies of the modified Vector3, meaning you can do method-chaining easily.
 // Vectors seem to be most efficient when copied (so try not to store pointers to them if possible, as dereferencing pointers
 // can be more inefficient than directly acting on data, and storing pointers moves variables to heap).
-type Vector struct {
-	X float64 // The X (1st) component of the Vector
-	Y float64 // The Y (2nd) component of the Vector
-	Z float64 // The Z (3rd) component of the Vector
-	W float64 // The w (4th) component of the Vector; not used for most Vector functions
+type Vector3 struct {
+	X float32 // The X (1st) component of the Vector
+	Y float32 // The Y (2nd) component of the Vector
+	Z float32 // The Z (3rd) component of the Vector
 }
 
-// NewVector creates a new Vector with the specified x, y, and z components. The W component is generally ignored for most purposes.
-func NewVector(x, y, z float64) Vector {
-	return Vector{X: x, Y: y, Z: z, W: 0}
+// NewVector3 creates a new Vector3 with the specified x, y, and z components. The W component is generally ignored for most purposes.
+func NewVector3(x, y, z float32) Vector3 {
+	return Vector3{X: x, Y: y, Z: z}
 }
 
-// NewVector creates a new Vector with the specified x and y components. The Z and W components are set to 0.
-func NewVector2d(x, y float64) Vector {
-	return Vector{X: x, Y: y, Z: 0, W: 0}
-}
-
-// NewVectorZero creates a new "zero-ed out" Vector, with the values of 0, 0, 0, and 0 (for W).
-func NewVectorZero() Vector {
-	return Vector{}
-}
-
-// NewVectorRandom creates a new random vector with components ranging between the minimum and maximum values provided.
-func NewVectorRandom(minX, maxX, minY, maxY, minZ, maxZ float64) Vector {
+// NewVector3Random creates a new random vector with components ranging between the minimum and maximum values provided.
+func NewVector3Random(minX, maxX, minY, maxY, minZ, maxZ float32) Vector3 {
 	dx := maxX - minX
 	dy := maxY - minY
 	dz := maxZ - minZ
-	return Vector{
-		X: minX + rand.Float64()*dx,
-		Y: minY + rand.Float64()*dy,
-		Z: minZ + rand.Float64()*dz,
+	return Vector3{
+		X: minX + rand.Float32()*dx,
+		Y: minY + rand.Float32()*dy,
+		Z: minZ + rand.Float32()*dz,
 	}
 }
 
-// Modify returns a ModVector object (a pointer to the original vector).
-func (vec *Vector) Modify() ModVector {
-	ip := ModVector{Vector: vec}
+// Modify returns a ModVector3 object (a pointer to the original vector).
+func (vec *Vector3) Modify() ModVector3 {
+	ip := ModVector3{Vector3: vec}
 	return ip
 }
 
 // Clone clones the provided Vector, returning a new copy of it. This isn't necessary for a value-based struct like this.
-// func (vec Vector) Clone() Vector {
+// func (vec Vector) Clone() Vector3 {
 // 	return vec
 // }
 
 // String returns a string representation of the Vector, excluding its W component (which is primarily used for internal purposes).
-func (vec Vector) String() string {
+func (vec Vector3) String() string {
 	return fmt.Sprintf("{%.2f, %.2f, %.2f}", vec.X, vec.Y, vec.Z)
 }
 
 // String returns a string representation of the Vector, excluding its W component (which is primarily used for internal purposes).
-func (vec Vector) StringW() string {
+func (vec Vector4) String() string {
 	return fmt.Sprintf("{%.2f, %.2f, %.2f, %.2f}", vec.X, vec.Y, vec.Z, vec.W)
 }
 
-// Add returns a copy of the calling vector, added together with the other Vector provided (ignoring the W component).
-func (vec Vector) Add(other Vector) Vector {
+// Add returns a copy of the calling vector, added together with the other Vector3 provided (ignoring the W component).
+func (vec Vector3) Add(other Vector3) Vector3 {
 	vec.X += other.X
 	vec.Y += other.Y
 	vec.Z += other.Z
 	return vec
 }
 
-// Sub returns a copy of the calling Vector, with the other Vector subtracted from it (ignoring the W component).
-func (vec Vector) Sub(other Vector) Vector {
+// Sub returns a copy of the calling Vector, with the other Vector3 subtracted from it (ignoring the W component).
+func (vec Vector3) Sub(other Vector3) Vector3 {
 	vec.X -= other.X
 	vec.Y -= other.Y
 	vec.Z -= other.Z
 	return vec
 }
 
-// Expand expands the Vector by the margin specified, in absolute units, if each component is over the minimum argument.
-// To illustrate: Given a Vector of {1, 0.1, -0.3}, Vector.Expand(0.5, 0.2) would give you a Vector of {1.5, 0.1, -0.8}.
-// This function returns a copy of the Vector with the result.
-func (vec Vector) Expand(margin, min float64) Vector {
+// Expand expands the Vector3 by the margin specified, in absolute units, if each component is over the minimum argument.
+// To illustrate: Given a Vector3 of {1, 0.1, -0.3}, Vector.Expand(0.5, 0.2) would give you a Vector3 of {1.5, 0.1, -0.8}.
+// This function returns a copy of the Vector3 with the result.
+func (vec Vector3) Expand(margin, min float32) Vector3 {
+
 	if vec.X > min || vec.X < -min {
-		vec.X += math.Copysign(margin, vec.X)
+		vec.X += math32.Copysign(margin, vec.X)
 	}
 	if vec.Y > min || vec.Y < -min {
-		vec.Y += math.Copysign(margin, vec.Y)
+		vec.Y += math32.Copysign(margin, vec.Y)
 	}
 	if vec.Z > min || vec.Z < -min {
-		vec.Z += math.Copysign(margin, vec.Z)
+		vec.Z += math32.Copysign(margin, vec.Z)
 	}
 	return vec
 }
 
-// Cross returns a new Vector, indicating the cross product of the calling Vector and the provided Other Vector.
+// Cross returns a new Vector, indicating the cross product of the calling Vector3 and the provided Other Vector.
 // This function ignores the W component of both Vectors.
-func (vec Vector) Cross(other Vector) Vector {
+func (vec Vector3) Cross(other Vector3) Vector3 {
 
 	ogVecY := vec.Y
 	ogVecZ := vec.Z
@@ -139,45 +131,45 @@ func (vec Vector) Cross(other Vector) Vector {
 
 }
 
-// Invert returns a copy of the Vector with all components inverted (ignoring the Vector's W component).
-func (vec Vector) Invert() Vector {
+// Invert returns a copy of the Vector3 with all components inverted (ignoring the Vector's W component).
+func (vec Vector3) Invert() Vector3 {
 	vec.X = -vec.X
 	vec.Y = -vec.Y
 	vec.Z = -vec.Z
 	return vec
 }
 
-// Magnitude returns the length of the Vector (ignoring the Vector's W component).
-func (vec Vector) Magnitude() float64 {
-	return math.Sqrt(vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z)
+// Magnitude returns the length of the Vector3 (ignoring the Vector's W component).
+func (vec Vector3) Magnitude() float32 {
+	return math32.Sqrt(vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z)
 }
 
-// MagnitudeSquared returns the squared length of the Vector (ignoring the Vector's W component); this is faster than Length() as it avoids using math.Sqrt().
-func (vec Vector) MagnitudeSquared() float64 {
+// MagnitudeSquared returns the squared length of the Vector3 (ignoring the Vector's W component); this is faster than Length() as it avoids using math32.Sqrt().
+func (vec Vector3) MagnitudeSquared() float32 {
 	return vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z
 }
 
-// ClampMagnitude clamps the overall magnitude of the Vector to the maximum magnitude specified, returning a copy with the result.
+// ClampMagnitude clamps the overall magnitude of the Vector3 to the maximum magnitude specified, returning a copy with the result.
 // If the magnitude is less than that maximum magnitude, the vector is unmodified.
-func (vec Vector) ClampMagnitude(maxMag float64) Vector {
+func (vec Vector3) ClampMagnitude(maxMag float32) Vector3 {
 	if vec.Magnitude() > maxMag {
 		vec = vec.Unit().Scale(maxMag)
 	}
 	return vec
 }
 
-// SubMagnitude returns a copy of the Vector with the given magnitude subtracted from it. If the vector's magnitude is less than the given magnitude to subtract,
-// a zero-length Vector will be returned.
-func (vec Vector) SubMagnitude(mag float64) Vector {
+// SubMagnitude returns a copy of the Vector3 with the given magnitude subtracted from it. If the vector's magnitude is less than the given magnitude to subtract,
+// a zero-length Vector3 will be returned.
+func (vec Vector3) SubMagnitude(mag float32) Vector3 {
 	if vec.Magnitude() > mag {
 		return vec.Sub(vec.Unit().Scale(mag))
 	}
-	return Vector{0, 0, 0, vec.W}
+	return Vector3{0, 0, 0}
 
 }
 
-// MoveTowards moves a Vector towards another Vector given a specific magnitude. If the distance is less than that magnitude, it returns the target vector.
-func (vec Vector) MoveTowards(target Vector, magnitude float64) Vector {
+// MoveTowards moves a Vector3 towards another Vector3 given a specific magnitude. If the distance is less than that magnitude, it returns the target vector.
+func (vec Vector3) MoveTowards(target Vector3, magnitude float32) Vector3 {
 	diff := target.Sub(vec)
 	if diff.Magnitude() > magnitude {
 		return vec.Add(diff.Unit().Scale(magnitude))
@@ -185,25 +177,25 @@ func (vec Vector) MoveTowards(target Vector, magnitude float64) Vector {
 	return target
 }
 
-// Distance returns the distance from the calling Vector to the other Vector provided.
-func (vec Vector) Distance(other Vector) float64 {
+// Distance returns the distance from the calling Vector3 to the other Vector3 provided.
+func (vec Vector3) Distance(other Vector3) float32 {
 	// return vec.Sub(other).Magnitude()
 	vec.X -= other.X
 	vec.Y -= other.Y
 	vec.Z -= other.Z
-	return math.Sqrt(vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z)
+	return math32.Sqrt(vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z)
 }
 
-// DistanceSquared returns the squared distance from the calling Vector to the other Vector provided. This is faster than Distance(), as it avoids using math.Sqrt().
-func (vec Vector) DistanceSquared(other Vector) float64 {
+// DistanceSquared returns the squared distance from the calling Vector3 to the other Vector3 provided. This is faster than Distance(), as it avoids using math32.Sqrt().
+func (vec Vector3) DistanceSquared(other Vector3) float32 {
 	vec.X -= other.X
 	vec.Y -= other.Y
 	vec.Z -= other.Z
 	return vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z
 }
 
-// Mult performs Hadamard (component-wise) multiplication on the calling Vector with the other Vector provided, returning a copy with the result (and ignoring the Vector's W component).
-func (vec Vector) Mult(other Vector) Vector {
+// Mult performs Hadamard (component-wise) multiplication on the calling Vector3 with the other Vector3 provided, returning a copy with the result (and ignoring the Vector's W component).
+func (vec Vector3) Mult(other Vector3) Vector3 {
 	vec.X *= other.X
 	vec.Y *= other.Y
 	vec.Z *= other.Z
@@ -212,7 +204,7 @@ func (vec Vector) Mult(other Vector) Vector {
 
 // Unit returns a copy of the Vector, normalized (set to be of unit length).
 // It does not alter the W component of the Vector.
-func (vec Vector) Unit() Vector {
+func (vec Vector3) Unit() Vector3 {
 	l := vec.Magnitude()
 	if l < 1e-8 || l == 1 {
 		// If it's 0, then don't modify the vector
@@ -222,11 +214,11 @@ func (vec Vector) Unit() Vector {
 	return vec
 }
 
-// Swizzle swizzles the Vector using the string provided, returning the swizzled copy.
+// Swizzle swizzles the Vector3 using the string provided, returning the swizzled copy.
 // The string can be of length 3 ("xyz") or 4 ("xyzw").
 // The string should be composed of the axes of a vector, i.e. 'x', 'y', 'z', or 'w'.
-// Example: `vec := Vector{1, 2, 3}.Swizzle("zxy") // Returns a Vector of {3, 1, 2}.`
-func (vec Vector) Swizzle(swizzleString string) Vector {
+// Example: `vec := Vector{1, 2, 3}.Swizzle("zxy") // Returns a Vector3 of {3, 1, 2}.`
+func (vec Vector3) Swizzle(swizzleString string) Vector3 {
 
 	if l := len(swizzleString); l < 3 || l > 4 {
 		panic("Error: Can't call Vec.Swizzle() with less than 3, or greater than 4 values")
@@ -237,8 +229,7 @@ func (vec Vector) Swizzle(swizzleString string) Vector {
 	ogX := vec.X
 	ogY := vec.Y
 	ogZ := vec.Z
-	ogW := vec.W
-	var targetValue float64
+	var targetValue float32
 
 	for i, v := range swizzleString {
 
@@ -249,8 +240,6 @@ func (vec Vector) Swizzle(swizzleString string) Vector {
 			targetValue = ogY
 		case 'z':
 			targetValue = ogZ
-		case 'w':
-			targetValue = ogW
 		}
 
 		switch i {
@@ -260,8 +249,6 @@ func (vec Vector) Swizzle(swizzleString string) Vector {
 			vec.Y = targetValue
 		case 2:
 			vec.Z = targetValue
-		case 3:
-			vec.W = targetValue
 		}
 
 	}
@@ -271,46 +258,46 @@ func (vec Vector) Swizzle(swizzleString string) Vector {
 }
 
 // SetX sets the X component in the vector to the value provided.
-func (vec Vector) SetX(x float64) Vector {
+func (vec Vector3) SetX(x float32) Vector3 {
 	vec.X = x
 	return vec
 }
 
 // SetY sets the Y component in the vector to the value provided.
-func (vec Vector) SetY(y float64) Vector {
+func (vec Vector3) SetY(y float32) Vector3 {
 	vec.Y = y
 	return vec
 }
 
 // SetZ sets the Z component in the vector to the value provided.
-func (vec Vector) SetZ(z float64) Vector {
+func (vec Vector3) SetZ(z float32) Vector3 {
 	vec.Z = z
 	return vec
 }
 
-// Set sets the values in the Vector to the x, y, and z values provided.
-func (vec Vector) Set(x, y, z float64) Vector {
+// Set sets the values in the Vector3 to the x, y, and z values provided.
+func (vec Vector3) Set(x, y, z float32) Vector3 {
 	vec.X = x
 	vec.Y = y
 	vec.Z = z
 	return vec
 }
 
-// Floats returns a [4]float64 array consisting of the Vector's contents.
-func (vec Vector) Floats() [4]float64 {
-	return [4]float64{vec.X, vec.Y, vec.Z, vec.W}
+// Floats returns a [4]float32 array consisting of the Vector's contents.
+func (vec Vector3) Floats() [4]float32 {
+	return [4]float32{vec.X, vec.Y, vec.Z}
 }
 
 // Equals returns true if the two Vectors are close enough in all values (excluding W).
-func (vec Vector) Equals(other Vector) bool {
+func (vec Vector3) Equals(other Vector3) bool {
 
-	eps := 1e-4
+	eps := float32(1e-4)
 
-	if math.Abs(float64(vec.X-other.X)) > eps || math.Abs(float64(vec.Y-other.Y)) > eps || math.Abs(float64(vec.Z-other.Z)) > eps {
+	if math32.Abs(float32(vec.X-other.X)) > eps || math32.Abs(float32(vec.Y-other.Y)) > eps || math32.Abs(float32(vec.Z-other.Z)) > eps {
 		return false
 	}
 
-	// if !onlyXYZ && math.Abs(vec.W-other.W) > eps {
+	// if !onlyXYZ && math32.Abs(vec.W-other.W) > eps {
 	// 	return false
 	// }
 
@@ -318,16 +305,16 @@ func (vec Vector) Equals(other Vector) bool {
 
 }
 
-// IsZero returns true if all of the values in the Vector are extremely close to 0 (excluding W).
-func (vec Vector) IsZero() bool {
+// IsZero returns true if all of the values in the Vector3 are extremely close to 0 (excluding W).
+func (vec Vector3) IsZero() bool {
 
-	eps := 1e-4
+	eps := float32(1e-4)
 
-	if math.Abs(float64(vec.X)) > eps || math.Abs(float64(vec.Y)) > eps || math.Abs(float64(vec.Z)) > eps {
+	if math32.Abs(float32(vec.X)) > eps || math32.Abs(float32(vec.Y)) > eps || math32.Abs(float32(vec.Z)) > eps {
 		return false
 	}
 
-	// if !onlyXYZ && math.Abs(vec.W-other.W) > eps {
+	// if !onlyXYZ && math32.Abs(vec.W-other.W) > eps {
 	// 	return false
 	// }
 
@@ -336,49 +323,49 @@ func (vec Vector) IsZero() bool {
 }
 
 // IsNaN returns if any of the values are NaN (not a number).
-func (vec Vector) IsNaN() bool {
-	return math.IsNaN(vec.X) || math.IsNaN(vec.Y) || math.IsNaN(vec.Z)
+func (vec Vector3) IsNaN() bool {
+	return math32.IsNaN(vec.X) || math32.IsNaN(vec.Y) || math32.IsNaN(vec.Z)
 }
 
 // IsInf returns if any of the values are infinite.
-func (vec Vector) IsInf() bool {
-	return math.IsInf(vec.X, 0) || math.IsInf(vec.Y, 0) || math.IsInf(vec.Z, 0)
+func (vec Vector3) IsInf() bool {
+	return math32.IsInf(vec.X, 0) || math32.IsInf(vec.Y, 0) || math32.IsInf(vec.Z, 0)
 }
 
-// Rotate returns a copy of the Vector, rotated around the Vector axis provided by the angle provided (in radians).
+// Rotate returns a copy of the Vector, rotated around the Vector3 axis provided by the angle provided (in radians).
 // The function is most efficient if passed an orthogonal, normalized axis (i.e. the X, Y, or Z constants).
 // Note that this function ignores the W component of both Vectors.
-func (vec Vector) RotateVec(axis Vector, angle float64) Vector {
+func (vec Vector3) RotateVec(axis Vector3, angle float32) Vector3 {
 	return NewQuaternionFromAxisAngle(axis, angle).RotateVec(vec)
 }
 
-// Rotate returns a copy of the Vector, rotated around an axis Vector with the x, y, and z components provided, by the angle
+// Rotate returns a copy of the Vector, rotated around an axis Vector3 with the x, y, and z components provided, by the angle
 // provided (in radians), counter-clockwise.
 // The function is most efficient if passed an orthogonal, normalized axis (i.e. the X, Y, or Z constants).
 // Note that this function ignores the W component of both Vectors.
-func (vec Vector) Rotate(x, y, z, angle float64) Vector {
-	return NewQuaternionFromAxisAngle(Vector{X: x, Y: y, Z: z}, angle).RotateVec(vec)
+func (vec Vector3) Rotate(x, y, z, angle float32) Vector3 {
+	return NewQuaternionFromAxisAngle(Vector3{X: x, Y: y, Z: z}, angle).RotateVec(vec)
 }
 
-// Angle returns the angle in radians between the calling Vector and the provided other Vector (ignoring the W component).
-func (vec Vector) Angle(other Vector) float64 {
+// Angle returns the angle in radians between the calling Vector3 and the provided other Vector3 (ignoring the W component).
+func (vec Vector3) Angle(other Vector3) float32 {
 	// d := vec.Unit().Dot(other.Unit())
 	d := vec.Dot(other)
 	d /= vec.MagnitudeSquared() * other.MagnitudeSquared() // REVIEW
-	d = clamp(d, -1, 1)                                    // Acos returns NaN if value < -1 or > 1
-	return math.Acos(float64(d))
+	d = math32.Clamp(d, -1, 1)                             // Acos returns NaN if value < -1 or > 1
+	return math32.Acos(float32(d))
 }
 
-// AngleSigned returns the signed angle between vec and other, with planeNormal indicating the plane that both vectors share.
-// In other words, if you want the signed angle between Vector A and Vector B, and the vectors differ only on two axes (say, X and Z),
-// then the planeNormal Vector would be the cross product of these two Vectors (a Vector pointing "up", or Y+).
-func (vec Vector) AngleSigned(other, planeNormal Vector) float64 {
-	return math.Atan2(other.Cross(vec).Dot(planeNormal.Unit()), vec.Dot(other))
+// AngleSigned returns the signed angle between the calling Vector and the other Vector, with planeNormal indicating the plane that both vectors share.
+// In other words, if you want the signed angle between Vector3 A and Vector3 B, and the vectors differ only on two axes (say, X and Z),
+// then the planeNormal Vector3 would be the cross product of these two Vectors (a Vector3 pointing "up", or Y+).
+func (vec Vector3) AngleSigned(other, planeNormal Vector3) float32 {
+	return math32.Atan2(other.Cross(vec).Dot(planeNormal.Unit()), vec.Dot(other))
 }
 
-// ClampAngle clamps the Vector such that it doesn't exceed the angle specified (in radians)
+// ClampAngle clamps the Vector3 such that it doesn't exceed the angle specified (in radians)
 // between it and the baseline Vector.
-func (vec Vector) ClampAngle(baselineVec Vector, maxAngle float64) Vector {
+func (vec Vector3) ClampAngle(baselineVec Vector3, maxAngle float32) Vector3 {
 
 	mag := vec.Magnitude()
 
@@ -392,189 +379,189 @@ func (vec Vector) ClampAngle(baselineVec Vector, maxAngle float64) Vector {
 
 }
 
-// Scale scales a Vector by the given scalar (ignoring the W component), returning a copy with the result.
-func (vec Vector) Scale(scalar float64) Vector {
+// Scale scales a Vector3 by the given scalar (ignoring the W component), returning a copy with the result.
+func (vec Vector3) Scale(scalar float32) Vector3 {
 	vec.X *= scalar
 	vec.Y *= scalar
 	vec.Z *= scalar
 	return vec
 }
 
-// Divide divides a Vector by the given scalar (ignoring the W component), returning a copy with the result.
-func (vec Vector) Divide(scalar float64) Vector {
+// Divide divides a Vector3 by the given scalar (ignoring the W component), returning a copy with the result.
+func (vec Vector3) Divide(scalar float32) Vector3 {
 	vec.X /= scalar
 	vec.Y /= scalar
 	vec.Z /= scalar
 	return vec
 }
 
-// Dot returns the dot product of a Vector and another Vector (ignoring the W component).
-func (vec Vector) Dot(other Vector) float64 {
+// Dot returns the dot product of a Vector3 and another Vector3 (ignoring the W component).
+func (vec Vector3) Dot(other Vector3) float32 {
 	return vec.X*other.X + vec.Y*other.Y + vec.Z*other.Z
 }
 
 // Round rounds the Vector's components off to the given increments, returning a new Vector.
 // For example, Vector{0.1, 1.47, 3.33}.Round(0.25) will return Vector{0, 1.5, 3.25}.
-func (vec Vector) Round(roundToUnits float64) Vector {
-	vec.X = round(vec.X/roundToUnits) * roundToUnits
-	vec.Y = round(vec.Y/roundToUnits) * roundToUnits
-	vec.Z = round(vec.Z/roundToUnits) * roundToUnits
+func (vec Vector3) Round(roundToUnits float32) Vector3 {
+	vec.X = math32.Round(vec.X/roundToUnits) * roundToUnits
+	vec.Y = math32.Round(vec.Y/roundToUnits) * roundToUnits
+	vec.Z = math32.Round(vec.Z/roundToUnits) * roundToUnits
 	return vec
 }
 
 // Floor floors the Vector's components off, returning a new Vector.
 // For example, Vector{0.1, 1.87, 3.33}.Floor() will return Vector{0, 1, 3}.
-func (vec Vector) Floor() Vector {
-	vec.X = math.Floor(vec.X)
-	vec.Y = math.Floor(vec.Y)
-	vec.Z = math.Floor(vec.Z)
+func (vec Vector3) Floor() Vector3 {
+	vec.X = math32.Floor(vec.X)
+	vec.Y = math32.Floor(vec.Y)
+	vec.Z = math32.Floor(vec.Z)
 	return vec
 }
 
 // Ceil ceils the Vector's components off, returning a new Vector.
 // For example, Vector{0.1, 1.27, 3.33}.Ceil() will return Vector{1, 2, 4}.
-func (vec Vector) Ceil() Vector {
-	vec.X = math.Ceil(vec.X)
-	vec.Y = math.Ceil(vec.Y)
-	vec.Z = math.Ceil(vec.Z)
+func (vec Vector3) Ceil() Vector3 {
+	vec.X = math32.Ceil(vec.X)
+	vec.Y = math32.Ceil(vec.Y)
+	vec.Z = math32.Ceil(vec.Z)
 	return vec
 }
 
-// Lerp performs a linear interpolation between the starting Vector and the provided
+// Lerp performs a linear interpolation between the starting Vector3 and the provided
 // other Vector, to the given percentage (ranging from 0 to 1).
-func (vec Vector) Lerp(other Vector, percentage float64) Vector {
-	percentage = clamp(percentage, 0, 1)
+func (vec Vector3) Lerp(other Vector3, percentage float32) Vector3 {
+	percentage = math32.Clamp(percentage, 0, 1)
 	vec.X = vec.X + ((other.X - vec.X) * percentage)
 	vec.Y = vec.Y + ((other.Y - vec.Y) * percentage)
 	vec.Z = vec.Z + ((other.Z - vec.Z) * percentage)
 	return vec
 }
 
-// Slerp performs a spherical linear interpolation between the starting Vector and the provided
+// Slerp performs a spherical linear interpolation between the starting Vector3 and the provided
 // ending Vector, to the given percentage (ranging from 0 to 1).
-// A slerp rotates a Vector around to a desired end Vector, rather than linearly interpolating to it.
+// A slerp rotates a Vector3 around to a desired end Vector, rather than linearly interpolating to it.
 // This normalizes the resulting Vector.
-func (vec Vector) Slerp(end Vector, percentage float64) Vector {
+func (vec Vector3) Slerp(end Vector3, percentage float32) Vector3 {
 
 	vec = vec.Unit()
 	end = end.Unit()
 
 	// Thank you StackOverflow, once again! : https://stackoverflow.com/questions/67919193/how-does-unity-implements-vector3-slerp-exactly
-	percentage = clamp(percentage, 0, 1)
+	percentage = math32.Clamp(percentage, 0, 1)
 
 	dot := vec.Dot(end)
 
-	dot = clamp(dot, -1, 1)
+	dot = math32.Clamp(dot, -1, 1)
 
-	theta := math.Acos(dot) * percentage
+	theta := math32.Acos(dot) * percentage
 	relative := end.Sub(vec.Scale(dot)).Unit()
 
-	return (vec.Scale(math.Cos(theta)).Add(relative.Scale(math.Sin(theta)))).Unit()
+	return (vec.Scale(math32.Cos(theta)).Add(relative.Scale(math32.Sin(theta)))).Unit()
 
 }
 
-// Clamp clamps the Vector to the maximum values provided.
-func (vec Vector) Clamp(x, y, z float64) Vector {
-	vec.X = clamp(vec.X, -x, x)
-	vec.Y = clamp(vec.Y, -y, y)
-	vec.Z = clamp(vec.Z, -z, z)
+// Clamp clamps the Vector3 to the maximum values provided.
+func (vec Vector3) Clamp(x, y, z float32) Vector3 {
+	vec.X = math32.Clamp(vec.X, -x, x)
+	vec.Y = math32.Clamp(vec.Y, -y, y)
+	vec.Z = math32.Clamp(vec.Z, -z, z)
 	return vec
 }
 
-// ClampVec clamps the Vector to the maximum values in the Vector provided.
-func (vec Vector) ClampVec(extents Vector) Vector {
-	vec.X = clamp(vec.X, -extents.X, extents.X)
-	vec.Y = clamp(vec.Y, -extents.Y, extents.Y)
-	vec.Z = clamp(vec.Z, -extents.Z, extents.Z)
+// ClampVec clamps the Vector3 to the maximum values in the Vector3 provided.
+func (vec Vector3) ClampVec(extents Vector3) Vector3 {
+	vec.X = math32.Clamp(vec.X, -extents.X, extents.X)
+	vec.Y = math32.Clamp(vec.Y, -extents.Y, extents.Y)
+	vec.Z = math32.Clamp(vec.Z, -extents.Z, extents.Z)
 	return vec
 }
 
-// ModVector represents a reference to a Vector, made to facilitate easy method-chaining and modifications on that Vector (as you
+// ModVector3 represents a reference to a Vector, made to facilitate easy method-chaining and modifications on that Vector3 (as you
 // don't need to re-assign the results of a chain of operations to the original variable to "save" the results).
-// Note that a ModVector is not meant to be used to chain methods on a vector to pass directly into a function; you can just
+// Note that a ModVector3 is not meant to be used to chain methods on a vector to pass directly into a function; you can just
 // use the normal vector functions for that purpose. ModVectors are pointers, which are allocated to the heap. This being the case,
 // they should be slower relative to normal Vectors, so use them only in non-performance-critical parts of your application.
-type ModVector struct {
-	*Vector
+type ModVector3 struct {
+	*Vector3
 }
 
-// Add adds the other Vector provided to the ModVector.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Add(other Vector) ModVector {
+// Add adds the other Vector3 provided to the ModVector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Add(other Vector3) ModVector3 {
 	ip.X += other.X
 	ip.Y += other.Y
 	ip.Z += other.Z
 	return ip
 }
 
-// Sub subtracts the other Vector from the calling ModVector.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Sub(other Vector) ModVector {
+// Sub subtracts the other Vector3 from the calling ModVector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Sub(other Vector3) ModVector3 {
 	ip.X -= other.X
 	ip.Y -= other.Y
 	ip.Z -= other.Z
 	return ip
 }
 
-// MoveTowards moves a Vector towards another Vector given a specific magnitude. If the distance is less than that magnitude, it returns the target vector.
-func (ip ModVector) MoveTowards(target Vector, magnitude float64) ModVector {
-	modified := (*ip.Vector).MoveTowards(target, magnitude)
+// MoveTowards moves a Vector3 towards another Vector3 given a specific magnitude. If the distance is less than that magnitude, it returns the target vector.
+func (ip ModVector3) MoveTowards(target Vector3, magnitude float32) ModVector3 {
+	modified := (*ip.Vector3).MoveTowards(target, magnitude)
 	ip.X = modified.X
 	ip.Y = modified.Y
 	ip.Z = modified.Z
 	return ip
 }
 
-// SetZero sets the Vector to zero.
-func (ip ModVector) SetZero() ModVector {
+// SetZero sets the Vector3 to zero.
+func (ip ModVector3) SetZero() ModVector3 {
 	ip.X = 0
 	ip.Y = 0
 	ip.Z = 0
 	return ip
 }
 
-// Scale scales the Vector by the scalar provided.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Scale(scalar float64) ModVector {
+// Scale scales the Vector3 by the scalar provided.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Scale(scalar float32) ModVector3 {
 	ip.X *= scalar
 	ip.Y *= scalar
 	ip.Z *= scalar
 	return ip
 }
 
-// Divide divides a Vector by the given scalar (ignoring the W component).
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Divide(scalar float64) ModVector {
+// Divide divides a Vector3 by the given scalar (ignoring the W component).
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Divide(scalar float32) ModVector3 {
 	ip.X /= scalar
 	ip.Y /= scalar
 	ip.Z /= scalar
 	return ip
 }
 
-// Expand expands the ModVector by the margin specified, in absolute units, if each component is over the minimum argument.
-// To illustrate: Given a ModVector of {1, 0.1, -0.3}, ModVector.Expand(0.5, 0.2) would give you a ModVector of {1.5, 0.1, -0.8}.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Expand(margin, min float64) ModVector {
-	exp := ip.Vector.Expand(margin, min)
+// Expand expands the ModVector3 by the margin specified, in absolute units, if each component is over the minimum argument.
+// To illustrate: Given a ModVector3 of {1, 0.1, -0.3}, ModVector.Expand(0.5, 0.2) would give you a ModVector3 of {1.5, 0.1, -0.8}.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Expand(margin, min float32) ModVector3 {
+	exp := ip.Vector3.Expand(margin, min)
 	ip.X = exp.X
 	ip.Y = exp.Y
 	ip.Z = exp.Z
 	return ip
 }
 
-// Mult performs Hadamard (component-wise) multiplication with the Vector on the other Vector provided.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Mult(other Vector) ModVector {
+// Mult performs Hadamard (component-wise) multiplication with the Vector3 on the other Vector3 provided.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Mult(other Vector3) ModVector3 {
 	ip.X *= other.X
 	ip.Y *= other.Y
 	ip.Z *= other.Z
 	return ip
 }
 
-// Unit normalizes the ModVector (sets it to be of unit length).
+// Unit normalizes the ModVector3 (sets it to be of unit length).
 // It does not alter the W component of the Vector.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Unit() ModVector {
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Unit() ModVector3 {
 	l := ip.Magnitude()
 	if l < 1e-8 || l == 1 {
 		// If it's 0, then don't modify the vector
@@ -584,13 +571,13 @@ func (ip ModVector) Unit() ModVector {
 	return ip
 }
 
-// Swizzle swizzles the ModVector using the string provided.
+// Swizzle swizzles the ModVector3 using the string provided.
 // The string can be of length 3 ("xyz") or 4 ("xyzw").
 // The string should be composed of the axes of a vector, i.e. 'x', 'y', 'z', or 'w'.
-// Example: `vec := Vector{1, 2, 3}.Swizzle("zxy") // Returns a Vector of {3, 1, 2}.`
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Swizzle(swizzleString string) ModVector {
-	vec := ip.Vector.Swizzle(swizzleString)
+// Example: `vec := Vector{1, 2, 3}.Swizzle("zxy") // Returns a Vector3 of {3, 1, 2}.`
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Swizzle(swizzleString string) ModVector3 {
+	vec := ip.Vector3.Swizzle(swizzleString)
 	ip.X = vec.X
 	ip.Y = vec.Y
 	ip.Z = vec.Z
@@ -598,30 +585,30 @@ func (ip ModVector) Swizzle(swizzleString string) ModVector {
 }
 
 // Cross performs a cross-product multiplication on the ModVector.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Cross(other Vector) ModVector {
-	cross := (*ip.Vector).Cross(other)
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Cross(other Vector3) ModVector3 {
+	cross := (*ip.Vector3).Cross(other)
 	ip.X = cross.X
 	ip.Y = cross.Y
 	ip.Z = cross.Z
 	return ip
 }
 
-// RotateVec rotates the calling ModVector by the axis Vector and angle provided (in radians).
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) RotateVec(axis Vector, angle float64) ModVector {
-	rot := (*ip.Vector).RotateVec(axis, angle)
+// RotateVec rotates the calling ModVector3 by the axis Vector3 and angle provided (in radians).
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) RotateVec(axis Vector3, angle float32) ModVector3 {
+	rot := (*ip.Vector3).RotateVec(axis, angle)
 	ip.X = rot.X
 	ip.Y = rot.Y
 	ip.Z = rot.Z
 	return ip
 }
 
-// RotateVec rotates the calling ModVector by an axis Vector composed of the x, y, and z components provided,
+// RotateVec rotates the calling ModVector3 by an axis Vector3 composed of the x, y, and z components provided,
 // by the angle provided (in radians).
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Rotate(x, y, z, angle float64) ModVector {
-	rot := (*ip.Vector).Rotate(x, y, z, angle)
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Rotate(x, y, z, angle float32) ModVector3 {
+	rot := (*ip.Vector3).Rotate(x, y, z, angle)
 	ip.X = rot.X
 	ip.Y = rot.Y
 	ip.Z = rot.Z
@@ -629,8 +616,8 @@ func (ip ModVector) Rotate(x, y, z, angle float64) ModVector {
 }
 
 // Invert inverts all components of the calling ModVector.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Invert() ModVector {
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Invert() ModVector3 {
 	ip.X = -ip.X
 	ip.Y = -ip.Y
 	ip.Z = -ip.Z
@@ -639,9 +626,9 @@ func (ip ModVector) Invert() ModVector {
 
 // Round rounds off the ModVector's components to the given space in world units.
 // For example, Vector{0.1, 1.27, 3.33}.Modify().Round(0.25) will return Vector{0, 1.25, 3.25}.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Round(roundToUnits float64) ModVector {
-	snapped := (*ip.Vector).Round(roundToUnits)
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Round(roundToUnits float32) ModVector3 {
+	snapped := (*ip.Vector3).Round(roundToUnits)
 	ip.X = snapped.X
 	ip.Y = snapped.Y
 	ip.Z = snapped.Z
@@ -650,9 +637,9 @@ func (ip ModVector) Round(roundToUnits float64) ModVector {
 
 // Floor floors the ModVector's components off, returning a new Vector.
 // For example, Vector{0.1, 1.27, 3.33}.Modify().Floor() will return Vector{0, 1, 3}.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Floor() ModVector {
-	snapped := (*ip.Vector).Floor()
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Floor() ModVector3 {
+	snapped := (*ip.Vector3).Floor()
 	ip.X = snapped.X
 	ip.Y = snapped.Y
 	ip.Z = snapped.Z
@@ -661,19 +648,19 @@ func (ip ModVector) Floor() ModVector {
 
 // Ceil ceils the ModVector's components off, returning a new Vector.
 // For example, Vector{0.1, 1.27, 3.33}.Modify().Ceil() will return Vector{1, 2, 4}.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Ceil() ModVector {
-	snapped := (*ip.Vector).Ceil()
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Ceil() ModVector3 {
+	snapped := (*ip.Vector3).Ceil()
 	ip.X = snapped.X
 	ip.Y = snapped.Y
 	ip.Z = snapped.Z
 	return ip
 }
 
-// ClampMagnitude clamps the overall magnitude of the Vector to the maximum magnitude specified.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) ClampMagnitude(maxMag float64) ModVector {
-	clamped := (*ip.Vector).ClampMagnitude(maxMag)
+// ClampMagnitude clamps the overall magnitude of the Vector3 to the maximum magnitude specified.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) ClampMagnitude(maxMag float32) ModVector3 {
+	clamped := (*ip.Vector3).ClampMagnitude(maxMag)
 	ip.X = clamped.X
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
@@ -681,11 +668,11 @@ func (ip ModVector) ClampMagnitude(maxMag float64) ModVector {
 }
 
 // SubMagnitude subtacts the given magnitude from the Vector's. If the vector's magnitude is less than the given magnitude to subtract,
-// a zero-length Vector will be returned.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) SubMagnitude(mag float64) ModVector {
+// a zero-length Vector3 will be returned.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) SubMagnitude(mag float32) ModVector3 {
 	if ip.Magnitude() > mag {
-		ip.Sub(ip.Vector.Unit().Scale(mag))
+		ip.Sub(ip.Vector3.Unit().Scale(mag))
 	} else {
 		ip.X = 0
 		ip.Y = 0
@@ -695,247 +682,433 @@ func (ip ModVector) SubMagnitude(mag float64) ModVector {
 
 }
 
-// Lerp performs a linear interpolation between the starting ModVector and the provided
+// Lerp performs a linear interpolation between the starting ModVector3 and the provided
 // other Vector, to the given percentage.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Lerp(other Vector, percentage float64) ModVector {
-	lerped := (*ip.Vector).Lerp(other, percentage)
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Lerp(other Vector3, percentage float32) ModVector3 {
+	lerped := (*ip.Vector3).Lerp(other, percentage)
 	ip.X = lerped.X
 	ip.Y = lerped.Y
 	ip.Z = lerped.Z
 	return ip
 }
 
-// Slerp performs a spherical linear interpolation between the starting ModVector and the provided
+// Slerp performs a spherical linear interpolation between the starting ModVector3 and the provided
 // other Vector, to the given percentage.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Slerp(other Vector, percentage float64) ModVector {
-	slerped := (*ip.Vector).Slerp(other, percentage)
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Slerp(other Vector3, percentage float32) ModVector3 {
+	slerped := (*ip.Vector3).Slerp(other, percentage)
 	ip.X = slerped.X
 	ip.Y = slerped.Y
 	ip.Z = slerped.Z
 	return ip
 }
 
-// Clamp clamps the Vector to the maximum values provided.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Clamp(x, y, z float64) ModVector {
-	clamped := (*ip.Vector).Clamp(x, y, z)
+// Clamp clamps the Vector3 to the maximum values provided.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Clamp(x, y, z float32) ModVector3 {
+	clamped := (*ip.Vector3).Clamp(x, y, z)
 	ip.X = clamped.X
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
 	return ip
 }
 
-// ClampVec clamps the Vector to the maximum values in the Vector provided.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) ClampVec(extents Vector) ModVector {
-	clamped := (*ip.Vector).ClampVec(extents)
+// ClampVec clamps the Vector3 to the maximum values in the Vector3 provided.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) ClampVec(extents Vector3) ModVector3 {
+	clamped := (*ip.Vector3).ClampVec(extents)
 	ip.X = clamped.X
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
 	return ip
 }
 
-// ClampAngle clamps the Vector such that it doesn't exceed the angle specified (in radians).
-// This function returns a normalized (unit) ModVector for method chaining.
-func (ip ModVector) ClampAngle(baselineVec Vector, maxAngle float64) ModVector {
-	clamped := (*ip.Vector).ClampAngle(baselineVec, maxAngle)
+// ClampAngle clamps the Vector3 such that it doesn't exceed the angle specified (in radians).
+// This function returns a normalized (unit) ModVector3 for method chaining.
+func (ip ModVector3) ClampAngle(baselineVec Vector3, maxAngle float32) ModVector3 {
+	clamped := (*ip.Vector3).ClampAngle(baselineVec, maxAngle)
 	ip.X = clamped.X
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
 	return ip
 }
 
-// String converts the ModVector to a string. Because it's a ModVector, it's represented with a *.
-func (ip ModVector) String() string {
+// String converts the ModVector3 to a string. Because it's a ModVector, it's represented with a *.
+func (ip ModVector3) String() string {
 	return fmt.Sprintf("*{%.2f, %.2f, %.2f}", ip.X, ip.Y, ip.Z)
 }
 
-// Clone returns a ModVector of a clone of its backing Vector.
-// This function returns the calling ModVector for method chaining.
-func (ip ModVector) Clone() ModVector {
-	v := *ip.Vector
+// Clone returns a ModVector3 of a clone of its backing Vector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip ModVector3) Clone() ModVector3 {
+	v := *ip.Vector3
 	return v.Modify()
 }
 
-// ToVector returns a copy of the Vector that the ModVector is modifying.
-func (ip ModVector) ToVector() Vector {
-	return *ip.Vector
+// ToVector3 returns a copy of the Vector3 that the ModVector3 is modifying.
+func (ip ModVector3) ToVector() Vector3 {
+	return *ip.Vector3
 }
 
-// The previous iteration of a Vector implementation was this VectorFloat, which was more performant than the previously used quartercastle's Vector package,
-// but also more awkward, since we have to pass pointers into functions to modify them, but avoid actually storing these pointers to keep vectors from being allocated to heap.
-// It also meant you couldn't effectively method chain (as this allocated to heap as well).
-// That created an awkward system like so:
+// //////
 
-// ```
-// result := vectorA.Add(&vectorB)
-// result.Sub(&vectorC) // We pass pointers to arrays to avoid data being put on heap.
-// ```
+// Vector2 represents a 2D Vector2, which can be used for usual 2D applications (position, direction, velocity, etc).
+// Any Vector2 functions that modify the calling Vector2 return copies of the modified Vector2, meaning you can do method-chaining easily.
+type Vector2 struct {
+	X float32 // The X (1st) component of the Vector
+	Y float32 // The Y (2nd) component of the Vector
+}
 
-// It seems to be faster to simply use structs that are copied into functions. This allows us to be more efficient and do method chaining comfortably:
-// `result := vectorA.Add(vectorB).Sub(vectorC) // All vectors are structs, not pointers to structs, arrays, or slices`
+// NewVector2 creates a new Vector with the specified x, y, and z components. The W component is generally ignored for most purposes.
+func NewVector2(x, y float32) Vector2 {
+	return Vector2{X: x, Y: y}
+}
 
-// The previous iteration of Vectors (VectorFloat) is presented below:
+// String returns a string representation of the Vector, excluding its W component (which is primarily used for internal purposes).
+func (vec Vector2) String() string {
+	return fmt.Sprintf("{%.2f, %.2f}", vec.X, vec.Y)
+}
 
-// VectorFloat represents a vector in space, as stored in a [4]float64. It has 3D vector functions like Length and LengthSquared(), but is fundamentally a 4D VectorFloat.
-// type VectorFloat [3]float64
+// Add returns a copy of the calling vector, added together with the other Vector provided (ignoring the W component).
+func (vec Vector2) Add(other Vector2) Vector2 {
+	vec.X += other.X
+	vec.Y += other.Y
+	return vec
+}
 
-// // NewVectorFloat creates a new Vector with the specified x, y, z, and w components.
-// func NewVectorFloat(x, y, z float64) VectorFloat {
-// 	return VectorFloat{x, y, z}
-// }
+// AddX returns a copy of the calling vector with an added value to the X axis.
+func (vec Vector2) AddX(x float32) Vector2 {
+	vec.X += x
+	return vec
+}
 
-// // NewVectorFloatZero creates a new "zero-ed out" Vector, with the values of 0, 0, 0, and 1 (for W).
-// func NewVectorFloatZero() VectorFloat {
-// 	return NewVectorFloat(0, 0, 0)
-// }
+// AddY returns a copy of the calling vector with an added value to the Y axis.
+func (vec Vector2) AddY(y float32) Vector2 {
+	vec.Y += y
+	return vec
+}
 
-// // Clone clones the provided Vector, returning a new copy of it.
-// func (vec VectorFloat) Clone() VectorFloat {
-// 	return NewVectorFloat(vec[0], vec[1], vec[2])
-// }
+// Sub returns a copy of the calling Vector, with the other Vector subtracted from it (ignoring the W component).
+func (vec Vector2) Sub(other Vector2) Vector2 {
+	vec.X -= other.X
+	vec.Y -= other.Y
+	return vec
+}
 
-// // Add adds the provided other Vector into the existing one.
-// func (vec VectorFloat) Add(other VectorFloat) {
-// 	vec[0] += other[0]
-// 	vec[1] += other[1]
-// 	vec[2] += other[2]
-// }
+// SubX returns a copy of the calling vector with an added value to the X axis.
+func (vec Vector2) SubX(x float32) Vector2 {
+	vec.X -= x
+	return vec
+}
 
-// // Sub subtracts the provided other Vector into the existing one.
-// func (vec VectorFloat) Sub(other VectorFloat) VectorFloat {
-// 	vec[0] -= other[0]
-// 	vec[1] -= other[1]
-// 	vec[2] -= other[2]
-// 	return vec
-// }
+// SubY returns a copy of the calling vector with an added value to the Y axis.
+func (vec Vector2) SubY(y float32) Vector2 {
+	vec.Y -= y
+	return vec
+}
 
-// // Length returns the length of the Vector.
-// func (vec VectorFloat) Length() float64 {
-// 	return float64(math.Sqrt(float64(vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2])))
-// }
+// Expand expands the Vector by the margin specified, in absolute units, if each component is over the minimum argument.
+// To illustrate: Given a Vector of {1, 0.1, -0.3}, Vector.Expand(0.5, 0.2) would give you a Vector of {1.5, 0.1, -0.8}.
+// This function returns a copy of the Vector with the result.
+func (vec Vector2) Expand(margin, min float32) Vector2 {
+	if vec.X > min || vec.X < -min {
+		vec.X += math32.Copysign(margin, vec.X)
+	}
+	if vec.Y > min || vec.Y < -min {
+		vec.Y += math32.Copysign(margin, vec.Y)
+	}
+	return vec
+}
 
-// // LengthSquared returns the squared length of the Vector; this is faster than Length().
-// func (vec VectorFloat) LengthSquared() float64 {
-// 	return vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2]
-// }
+// Invert returns a copy of the Vector with all components inverted.
+func (vec Vector2) Invert() Vector2 {
+	vec.X = -vec.X
+	vec.Y = -vec.Y
+	return vec
+}
 
-// // Normalize normalizes the Vector (sets it to be of unit length).
-// func (vec VectorFloat) Normalize() VectorFloat {
-// 	l := vec.Length()
-// 	if l < 1e-8 {
-// 		// If it's 0, then remove it
-// 		return vec
-// 	}
-// 	vec[0], vec[1], vec[2] = vec[0]/l, vec[1]/l, vec[2]/l
-// 	return vec
-// }
+// Magnitude returns the length of the Vector.
+func (vec Vector2) Magnitude() float32 {
+	return math32.Sqrt(vec.X*vec.X + vec.Y*vec.Y)
+}
 
-// // Swizzle swizzles the Vector
-// func (vec VectorFloat) Swizzle(indices ...int) VectorFloat {
+// MagnitudeSquared returns the squared length of the Vector; this is faster than Length() as it avoids using math.math32.Sqrt().
+func (vec Vector2) MagnitudeSquared() float32 {
+	return vec.X*vec.X + vec.Y*vec.Y
+}
 
-// 	if len(indices) < 3 {
-// 		panic("Error: Can't call Vec.Swizzle() with less than 3 values")
-// 	}
+// ClampMagnitude clamps the overall magnitude of the Vector to the maximum magnitude specified, returning a copy with the result.
+func (vec Vector2) ClampMagnitude(maxMag float32) Vector2 {
+	if vec.Magnitude() > maxMag {
+		vec = vec.Unit().Scale(maxMag)
+	}
+	return vec
+}
 
-// 	nv := NewVectorFloatZero()
+// AddMagnitude adds magnitude to the Vector in the direction it's already pointing.
+func (vec Vector2) AddMagnitude(mag float32) Vector2 {
+	return vec.Add(vec.Unit().Scale(mag))
+}
 
-// 	for _, i := range indices {
-// 		nv[i] = vec[i]
-// 	}
+// SubMagnitude subtracts the given magnitude from the Vector's existing magnitude.
+// If the vector's magnitude is less than the given magnitude to subtract, a zero-length Vector will be returned.
+func (vec Vector2) SubMagnitude(mag float32) Vector2 {
+	if vec.Magnitude() > mag {
+		return vec.Sub(vec.Unit().Scale(mag))
+	}
+	return Vector2{0, 0}
 
-// 	return nv
+}
 
-// }
+// Distance returns the distance from the calling Vector to the other Vector provided.
+func (vec Vector2) Distance(other Vector2) float32 {
+	vec.X -= other.X
+	vec.Y -= other.Y
+	return math32.Sqrt(vec.X*vec.X + vec.Y*vec.Y)
+}
 
-// // Set3d sets the values in the Vector to the x, y, z, and w values provided. If you intend to use this Vector as a 3D Vector, then you
-// // can just ignore the w value.
-// func (vec VectorFloat) Set3d(x, y, z float64) {
-// 	vec[0] = x
-// 	vec[1] = y
-// 	vec[2] = z
-// }
+// Distance returns the squared distance from the calling Vector to the other Vector provided. This is faster than Distance(), as it avoids using math.math32.Sqrt().
+func (vec Vector2) DistanceSquared(other Vector2) float32 {
+	vec.X -= other.X
+	vec.Y -= other.Y
+	return vec.X*vec.X + vec.Y*vec.Y
+}
 
-// // Set4d sets the values in the Vector to the x, y, z, and w values provided. If you intend to use this Vector as a 3D Vector, then you
-// // can just ignore the w value.
-// func (vec VectorFloat) Set4d(x, y, z, w float64) {
-// 	vec[0] = x
-// 	vec[1] = y
-// 	vec[2] = z
-// }
+// Mult performs Hadamard (component-wise) multiplication on the calling Vector with the other Vector provided, returning a copy with the result (and ignoring the Vector's W component).
+func (vec Vector2) Mult(other Vector2) Vector2 {
+	vec.X *= other.X
+	vec.Y *= other.Y
+	return vec
+}
 
-// // SetVec sets the values in the Vector to the ones in the other Vector provided.
-// func (vec VectorFloat) SetVec(other VectorFloat) {
-// 	for i := range vec {
-// 		vec[i] = other[i]
-// 	}
-// }
+// Unit returns a copy of the Vector, normalized (set to be of unit length).
+// It does not alter the W component of the Vector.
+func (vec Vector2) Unit() Vector2 {
+	l := vec.Magnitude()
+	if l < 1e-8 || l == 1 {
+		// If it's 0, then don't modify the vector
+		return vec
+	}
+	vec.X, vec.Y = vec.X/l, vec.Y/l
+	return vec
+}
 
-// // Cross works for the X, Y, and Z values only of a Vector
-// func (vec VectorFloat) Cross(other VectorFloat) {
+// SetX sets the X component in the vector to the value provided.
+func (vec Vector2) SetX(x float32) Vector2 {
+	vec.X = x
+	return vec
+}
 
-// 	ogVec1 := vec[1]
-// 	ogVec2 := vec[2]
+// SetY sets the Y component in the vector to the value provided.
+func (vec Vector2) SetY(y float32) Vector2 {
+	vec.Y = y
+	return vec
+}
 
-// 	vec[2] = vec[0]*other[1] - other[0]*vec[1]
-// 	vec[1] = ogVec2*other[0] - other[2]*vec[0]
-// 	vec[0] = ogVec1*other[2] - other[1]*ogVec2
+// Set sets the values in the Vector to the x, y, and z values provided.
+func (vec Vector2) Set(x, y float32) Vector2 {
+	vec.X = x
+	vec.Y = y
+	return vec
+}
 
-// }
+// Reflect reflects the vector against the given surface normal.
+func (vec Vector2) Reflect(normal Vector2) Vector2 {
+	n := normal.Unit()
+	return vec.Sub(n.Scale(2 * n.Dot(vec)))
+}
 
-// func (vec VectorFloat) Floats() [3]float64 {
-// 	return [3]float64(*vec)
-// }
+// Perp returns the right-handed perpendicular of the vector (i.e. the vector rotated 90 degrees to the right, clockwise).
+func (vec Vector2) Perp() Vector2 {
+	return Vector2{-vec.Y, vec.X}
+}
 
-// func (vec VectorFloat) Rotate(axis VectorFloat, angle float64) {
+// Floats returns a [2]float32 array consisting of the Vector's contents.
+func (vec Vector2) Floats() [2]float32 {
+	return [2]float32{vec.X, vec.Y}
+}
 
-// 	u := axis.Clone()
-// 	u.Normalize()
+// Equals returns true if the two Vectors are close enough in all values (excluding W).
+func (vec Vector2) Equals(other Vector2) bool {
 
-// 	x := u.Clone()
-// 	x.Cross(&vec)
+	eps := float32(1e-4)
 
-// 	d := u.Dot(vec)
+	if math32.Abs(float32(vec.X-other.X)) > eps || math32.Abs(float32(vec.Y-other.Y)) > eps {
+		return false
+	}
 
-// 	c, s := math.Cos(float64(angle)), math.Sin(float64(angle))
-// 	cos := float64(c)
-// 	sin := float64(s)
+	return true
 
-// 	vec.Scale(cos)
+}
 
-// 	x.Scale(sin)
-// 	vec.Add(&x)
+// IsZero returns true if the values in the Vector are extremely close to 0 (excluding W).
+func (vec Vector2) IsZero() bool {
 
-// 	ud := u.Clone()
-// 	ud.Scale(d)
+	eps := float32(1e-4)
 
-// 	// vec.Add()
+	if math32.Abs(float32(vec.X)) > eps || math32.Abs(float32(vec.Y)) > eps {
+		return false
+	}
 
-// 	// add(a, scale(a, cos))
-// 	// add(a, scale(x, sin))
-// 	// add(a, scale(scale(u, d), 1-cos))
+	// if !onlyXYZ && math.math32.Abs(vec.W-other.W) > eps {
+	// 	return false
+	// }
 
-// }
+	return true
 
-// func (vec VectorFloat) Scale(scalar float64) VectorFloat {
-// 	vec[0] *= scalar
-// 	vec[1] *= scalar
-// 	vec[2] *= scalar
-// 	return *vec
-// }
+}
 
-// func (vec VectorFloat) Dot(other VectorFloat) float64 {
-// 	return vec[0]*other[0] + vec[1]*other[1] + vec[2]*other[2]
-// }
+// Rotate returns a copy of the Vector, rotated around an axis Vector with the x, y, and z components provided, by the angle
+// provided (in radians), counter-clockwise.
+// The function is most efficient if passed an orthogonal, normalized axis (i.e. the X, Y, or Z constants).
+// Note that this function ignores the W component of both Vectors.
+func (vec Vector2) Rotate(angle float32) Vector2 {
+	x := vec.X
+	y := vec.Y
+	vec.X = x*math32.Cos(angle) - y*math32.Sin(angle)
+	vec.Y = x*math32.Sin(angle) + y*math32.Cos(angle)
+	return vec
+}
 
-// // func BenchmarkAllocateArrays(b *testing.B) {
+// Angle returns the signed angle in radians between the calling Vector and the provided other Vector (ignoring the W component).
+func (vec Vector2) Angle(other Vector2) float32 {
+	angle := math32.Atan2(other.Y, other.X) - math32.Atan2(vec.Y, vec.X)
+	if angle > math.Pi {
+		angle -= 2 * math.Pi
+	} else if angle <= -math.Pi {
+		angle += 2 * math.Pi
+	}
+	return angle
+}
 
-// // 	testMax := 100_000
-// // 	vecs := make([][3]float64, 0, testMax)
-// // 	for i := 0; i < testMax; i++ {
-// // 		vecs = append(vecs, [3]float64{0, 0, 0})
-// // 	}
+var worldRight2D = Vector2{1, 0}
 
-// // }
+// AngleRotation returns the angle in radians between this Vector and world right (1, 0).
+func (vec Vector2) AngleRotation() float32 {
+	return vec.Angle(worldRight2D)
+}
+
+// Scale scales a Vector by the given scalar (ignoring the W component), returning a copy with the result.
+func (vec Vector2) Scale(scalar float32) Vector2 {
+	vec.X *= scalar
+	vec.Y *= scalar
+	return vec
+}
+
+// Divide divides a Vector by the given scalar (ignoring the W component), returning a copy with the result.
+func (vec Vector2) Divide(scalar float32) Vector2 {
+	vec.X /= scalar
+	vec.Y /= scalar
+	return vec
+}
+
+// Dot returns the dot product of a Vector and another Vector (ignoring the W component).
+func (vec Vector2) Dot(other Vector2) float32 {
+	return vec.X*other.X + vec.Y*other.Y
+}
+
+// Round rounds off the Vector's components to the given space in world unit increments, returning a clone
+// (e.g. Vector{0.1, 1.27, 3.33}.Snap(0.25) will return Vector{0, 1.25, 3.25}).
+func (vec Vector2) Round(snapToUnits float32) Vector2 {
+	vec.X = math32.Round(vec.X/snapToUnits) * snapToUnits
+	vec.Y = math32.Round(vec.Y/snapToUnits) * snapToUnits
+	return vec
+}
+
+// ClampAngle clamps the Vector such that it doesn't exceed the angle specified (in radians).
+// This function returns a normalized (unit) Vector.
+func (vec Vector2) ClampAngle(baselineVec Vector2, maxAngle float32) Vector2 {
+
+	mag := vec.Magnitude()
+
+	angle := vec.Angle(baselineVec)
+
+	if angle > maxAngle {
+		vec = baselineVec.Slerp(vec, maxAngle/angle).Unit()
+	}
+
+	return vec.Scale(mag)
+
+}
+
+// Lerp performs a linear interpolation between the starting Vector and the provided
+// other Vector, to the given percentage (ranging from 0 to 1).
+func (vec Vector2) Lerp(other Vector2, percentage float32) Vector2 {
+	percentage = math32.Clamp(percentage, 0, 1)
+	vec.X = vec.X + ((other.X - vec.X) * percentage)
+	vec.Y = vec.Y + ((other.Y - vec.Y) * percentage)
+	return vec
+}
+
+// Slerp performs a spherical linear interpolation between the starting Vector and the provided
+// ending Vector, to the given percentage (ranging from 0 to 1).
+// This should be done with directions, usually, rather than positions.
+// This being the case, this normalizes both Vectors.
+func (vec Vector2) Slerp(targetDirection Vector2, percentage float32) Vector2 {
+
+	vec = vec.Unit()
+	targetDirection = targetDirection.Unit()
+
+	// Thank you StackOverflow, once again! : https://stackoverflow.com/questions/67919193/how-does-unity-implements-vector3-slerp-exactly
+	percentage = math32.Clamp(percentage, 0, 1)
+
+	dot := vec.Dot(targetDirection)
+
+	dot = math32.Clamp(dot, -1, 1)
+
+	theta := math32.Acos(dot) * percentage
+	relative := targetDirection.Sub(vec.Scale(dot)).Unit()
+
+	return (vec.Scale(math32.Cos(theta)).Add(relative.Scale(math32.Sin(theta)))).Unit()
+
+}
+
+type Vector4 struct {
+	X float32 // The X (1st) component of the Vector
+	Y float32 // The Y (2nd) component of the Vector
+	Z float32 // The Z (3rd) component of the Vector
+	W float32 // The w (4th) component of the Vector; not used for most Vector3 functions
+}
+
+// Unit returns a copy of the Vector, normalized (set to be of unit length).
+// It does not alter the W component of the Vector.
+func (vec Vector4) Unit() Vector4 {
+	l := vec.Magnitude()
+	if l < 1e-8 || l == 1 {
+		// If it's 0, then don't modify the vector
+		return vec
+	}
+	vec.X, vec.Y, vec.Z = vec.X/l, vec.Y/l, vec.Z/l
+	return vec
+}
+
+// Magnitude returns the length of the Vector3 (ignoring the Vector's W component).
+func (vec Vector4) Magnitude() float32 {
+	return math32.Sqrt(vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z)
+}
+
+// Invert returns a copy of the Vector3 with all components inverted (ignoring the Vector's W component).
+func (vec Vector4) Invert() Vector4 {
+	vec.X = -vec.X
+	vec.Y = -vec.Y
+	vec.Z = -vec.Z
+	return vec
+}
+
+func (vec Vector3) To4D() Vector4 {
+	return Vector4{vec.X, vec.Y, vec.Z, 0}
+}
+
+func (vec Vector4) To3D() Vector3 {
+	return Vector3{vec.X, vec.Y, vec.Z}
+}
+
+// Round rounds the Vector's components off to the given increments, returning a new Vector.
+// For example, Vector{0.1, 1.47, 3.33}.Round(0.25) will return Vector{0, 1.5, 3.25}.
+func (vec Vector4) Round(roundToUnits float32) Vector4 {
+	vec.X = math32.Round(vec.X/roundToUnits) * roundToUnits
+	vec.Y = math32.Round(vec.Y/roundToUnits) * roundToUnits
+	vec.Z = math32.Round(vec.Z/roundToUnits) * roundToUnits
+	return vec
+}

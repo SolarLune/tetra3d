@@ -1,6 +1,8 @@
 package tetra3d
 
-import "math"
+import (
+	"github.com/solarlune/tetra3d/math32"
+)
 
 // ILight represents an interface that is fulfilled by an object that emits light, returning the color a vertex should be given that Vertex and its model matrix.
 type ILight interface {
@@ -13,7 +15,7 @@ type ILight interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model)
 
-	Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) // Light lights the triangles in the MeshPart, storing the result in the targetColors
+	Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) // Light lights the triangles in the MeshPart, storing the result in the targetColors
 	// color buffer. If onlyVisible is true, only the visible vertices will be lit; if it's false, they will all be lit.
 	IsOn() bool    // isOn is simply used tfo tell if a "generic" Light is on or not.
 	SetOn(on bool) // SetOn sets whether the light is on or not
@@ -72,9 +74,11 @@ func (amb *AmbientLight) beginRender() {
 func (amb *AmbientLight) beginModel(model *Model) {}
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
+func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
 	meshPart.ForEachVertexIndex(func(vertIndex int) {
-		targetColors[vertIndex] = targetColors[vertIndex].AddRGBA(amb.result[0], amb.result[1], amb.result[2], 0)
+		targetColors[vertIndex].R += amb.result[0]
+		targetColors[vertIndex].G += amb.result[1]
+		targetColors[vertIndex].B += amb.result[2]
 	}, onlyVisible)
 }
 
@@ -114,7 +118,7 @@ type PointLight struct {
 	*Node
 	// Range represents the distance after which the light fully attenuates. If this is 0 (the default),
 	// it falls off using something akin to the inverse square law.
-	Range float64
+	Range float32
 	// color is the color of the PointLight.
 	color Color
 	// energy is the overall energy of the Light, with 1.0 being full brightness. Internally, technically there's no
@@ -124,8 +128,8 @@ type PointLight struct {
 	// If the light is on and contributing to the scene.
 	On bool
 
-	rangeSquared    float64
-	workingPosition Vector
+	rangeSquared    float32
+	workingPosition Vector3
 }
 
 // NewPointLight creates a new Point light.
@@ -172,13 +176,13 @@ func (p *PointLight) beginModel(model *Model) {
 	if model.skinned {
 		p.workingPosition = p.WorldPosition()
 	} else {
-		p.workingPosition = rot.MultVec(p.WorldPosition()).Add(pos.Mult(Vector{1 / sca.X, 1 / sca.Y, 1 / sca.Z, sca.W}))
+		p.workingPosition = rot.MultVec(p.WorldPosition()).Add(pos.Mult(Vector3{1 / sca.X, 1 / sca.Y, 1 / sca.Z}))
 	}
 
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
+func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
@@ -188,7 +192,7 @@ func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Colo
 
 		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
-		var vertPos, vertNormal Vector
+		var vertPos, vertNormal Vector3
 
 		if model.skinned {
 			vertPos = model.Mesh.vertexSkinnedPositions[index]
@@ -223,7 +227,7 @@ func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Colo
 			// }
 
 		} else {
-			if 1/distance*float64(p.energy) < 0.001 {
+			if 1/distance*float32(p.energy) < 0.001 {
 				return
 			}
 		}
@@ -241,7 +245,7 @@ func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Colo
 		diffuse := vertNormal.Dot(lightVec)
 
 		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
-			diffuse = math.Abs(diffuse)
+			diffuse = math32.Abs(diffuse)
 		}
 
 		if diffuse > 0 {
@@ -249,16 +253,13 @@ func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors []Colo
 			diffuseFactor := diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
 
 			if p.Range > 0 {
-				distClamp := clamp((p.rangeSquared-distance)/distance, 0, 1)
+				distClamp := math32.Clamp((p.rangeSquared-distance)/distance, 0, 1)
 				diffuseFactor *= distClamp
 			}
 
-			targetColors[index] = targetColors[index].AddRGBA(
-				p.color.R*float32(diffuseFactor)*p.energy,
-				p.color.G*float32(diffuseFactor)*p.energy,
-				p.color.B*float32(diffuseFactor)*p.energy,
-				0,
-			)
+			targetColors[index].R += p.color.R * float32(diffuseFactor) * p.energy
+			targetColors[index].G += p.color.G * float32(diffuseFactor) * p.energy
+			targetColors[index].B += p.color.B * float32(diffuseFactor) * p.energy
 
 		}
 
@@ -306,7 +307,7 @@ type DirectionalLight struct {
 	energy float32
 	On     bool // If the light is on and contributing to the scene.
 
-	workingForward       Vector  // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
+	workingForward       Vector3 // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
 	workingModelRotation Matrix4 // Similarly, this is an internal rotational transform (without the transformation row) for the Model being lit.
 }
 
@@ -349,11 +350,11 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
+func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
 
 	meshPart.ForEachVertexIndex(func(index int) {
 
-		var normal Vector
+		var normal Vector3
 		if model.skinned {
 			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
 			normal = model.Mesh.vertexSkinnedNormals[index]
@@ -368,19 +369,16 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 		diffuseFactor := normal.Dot(sun.workingForward)
 
 		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
-			diffuseFactor = math.Abs(diffuseFactor)
+			diffuseFactor = math32.Abs(diffuseFactor)
 		}
 
 		if diffuseFactor <= 0 {
 			return
 		}
 
-		targetColors[index] = targetColors[index].AddRGBA(
-			sun.color.R*float32(diffuseFactor)*sun.energy,
-			sun.color.G*float32(diffuseFactor)*sun.energy,
-			sun.color.B*float32(diffuseFactor)*sun.energy,
-			0,
-		)
+		targetColors[index].R += sun.color.R * float32(diffuseFactor) * sun.energy
+		targetColors[index].G += sun.color.G * float32(diffuseFactor) * sun.energy
+		targetColors[index].B += sun.color.B * float32(diffuseFactor) * sun.energy
 
 	}, onlyVisible)
 
@@ -424,11 +422,11 @@ type CubeLight struct {
 	On         bool       // If the CubeLight is on or not
 	// A value between 0 and 1 indicating how much opposite faces are still lit within the volume (i.e. at LightBleed = 0.0,
 	// faces away from the light are dark; at 1.0, faces away from the light are fully illuminated)
-	Bleed             float64
-	LightingAngle     Vector // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
+	Bleed             float32
+	LightingAngle     Vector3 // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
 	workingDimensions Dimensions
-	workingPosition   Vector
-	workingAngle      Vector
+	workingPosition   Vector3
+	workingAngle      Vector3
 }
 
 // NewCubeLight creates a new CubeLight with the given dimensions.
@@ -440,7 +438,7 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 		energy:        1,
 		color:         NewColor(1, 1, 1, 1),
 		On:            true,
-		LightingAngle: Vector{0, -1, 0, 0},
+		LightingAngle: Vector3{0, -1, 0},
 	}
 	cube.owner = cube
 	return cube
@@ -478,7 +476,7 @@ func (cube *CubeLight) TransformedDimensions() Dimensions {
 
 	p, s, r := cube.Transform().Decompose()
 
-	corners := [][]float64{
+	corners := [][]float32{
 		{1, 1, 1},
 		{1, -1, 1},
 		{-1, 1, 1},
@@ -493,11 +491,10 @@ func (cube *CubeLight) TransformedDimensions() Dimensions {
 
 	for _, c := range corners {
 
-		position := r.MultVec(Vector{
+		position := r.MultVec(Vector3{
 			(cube.Dimensions.Width() * c[0] * s.X / 2),
 			(cube.Dimensions.Height() * c[1] * s.Y / 2),
 			(cube.Dimensions.Depth() * c[2] * s.Z / 2),
-			0,
 		})
 
 		if dimensions.Min.X > position.X {
@@ -554,8 +551,7 @@ func (cube *CubeLight) beginModel(model *Model) {
 		cube.workingPosition = lightStartPos
 	} else {
 
-		sDen := Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}
-		_ = sDen
+		sDen := Vector3{1 / s.X, 1 / s.Y, 1 / s.Z}
 
 		cube.workingPosition = r.MultVec(lightStartPos).Add(p.Mult(sDen))
 
@@ -572,7 +568,7 @@ func (cube *CubeLight) beginModel(model *Model) {
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []Color, onlyVisible bool) {
+func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
 
 	meshPart.ForEachVertexIndex(func(index int) {
 
@@ -605,7 +601,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []Co
 		// 	return light
 		// }
 
-		var vertPos, vertNormal Vector
+		var vertPos, vertNormal Vector3
 
 		if model.skinned {
 			vertPos = model.Mesh.vertexSkinnedPositions[index]
@@ -615,7 +611,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []Co
 			vertNormal = model.Mesh.VertexNormals[index]
 		}
 
-		var diffuse, diffuseFactor float64
+		var diffuse, diffuseFactor float32
 
 		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
 			vertNormal = cube.workingAngle
@@ -624,7 +620,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []Co
 		diffuse = vertNormal.Dot(cube.workingAngle)
 
 		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
-			diffuse = math.Abs(diffuse)
+			diffuse = math32.Abs(diffuse)
 		}
 
 		if cube.Bleed > 0 {
@@ -658,12 +654,9 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors []Co
 			return
 		}
 
-		targetColors[index] = targetColors[index].AddRGBA(
-			cube.color.R*float32(diffuseFactor)*cube.energy,
-			cube.color.G*float32(diffuseFactor)*cube.energy,
-			cube.color.B*float32(diffuseFactor)*cube.energy,
-			0,
-		)
+		targetColors[index].R += cube.color.R * float32(diffuseFactor) * cube.energy
+		targetColors[index].G += cube.color.G * float32(diffuseFactor) * cube.energy
+		targetColors[index].B += cube.color.B * float32(diffuseFactor) * cube.energy
 
 	}, onlyVisible)
 
@@ -704,21 +697,21 @@ func (cube *CubeLight) Type() NodeType {
 
 // type polygonLightCell struct {
 // 	Color    *Color
-// 	Distance float64
+// 	Distance float32
 // }
 
 // type PolygonLight struct {
 // 	*Node
-// 	Distance float64
+// 	Distance float32
 // 	Energy   float32
 // 	Model    *Model
 // 	On       bool
-// 	gridSize float64
+// 	gridSize float32
 
 // 	lightCells [][][]*polygonLightCell
 // }
 
-// func NewPolygonLight(model *Model, energy float32, gridSize float64) *PolygonLight {
+// func NewPolygonLight(model *Model, energy float32, gridSize float32) *PolygonLight {
 
 // 	poly := &PolygonLight{
 // 		Model:      model,
@@ -735,7 +728,7 @@ func (cube *CubeLight) Type() NodeType {
 // 	return poly
 // }
 
-// func (poly *PolygonLight) ResizeGrid(gridSize float64) {
+// func (poly *PolygonLight) ResizeGrid(gridSize float32) {
 
 // 	poly.lightCells = [][][]*polygonLightCell{}
 
@@ -743,9 +736,9 @@ func (cube *CubeLight) Type() NodeType {
 
 // 	transform := poly.Model.Transform()
 
-// 	zd := int(math.Ceil(dim.Depth() / gridSize))
-// 	yd := int(math.Ceil(dim.Height() / gridSize))
-// 	xd := int(math.Ceil(dim.Width() / gridSize))
+// 	zd := int(Ceil(dim.Depth() / gridSize))
+// 	yd := int(Ceil(dim.Height() / gridSize))
+// 	xd := int(Ceil(dim.Width() / gridSize))
 
 // 	poly.lightCells = make([][][]*polygonLightCell, zd)
 
@@ -760,14 +753,14 @@ func (cube *CubeLight) Type() NodeType {
 // 			for x := 0; x < xd; x++ {
 
 // 				gridPos := Vector{
-// 					(float64(x) - float64(xd/2)) * gridSize,
-// 					(float64(y) - float64(yd/2)) * gridSize,
-// 					(float64(z) - float64(zd/2)) * gridSize,
+// 					(float32(x) - float32(xd/2)) * gridSize,
+// 					(float32(y) - float32(yd/2)) * gridSize,
+// 					(float32(z) - float32(zd/2)) * gridSize,
 // 				}
 // 				gridPos = transform.MultVec(gridPos)
 
 // 				// closest := poly.Model.Mesh.Triangles[0]
-// 				closestDistance := math.MaxFloat64
+// 				closestDistance := Maxfloat32
 
 // 				for _, tri := range poly.Model.Mesh.Triangles {
 
@@ -847,10 +840,10 @@ func (cube *CubeLight) Type() NodeType {
 // 			diffuse = 0
 // 		}
 
-// 		var diffuseFactor float64
+// 		var diffuseFactor float32
 // 		distance := fastVectorDistanceSquared(lightPos, vertPos)
 
-// 		diffuseFactor = diffuse * math.Max(math.Min(1.0-(math.Pow((distance/distanceSquared), 4)), 1), 0)
+// 		diffuseFactor = diffuse * Max(Min(1.0-(Pow((distance/distanceSquared), 4)), 1), 0)
 
 // 		light[i] = color.R * float32(diffuseFactor) * poly.Energy
 // 		light[i+1] = color.G * float32(diffuseFactor) * poly.Energy

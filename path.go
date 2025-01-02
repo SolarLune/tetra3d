@@ -2,13 +2,15 @@ package tetra3d
 
 import (
 	"strconv"
+
+	"github.com/solarlune/tetra3d/math32"
 )
 
 // PathStepper is an object that steps through points in a set path.
 // It returns the position of the current node and has the ability to go to the next or previous node in the path.
 type PathStepper struct {
 	path   IPath
-	points []Vector
+	points []Vector3
 	Index  int
 }
 
@@ -45,7 +47,7 @@ func (ps *PathStepper) SetIndexToEnd() {
 }
 
 // CurrentWorldPosition returns the current node's world position for the PathStepper.
-func (ps *PathStepper) CurrentWorldPosition() Vector {
+func (ps *PathStepper) CurrentWorldPosition() Vector3 {
 	return ps.points[ps.Index]
 }
 
@@ -87,19 +89,19 @@ func (ps *PathStepper) AtStart() bool {
 // The percentage is weighted for distance, not for number of points.
 // For example, say you had a path comprised of four points: {0, 0, 0}, {9, 0, 0}, {9.5, 0, 0}, and {10, 0, 0}. If you called PathStepper.ProgressToWorldPosition(0.9), you'd get {9, 0, 0} (90% of the way through the path).
 // If the PathStepper has a nil Path or its Path has no points, this function returns an empty Vector.
-func (ps *PathStepper) ProgressToWorldPosition(perc float64) Vector {
+func (ps *PathStepper) ProgressToWorldPosition(perc float32) Vector3 {
 
 	if ps.path == nil || len(ps.points) == 0 {
-		return Vector{}
+		return Vector3{}
 	}
 
 	if len(ps.points) == 1 {
 		return ps.points[0]
 	}
 
-	perc = clamp(perc, 0, 1)
+	perc = math32.Clamp(perc, 0, 1)
 
-	points := append(make([]Vector, 0, len(ps.points)), ps.points...)
+	points := append(make([]Vector3, 0, len(ps.points)), ps.points...)
 
 	if ps.path.isClosed() {
 		points = append(points, ps.points[0])
@@ -129,9 +131,9 @@ func (ps *PathStepper) ProgressToWorldPosition(perc float64) Vector {
 // a distance.
 type IPath interface {
 	// Length returns the length of the overall path.
-	Length() float64
+	Length() float32
 	// Points returns the points of the IPath in a slice.
-	Points() []Vector
+	Points() []Vector3
 	HopCount() int // HopCount returns the number of hops in the path.
 	isClosed() bool
 }
@@ -145,7 +147,7 @@ type Path struct {
 
 // NewPath returns a new Path object. A Path is a Node whose children represent points on a path. A Path can be stepped through
 // spatially using a Navigator. The passed point vectors will become Nodes, children of the Path.
-func NewPath(name string, points ...Vector) *Path {
+func NewPath(name string, points ...Vector3) *Path {
 	path := &Path{
 		Node: NewNode(name),
 	}
@@ -175,8 +177,8 @@ func (path *Path) Clone() INode {
 }
 
 // Length returns the total distance that a Path covers by stepping through all of the children under the Path.
-func (path *Path) Length() float64 {
-	dist := 0.0
+func (path *Path) Length() float32 {
+	dist := float32(0.0)
 	points := path.Children()
 
 	if len(points) <= 1 {
@@ -198,8 +200,8 @@ func (path *Path) Length() float64 {
 }
 
 // Points returns the Vector world positions of each point in the Path.
-func (path *Path) Points() []Vector {
-	points := make([]Vector, 0, len(path.Children()))
+func (path *Path) Points() []Vector3 {
+	points := make([]Vector3, 0, len(path.Children()))
 	for _, c := range path.children {
 		points = append(points, c.WorldPosition())
 	}
@@ -217,7 +219,7 @@ func (path *Path) isClosed() bool {
 
 // Next returns the next point in the path as an iterator - if the boolean value is true, you have reached the end of the path.
 // Useful if you don't want to use a Navigator to navigate through it.
-func (path *Path) Next() (Vector, bool) {
+func (path *Path) Next() (Vector3, bool) {
 	points := path.Points()
 	path.PathIndex++
 	atEnd := false

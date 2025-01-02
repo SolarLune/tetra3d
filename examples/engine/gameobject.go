@@ -29,8 +29,8 @@ func NewPlayer(node tetra3d.INode) *Player {
 
 func (player *Player) Update() {
 
-	move := tetra3d.Vector{}
-	moveSpd := 0.1
+	move := tetra3d.Vector3{}
+	moveSpd := float32(0.1)
 
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
 		move.X -= moveSpd

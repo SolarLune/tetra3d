@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/solarlune/tetra3d/math32"
 )
 
 const (
@@ -43,13 +44,13 @@ type Model struct {
 	// a traditional GPU vertex shader, but is fine for simple / low-poly mesh transformations).
 	// This function is run after skinning the vertex if the material belongs to a mesh that is skinned by an armature.
 	// Note that the VertexTransformFunction must return the vector passed.
-	VertexTransformFunction func(vertexPosition *Vector, vertexIndex int)
+	VertexTransformFunction func(vertexPosition *Vector3, vertexIndex int)
 
 	// VertexClipFunction is a function that runs on the clipped result of each vertex position rendered with the material.
 	// The function takes the vertex position along with the vertex index in the mesh.
 	// This program runs after the vertex position is clipped to screen coordinates.
 	// Note that the VertexClipFunction must return the vector passed.
-	VertexClipFunction func(vertexPosition *Vector, vertexIndex int)
+	VertexClipFunction func(vertexPosition *Vector4, vertexIndex int)
 
 	// Automatic batching mode; when set and a Model changes parenting, it will be automatically batched as necessary according to
 	// the AutoBatchMode set.
@@ -75,7 +76,7 @@ func NewModel(name string, mesh *Mesh) *Model {
 	model.owner = model
 	model.Node.onTransformUpdate = model.onTransformUpdate
 
-	radius := 0.0
+	radius := float32(0)
 	if mesh != nil {
 		radius = mesh.Dimensions.MaxSpan() / 2
 	}
@@ -152,7 +153,7 @@ func (model *Model) onTransformUpdate() {
 	// To combat this, we save the original local positions of the mesh on export to position the bounding sphere in the
 	// correct location.
 
-	var center Vector
+	var center Vector3
 
 	// We do this because if a model is skinned and we've parented the model to the armature, then the center is
 	// now from origin relative to the base of the armature on scene export. Otherwise, it's the center of the mesh.
@@ -314,7 +315,7 @@ func (model *Model) StaticMerge(models ...*Model) {
 		model.Mesh.allocateVertexBuffers(len(model.Mesh.VertexPositions) + totalSize)
 	}
 
-	vec := NewVectorZero()
+	vec := Vector3{}
 
 	for _, other := range models {
 
@@ -427,14 +428,14 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 
 }
 
-func (model *Model) skinVertex(vertID int) (Vector, Vector) {
+func (model *Model) skinVertex(vertID int) (Vector3, Vector3) {
 
 	// Avoid reallocating a new matrix for every vertex; that's wasteful
 	model.skinMatrix.Clear()
 
 	for boneIndex, bone := range model.bones[vertID] {
 
-		weightPerc := float64(model.Mesh.VertexWeights[vertID][boneIndex])
+		weightPerc := float32(model.Mesh.VertexWeights[vertID][boneIndex])
 
 		if weightPerc == 0 {
 			continue
@@ -453,14 +454,14 @@ func (model *Model) skinVertex(vertID int) (Vector, Vector) {
 
 	}
 
-	vertOut := model.skinMatrix.MultVecW(model.Mesh.VertexPositions[vertID])
+	vertOut := model.skinMatrix.MultVec(model.Mesh.VertexPositions[vertID])
 
 	model.skinMatrix[3][0] = 0
 	model.skinMatrix[3][1] = 0
 	model.skinMatrix[3][2] = 0
 	model.skinMatrix[3][3] = 1
 
-	normal := model.skinMatrix.MultVecW(model.Mesh.VertexNormals[vertID])
+	normal := model.skinMatrix.MultVec(model.Mesh.VertexNormals[vertID])
 
 	return vertOut, normal
 
@@ -482,7 +483,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		return
 	}
 
-	var transformFunc func(vertPos *Vector, index int)
+	var transformFunc func(vertPos *Vector3, index int)
 
 	if model.VertexTransformFunction != nil {
 		transformFunc = model.VertexTransformFunction
@@ -502,7 +503,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	// TODO: Review this, as it still seems problematic when it comes to distance checks for pre-emptive culling?
 	p, s, r := modelTransform.Inverted().Decompose()
-	invertedCamPos := r.MultVec(camPos).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, 1}))
+	invertedCamPos := r.MultVec(camPos).Add(p.Mult(Vector3{1 / s.X, 1 / s.Y, 1 / s.Z}))
 
 	// invertedCamPos := camPos
 
@@ -513,14 +514,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		if mat.BillboardMode == BillboardModeFixedVertical {
 
 			out := camera.cameraForward.Invert()
-			lookat = NewLookAtMatrix(Vector{}, out, camera.cameraUp)
+			lookat = NewLookAtMatrix(Vector3{}, out, camera.cameraUp)
 
 		} else if mat.BillboardMode != BillboardModeNone {
 
 			lookat = NewLookAtMatrix(model.WorldPosition(), camPos, WorldUp)
 
 			if mat.BillboardMode == BillboardModeHorizontal {
-				lookat.SetRow(1, Vector{0, 1, 0, 0})
+				lookat.SetRow(1, Vector4{0, 1, 0, 0})
 				x := lookat.Row(0)
 				x.Y = 0
 				lookat.SetRow(0, x.Unit())
@@ -536,7 +537,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		p, s, r := base.Decompose()
 		base = r.Mult(NewMatrix4Scale(s.X, s.Y, s.Z)).Mult(lookat)
-		base.SetRow(3, Vector{p.X, p.Y, p.Z, 1})
+		base.SetRow(3, Vector4{p.X, p.Y, p.Z, 1})
 
 	}
 
@@ -555,63 +556,78 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	camNear := camera.near
 	camFar := camera.far
 	modelSkinned := model.skinned
+	vertexSnappingOn := camera.VertexSnapping > 0
+	renderNormals := camera.RenderNormals
+
+	var vert Vector3
+	var normal Vector3
+
+	var t time.Time
+	if modelSkinned {
+		t = time.Now()
+	}
+
+	vertexPositions := mesh.VertexPositions
+	vertexTransforms := mesh.vertexTransforms
 
 	for vertexIndex := meshPart.VertexIndexStart; vertexIndex < meshPart.VertexIndexEnd; vertexIndex++ {
 
 		if modelSkinned {
 
-			t := time.Now()
-
-			vertPos, vertNormal := model.skinVertex(vertexIndex)
+			vert, normal = model.skinVertex(vertexIndex)
 
 			if transformFuncExists {
-				transformFunc(&vertPos, vertexIndex)
+				transformFunc(&vert, vertexIndex)
 			}
 
-			mesh.vertexSkinnedNormals[vertexIndex] = vertNormal
-			mesh.vertexSkinnedPositions[vertexIndex] = vertPos
+			mesh.vertexSkinnedNormals[vertexIndex].X = normal.X
+			mesh.vertexSkinnedNormals[vertexIndex].Y = normal.Y
+			mesh.vertexSkinnedNormals[vertexIndex].Z = normal.Z
 
-			// MultVecW() matrix multiplication, but faster to do it right here rather than using functions and pointers
-			mesh.vertexTransforms[vertexIndex].X = vpMatrix[0][0]*vertPos.X + vpMatrix[1][0]*vertPos.Y + vpMatrix[2][0]*vertPos.Z + vpMatrix[3][0]
-			mesh.vertexTransforms[vertexIndex].Y = vpMatrix[0][1]*vertPos.X + vpMatrix[1][1]*vertPos.Y + vpMatrix[2][1]*vertPos.Z + vpMatrix[3][1]
-			mesh.vertexTransforms[vertexIndex].Z = vpMatrix[0][2]*vertPos.X + vpMatrix[1][2]*vertPos.Y + vpMatrix[2][2]*vertPos.Z + vpMatrix[3][2]
-			mesh.vertexTransforms[vertexIndex].W = vpMatrix[0][3]*vertPos.X + vpMatrix[1][3]*vertPos.Y + vpMatrix[2][3]*vertPos.Z + vpMatrix[3][3]
+			mesh.vertexSkinnedPositions[vertexIndex].X = vert.X
+			mesh.vertexSkinnedPositions[vertexIndex].Y = vert.Y
+			mesh.vertexSkinnedPositions[vertexIndex].Z = vert.Z
 
-			camera.DebugInfo.currentAnimationTime += time.Since(t)
+			// MultVecW() matrix multiplication, but faster to do it right here rather than using functions and/or pointers
+			mesh.vertexTransforms[vertexIndex].X = vpMatrix[0][0]*vert.X + vpMatrix[1][0]*vert.Y + vpMatrix[2][0]*vert.Z + vpMatrix[3][0]
+			mesh.vertexTransforms[vertexIndex].Y = vpMatrix[0][1]*vert.X + vpMatrix[1][1]*vert.Y + vpMatrix[2][1]*vert.Z + vpMatrix[3][1]
+			mesh.vertexTransforms[vertexIndex].Z = vpMatrix[0][2]*vert.X + vpMatrix[1][2]*vert.Y + vpMatrix[2][2]*vert.Z + vpMatrix[3][2]
+			mesh.vertexTransforms[vertexIndex].W = vpMatrix[0][3]*vert.X + vpMatrix[1][3]*vert.Y + vpMatrix[2][3]*vert.Z + vpMatrix[3][3]
 
 		} else {
 
-			if transformFuncExists {
-				transformFunc(&mesh.VertexPositions[vertexIndex], vertexIndex)
-			}
-
-			v0 := mesh.VertexPositions[vertexIndex]
+			// It is, of course, faster to set the values in a vertex than to allocate memory for a new one
+			vert.X = vertexPositions[vertexIndex].X
+			vert.Y = vertexPositions[vertexIndex].Y
+			vert.Z = vertexPositions[vertexIndex].Z
 
 			if transformFunc != nil {
-				transformFunc(&v0, vertexIndex)
+				transformFunc(&vert, vertexIndex)
 			}
 
-			// mesh.vertexTransforms[vertexIndex] = mvp.MultVecW(v0)
-
-			mesh.vertexTransforms[vertexIndex].X = mvp[0][0]*v0.X + mvp[1][0]*v0.Y + mvp[2][0]*v0.Z + mvp[3][0]
-			mesh.vertexTransforms[vertexIndex].Y = mvp[0][1]*v0.X + mvp[1][1]*v0.Y + mvp[2][1]*v0.Z + mvp[3][1]
-			mesh.vertexTransforms[vertexIndex].Z = mvp[0][2]*v0.X + mvp[1][2]*v0.Y + mvp[2][2]*v0.Z + mvp[3][2]
-			mesh.vertexTransforms[vertexIndex].W = mvp[0][3]*v0.X + mvp[1][3]*v0.Y + mvp[2][3]*v0.Z + mvp[3][3]
+			vertexTransforms[vertexIndex].X = mvp[0][0]*vert.X + mvp[1][0]*vert.Y + mvp[2][0]*vert.Z + mvp[3][0]
+			vertexTransforms[vertexIndex].Y = mvp[0][1]*vert.X + mvp[1][1]*vert.Y + mvp[2][1]*vert.Z + mvp[3][1]
+			vertexTransforms[vertexIndex].Z = mvp[0][2]*vert.X + mvp[1][2]*vert.Y + mvp[2][2]*vert.Z + mvp[3][2]
+			vertexTransforms[vertexIndex].W = mvp[0][3]*vert.X + mvp[1][3]*vert.Y + mvp[2][3]*vert.Z + mvp[3][3]
 
 		}
 
-		if camera.VertexSnapping > 0 {
+		if vertexSnappingOn {
 			mesh.vertexTransforms[vertexIndex] = mesh.vertexTransforms[vertexIndex].Round(camera.VertexSnapping)
 		}
 
-		if camera.RenderNormals {
-			mesh.vertexTransformedNormals[vertexIndex] = mvJustRForNormals.MultVecW(mesh.VertexNormals[vertexIndex])
+		if renderNormals {
+			mesh.vertexTransformedNormals[vertexIndex] = mvJustRForNormals.MultVec(mesh.VertexNormals[vertexIndex])
 		}
 
 	}
 
-	var skinnedTriCenter Vector
-	var transformedVertexPositions = [3]Vector{}
+	if modelSkinned {
+		camera.DebugInfo.currentAnimationTime += time.Since(t)
+	}
+
+	var skinnedTriCenter Vector3
+	var transformedVertexPositions = [3]Vector3{}
 
 	for ti := meshPart.TriangleStart; ti <= meshPart.TriangleEnd; ti++ {
 
@@ -800,18 +816,20 @@ func (model *Model) Dimensions() Dimensions {
 }
 
 type AOBakeOptions struct {
+	TargetMeshParts []*MeshPart // The target meshparts / materials to use for baking AO values to. If not set, then all meshparts will be used.
+	SourceVertices  VertexSelection
 	// The target vertex color channel to bake the ambient occlusion to.
 	// If the Model doesn't have enough vertex color channels to bake to this channel index, the BakeAO() function will
 	// create vertex color channels to fill in the values up to the target channel index.
 	TargetChannel  int
-	OcclusionAngle float64 // How severe the angle must be (in radians) for the occlusion effect to show up.
+	OcclusionAngle float32 // How severe the angle must be (in radians) for the occlusion effect to show up.
 	OcclusionColor Color   // The color for the ambient occlusion.
 
-	// A slice indicating other models that influence AO when baking. If this is empty, the AO will
+	// A filter indicating other models that influence ambient occlusion when baking. If this is not set, the AO will
 	// just take effect for triangles within the Model, rather than also taking effect for objects that
 	// are close to the baking Model.
-	OtherModels        []*Model
-	InterModelDistance float64 // How far the other models in OtherModels must be to influence the baking AO.
+	OtherModels        NodeFilter
+	InterModelDistance float32 // How far the other models in OtherModels must be to influence the baking AO.
 }
 
 // NewDefaultAOBakeOptions creates a new AOBakeOptions struct with default settings.
@@ -819,10 +837,9 @@ func NewDefaultAOBakeOptions() *AOBakeOptions {
 
 	return &AOBakeOptions{
 		TargetChannel:      0,
-		OcclusionAngle:     ToRadians(60),
+		OcclusionAngle:     math32.ToRadians(60),
 		OcclusionColor:     NewColor(0.4, 0.4, 0.4, 1),
 		InterModelDistance: 1,
-		OtherModels:        []*Model{},
 	}
 
 }
@@ -848,6 +865,19 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 	for _, tri := range model.Mesh.Triangles {
 
+		if len(bakeOptions.TargetMeshParts) > 0 {
+			include := false
+			for _, m := range bakeOptions.TargetMeshParts {
+				if m == tri.MeshPart {
+					include = true
+					break
+				}
+			}
+			if !include {
+				continue
+			}
+		}
+
 		ao := [3]float32{0, 0, 0}
 
 		verts := tri.VertexIndices
@@ -858,7 +888,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 				continue
 			}
 
-			span := max(tri.MaxSpan, other.MaxSpan) * 0.66
+			span := math32.Max(tri.MaxSpan, other.MaxSpan) * 0.66
 
 			if tri.Center.DistanceSquared(other.Center) > span*span {
 				continue
@@ -890,80 +920,91 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 		}
 
 		for i := 0; i < 3; i++ {
-			color := model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel]
-			model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.OcclusionColor, ao[i])
+			p := math32.Clamp(ao[i], 0, 1)
+			model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].R += (bakeOptions.OcclusionColor.R - model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].R) * p
+			model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].G += (bakeOptions.OcclusionColor.G - model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].G) * p
+			model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].B += (bakeOptions.OcclusionColor.B - model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].B) * p
+			model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].A += (bakeOptions.OcclusionColor.A - model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].A) * p
 		}
 
 	}
 
 	// Inter-object AO next; this is kinda slow and janky, but it does work OK, I think
 
-	transform := model.Transform()
+	if !bakeOptions.OtherModels.IsZero() {
 
-	distanceSquared := bakeOptions.InterModelDistance * bakeOptions.InterModelDistance
+		transform := model.Transform()
 
-	for _, other := range bakeOptions.OtherModels {
+		distanceSquared := bakeOptions.InterModelDistance * bakeOptions.InterModelDistance
 
-		rad := model.frustumCullingSphere.WorldRadius()
-		if or := other.frustumCullingSphere.WorldRadius(); or > rad {
-			rad = or
-		}
-		if model == other || model.WorldPosition().DistanceSquared(other.WorldPosition()) > rad*rad {
-			continue
-		}
+		bakeOptions.OtherModels.ForEach(func(node INode) bool {
 
-		otherTransform := other.Transform()
+			other := node.(*Model)
 
-		for _, tri := range model.Mesh.Triangles {
-
-			ao := [3]float32{0, 0, 0}
-
-			verts := tri.VertexIndices
-
-			transformedTriVerts := [3]Vector{
-				transform.MultVec(model.Mesh.VertexPositions[verts[0]]),
-				transform.MultVec(model.Mesh.VertexPositions[verts[1]]),
-				transform.MultVec(model.Mesh.VertexPositions[verts[2]]),
+			rad := model.frustumCullingSphere.WorldRadius()
+			if or := other.frustumCullingSphere.WorldRadius(); or > rad {
+				rad = or
+			}
+			if model == other || model.WorldPosition().DistanceSquared(other.WorldPosition()) > rad*rad {
+				return true
 			}
 
-			for _, otherTri := range other.Mesh.Triangles {
+			otherTransform := other.Transform()
 
-				otherVerts := otherTri.VertexIndices
+			for _, tri := range model.Mesh.Triangles {
 
-				span := tri.MaxSpan
-				if otherTri.MaxSpan > span {
-					span = otherTri.MaxSpan
+				ao := [3]float32{0, 0, 0}
+
+				verts := tri.VertexIndices
+
+				transformedTriVerts := [3]Vector3{
+					transform.MultVec(model.Mesh.VertexPositions[verts[0]]),
+					transform.MultVec(model.Mesh.VertexPositions[verts[1]]),
+					transform.MultVec(model.Mesh.VertexPositions[verts[2]]),
 				}
 
-				span *= 0.66
+				for _, otherTri := range other.Mesh.Triangles {
 
-				if transform.MultVec(tri.Center).DistanceSquared(otherTransform.MultVec(otherTri.Center)) > span {
-					continue
-				}
+					otherVerts := otherTri.VertexIndices
 
-				transformedOtherVerts := [3]Vector{
-					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[0]]),
-					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[1]]),
-					otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[2]]),
+					span := tri.MaxSpan
+					if otherTri.MaxSpan > span {
+						span = otherTri.MaxSpan
+					}
+
+					span *= 0.66
+
+					if transform.MultVec(tri.Center).DistanceSquared(otherTransform.MultVec(otherTri.Center)) > span {
+						continue
+					}
+
+					transformedOtherVerts := [3]Vector3{
+						otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[0]]),
+						otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[1]]),
+						otherTransform.MultVec(other.Mesh.VertexPositions[otherVerts[2]]),
+					}
+
+					for i := 0; i < 3; i++ {
+						for j := 0; j < 3; j++ {
+							if transformedTriVerts[i].DistanceSquared(transformedOtherVerts[j]) <= distanceSquared {
+								ao[i] = 1
+								break
+							}
+						}
+					}
+
 				}
 
 				for i := 0; i < 3; i++ {
-					for j := 0; j < 3; j++ {
-						if transformedTriVerts[i].DistanceSquared(transformedOtherVerts[j]) <= distanceSquared {
-							ao[i] = 1
-							break
-						}
-					}
+					color := model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel]
+					model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.OcclusionColor, ao[i])
 				}
 
 			}
 
-			for i := 0; i < 3; i++ {
-				color := model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel]
-				model.Mesh.VertexColors[verts[i]][bakeOptions.TargetChannel] = color.Mix(bakeOptions.OcclusionColor, ao[i])
-			}
+			return true
 
-		}
+		})
 
 	}
 
@@ -996,27 +1037,34 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 
 	}
 
-	// TODO: Switch Mesh.VertexColors around so instead of [vertex index][channel] it's [channel][vertex index]; this way we could directly pass
-	// a vertex channel into Light.Light().
+	for _, mp := range model.Mesh.MeshParts {
 
-	targetColors := make([]Color, len(model.Mesh.VertexColors))
+		if mp.Material != nil && mp.Material.Shadeless {
 
-	for i := 0; i < len(targetColors); i++ {
-		targetColors[i] = NewColor(0, 0, 0, 1)
-	}
+			mp.ForEachVertexIndex(func(vertIndex int) {
+				model.Mesh.VertexColors[targetChannel][vertIndex].R = 1
+				model.Mesh.VertexColors[targetChannel][vertIndex].G = 1
+				model.Mesh.VertexColors[targetChannel][vertIndex].B = 1
+			}, false)
+			continue
+		} else {
 
-	for _, light := range allLights {
+			mp.ForEachVertexIndex(func(vertIndex int) {
+				model.Mesh.VertexColors[targetChannel][vertIndex].R = 0
+				model.Mesh.VertexColors[targetChannel][vertIndex].G = 0
+				model.Mesh.VertexColors[targetChannel][vertIndex].B = 0
+			}, false)
 
-		if light.IsOn() {
-			for _, mp := range model.Mesh.MeshParts {
-				light.Light(mp, model, targetColors, false)
+			for _, light := range allLights {
+
+				if light.IsOn() {
+					light.Light(mp, model, model.Mesh.VertexColors[targetChannel], false)
+				}
+
 			}
+
 		}
 
-	}
-
-	for i := 0; i < len(model.Mesh.VertexColors); i++ {
-		model.Mesh.VertexColors[i][targetChannel] = targetColors[i]
 	}
 
 }

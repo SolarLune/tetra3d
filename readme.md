@@ -416,6 +416,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 - [ ] **3D Sound** (adjusting panning of sound sources based on 3D location?)
 - [ ] **Optimization**
+- [ ] -- Try using [avo](https://github.com/mmcloughlin/avo) to generate assembly for SIMD-ing, particularly Matrix x Vector multiplication
+- [ ] -- Try using ebiten.Vertex directly, rather than storing data in Mesh.VertexTransforms and then copying that to the vertex list. Maybe the W component could be stored in the current Custom0 attribute and perspective divide could be done in the Kage shader.
 - [ ] -- It might be possible to not have to write depth manually (5/22/23, SolarLune: Not sure what past me meant by this)
 - [ ] -- Minimize texture-swapping - should be possible to do now that Kage shaders can handle images of multiple sizes.
 - [X] -- Make NodeFilters work lazily, rather than gathering all nodes in the filter at once

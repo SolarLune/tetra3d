@@ -10,7 +10,7 @@ package tetra3d
 // object could be colliding with, and then returns that set for finer examination.
 type Broadphase struct {
 	GridCellCount int           // The number of cells in the broadphase grid
-	cellSize      float64       // The size of each cell in the grid
+	cellSize      float32       // The size of each cell in the grid
 	center        *Node         // The center node of the broadphase
 	workingAABB   *BoundingAABB // The working-process AABB used to determine which triangles belong in which cells
 	TriSets       [][][][]int   // The sets of triangles
@@ -24,7 +24,7 @@ type Broadphase struct {
 // it's being used for a mesh, and should be the position of the BoundingTriangles if it's being used for
 // collision testing.
 // mesh is the Mesh to be used for broadphase testing.
-func NewBroadphase(gridCellCount int, worldPosition Vector, mesh *Mesh) *Broadphase {
+func NewBroadphase(gridCellCount int, worldPosition Vector3, mesh *Mesh) *Broadphase {
 
 	b := &Broadphase{
 		mesh:        mesh,
@@ -76,7 +76,7 @@ func (b *Broadphase) Resize(gridSize int) {
 	}
 
 	maxDim := b.mesh.Dimensions.MaxDimension()
-	cellSize := (maxDim / float64(gridSize)) + 1 // The +1 adds a little extra room
+	cellSize := (maxDim / float32(gridSize)) + 1 // The +1 adds a little extra room
 	b.cellSize = cellSize
 
 	b.workingAABB.internalSize.X = cellSize
@@ -87,7 +87,7 @@ func (b *Broadphase) Resize(gridSize int) {
 	b.TriSets = make([][][][]int, gridSize)
 	b.allTriSet = newSet[int]()
 
-	hg := float64(b.GridCellCount) / 2
+	hg := float32(b.GridCellCount) / 2
 
 	for i := 0; i < gridSize; i++ {
 		b.TriSets[i] = make([][][]int, gridSize)
@@ -97,11 +97,10 @@ func (b *Broadphase) Resize(gridSize int) {
 
 				b.TriSets[i][j][k] = []int{}
 
-				b.workingAABB.SetLocalPositionVec(Vector{
-					(float64(i) - hg + 0.5) * b.cellSize,
-					(float64(j) - hg + 0.5) * b.cellSize,
-					(float64(k) - hg + 0.5) * b.cellSize,
-					0,
+				b.workingAABB.SetLocalPositionVec(Vector3{
+					(float32(i) - hg + 0.5) * b.cellSize,
+					(float32(j) - hg + 0.5) * b.cellSize,
+					(float32(k) - hg + 0.5) * b.cellSize,
 				})
 
 				center := b.workingAABB.WorldPosition()
@@ -144,7 +143,7 @@ func (b *Broadphase) TrianglesFromBoundingObject(boundingObject IBoundingObject)
 
 	trianglesSet := make(Set[int], len(b.TriSets))
 
-	hg := float64(b.GridCellCount) / 2
+	hg := float32(b.GridCellCount) / 2
 
 	// We're brute forcing it here; this isn't ideal, but it works alright for now
 	for i := 0; i < b.GridCellCount; i++ {
@@ -156,11 +155,10 @@ func (b *Broadphase) TrianglesFromBoundingObject(boundingObject IBoundingObject)
 					continue
 				}
 
-				b.workingAABB.SetLocalPositionVec(Vector{
-					(float64(i) - hg + 0.5) * b.cellSize,
-					(float64(j) - hg + 0.5) * b.cellSize,
-					(float64(k) - hg + 0.5) * b.cellSize,
-					0,
+				b.workingAABB.SetLocalPositionVec(Vector3{
+					(float32(i) - hg + 0.5) * b.cellSize,
+					(float32(j) - hg + 0.5) * b.cellSize,
+					(float32(k) - hg + 0.5) * b.cellSize,
 				})
 
 				if b.workingAABB.Colliding(boundingObject) {
@@ -185,9 +183,9 @@ func (b *Broadphase) allAABBPositions() []*BoundingAABB {
 		return aabbs
 	}
 
-	hg := float64(b.GridCellCount) / 2
+	hg := float32(b.GridCellCount) / 2
 
-	b.workingAABB.SetLocalPositionVec(NewVectorZero())
+	b.workingAABB.SetLocalPositionVec(Vector3{})
 
 	for i := 0; i < b.GridCellCount; i++ {
 		for j := 0; j < b.GridCellCount; j++ {
@@ -195,11 +193,10 @@ func (b *Broadphase) allAABBPositions() []*BoundingAABB {
 
 				clone := b.workingAABB.Clone().(*BoundingAABB)
 
-				clone.SetLocalPositionVec(Vector{
-					(float64(i) - hg + 0.5) * b.cellSize,
-					(float64(j) - hg + 0.5) * b.cellSize,
-					(float64(k) - hg + 0.5) * b.cellSize,
-					0,
+				clone.SetLocalPositionVec(Vector3{
+					(float32(i) - hg + 0.5) * b.cellSize,
+					(float32(j) - hg + 0.5) * b.cellSize,
+					(float32(k) - hg + 0.5) * b.cellSize,
 				})
 
 				clone.SetWorldTransform(b.workingAABB.Transform().Mult(clone.Transform()))

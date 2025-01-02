@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 
 	_ "embed"
@@ -10,9 +9,9 @@ import (
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"
+	"github.com/solarlune/tetra3d/math32"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 //go:embed transparency.glb
@@ -25,7 +24,7 @@ type Game struct {
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
 
-	Time float64
+	Time float32
 }
 
 func NewGame() *Game {
@@ -56,8 +55,8 @@ func (g *Game) Init() {
 
 	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
 
-	water.VertexTransformFunction = func(v *tetra3d.Vector, vertID int) {
-		v.Y += math.Sin((g.Time*math.Pi)+(v.X*1.2)+(v.Z*0.739)) * 0.1
+	water.VertexTransformFunction = func(v *tetra3d.Vector3, vertID int) {
+		v.Y += math32.Sin((g.Time*math.Pi)+(v.X*1.2)+(v.Z*0.739)) * 0.1
 	}
 
 }
@@ -65,19 +64,6 @@ func (g *Game) Init() {
 func (g *Game) Update() error {
 
 	g.Time += 1.0 / 60.0
-
-	// We toggle transparency here; note that we can also just leave the mode set to TransparencyModeAuto for the water, instead; then, we would just need to make the material or object color transparent.
-	// Tetra3D would then treat the material as though it had TransparencyModeTransparent set.
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {
-			g.Library.Materials["TransparentSquare"].TransparencyMode = tetra3d.TransparencyModeAlphaClip
-			g.Library.Materials["Water"].TransparencyMode = tetra3d.TransparencyModeTransparent
-		} else {
-			g.Library.Materials["TransparentSquare"].TransparencyMode = tetra3d.TransparencyModeOpaque
-			g.Library.Materials["Water"].TransparencyMode = tetra3d.TransparencyModeOpaque
-		}
-	}
-
 	g.Camera.Update()
 	return g.System.Update()
 
@@ -100,20 +86,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.System.Draw(screen, g.Camera.Camera)
 
 	if g.System.DrawDebugText {
-
-		transparencyOn := "On"
-		if g.Library.Materials["TransparentSquare"].TransparencyMode == tetra3d.TransparencyModeOpaque {
-			transparencyOn = "Off"
-		}
-
-		txt := fmt.Sprintf(`Transparent materials draw in a second pass,
+		txt := `Transparent materials draw in a second pass,
 meaning they don't appear in the depth texture.
 Because of this, they can overlap at certain
 angles (which is bad), but also show things
-underneath (which is, of course, good).
-1 Key: Toggle transparency, currently: %s`, transparencyOn)
+underneath (which is, of course, good).`
 
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 
 	}
 }

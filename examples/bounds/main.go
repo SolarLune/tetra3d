@@ -21,8 +21,8 @@ type Game struct {
 	Scene *tetra3d.Scene
 
 	Controlling   *tetra3d.Model
-	Movement      tetra3d.Vector
-	VerticalSpeed float64
+	Movement      tetra3d.Vector3
+	VerticalSpeed float32
 
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
@@ -57,10 +57,10 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	friction := 0.05
-	maxSpd := 0.25
-	accel := 0.05 + friction
-	gravity := 0.05
+	friction := float32(0.05)
+	maxSpd := float32(0.25)
+	accel := float32(0.05) + friction
+	gravity := float32(0.05)
 
 	bounds := g.Controlling.Children()[0].(tetra3d.IBoundingObject)
 	solids := g.Scene.Root.SearchTree().IBoundingObjects()
@@ -102,7 +102,7 @@ func (g *Game) Update() error {
 
 	g.Controlling.MoveVec(g.Movement)
 
-	margin := 0.01
+	margin := float32(0.01)
 
 	bounds.CollisionTest(tetra3d.CollisionTestSettings{
 

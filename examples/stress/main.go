@@ -23,6 +23,10 @@ type Game struct {
 	Scene  *tetra3d.Scene
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
+
+	FrameTime    time.Duration
+	MaxFrameTime time.Duration
+	MinFrameTime time.Duration
 }
 
 func NewGame() *Game {
@@ -91,18 +95,23 @@ func (g *Game) Init() {
 	// "sections" of cubes.
 	for x := 0; x < 8; x++ {
 		m2 := merged.Clone()
-		m2.Move(4*float64(x+1), 0, 0)
+		m2.Move(4*float32(x+1), 0, 0)
 		g.Scene.Root.AddChildren(m2)
 	}
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
 	g.System = examples.NewBasicSystemHandler(g)
 
-	ebiten.SetFPSMode(ebiten.FPSModeVsyncOffMaximum)
+	ebiten.SetVsyncEnabled(false)
 
 	go func() {
 		for {
-			fmt.Println("FPS:", ebiten.ActualFPS())
+			fmt.Println("----")
+			fmt.Println("Average FPS:", ebiten.ActualFPS())
+			fmt.Println("Extrapolated FPS from Max Frametime:", 1000/float32(g.MaxFrameTime.Milliseconds()))
+			fmt.Println("Extrapolated FPS from Min Frametime:", 1000/float32(g.MinFrameTime.Milliseconds()))
+			g.MaxFrameTime = 0
+			g.MinFrameTime = 0
 			time.Sleep(time.Second)
 		}
 	}()
@@ -118,6 +127,8 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+
+	t := time.Now()
 
 	// Clear, but with a color
 	screen.Fill(color.RGBA{60, 70, 80, 255})
@@ -144,6 +155,14 @@ together into as few render calls as possible.`
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)
+
+	g.FrameTime = time.Since(t)
+	if g.MaxFrameTime == 0 || g.MaxFrameTime < g.FrameTime {
+		g.MaxFrameTime = g.FrameTime
+	}
+	if g.MinFrameTime == 0 || g.FrameTime < g.MinFrameTime {
+		g.MinFrameTime = g.FrameTime
+	}
 
 }
 

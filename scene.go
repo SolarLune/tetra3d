@@ -134,6 +134,9 @@ func (scene *Scene) HandleAutobatch() {
 							scene.Root.AddChildren(scene.autobatchStaticMap[mat])
 						}
 						scene.autobatchStaticMap[mat].StaticMerge(model)
+						if len(scene.autobatchStaticMap[mat].Mesh.VertexColors) > 0 {
+							scene.autobatchStaticMap[mat].Mesh.VertexActiveColorChannel = 0
+						}
 
 					}
 

@@ -44,6 +44,7 @@ type Material struct {
 	Name              string         // Name is the name of the Material.
 	Color             Color          // The overall color of the Material.
 	Texture           *ebiten.Image  // The texture applied to the Material.
+	UseTexture        bool           // Whether to use the texture while rendering or not.
 	TexturePath       string         // The path to the texture, if it was not packed into the exporter.
 	TextureFilterMode ebiten.Filter  // Texture filtering mode
 	textureWrapMode   ebiten.Address // Texture wrapping mode; this is ignored currently, as all triangles render through shaders, where looping is enforced.
@@ -77,7 +78,7 @@ type Material struct {
 	TransparencyMode int
 
 	CustomDepthOffsetOn    bool    // Whether custom depth offset is on or not.
-	CustomDepthOffsetValue float64 // How many world units to offset the depth of the material by.
+	CustomDepthOffsetValue float32 // How many world units to offset the depth of the material by.
 	LightingMode           int     // How materials are lit
 
 	// CustomDepthFunction is a customizeable function that takes the depth value of each vertex of a rendered MeshPart and
@@ -85,7 +86,7 @@ type Material struct {
 	// A good use for this would be to render sprites on billboarded planes with a higher depth, thereby fixing them
 	// "cutting" into geometry that's further back.
 	// The default value for CustomDepthFunction is nil.
-	CustomDepthFunction func(originalDepth float64) float64
+	CustomDepthFunction func(originalDepth float32) float32
 }
 
 // NewMaterial creates a new Material with the name given.
@@ -97,6 +98,7 @@ func NewMaterial(name string) *Material {
 		TextureFilterMode:     ebiten.FilterNearest,
 		textureWrapMode:       ebiten.AddressRepeat,
 		BackfaceCulling:       true,
+		UseTexture:            true,
 		TriangleSortMode:      TriangleSortModeBackToFront,
 		TransparencyMode:      TransparencyModeAuto,
 		FragmentShaderOptions: &ebiten.DrawTrianglesShaderOptions{},
@@ -113,6 +115,7 @@ func (m *Material) Clone() *Material {
 	newMat.Color = m.Color
 
 	newMat.Texture = m.Texture
+	newMat.UseTexture = m.UseTexture
 	newMat.TexturePath = m.TexturePath
 	newMat.TextureFilterMode = m.TextureFilterMode
 	newMat.textureWrapMode = m.textureWrapMode

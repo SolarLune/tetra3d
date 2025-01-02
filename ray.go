@@ -2,31 +2,31 @@ package tetra3d
 
 import (
 	"errors"
-	"math"
 	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/solarlune/tetra3d/math32"
 )
 
 // RayHit represents the result of a raycast test.
 type RayHit struct {
-	Object   INode  // Object is a pointer to the BoundingObject that was struck by the raycast.
-	Position Vector // Position is the world position that the object was struct.
-	from     Vector // The starting position of the Ray
-	Normal   Vector // Normal is the normal of the surface the ray struck.
+	Object   INode   // Object is a pointer to the BoundingObject that was struck by the raycast.
+	Position Vector3 // Position is the world position that the object was struct.
+	from     Vector3 // The starting position of the Ray
+	Normal   Vector3 // Normal is the normal of the surface the ray struck.
 
 	// What triangle the raycast hit - note that this is only set to a non-nil value for raycasts against BoundingTriangle objects
 	Triangle              *Triangle
-	untransformedPosition Vector // untransformed position of the ray test for BoundingTriangles tests
+	untransformedPosition Vector3 // untransformed position of the ray test for BoundingTriangles tests
 }
 
 // Slope returns the slope of the RayHit's normal, in radians. This ranges from 0 (straight up) to pi (straight down).
-func (r RayHit) Slope() float64 {
+func (r RayHit) Slope() float32 {
 	return WorldUp.Angle(r.Normal)
 }
 
 // Distance returns the distance from the RayHit's originating ray source point to the struck position.
-func (r RayHit) Distance() float64 {
+func (r RayHit) Distance() float32 {
 	return r.from.Distance(r.Position)
 }
 
@@ -52,9 +52,9 @@ func (r RayHit) VertexColor(channelIndex int) (Color, error) {
 	tri := r.Triangle
 	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndices[0]], mesh.VertexPositions[tri.VertexIndices[1]], mesh.VertexPositions[tri.VertexIndices[2]])
 
-	vc1 := mesh.VertexColors[tri.VertexIndices[0]][channelIndex]
-	vc2 := mesh.VertexColors[tri.VertexIndices[1]][channelIndex]
-	vc3 := mesh.VertexColors[tri.VertexIndices[2]][channelIndex]
+	vc1 := mesh.VertexColors[channelIndex][tri.VertexIndices[0]]
+	vc2 := mesh.VertexColors[channelIndex][tri.VertexIndices[1]]
+	vc3 := mesh.VertexColors[channelIndex][tri.VertexIndices[2]]
 
 	output := vc1.Mix(vc2, float32(v)).Mix(vc3, float32(u))
 
@@ -66,10 +66,10 @@ func (r RayHit) VertexColor(channelIndex int) (Color, error) {
 // assuming the object struck was a BoundingTriangles.
 // The returned UV value is linearly interpolated across the triangle just like it would be when a triangle is rendered.
 // UV will return a zero Vector and an error if the BoundingObject hit was not a BoundingTriangles object.
-func (r RayHit) UV() (Vector, error) {
+func (r RayHit) UV() (Vector2, error) {
 
 	if r.Triangle == nil {
-		return NewVector2d(0, 0), errors.New(ErrorObjectHitNotBoundingTriangles)
+		return Vector2{}, errors.New(ErrorObjectHitNotBoundingTriangles)
 	}
 
 	mesh := r.Object.(*BoundingTriangles).Mesh
@@ -87,7 +87,7 @@ func (r RayHit) UV() (Vector, error) {
 
 }
 
-func boundingSphereRayTest(center Vector, radius float64, from, to Vector) (RayHit, bool) {
+func boundingSphereRayTest(center Vector3, radius float32, from, to Vector3) (RayHit, bool) {
 
 	// normal := to.Sub(from)
 	// normalUnit := normal.Unit()
@@ -96,11 +96,11 @@ func boundingSphereRayTest(center Vector, radius float64, from, to Vector) (RayH
 
 	// esq := e.MagnitudeSquared()
 	// a := e.Dot(normalUnit)
-	// b := math.Sqrt(esq - (a * a))
-	// // if math.IsNaN(b) {
+	// b := Sqrt(esq - (a * a))
+	// // if IsNaN(b) {
 	// // 	return RayHit{}, false
 	// // }
-	// f := math.Sqrt((radius * radius) - (b * b))
+	// f := Sqrt((radius * radius) - (b * b))
 
 	// // fmt.Println("a:", esq-(a*a), esq, a, b, radius*radius-esq+a*a)
 	// t := 0.0
@@ -147,7 +147,7 @@ func boundingSphereRayTest(center Vector, radius float64, from, to Vector) (RayH
 		return RayHit{}, false
 	}
 
-	t := -b - math.Sqrt(discr)
+	t := -b - math32.Sqrt(discr)
 
 	if t < 0 {
 		t = 0
@@ -173,8 +173,8 @@ func boundingSphereRayTest(center Vector, radius float64, from, to Vector) (RayH
 
 	// esq := e.MagnitudeSquared()
 	// a := e.Dot(dir)
-	// b := math.Sqrt(esq - (a * a))
-	// f := math.Sqrt((radius * radius) - (b * b))
+	// b := Sqrt(esq - (a * a))
+	// f := Sqrt((radius * radius) - (b * b))
 
 	// vecLength := 0.0
 
@@ -203,7 +203,7 @@ func boundingSphereRayTest(center Vector, radius float64, from, to Vector) (RayH
 
 }
 
-func boundingAABBRayTest(from, to Vector, test *BoundingAABB) (RayHit, bool) {
+func boundingAABBRayTest(from, to Vector3, test *BoundingAABB) (RayHit, bool) {
 
 	rayLine := to.Sub(from)
 	rayLineUnit := rayLine.Unit()
@@ -217,10 +217,10 @@ func boundingAABBRayTest(from, to Vector, test *BoundingAABB) (RayHit, bool) {
 	t5 := (test.Dimensions.Min.Z + pos.Z - from.Z) / rayLineUnit.Z
 	t6 := (test.Dimensions.Max.Z + pos.Z - from.Z) / rayLineUnit.Z
 
-	tmin := max(max(min(t1, t2), min(t3, t4)), min(t5, t6))
-	tmax := min(min(max(t1, t2), max(t3, t4)), max(t5, t6))
+	tmin := math32.Max(math32.Max(math32.Min(t1, t2), math32.Min(t3, t4)), math32.Min(t5, t6))
+	tmax := math32.Min(math32.Min(math32.Max(t1, t2), math32.Max(t3, t4)), math32.Max(t5, t6))
 
-	if math.IsNaN(tmin) || math.IsNaN(tmax) {
+	if math32.IsNaN(tmin) || math32.IsNaN(tmax) {
 		return RayHit{}, false
 	}
 
@@ -253,7 +253,7 @@ func boundingAABBRayTest(from, to Vector, test *BoundingAABB) (RayHit, bool) {
 
 }
 
-func boundingTrianglesRayTest(from, to Vector, test *BoundingTriangles, doublesided bool) []RayHit {
+func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doublesided bool) []RayHit {
 
 	rayDistSquared := to.DistanceSquared(from)
 
@@ -329,7 +329,7 @@ var internalRayTest = []RayHit{}
 
 // RayTestOptions is a struct designed to control what options to use when performing a ray test.
 type RayTestOptions struct {
-	From, To Vector // From and To are the starting and ending points of the ray test.
+	From, To Vector3 // From and To are the starting and ending points of the ray test.
 
 	// If cast rays can strike both sides of BoundingTriangles triangles or not.
 	// TODO: Implement this for all collision types, not just triangles.
@@ -428,7 +428,7 @@ func RayTest(options RayTestOptions) bool {
 // performing a ray test from the Camera towards the Mouse.
 type MouseRayTestOptions struct {
 	// Depth is the distance to extend the ray in world units; defaults to the Camera's far plane.
-	Depth float64
+	Depth float32
 	// If cast rays can strike both sides of BoundingTriangles triangles or not.
 	Doublesided bool
 	// TestAgainst is used to specify a selection of BoundingObjects to test against - this can be either a NodeFilter or a NodeCollection (a slice of Nodes).

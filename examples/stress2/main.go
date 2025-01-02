@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"image"
 	"image/color"
-	"math"
 
 	_ "embed"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"
+	"github.com/solarlune/tetra3d/math32"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -30,7 +30,7 @@ type Game struct {
 
 	Cubes []*tetra3d.Model
 
-	Time float64
+	Time float32
 }
 
 func NewGame() *Game {
@@ -110,8 +110,8 @@ func (g *Game) Init() {
 
 	batched := tetra3d.NewModel("DynamicBatching", planeMesh)
 	batched.Move(0, 4, 0)
-	batched.Rotate(1, 0, 0, tetra3d.ToRadians(90))
-	batched.Rotate(0, 1, 0, tetra3d.ToRadians(180))
+	batched.Rotate(1, 0, 0, math32.ToRadians(90))
+	batched.Rotate(0, 1, 0, math32.ToRadians(180))
 
 	batched.FrustumCulling = false // For now, disallow frustum culling
 
@@ -121,7 +121,7 @@ func (g *Game) Init() {
 		for j := 0; j < 21; j++ {
 			// Create a new Cube, position it, add it to the scene, and add it to the cubes slice.
 			cube := tetra3d.NewModel("Cube", cubeMesh)
-			cube.SetLocalPosition(float64(i)*1.5, 0, float64(-j*3))
+			cube.SetLocalPosition(float32(i)*1.5, 0, float32(-j*3))
 			g.Scene.Root.AddChildren(cube)
 			g.Cubes = append(g.Cubes, cube)
 		}
@@ -141,14 +141,14 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	tps := 1.0 / 60.0 // 60 ticks per second, regardless of display FPS
+	tps := float32(1.0 / 60.0) // 60 ticks per second, regardless of display FPS
 
 	g.Time += tps
 
 	for cubeIndex, cube := range g.Cubes {
 		wp := cube.WorldPosition()
 
-		wp.Y = math.Sin(g.Time*math.Pi + float64(cubeIndex))
+		wp.Y = math32.Sin(g.Time*math32.Pi + float32(cubeIndex))
 
 		cube.SetWorldPositionVec(wp)
 		cube.Color.R = float32(cubeIndex) / 100

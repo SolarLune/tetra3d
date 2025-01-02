@@ -1,21 +1,19 @@
 package tetra3d
 
-import (
-	"math"
-)
+import "github.com/solarlune/tetra3d/math32"
 
 // Quaternion is a tool to rotate objects, similar to rotation Matrix4s. However, a difference is that they can very easily be lerped without
 // losing data - if you were to lerp two rotation matrices, you can easily end up with a zero matrix, making your rotating object disappear.
 // Instead, you can create the two Quaternions you need (either from Matrix4s or directly), and then lerp them together.
 type Quaternion struct {
-	X, Y, Z, W float64
+	X, Y, Z, W float32
 }
 
-func NewQuaternion(x, y, z, w float64) Quaternion {
+func NewQuaternion(x, y, z, w float32) Quaternion {
 	return Quaternion{x, y, z, w}
 }
 
-// func (quat *Quaternion) Slerp(other *Quaternion, percent float64) *Quaternion {
+// func (quat *Quaternion) Slerp(other *Quaternion, percent float32) *Quaternion {
 
 // 	if percent <= 0 {
 // 		return quat.Clone()
@@ -27,12 +25,12 @@ func NewQuaternion(x, y, z, w float64) Quaternion {
 
 // 	angle := quat.Dot(other)
 
-// 	if math.Abs(angle) >= 1 {
+// 	if Abs(angle) >= 1 {
 // 		return newQuat
 // 	}
 
-// 	sinHalfTheta := math.Sqrt(1 - angle*angle)
-// 	halfTheta := math.Atan2(sinHalfTheta, angle)
+// 	sinHalfTheta := Sqrt(1 - angle*angle)
+// 	halfTheta := Atan2(sinHalfTheta, angle)
 
 // 	if angle < 0 {
 // 		newQuat.W = -other.W
@@ -45,8 +43,8 @@ func NewQuaternion(x, y, z, w float64) Quaternion {
 // 		return quat.Clone()
 // 	}
 
-// 	ratioA := math.Sin((1-percent)*halfTheta) / sinHalfTheta
-// 	ratioB := math.Sin(percent*halfTheta) / sinHalfTheta
+// 	ratioA := Sin((1-percent)*halfTheta) / sinHalfTheta
+// 	ratioB := Sin(percent*halfTheta) / sinHalfTheta
 
 // 	newQuat.W = quat.W*ratioA + other.W*ratioB
 // 	newQuat.X = quat.X*ratioA + other.X*ratioB
@@ -57,7 +55,7 @@ func NewQuaternion(x, y, z, w float64) Quaternion {
 
 // }
 
-func (quat Quaternion) Lerp(end Quaternion, percent float64) Quaternion {
+func (quat Quaternion) Lerp(end Quaternion, percent float32) Quaternion {
 
 	if percent <= 0 {
 		return quat
@@ -78,12 +76,12 @@ func (quat Quaternion) Lerp(end Quaternion, percent float64) Quaternion {
 
 }
 
-func (quat Quaternion) Dot(other Quaternion) float64 {
+func (quat Quaternion) Dot(other Quaternion) float32 {
 	return quat.X*other.X + quat.Y*other.Y + quat.Z*other.Z + quat.W*other.W
 }
 
-func (quat Quaternion) Magnitude() float64 {
-	return math.Sqrt(
+func (quat Quaternion) Magnitude() float32 {
+	return math32.Sqrt(
 		(quat.X * quat.X) +
 			(quat.Y * quat.Y) +
 			(quat.Z * quat.Z) +
@@ -166,7 +164,7 @@ func (quat Quaternion) ToMatrix4() Matrix4 {
 }
 
 // RotateVec rotates the given vector around using the Quaternion counter-clockwise.
-func (quat Quaternion) RotateVec(v Vector) Vector {
+func (quat Quaternion) RotateVec(v Vector3) Vector3 {
 
 	// xyz := NewVector(quat.X, quat.Y, quat.Z)
 	// t := xyz.Cross(v).Scale(2)
@@ -174,7 +172,7 @@ func (quat Quaternion) RotateVec(v Vector) Vector {
 
 	// Cribbed from StackOverflow, yet again~: https://gamedev.stackexchange.com/questions/28395/rotating-vector3-by-a-quaternion
 
-	u := NewVector(quat.X, quat.Y, quat.Z)
+	u := NewVector3(quat.X, quat.Y, quat.Z)
 	s := quat.W
 	out := u.Scale(u.Dot(v)).Scale(2)
 	out = out.Add(v.Scale(2*s*s - 1))
@@ -191,32 +189,32 @@ func (quat Quaternion) RotateVec(v Vector) Vector {
 
 // 	dot := globalForward.Dot(forward)
 
-// 	if math.Abs(dot+1.0) < 0.000001 {
-// 		return NewQuaternion(vector.Y[0], vector.Y[1], vector.Y[2], math.Pi)
+// 	if Abs(dot+1.0) < 0.000001 {
+// 		return NewQuaternion(vector.Y[0], vector.Y[1], vector.Y[2], Pi)
 // 	}
 
-// 	if math.Abs(dot-1.0) < 0.000001 {
+// 	if Abs(dot-1.0) < 0.000001 {
 // 		return NewQuaternion(0, 0, 0, 0)
 // 	}
 
-// 	rotAngle := math.Acos(dot)
+// 	rotAngle := Acos(dot)
 // 	rotAxis, _ := globalForward.Cross(forward)
 // 	vector.In(rotAxis).Unit()
 // 	return NewQuaternionFromAxisAngle(rotAxis, rotAngle)
 // }
 
 // ToAxisAngle returns tha axis Vector and angle (in radians) for a quaternion's rotation.
-func (quat Quaternion) ToAxisAngle() (Vector, float64) {
+func (quat Quaternion) ToAxisAngle() (Vector3, float32) {
 
 	if quat.W > 1 {
 		quat = quat.Normalized()
 	}
 
-	angle := 2 * math.Acos(quat.W)
+	angle := 2 * math32.Acos(quat.W)
 
-	s := math.Sqrt(1 - quat.W*quat.W)
+	s := math32.Sqrt(1 - quat.W*quat.W)
 
-	vec := NewVectorZero()
+	vec := Vector3{}
 	if s < 0.001 {
 		vec.X = quat.X
 		vec.Y = quat.Y
@@ -233,23 +231,23 @@ func (quat Quaternion) ToAxisAngle() (Vector, float64) {
 }
 
 // NewQuaternionFromAxisAngle returns a new Quaternion from the given axis and angle combination.
-func NewQuaternionFromAxisAngle(axis Vector, angle float64) Quaternion {
+func NewQuaternionFromAxisAngle(axis Vector3, angle float32) Quaternion {
 	axis = axis.Unit()
 	halfAngle := angle / 2
-	s := math.Sin(halfAngle)
+	s := math32.Sin(halfAngle)
 	return NewQuaternion(
 		axis.X*s,
 		axis.Y*s,
 		axis.Z*s,
-		math.Cos(halfAngle),
+		math32.Cos(halfAngle),
 	)
 }
 
 // type AxisAngle struct {
-// 	X, Y, Z, Angle float64
+// 	X, Y, Z, Angle float32
 // }
 
-// func NewAxisAngle(x, y, z, angle float64) *AxisAngle {
+// func NewAxisAngle(x, y, z, angle float32) *AxisAngle {
 // 	return &AxisAngle{X: x, Y: y, Z: z, Angle: angle}
 // }
 
@@ -282,7 +280,7 @@ func NewQuaternionFromAxisAngle(axis Vector, angle float64) Quaternion {
 
 // 	if trace > 0 {
 
-// 		s := 0.5 / math.Sqrt(trace+1.0)
+// 		s := 0.5 / Sqrt(trace+1.0)
 // 		q.W = 0.25 / s
 // 		q.X = (localUp[1] - forward[2]) * s
 // 		q.Z = (forward[0] - right[1]) * s
@@ -291,19 +289,19 @@ func NewQuaternionFromAxisAngle(axis Vector, angle float64) Quaternion {
 // 	} else {
 
 // 		if right[0] > localUp[2] && right[0] > forward[1] {
-// 			s := 2.0 * math.Sqrt(1.0+right[0]-localUp[2]-forward[1])
+// 			s := 2.0 * Sqrt(1.0+right[0]-localUp[2]-forward[1])
 // 			q.W = (localUp[1] - forward[2]) / s
 // 			q.X = 0.25 * s
 // 			q.Y = (localUp[0] + right[2]) / s
 // 			q.Z = (forward[0] + right[1]) / s
 // 		} else if localUp[2] > forward[1] {
-// 			s := 2.0 * math.Sqrt(1.0+localUp[2]-right[0]-forward[1])
+// 			s := 2.0 * Sqrt(1.0+localUp[2]-right[0]-forward[1])
 // 			q.W = (forward[0] - right[1]) / s
 // 			q.X = (localUp[0] + right[2]) / s
 // 			q.Y = 0.25 * s
 // 			q.Z = (forward[2] + localUp[1]) / s
 // 		} else {
-// 			s := 2.0 * math.Sqrt(1.0+forward[1]-right[0]-localUp[2])
+// 			s := 2.0 * Sqrt(1.0+forward[1]-right[0]-localUp[2])
 // 			q.W = (right[2] - localUp[0]) / s
 // 			q.X = (forward[0] + right[1]) / s
 // 			q.Y = (forward[2] + localUp[1]) / s
@@ -373,17 +371,17 @@ func NewQuaternionFromAxisAngle(axis Vector, angle float64) Quaternion {
 // 	}
 
 // 	dot := forward.Dot(diff)
-// 	angle := math.Acos(dot)
+// 	angle := Acos(dot)
 
 // 	return NewQuaternionFromAxisAngle(rotAxis, angle)
 
 // }
 
-// func NewQuaternionFromAxisAngle(axis Vector, angle float64) *Quaternion {
+// func NewQuaternionFromAxisAngle(axis Vector, angle float32) *Quaternion {
 // 	// Also cribbed from the same StackOverflow site whoops
-// 	s := math.Sin(angle / 2)
+// 	s := Sin(angle / 2)
 // 	axis = axis.Unit()
-// 	return NewQuaternion(axis[0]*s, axis[1]*s, axis[2]*s, math.Cos(angle/2))
+// 	return NewQuaternion(axis[0]*s, axis[1]*s, axis[2]*s, Cos(angle/2))
 
 // }
 

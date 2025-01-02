@@ -1,8 +1,6 @@
 package tetra3d
 
-import (
-	"math"
-)
+import "github.com/solarlune/tetra3d/math32"
 
 // BoundingTriangles is a Node specifically for detecting a collision between any of the triangles from a mesh instance and another BoundingObject.
 type BoundingTriangles struct {
@@ -18,8 +16,8 @@ type BoundingTriangles struct {
 // fewer broadphase cells need to be checked. Striking a balance is a good idea if you're setting this value by hand (by default, the grid size is
 // the maximum dimension size / 20, rounded up (a grid of at least one cell every 20 Blender Units). A size of 0 disables the usage of the broadphase
 // for collision checks.
-func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float64) *BoundingTriangles {
-	margin := 0.25 // An additional margin to help ensure the broadphase is crossed before checking for collisions
+func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float32) *BoundingTriangles {
+	margin := float32(0.25) // An additional margin to help ensure the broadphase is crossed before checking for collisions
 	bt := &BoundingTriangles{
 		Node:         NewNode(name),
 		BoundingAABB: NewBoundingAABB("triangle broadphase aabb", mesh.Dimensions.Width()+margin, mesh.Dimensions.Height()+margin, mesh.Dimensions.Depth()+margin),
@@ -35,7 +33,7 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float64) *
 	gridSize := 0
 
 	if broadphaseGridSize > 0 {
-		gridSize = int(math.Ceil(maxDim / broadphaseGridSize))
+		gridSize = int(math32.Ceil(maxDim / broadphaseGridSize))
 	}
 
 	bt.Broadphase = NewBroadphase(gridSize, bt.WorldPosition(), mesh)
@@ -148,15 +146,15 @@ func (bt *BoundingTriangles) CollisionTest(settings CollisionTestSettings) bool 
 }
 
 type collisionPlane struct {
-	Normal   Vector
-	Distance float64
+	Normal   Vector3
+	Distance float32
 }
 
 func newCollisionPlane() collisionPlane {
 	return collisionPlane{}
 }
 
-func (plane *collisionPlane) Set(v0, v1, v2 Vector) {
+func (plane *collisionPlane) Set(v0, v1, v2 Vector3) {
 
 	first := v1.Sub(v0)
 	second := v2.Sub(v0)
@@ -168,14 +166,14 @@ func (plane *collisionPlane) Set(v0, v1, v2 Vector) {
 
 }
 
-func (plane *collisionPlane) ClosestPoint(point Vector) Vector {
+func (plane *collisionPlane) ClosestPoint(point Vector3) Vector3 {
 
 	dist := plane.Normal.Dot(point) - plane.Distance
 	return point.Sub(plane.Normal.Scale(dist))
 
 }
 
-func (plane *collisionPlane) RayAgainstPlane(from, to Vector, doublesided bool) (Vector, bool) {
+func (plane *collisionPlane) RayAgainstPlane(from, to Vector3, doublesided bool) (Vector3, bool) {
 
 	dir := to.Sub(from).Unit()
 
@@ -184,7 +182,7 @@ func (plane *collisionPlane) RayAgainstPlane(from, to Vector, doublesided bool) 
 
 	if !doublesided && nd >= 0 {
 		// if !doublesided && nd <= 0 {
-		return Vector{}, false
+		return Vector3{}, false
 	}
 
 	t := (plane.Distance - pn) / nd
@@ -193,13 +191,13 @@ func (plane *collisionPlane) RayAgainstPlane(from, to Vector, doublesided bool) 
 		return from.Add(dir.Scale(t)), true
 	}
 
-	return Vector{}, false
+	return Vector3{}, false
 
 }
 
 var colPlane = newCollisionPlane()
 
-func closestPointOnTri(point, v0, v1, v2 Vector) Vector {
+func closestPointOnTri(point, v0, v1, v2 Vector3) Vector3 {
 
 	colPlane.Set(v0, v1, v2)
 	if planePoint := colPlane.ClosestPoint(point); isPointInsideTriangle(planePoint, v0, v1, v2) {
@@ -229,12 +227,12 @@ func closestPointOnTri(point, v0, v1, v2 Vector) Vector {
 
 }
 
-func isPointInsideTriangle(point, v0, v1, v2 Vector) bool {
+func isPointInsideTriangle(point, v0, v1, v2 Vector3) bool {
 	u, v := pointInsideTriangle(point, v0, v1, v2)
 	return (u >= 0) && (v >= 0) && (u+v < 1)
 }
 
-func pointInsideTriangle(point, v0, v1, v2 Vector) (u, v float64) {
+func pointInsideTriangle(point, v0, v1, v2 Vector3) (u, v float32) {
 
 	ca := v2.Sub(v0)
 	ba := v1.Sub(v0)
@@ -256,7 +254,7 @@ func pointInsideTriangle(point, v0, v1, v2 Vector) (u, v float64) {
 	return
 }
 
-func (plane *collisionPlane) closestPointOnLine(point, start, end Vector) Vector {
+func (plane *collisionPlane) closestPointOnLine(point, start, end Vector3) Vector3 {
 
 	diff := end.Sub(start)
 	dotA := point.Sub(start).Dot(diff)

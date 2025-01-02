@@ -8,6 +8,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/solarlune/tetra3d/math32"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 
@@ -30,17 +31,17 @@ const (
 type TextStyle struct {
 	Font                 font.Face               // The font face to use for rendering the text. The size is customizeable, but the DPI should be 72.
 	Cursor               string                  // A cursor string sequence is drawn at the end while typewriter-ing; defaults to a blank string ("").
-	LineHeightMultiplier float64                 // The multiplier for line height changes.
+	LineHeightMultiplier float32                 // The multiplier for line height changes.
 	AlignmentHorizontal  TextHorizontalAlignment // How the text should be horizontally aligned in the Text texture.
 	AlignmentVertical    TextVerticalAlignment
 
 	BGColor Color // The Background color for the text. Defaults to black (0, 0, 0, 1).
 	FGColor Color // The Foreground color for the text. Defaults to white (1, 1, 1, 1).
 
-	ShadowDirection Vector // A vector indicating direction of the shadow's heading. Defaults to down-right ( {1, 1, 0}, normalized ).
-	ShadowLength    int    // The length of the shadow in pixels. Defaults to 0 (no shadow).
-	ShadowColorNear Color  // The color of the shadow near the letters. Defaults to black (0, 0, 0, 1).
-	ShadowColorFar  Color  // The color of the shadow towards the end of the letters. Defaults to black (0, 0, 0, 1).
+	ShadowDirection Vector3 // A vector indicating direction of the shadow's heading. Defaults to down-right ( {1, 1, 0}, normalized ).
+	ShadowLength    int     // The length of the shadow in pixels. Defaults to 0 (no shadow).
+	ShadowColorNear Color   // The color of the shadow near the letters. Defaults to black (0, 0, 0, 1).
+	ShadowColorFar  Color   // The color of the shadow towards the end of the letters. Defaults to black (0, 0, 0, 1).
 
 	OutlineThickness int   // Overall thickness of the outline in pixels. Defaults to 0 (no outline).
 	OutlineRounded   bool  // If the outline is rounded or not. Defaults to false (square outlines).
@@ -62,7 +63,7 @@ func NewDefaultTextStyle() TextStyle {
 
 		OutlineColor: NewColor(0, 0, 0, 1),
 
-		ShadowDirection: Vector{1, 1, 0, 0}.Unit(),
+		ShadowDirection: Vector3{1, 1, 0}.Unit(),
 		ShadowColorNear: NewColor(0, 0, 0, 1),
 		ShadowColorFar:  NewColor(0, 0, 0, 1),
 	}
@@ -109,9 +110,9 @@ func NewText(meshPart *MeshPart, textureWidth int) (*Text, error) {
 	// meshpart's vertex positions; this determines our texture's aspect ratio.
 	w, h := meshPart.primaryDimensions()
 
-	asr := float64(h) / float64(w)
+	asr := float32(h) / float32(w)
 
-	text.Texture = ebiten.NewImage(textureWidth, int(float64(textureWidth)*asr))
+	text.Texture = ebiten.NewImage(textureWidth, int(float32(textureWidth)*asr))
 
 	if meshPart.Material == nil {
 		// If no material is present, then we can create a new one with sane defaults
@@ -145,8 +146,8 @@ func NewText(meshPart *MeshPart, textureWidth int) (*Text, error) {
 
 	text.SetStyle(NewDefaultTextStyle()) // The texture will update when we apply the style.
 
-	uvMin := Vector{math.MaxFloat64, math.MaxFloat64, 0, 0}
-	uvMax := Vector{-math.MaxFloat64, -math.MaxFloat64, 0, 0}
+	uvMin := Vector3{math.MaxFloat32, math.MaxFloat32, 0}
+	uvMax := Vector3{-math.MaxFloat32, -math.MaxFloat32, 0}
 
 	meshPart.ForEachVertexIndex(func(vertIndex int) {
 		uv := meshPart.Mesh.VertexUVs[vertIndex]
@@ -189,7 +190,7 @@ func NewTextAutoSize(meshPart *MeshPart, camera *Camera) (*Text, error) {
 
 	meshPartDimWidth, _ := meshPart.primaryDimensions()
 
-	texWidth := math.Round(meshPartDimWidth / camera.OrthoScale() * float64(w))
+	texWidth := math32.Round(meshPartDimWidth / camera.OrthoScale() * float32(w))
 
 	return NewText(meshPart, int(texWidth))
 }
@@ -260,7 +261,7 @@ func (textObj *Text) SetText(txt string, arguments ...any) *Text {
 		textureWidth := textObj.Texture.Bounds().Dx()
 
 		// If a word gets too close to the texture's right side, we loop
-		safetyMargin := int(float64(textureWidth)*0.1) + textObj.style.MarginHorizontal
+		safetyMargin := int(float32(textureWidth)*0.1) + textObj.style.MarginHorizontal
 
 		parsedText := []string{}
 
@@ -334,8 +335,8 @@ func (textObj *Text) UpdateTexture() {
 	}
 
 	textLineMargin := 2
-	lineHeight := int(float64(textObj.style.Font.Metrics().Height.Ceil() + textLineMargin))
-	multipliedLineHeight := int(float64(lineHeight) * textObj.style.LineHeightMultiplier)
+	lineHeight := int(float32(textObj.style.Font.Metrics().Height.Ceil() + textLineMargin))
+	multipliedLineHeight := int(float32(lineHeight) * textObj.style.LineHeightMultiplier)
 	ascent := textObj.style.Font.Metrics().Ascent.Ceil()
 
 	typing := true
@@ -349,7 +350,7 @@ func (textObj *Text) UpdateTexture() {
 	textureWidth := textObj.Texture.Bounds().Dx()
 	textureHeight := textObj.Texture.Bounds().Dy()
 
-	blockHeight := max(len(textObj.parsedText)*multipliedLineHeight, lineHeight)
+	blockHeight := math32.Max(len(textObj.parsedText)*multipliedLineHeight, lineHeight)
 
 	for lineIndex, line := range textObj.parsedText {
 
@@ -545,10 +546,10 @@ func (text *Text) Dispose() {
 // 	setText         string
 // 	typewriterIndex int
 // 	texture         *ebiten.Image
-// 	lineHeight      float64
+// 	lineHeight      float32
 // }
 
-// func NewText(name string, lineHeight float64) *Text {
+// func NewText(name string, lineHeight float32) *Text {
 // 	text := &Text{
 // 		Node:            NewNode(name),
 // 		textModel:       NewModel(NewSubdividedPlaneMesh(4, 4), "text model"),
@@ -607,7 +608,7 @@ func (text *Text) Dispose() {
 
 // 	measure := text.BoundString(textObj.font, textObj.Text())
 
-// 	asr := float64(measure.Dx()) / float64(measure.Dy())
+// 	asr := float32(measure.Dx()) / float32(measure.Dy())
 
 // 	if textObj.texture == nil || measure.Dx() > textObj.texture.Bounds().Dx() || measure.Dy() > textObj.texture.Bounds().Dy() {
 
@@ -615,8 +616,8 @@ func (text *Text) Dispose() {
 // 			textObj.texture.Dispose()
 // 		}
 
-// 		newWidth := int(closestPowerOfTwo(float64(measure.Dx())) * 1.5)
-// 		newHeight := int(closestPowerOfTwo(float64(measure.Dy())) * 1.5)
+// 		newWidth := int(closestPowerOfTwo(float32(measure.Dx())) * 1.5)
+// 		newHeight := int(closestPowerOfTwo(float32(measure.Dy())) * 1.5)
 
 // 		textObj.texture = ebiten.NewImage(newWidth, newHeight)
 
@@ -633,7 +634,7 @@ func (text *Text) Dispose() {
 // 		txt = textObj.Text()
 // 	}
 
-// 	lineCount := float64(strings.Count(textObj.Text(), "\n")) + 1
+// 	lineCount := float32(strings.Count(textObj.Text(), "\n")) + 1
 
 // 	text.Draw(textObj.texture, txt, textObj.font, -measure.Min.X, -measure.Min.Y, color.White)
 

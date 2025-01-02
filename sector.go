@@ -26,7 +26,7 @@ type Sector struct {
 func NewSector(model *Model) *Sector {
 
 	mesh := model.Mesh
-	margin := 0.01
+	margin := float32(0.01)
 	sectorAABB := NewBoundingAABB("sector", mesh.Dimensions.Width()+margin, mesh.Dimensions.Height()+margin, mesh.Dimensions.Depth()+margin)
 	sectorAABB.SetLocalPositionVec(model.WorldPosition().Add(mesh.Dimensions.Center()))
 

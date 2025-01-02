@@ -103,7 +103,7 @@ func (p *PathAgent) Update() {
 
 	if p.PathStepper.Path() != nil {
 
-		moveSpd := 0.05
+		moveSpd := float32(0.05)
 
 		currentPos := p.PathStepper.CurrentWorldPosition()
 		diff := currentPos.Sub(p.Model.WorldPosition()).ClampMagnitude(moveSpd)

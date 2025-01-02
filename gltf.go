@@ -17,6 +17,7 @@ import (
 	"github.com/qmuntal/gltf"
 	"github.com/qmuntal/gltf/ext/lightspunctual"
 	"github.com/qmuntal/gltf/modeler"
+	"github.com/solarlune/tetra3d/math32"
 
 	_ "image/png"
 )
@@ -134,7 +135,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 	type Collection struct {
 		Objects []string
-		Offset  []float64
+		Offset  []float32
 		Path    string
 	}
 
@@ -214,9 +215,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					ce := cameraEntry.(map[string]any)
 
-					clipStart := ce["clip_start"].(float64)
-					clipEnd := ce["clip_end"].(float64)
-					fovY := ce["fovY"].(float64)
+					clipStart := float32(ce["clip_start"].(float64))
+					clipEnd := float32(ce["clip_end"].(float64))
+					fovY := float32(ce["fovY"].(float64))
 					perspective := ce["perspective"].(bool)
 
 					rotation := ce["rotation"].([]any)
@@ -225,10 +226,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					for i := 0; i < 3; i++ {
 						rotRow := rotation[i].([]any)
-						rotationMatrix.SetColumn(i, NewVector(rotRow[0].(float64), rotRow[1].(float64), rotRow[2].(float64)))
+						rotationMatrix.SetColumn(i, Vector4{float32(rotRow[0].(float64)), float32(rotRow[1].(float64)), float32(rotRow[2].(float64)), 0})
 					}
 
-					locVec := NewVector(location[0].(float64), location[1].(float64), location[2].(float64))
+					locVec := NewVector3(float32(location[0].(float64)), float32(location[1].(float64)), float32(location[2].(float64)))
 
 					newCam := NewCamera(camWidth, camHeight)
 
@@ -376,7 +377,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					newMat.CustomDepthOffsetOn = s.(float64) > 0
 				}
 				if s, exists := dataMap["t3dCustomDepthValue__"]; exists {
-					newMat.CustomDepthOffsetValue = s.(float64)
+					newMat.CustomDepthOffsetValue = float32(s.(float64))
 				}
 				if s, exists := dataMap["t3dMaterialLightingMode__"]; exists {
 					// newMat.NormalsAlwaysFaceLights = s.(float64) > 0
@@ -517,9 +518,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			for i, v := range vertPos {
 
 				vertexData[i] = NewVertex(
-					float64(v[0]),
-					float64(v[1]),
-					float64(v[2]),
+					float32(v[0]),
+					float32(v[1]),
+					float32(v[2]),
 					0, 0,
 				)
 
@@ -536,8 +537,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 
 				for i, v := range texCoords {
-					vertexData[i].U = float64(v[0])
-					vertexData[i].V = -(float64(v[1]) - 1)
+					vertexData[i].U = float32(v[0])
+					vertexData[i].V = -(float32(v[1]) - 1)
 				}
 
 			}
@@ -553,9 +554,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 
 				for i, v := range normals {
-					vertexData[i].NormalX = float64(v[0])
-					vertexData[i].NormalY = float64(v[1])
-					vertexData[i].NormalZ = float64(v[2])
+					vertexData[i].NormalX = float32(v[0])
+					vertexData[i].NormalY = float32(v[1])
+					vertexData[i].NormalZ = float32(v[2])
 				}
 
 			}
@@ -567,16 +568,15 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			if len(colorChannelNames) > 0 {
 
 				dataMap, _ := mesh.Extras.(map[string]any)
-				activeChannelIndex := int(dataMap["t3dActiveVertexColorIndex__"].(float64))
 
-				for _, name := range colorChannelNames {
+				for index, name := range colorChannelNames {
 
 					name = "_" + strings.ToUpper(name)
 
 					vertexColorAccessor, colorChannelExists := v.Attributes[name]
 
 					if !colorChannelExists {
-						vertexColorAccessor, colorChannelExists = v.Attributes["COLOR_0"]
+						vertexColorAccessor, colorChannelExists = v.Attributes["COLOR_"+strconv.Itoa(index)]
 					}
 
 					if colorChannelExists {
@@ -599,13 +599,14 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 								float32(colorData[3])/math.MaxUint16,
 							).ConvertTosRGB()
 							vertexData[i].Colors = append(vertexData[i].Colors, color)
-							vertexData[i].ActiveColorChannel = activeChannelIndex
 
 						}
 
 					}
 
 				}
+
+				newMesh.VertexActiveColorChannel = int(dataMap["t3dActiveVertexColorIndex__"].(float64))
 
 			}
 
@@ -674,7 +675,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		anim.library = library
 		library.Animations[gltfAnim.Name] = anim
 
-		animLength := 0.0
+		animLength := float32(0)
 
 		for _, channel := range gltfAnim.Channels {
 
@@ -713,9 +714,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				for i := 0; i < len(inputData); i++ {
 					t := inputData[i]
 					p := outputData[i]
-					track.AddKeyframe(float64(t), Vector{float64(p[0]), float64(p[1]), float64(p[2]), 0})
-					if float64(t) > animLength {
-						animLength = float64(t)
+					track.AddKeyframe(float32(t), Vector3{float32(p[0]), float32(p[1]), float32(p[2])})
+					if float32(t) > animLength {
+						animLength = float32(t)
 					}
 				}
 
@@ -742,9 +743,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				for i := 0; i < len(inputData); i++ {
 					t := inputData[i]
 					p := outputData[i]
-					track.AddKeyframe(float64(t), Vector{float64(p[0]), float64(p[1]), float64(p[2]), 0})
-					if float64(t) > animLength {
-						animLength = float64(t)
+					track.AddKeyframe(float32(t), Vector3{float32(p[0]), float32(p[1]), float32(p[2])})
+					if float32(t) > animLength {
+						animLength = float32(t)
 					}
 				}
 
@@ -772,9 +773,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				for i := 0; i < len(inputData); i++ {
 					t := inputData[i]
 					p := outputData[i]
-					track.AddKeyframe(float64(t), NewQuaternion(float64(p[0]), float64(p[1]), float64(p[2]), float64(p[3])))
-					if float64(t) > animLength {
-						animLength = float64(t)
+					track.AddKeyframe(float32(t), NewQuaternion(float32(p[0]), float32(p[1]), float32(p[2]), float32(p[3])))
+					if float32(t) > animLength {
+						animLength = float32(t)
 					}
 				}
 
@@ -811,7 +812,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					anim.Markers = append(anim.Markers, Marker{
 						Name: marker["name"].(string),
-						Time: marker["time"].(float64),
+						Time: float32(marker["time"].(float64)),
 					})
 				}
 			}
@@ -893,14 +894,14 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			newCam.updateProjectionMatrix = true
 
 			if gltfCam.Perspective != nil {
-				newCam.near = float64(gltfCam.Perspective.Znear)
-				newCam.far = float64(*gltfCam.Perspective.Zfar)
-				newCam.fieldOfView = ToDegrees(float64(gltfCam.Perspective.Yfov))
+				newCam.near = float32(gltfCam.Perspective.Znear)
+				newCam.far = float32(*gltfCam.Perspective.Zfar)
+				newCam.fieldOfView = math32.ToDegrees(float32(gltfCam.Perspective.Yfov))
 				newCam.perspective = true
 			} else if gltfCam.Orthographic != nil {
-				newCam.near = float64(gltfCam.Orthographic.Znear)
-				newCam.far = float64(gltfCam.Orthographic.Zfar)
-				newCam.orthoScale = float64(gltfCam.Orthographic.Xmag * 2)
+				newCam.near = float32(gltfCam.Orthographic.Znear)
+				newCam.far = float32(gltfCam.Orthographic.Zfar)
+				newCam.orthoScale = float32(gltfCam.Orthographic.Xmag * 2)
 				newCam.perspective = false
 			}
 
@@ -943,8 +944,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				obj = directionalLight
 			} else if lightData.Type == lightspunctual.TypePoint {
 				pointLight := NewPointLight(node.Name, float32(color[0]), float32(color[1]), float32(color[2]), float32(*lightData.Intensity)/80) // Point lights have wattage energy
-				if !math.IsInf(float64(*lightData.Range), 0) {
-					pointLight.Range = float64(*lightData.Range)
+				if !math.IsInf(*lightData.Range, 0) {
+					pointLight.Range = float32(*lightData.Range)
 				}
 				obj = pointLight
 			} else {
@@ -955,12 +956,12 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		} else if node.Extras != nil && nodeHasProp(node, "t3dPathPoints__") {
 
-			points := []Vector{}
+			points := []Vector3{}
 			extraMap := node.Extras.(map[string]any)
 
 			for _, p := range extraMap["t3dPathPoints__"].([]any) {
 				pointData := p.([]any)
-				points = append(points, Vector{pointData[0].(float64), pointData[2].(float64), -pointData[1].(float64), 0})
+				points = append(points, Vector3{float32(pointData[0].(float64)), float32(pointData[2].(float64)), float32(-pointData[1].(float64))})
 			}
 
 			path := NewPath(node.Name, points...)
@@ -978,7 +979,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			extraMap := node.Extras.(map[string]any)
 
 			type gridPointPosition struct {
-				X, Y, Z float64
+				X, Y, Z float32
 			}
 
 			creationOrder := []*GridPoint{}
@@ -991,9 +992,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				z, _ := strconv.ParseFloat(components[2], 64)
 
 				return gridPointPosition{
-					X: x,
-					Y: y,
-					Z: z,
+					X: float32(x),
+					Y: float32(y),
+					Z: float32(z),
 				}
 			}
 
@@ -1039,18 +1040,18 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					return defaultValue
 				}
 
-				getOrDefaultFloat := func(path string, defaultValue float64) float64 {
+				getOrDefaultFloat := func(path string, defaultValue float32) float32 {
 					if value, exists := dataMap[path]; exists {
-						return value.(float64)
+						return float32(value.(float64))
 					}
 					return defaultValue
 				}
 
-				getOrDefaultFloatSlice := func(path string, defaultValues []float64) []float64 {
+				getOrDefaultFloatSlice := func(path string, defaultValues []float32) []float32 {
 					if value, exists := dataMap[path]; exists {
-						floats := []float64{}
+						floats := []float32{}
 						for _, v := range value.([]any) {
-							floats = append(floats, v.(float64))
+							floats = append(floats, float32(v.(float64)))
 						}
 						return floats
 					}
@@ -1071,7 +1072,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 						if aabbCustomEnabled := getOrDefaultBool("t3dAABBCustomEnabled__", false); aabbCustomEnabled {
 
-							boundsSize := getOrDefaultFloatSlice("t3dAABBCustomSize__", []float64{2, 2, 2})
+							boundsSize := getOrDefaultFloatSlice("t3dAABBCustomSize__", []float32{2, 2, 2})
 							aabb = NewBoundingAABB("BoundingAABB", boundsSize[0], boundsSize[1], boundsSize[2])
 
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
@@ -1103,7 +1104,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
 							mesh := obj.(*Model).Mesh
 							dim := mesh.Dimensions
-							capsule = NewBoundingCapsule("BoundingCapsule", dim.Height(), math.Max(dim.Width(), dim.Depth())/2)
+							capsule = NewBoundingCapsule("BoundingCapsule", dim.Height(), math32.Max(dim.Width(), dim.Depth())/2)
 						}
 
 						if capsule != nil {
@@ -1153,7 +1154,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 						if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
 
-							gridSize := 20.0
+							gridSize := float32(20)
 
 							if getOrDefaultBool("t3dTrianglesCustomBroadphaseEnabled__", false) {
 								gridSize = getOrDefaultFloat("t3dTrianglesCustomBroadphaseGridSize__", 20)
@@ -1179,10 +1180,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		mtData := node.Matrix
 
 		matrix := NewMatrix4()
-		matrix.SetRow(0, Vector{float64(mtData[0]), float64(mtData[1]), float64(mtData[2]), float64(mtData[3])})
-		matrix.SetRow(1, Vector{float64(mtData[4]), float64(mtData[5]), float64(mtData[6]), float64(mtData[7])})
-		matrix.SetRow(2, Vector{float64(mtData[8]), float64(mtData[9]), float64(mtData[10]), float64(mtData[11])})
-		matrix.SetRow(3, Vector{float64(mtData[12]), float64(mtData[13]), float64(mtData[14]), float64(mtData[15])})
+		matrix.SetRow(0, Vector4{float32(mtData[0]), float32(mtData[1]), float32(mtData[2]), float32(mtData[3])})
+		matrix.SetRow(1, Vector4{float32(mtData[4]), float32(mtData[5]), float32(mtData[6]), float32(mtData[7])})
+		matrix.SetRow(2, Vector4{float32(mtData[8]), float32(mtData[9]), float32(mtData[10]), float32(mtData[11])})
+		matrix.SetRow(3, Vector4{float32(mtData[12]), float32(mtData[13]), float32(mtData[14]), float32(mtData[15])})
 
 		if !matrix.IsIdentity() {
 
@@ -1194,9 +1195,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		} else {
 
-			obj.SetLocalPositionVec(Vector{float64(node.Translation[0]), float64(node.Translation[1]), float64(node.Translation[2]), 0})
-			obj.SetLocalScaleVec(Vector{float64(node.Scale[0]), float64(node.Scale[1]), float64(node.Scale[2]), 0})
-			obj.SetLocalRotation(NewQuaternion(float64(node.Rotation[0]), float64(node.Rotation[1]), float64(node.Rotation[2]), float64(node.Rotation[3])).ToMatrix4())
+			obj.SetLocalPositionVec(Vector3{float32(node.Translation[0]), float32(node.Translation[1]), float32(node.Translation[2])})
+			obj.SetLocalScaleVec(Vector3{float32(node.Scale[0]), float32(node.Scale[1]), float32(node.Scale[2])})
+			obj.SetLocalRotation(NewQuaternion(float32(node.Rotation[0]), float32(node.Rotation[1]), float32(node.Rotation[2]), float32(node.Rotation[3])).ToMatrix4())
 
 		}
 
@@ -1263,7 +1264,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				newMat := NewMatrix4()
 				for rowIndex, row := range matrix {
-					newMat.SetColumn(rowIndex, Vector{float64(row[0]), float64(row[1]), float64(row[2]), float64(row[3])})
+					newMat.SetColumn(rowIndex, Vector4{float32(row[0]), float32(row[1]), float32(row[2]), float32(row[3])})
 				}
 
 				localBones[matIndex].inverseBindMatrix = newMat
@@ -1349,7 +1350,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					collection := collections[c.(string)]
 
-					offset := Vector{-collection.Offset[0], -collection.Offset[2], collection.Offset[1], 0}
+					offset := Vector3{-collection.Offset[0], -collection.Offset[2], collection.Offset[1]}
 
 					for _, cloneName := range collection.Objects {
 
@@ -1644,9 +1645,9 @@ func handleGameProperties(p any) (string, any) {
 		return defaultValue
 	}
 
-	getOrDefaultFloat := func(propMap map[string]any, key string, defaultValue float64) float64 {
+	getOrDefaultFloat := func(propMap map[string]any, key string, defaultValue float32) float32 {
 		if value, keyExists := propMap[key]; keyExists {
-			return value.(float64)
+			return float32(value.(float64))
 		}
 		return defaultValue
 	}
@@ -1665,11 +1666,11 @@ func handleGameProperties(p any) (string, any) {
 		return nil
 	}
 
-	getOrDefaultFloatArray := func(propMap map[string]any, key string, defaultValue []float64) []float64 {
+	getOrDefaultFloatArray := func(propMap map[string]any, key string, defaultValue []float32) []float32 {
 		if value, keyExists := propMap[key]; keyExists {
-			values := make([]float64, 0, len(value.([]any)))
+			values := make([]float32, 0, len(value.([]any)))
 			for _, v := range value.([]any) {
-				values = append(values, v.(float64))
+				values = append(values, float32(v.(float64)))
 			}
 			return values
 		}
@@ -1705,12 +1706,12 @@ func handleGameProperties(p any) (string, any) {
 			value = scene + ":" + getOrDefaultString(ref, "name", "")
 		}
 	} else if propType == 5 {
-		colorValues := getOrDefaultFloatArray(property, "valueColor", []float64{1, 1, 1, 1})
+		colorValues := getOrDefaultFloatArray(property, "valueColor", []float32{1, 1, 1, 1})
 		color := NewColor(float32(colorValues[0]), float32(colorValues[1]), float32(colorValues[2]), float32(colorValues[3])).ConvertTosRGB()
 		value = color
 	} else if propType == 6 {
-		vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float64{0, 0, 0})
-		value = Vector{vecValues[0], vecValues[2], -vecValues[1], 0}
+		vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float32{0, 0, 0})
+		value = Vector3{vecValues[0], vecValues[2], -vecValues[1]}
 	} else if propType == 7 {
 		value = getOrDefaultString(property, "valueFilepath", "")
 		if value != "" {

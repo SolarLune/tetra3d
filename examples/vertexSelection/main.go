@@ -22,7 +22,7 @@ type Game struct {
 
 	FlashingVertices tetra3d.VertexSelection
 
-	Time float64
+	Time float32
 
 	Cube *tetra3d.Model
 }

@@ -97,6 +97,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw the result to the screen, centered.
 	opt := &ebiten.DrawImageOptions{}
 	w, h := camera.Size()
+
 	opt.GeoM.Translate(float64(g.Width/2)-float64(w/2), float64(g.Height/2)-float64(h/2))
 	screen.DrawImage(camera.ColorTexture(), opt)
 

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"
+	"github.com/solarlune/tetra3d/math32"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -19,7 +19,7 @@ import (
 
 type Game struct {
 	Scene *tetra3d.Scene
-	Time  float64
+	Time  float32
 
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
@@ -84,11 +84,11 @@ func (g *Game) Update() error {
 		props := o.Properties()
 
 		if props.Has("turn") {
-			o.Rotate(0, 1, 0, 0.02*props.Get("turn").AsFloat64())
+			o.Rotate(0, 1, 0, 0.02*props.Get("turn").AsFloat32())
 		}
 
 		if props.Has("wave") && props.Get("wave").AsBool() {
-			o.Move(0, math.Sin(g.Time*math.Pi)*0.08, 0)
+			o.Move(0, math32.Sin(g.Time*math32.Pi)*0.08, 0)
 		}
 
 		if props.Has("blink") {
@@ -146,7 +146,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := `This demo shows how game properties work with
 the Tetra3D Blender add-on.
 Game properties are set in Blender, and
-exported from there to a GLTF file.	
+exported from there to a GLTF file.
 
 Collection instances can be used as prefabs,
 and properties set on a collection

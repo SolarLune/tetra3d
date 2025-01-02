@@ -105,7 +105,7 @@ The left and right arrow keys cycle through the cameras.`
 		if g.Camera.Perspective() {
 			txt += fmt.Sprintf("\n\nName: %s\nType: Perspective Camera\nFOV: %s", g.Camera.Name(), strconv.Itoa(int(g.Camera.FieldOfView())))
 		} else {
-			txt += fmt.Sprintf("\n\nName: %s\nType: Orthographic Camera\nOrtho-Scale: %s", g.Camera.Name(), strconv.FormatFloat(g.Camera.OrthoScale(), 'f', 1, 64))
+			txt += fmt.Sprintf("\n\nName: %s\nType: Orthographic Camera\nOrtho-Scale: %s", g.Camera.Name(), strconv.FormatFloat(float64(g.Camera.OrthoScale()), 'f', 1, 64))
 		}
 		g.Camera.DrawDebugText(screen, txt, 0, 210, 1, colors.LightGray())
 	}

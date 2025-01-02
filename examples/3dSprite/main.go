@@ -64,9 +64,9 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	moveSpd := 0.05
-	dx := 0.0
-	dz := 0.0
+	moveSpd := float32(0.05)
+	dx := float32(0)
+	dz := float32(0)
 
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
 		dx -= moveSpd

@@ -53,7 +53,7 @@ type NodeFilter struct {
 	depth          int
 	sortMode       int
 	reverseSort    bool
-	sortTo         Vector
+	sortTo         Vector3
 
 	multithreadingWG *sync.WaitGroup
 }
@@ -134,7 +134,7 @@ func (nf *NodeFilter) execute(node INode) []INode {
 		}
 
 		nf.sortMode = nfSortModeNone
-		nf.sortTo = Vector{}
+		nf.sortTo = Vector3{}
 		nf.reverseSort = false
 
 	}
@@ -412,7 +412,12 @@ func (nf NodeFilter) Index(node INode) int {
 	return -1
 }
 
-// IsEmpty returns true if the NodeFilter contains no Nodes.
+// IsZero returns true if the NodeFilter is uninitialized / empty.
+func (nf NodeFilter) IsZero() bool {
+	return nf.Start == nil
+}
+
+// IsEmpty returns true if no Nodes pass the NodeFilter.
 func (nf NodeFilter) IsEmpty() bool {
 	return len(nf.execute(nf.Start)) == 0
 }
@@ -493,7 +498,7 @@ func (nf NodeFilter) SortByZ() NodeFilter {
 
 // SortByDistance sorts the results of the NodeFilter by their distances to the specified INode.
 // Sorts do not combine.
-func (nf NodeFilter) SortByDistance(to Vector) NodeFilter {
+func (nf NodeFilter) SortByDistance(to Vector3) NodeFilter {
 	nf.sortMode = nfSortModeDistance
 	nf.sortTo = to
 	return nf

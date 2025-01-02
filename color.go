@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/solarlune/tetra3d/math32"
 	"github.com/tanema/gween/ease"
 )
 
@@ -106,13 +107,11 @@ func (color Color) Sub(other Color) Color {
 // Mix mixes the calling Color with the other Color, mixed to the percentage given (ranging from 0 - 1).
 func (color Color) Mix(other Color, percentage float32) Color {
 
-	p := clamp(float64(percentage), 0, 1)
-	percentage = float32(p)
-
-	color.R += (other.R - color.R) * percentage
-	color.G += (other.G - color.G) * percentage
-	color.B += (other.B - color.B) * percentage
-	color.A += (other.A - color.A) * percentage
+	p := math32.Clamp(percentage, 0, 1)
+	color.R += (other.R - color.R) * p
+	color.G += (other.G - color.G) * p
+	color.B += (other.B - color.B) * p
+	color.A += (other.A - color.A) * p
 	return color
 
 }
@@ -140,9 +139,9 @@ func (color Color) ToFloat32s() (float32, float32, float32, float32) {
 	return color.R, color.G, color.B, color.A
 }
 
-// ToFloat64s returns four float64 values for each channel in the Color in the order R, G, B, and A.
-func (color Color) ToFloat64s() (float64, float64, float64, float64) {
-	return float64(color.R), float64(color.G), float64(color.B), float64(color.A)
+// Tofloat32s returns four float32 values for each channel in the Color in the order R, G, B, and A.
+func (color Color) Tofloat32s() (float32, float32, float32, float32) {
+	return float32(color.R), float32(color.G), float32(color.B), float32(color.A)
 }
 
 // ToFloat32Array returns a [4]float32 array for each channel in the Color in the order of R, G, B, and A.
@@ -186,19 +185,19 @@ func (color Color) ConvertTosRGB() Color {
 	if color.R <= 0.0031308 {
 		color.R *= 12.92
 	} else {
-		color.R = float32(1.055*math.Pow(float64(color.R), 1/2.4) - 0.055)
+		color.R = float32(1.055*math32.Pow(float32(color.R), 1/2.4) - 0.055)
 	}
 
 	if color.G <= 0.0031308 {
 		color.G *= 12.92
 	} else {
-		color.G = float32(1.055*math.Pow(float64(color.G), 1/2.4) - 0.055)
+		color.G = float32(1.055*math32.Pow(float32(color.G), 1/2.4) - 0.055)
 	}
 
 	if color.B <= 0.0031308 {
 		color.B *= 12.92
 	} else {
-		color.B = float32(1.055*math.Pow(float64(color.B), 1/2.4) - 0.055)
+		color.B = float32(1.055*math32.Pow(float32(color.B), 1/2.4) - 0.055)
 	}
 
 	return color
@@ -206,9 +205,9 @@ func (color Color) ConvertTosRGB() Color {
 }
 
 // Lerp linearly interpolates the color from the starting color to the target by the percentage given.
-func (c Color) Lerp(other Color, percentage float64) Color {
+func (c Color) Lerp(other Color, percentage float32) Color {
 
-	percentage = clamp(percentage, 0, 1)
+	percentage = math32.Clamp(percentage, 0, 1)
 	c.R += (other.R - c.R) * float32(percentage)
 	c.G += (other.G - c.G) * float32(percentage)
 	c.B += (other.B - c.B) * float32(percentage)
@@ -218,9 +217,9 @@ func (c Color) Lerp(other Color, percentage float64) Color {
 }
 
 // Lerp linearly interpolates the color from the starting color to the target by the percentage given.
-func (c Color) LerpRGBA(r, g, b, a, percentage float64) Color {
+func (c Color) LerpRGBA(r, g, b, a, percentage float32) Color {
 
-	percentage = clamp(percentage, 0, 1)
+	percentage = math32.Clamp(percentage, 0, 1)
 	c.R += (float32(r) - c.R) * float32(percentage)
 	c.G += (float32(g) - c.G) * float32(percentage)
 	c.B += (float32(b) - c.B) * float32(percentage)
@@ -236,7 +235,7 @@ func (color Color) String() string {
 // NewColorFromHSV returns a new color, using hue, saturation, and value numbers, each ranging from 0 to 1. A hue of
 // 0 is red, while 1 is also red, but on the other end of the spectrum.
 // Cribbed from: https://github.com/lucasb-eyer/go-colorful/blob/master/colors.go
-func NewColorFromHSV(h, s, v float64) Color {
+func NewColorFromHSV(h, s, v float32) Color {
 
 	for h > 1 {
 		h--
@@ -259,12 +258,12 @@ func NewColorFromHSV(h, s, v float64) Color {
 		v = 0
 	}
 
-	Hp := h / 60.0
+	Hp := float32(h / 60.0)
 	C := v * s
-	X := C * (1.0 - math.Abs(math.Mod(Hp, 2.0)-1.0))
+	X := C * (1.0 - math32.Abs(math32.Mod(Hp, 2.0)-1.0))
 
 	m := v - C
-	r, g, b := 0.0, 0.0, 0.0
+	r, g, b := float32(0), float32(0), float32(0)
 
 	switch {
 	case 0.0 <= Hp && Hp < 1.0:
@@ -328,21 +327,21 @@ func NewColorFromHexString(hex string) Color {
 }
 
 // Hue returns the hue of the color as a value ranging from 0 to 1.
-func (color Color) Hue() float64 {
+func (color Color) Hue() float32 {
 	// Function cribbed from: https://github.com/lucasb-eyer/go-colorful/blob/master/colors.go
 
-	r := float64(color.R)
-	g := float64(color.G)
-	b := float64(color.B)
+	r := float32(color.R)
+	g := float32(color.G)
+	b := float32(color.B)
 
-	min := math.Min(math.Min(r, g), b)
-	v := math.Max(math.Max(r, g), b)
+	min := math32.Min(math32.Min(r, g), b)
+	v := math32.Max(math32.Max(r, g), b)
 	C := v - min
 
-	h := 0.0
+	h := float32(0)
 	if min != v {
 		if v == r {
-			h = math.Mod((g-b)/C, 6.0)
+			h = math32.Mod((g-b)/C, 6.0)
 		}
 		if v == g {
 			h = (b-r)/C + 2.0
@@ -359,17 +358,17 @@ func (color Color) Hue() float64 {
 }
 
 // Saturation returns the saturation of the color as a value ranging from 0 to 1.
-func (color Color) Saturation() float64 {
+func (color Color) Saturation() float32 {
 
-	r := float64(color.R)
-	g := float64(color.G)
-	b := float64(color.B)
+	r := float32(color.R)
+	g := float32(color.G)
+	b := float32(color.B)
 
-	min := math.Min(math.Min(r, g), b)
-	v := math.Max(math.Max(r, g), b)
+	min := math32.Min(math32.Min(r, g), b)
+	v := math32.Max(math32.Max(r, g), b)
 	C := v - min
 
-	s := 0.0
+	s := float32(0)
 	if v != 0.0 {
 		s = C / v
 	}
@@ -378,23 +377,23 @@ func (color Color) Saturation() float64 {
 }
 
 // Value returns the value of the color as a value, ranging from 0 to 1.
-func (color Color) Value() float64 {
+func (color Color) Value() float32 {
 
-	r := float64(color.R)
-	g := float64(color.G)
-	b := float64(color.B)
+	r := float32(color.R)
+	g := float32(color.G)
+	b := float32(color.B)
 
-	return math.Max(math.Max(r, g), b)
+	return math32.Max(math32.Max(r, g), b)
 }
 
-// func (color Color) HSV() (float64, float64, float64) {
+// func (color Color) HSV() (float32, float32, float32) {
 
-// 	r := float64(color.R)
-// 	g := float64(color.G)
-// 	b := float64(color.B)
+// 	r := float32(color.R)
+// 	g := float32(color.G)
+// 	b := float32(color.B)
 
-// 	min := math.Min(math.Min(r, g), b)
-// 	v := math.Max(math.Max(r, g), b)
+// 	min := math32.Min(math32.Min(r, g), b)
+// 	v := math32.Max(math32.Max(r, g), b)
 // 	C := v - min
 
 // 	s := 0.0
@@ -405,7 +404,7 @@ func (color Color) Value() float64 {
 // 	h := 0.0
 // 	if min != v {
 // 		if v == r {
-// 			h = math.Mod((g-b)/C, 6.0)
+// 			h = math32.Mod((g-b)/C, 6.0)
 // 		}
 // 		if v == g {
 // 			h = (b-r)/C + 2.0
@@ -423,19 +422,19 @@ func (color Color) Value() float64 {
 
 // SetHue returns a copy of the color with the hue set to the specified value.
 // Hue goes through the rainbow, starting with red, and ranges from 0 to 1.
-func (color Color) SetHue(h float64) Color {
+func (color Color) SetHue(h float32) Color {
 	return NewColorFromHSV(h, color.Saturation(), color.Value())
 }
 
 // SetSaturation returns a copy of the color with the saturation of the color set to the specified value.
 // Saturation ranges from 0 to 1.
-func (color Color) SetSaturation(s float64) Color {
+func (color Color) SetSaturation(s float32) Color {
 	return NewColorFromHSV(color.Hue(), s, color.Value())
 }
 
 // SetValue returns a copy of the color with the value of the color set to the specified value.
 // Value ranges from 0 to 1.
-func (color Color) SetValue(v float64) Color {
+func (color Color) SetValue(v float32) Color {
 	return NewColorFromHSV(color.Hue(), color.Saturation(), v)
 }
 
@@ -446,7 +445,7 @@ func (c Color) IsZero() bool {
 // ColorCurvePoint indicates an individual color point in a color curve.
 type ColorCurvePoint struct {
 	Color      Color
-	Percentage float64
+	Percentage float32
 }
 
 // ColorCurve represents a range of colors that a value of 0 to 1 can interpolate between.
@@ -467,7 +466,7 @@ func NewColorCurve(colors ...Color) ColorCurve {
 		cc.Add(colors[0], 0)
 	} else if len(colors) > 1 {
 		for i, color := range colors {
-			cc.Add(color, float64(i)/float64(len(colors)-1))
+			cc.Add(color, float32(i)/float32(len(colors)-1))
 		}
 	}
 
@@ -482,12 +481,12 @@ func (cc ColorCurve) Clone() ColorCurve {
 }
 
 // Add adds a color point to the ColorCurve with the color and percentage provided (from 0-1).
-func (cc *ColorCurve) Add(color Color, percentage float64) {
+func (cc *ColorCurve) Add(color Color, percentage float32) {
 	cc.AddRGBA(color.R, color.G, color.B, color.A, percentage)
 }
 
 // AddRGBA adds a point to the ColorCurve, with r, g, b, and a being the color and the percentage being a number between 0 and 1 indicating the .
-func (cc *ColorCurve) AddRGBA(r, g, b, a float32, percentage float64) {
+func (cc *ColorCurve) AddRGBA(r, g, b, a float32, percentage float32) {
 
 	if percentage > 1 {
 		percentage = 1
@@ -506,13 +505,7 @@ func (cc *ColorCurve) AddRGBA(r, g, b, a float32, percentage float64) {
 // Color returns the Color for the given percentage in the color curve. For example, if you have a curve composed of
 // the colors {0, 0, 0, 0} at 0 and {1, 1, 1, 1} at 1, then calling Curve.Color(0.5) would return {0.5, 0.5, 0.5, 0.5}.
 // If the curve doesn't have any color curve points, Color will return transparent.
-func (cc ColorCurve) Color(perc float64) Color {
-
-	if perc > 1 {
-		perc = 1
-	} else if perc < 0 {
-		perc = 0
-	}
+func (cc ColorCurve) Color(perc float32) Color {
 
 	var c Color
 
@@ -541,14 +534,14 @@ func (cc ColorCurve) Color(perc float64) Color {
 // ColorTween represents an object that tweens across a ColorCurve.
 type ColorTween struct {
 	ColorCurve ColorCurve // ColorCurve is the curve to use while tweening
-	Percent    float64    // Percent is the percentage through the tween the ColorTween is
-	Speed      float64    // Speed is the speed of the tween; if you want a
-	Duration   float64    // Duration is the duration of the tween in seconds
+	Percent    float32    // Percent is the percentage through the tween the ColorTween is
+	Speed      float32    // Speed is the speed of the tween; if you want a
+	Duration   float32    // Duration is the duration of the tween in seconds
 	playing    bool
 }
 
 // ColorTween creates a new ColorTween object with the specified duration and curve.
-func NewColorTween(duration float64, curve ColorCurve) ColorTween {
+func NewColorTween(duration float32, curve ColorCurve) ColorTween {
 	ct := ColorTween{
 		ColorCurve: curve,
 		Speed:      1,
@@ -558,12 +551,12 @@ func NewColorTween(duration float64, curve ColorCurve) ColorTween {
 }
 
 // Update updates the ColorTween using the delta value provided in seconds and returns if the tween is finished or not.
-func (c *ColorTween) Update(dt float64) bool {
+func (c *ColorTween) Update(dt float32) bool {
 	if c.playing {
 		c.Percent += dt / c.Duration * c.Speed
 		if (c.Percent >= 1 && c.Speed > 0) || (c.Percent <= 0 && c.Speed < 0) {
 			c.playing = false
-			c.Percent = clamp(c.Percent, 0, 1)
+			c.Percent = math32.Clamp(c.Percent, 0, 1)
 			return true
 		}
 	}
