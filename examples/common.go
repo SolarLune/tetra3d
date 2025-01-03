@@ -225,6 +225,7 @@ func (cc *BasicFreeCam) Update() {
 
 		// Divide by camera size to get hopefully screen size-independent movements;
 		// Note that using ebiten.WindowSize() may not work for this because it returns 0,0 on unsupported platforms (WASM, for example).
+		// All of the examples use the camera's size for the layout / "screen" size, so its' fine to use it as well here too.
 		w, h := cc.Camera.Size()
 
 		diff := mv.Sub(cc.PrevMousePosition)
