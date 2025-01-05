@@ -431,7 +431,7 @@ func (node *Node) clone(newOwner INode) INode {
 	}
 
 	if newOwner == nil && newNode.Callbacks() != nil && newNode.Callbacks().OnClone != nil {
-		newNode.Callbacks().OnClone(newOwner)
+		newNode.Callbacks().OnClone(newNode)
 	}
 
 	return newNode
