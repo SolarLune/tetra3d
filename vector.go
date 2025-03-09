@@ -59,8 +59,7 @@ func NewVector3Random(minX, maxX, minY, maxY, minZ, maxZ float32) Vector3 {
 
 // Modify returns a ModVector3 object (a pointer to the original vector).
 func (vec *Vector3) Modify() ModVector3 {
-	ip := ModVector3{Vector3: vec}
-	return ip
+	return ModVector3{Vector3: vec}
 }
 
 // Clone clones the provided Vector, returning a new copy of it. This isn't necessary for a value-based struct like this.
@@ -86,11 +85,47 @@ func (vec Vector3) Add(other Vector3) Vector3 {
 	return vec
 }
 
+// AddX returns a copy of the calling vector, with the value provided added to the X component.
+func (vec Vector3) AddX(value float32) Vector3 {
+	vec.X += value
+	return vec
+}
+
+// AddY returns a copy of the calling vector, with the value provided added to the Y component.
+func (vec Vector3) AddY(value float32) Vector3 {
+	vec.Y += value
+	return vec
+}
+
+// AddZ returns a copy of the calling vector, with the value provided added to the Z component.
+func (vec Vector3) AddZ(value float32) Vector3 {
+	vec.Z += value
+	return vec
+}
+
 // Sub returns a copy of the calling Vector, with the other Vector3 subtracted from it (ignoring the W component).
 func (vec Vector3) Sub(other Vector3) Vector3 {
 	vec.X -= other.X
 	vec.Y -= other.Y
 	vec.Z -= other.Z
+	return vec
+}
+
+// SubX returns a copy of the calling vector, with the value provided subtracted from the X component.
+func (vec Vector3) SubX(value float32) Vector3 {
+	vec.X += value
+	return vec
+}
+
+// SubY returns a copy of the calling vector, with the value provided subtracted from the Y component.
+func (vec Vector3) SubY(value float32) Vector3 {
+	vec.Y += value
+	return vec
+}
+
+// SubZ returns a copy of the calling vector, with the value provided subtracted from the Z component.
+func (vec Vector3) SubZ(value float32) Vector3 {
+	vec.Z += value
 	return vec
 }
 
@@ -177,8 +212,8 @@ func (vec Vector3) MoveTowards(target Vector3, magnitude float32) Vector3 {
 	return target
 }
 
-// Distance returns the distance from the calling Vector3 to the other Vector3 provided.
-func (vec Vector3) Distance(other Vector3) float32 {
+// DistanceTo returns the distance from the calling Vector3 to the other Vector3 provided.
+func (vec Vector3) DistanceTo(other Vector3) float32 {
 	// return vec.Sub(other).Magnitude()
 	vec.X -= other.X
 	vec.Y -= other.Y
@@ -186,8 +221,8 @@ func (vec Vector3) Distance(other Vector3) float32 {
 	return math32.Sqrt(vec.X*vec.X + vec.Y*vec.Y + vec.Z*vec.Z)
 }
 
-// DistanceSquared returns the squared distance from the calling Vector3 to the other Vector3 provided. This is faster than Distance(), as it avoids using math32.Sqrt().
-func (vec Vector3) DistanceSquared(other Vector3) float32 {
+// DistanceSquaredTo returns the squared distance from the calling Vector3 to the other Vector3 provided. This is faster than Distance(), as it avoids using math32.Sqrt().
+func (vec Vector3) DistanceSquaredTo(other Vector3) float32 {
 	vec.X -= other.X
 	vec.Y -= other.Y
 	vec.Z -= other.Z
@@ -283,9 +318,16 @@ func (vec Vector3) Set(x, y, z float32) Vector3 {
 	return vec
 }
 
+// SetTo sets the values in the Vector3 to the values in the other Vector3.
+func (vec *Vector3) SetTo(other Vector3) {
+	vec.X = other.X
+	vec.Y = other.Y
+	vec.Z = other.Z
+}
+
 // Floats returns a [4]float32 array consisting of the Vector's contents.
-func (vec Vector3) Floats() [4]float32 {
-	return [4]float32{vec.X, vec.Y, vec.Z}
+func (vec Vector3) Floats() [3]float32 {
+	return [3]float32{vec.X, vec.Y, vec.Z}
 }
 
 // Equals returns true if the two Vectors are close enough in all values (excluding W).
@@ -485,27 +527,91 @@ type ModVector3 struct {
 	*Vector3
 }
 
+// NewModVector3 creates a new ModVector3 instance.
+func NewModVector3(x, y, z float32) *ModVector3 {
+	return &ModVector3{
+		Vector3: &Vector3{X: x, Y: y, Z: z},
+	}
+}
+
+// Set sets the values in the Vector to the x, y, and z values provided.
+func (ip *ModVector3) Set(x, y, z float32) *ModVector3 {
+	ip.Vector3.X = x
+	ip.Vector3.Y = y
+	ip.Vector3.Z = z
+	return ip
+}
+
+// SetTo sets the values in the Vector3 to the values in the other Vector2.
+func (vec *ModVector3) SetTo(other Vector3) {
+	vec.Vector3.X = other.X
+	vec.Vector3.Y = other.Y
+	vec.Vector3.Z = other.Z
+}
+
 // Add adds the other Vector3 provided to the ModVector.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Add(other Vector3) ModVector3 {
+func (ip *ModVector3) Add(other Vector3) *ModVector3 {
 	ip.X += other.X
 	ip.Y += other.Y
 	ip.Z += other.Z
 	return ip
 }
 
+// AddX adds the value provided to the ModVector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip *ModVector3) AddX(x float32) *ModVector3 {
+	ip.X += x
+	return ip
+}
+
+// AddY adds the value provided to the ModVector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip *ModVector3) AddY(x float32) *ModVector3 {
+	ip.Y += x
+	return ip
+}
+
+// AddZ adds the value provided to the ModVector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip *ModVector3) AddZ(x float32) *ModVector3 {
+	ip.Z += x
+	return ip
+}
+
 // Sub subtracts the other Vector3 from the calling ModVector.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Sub(other Vector3) ModVector3 {
+func (ip *ModVector3) Sub(other Vector3) *ModVector3 {
 	ip.X -= other.X
 	ip.Y -= other.Y
 	ip.Z -= other.Z
 	return ip
 }
 
+// SubX subs the value provided to the ModVector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip *ModVector3) SubX(x float32) *ModVector3 {
+	ip.X -= x
+	return ip
+}
+
+// SubY subs the value provided to the ModVector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip *ModVector3) SubY(x float32) *ModVector3 {
+	ip.Y -= x
+	return ip
+}
+
+// SubZ subs the value provided to the ModVector.
+// This function returns the calling ModVector3 for method chaining.
+func (ip *ModVector3) SubZ(x float32) *ModVector3 {
+	ip.Z -= x
+	return ip
+}
+
 // MoveTowards moves a Vector3 towards another Vector3 given a specific magnitude. If the distance is less than that magnitude, it returns the target vector.
-func (ip ModVector3) MoveTowards(target Vector3, magnitude float32) ModVector3 {
-	modified := (*ip.Vector3).MoveTowards(target, magnitude)
+func (ip *ModVector3) MoveTowards(target Vector3, magnitude float32) *ModVector3 {
+	modified := (ip.Vector3).MoveTowards(target, magnitude)
 	ip.X = modified.X
 	ip.Y = modified.Y
 	ip.Z = modified.Z
@@ -513,7 +619,7 @@ func (ip ModVector3) MoveTowards(target Vector3, magnitude float32) ModVector3 {
 }
 
 // SetZero sets the Vector3 to zero.
-func (ip ModVector3) SetZero() ModVector3 {
+func (ip *ModVector3) SetZero() *ModVector3 {
 	ip.X = 0
 	ip.Y = 0
 	ip.Z = 0
@@ -522,7 +628,7 @@ func (ip ModVector3) SetZero() ModVector3 {
 
 // Scale scales the Vector3 by the scalar provided.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Scale(scalar float32) ModVector3 {
+func (ip *ModVector3) Scale(scalar float32) *ModVector3 {
 	ip.X *= scalar
 	ip.Y *= scalar
 	ip.Z *= scalar
@@ -531,7 +637,7 @@ func (ip ModVector3) Scale(scalar float32) ModVector3 {
 
 // Divide divides a Vector3 by the given scalar (ignoring the W component).
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Divide(scalar float32) ModVector3 {
+func (ip *ModVector3) Divide(scalar float32) *ModVector3 {
 	ip.X /= scalar
 	ip.Y /= scalar
 	ip.Z /= scalar
@@ -541,7 +647,7 @@ func (ip ModVector3) Divide(scalar float32) ModVector3 {
 // Expand expands the ModVector3 by the margin specified, in absolute units, if each component is over the minimum argument.
 // To illustrate: Given a ModVector3 of {1, 0.1, -0.3}, ModVector.Expand(0.5, 0.2) would give you a ModVector3 of {1.5, 0.1, -0.8}.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Expand(margin, min float32) ModVector3 {
+func (ip *ModVector3) Expand(margin, min float32) *ModVector3 {
 	exp := ip.Vector3.Expand(margin, min)
 	ip.X = exp.X
 	ip.Y = exp.Y
@@ -551,7 +657,7 @@ func (ip ModVector3) Expand(margin, min float32) ModVector3 {
 
 // Mult performs Hadamard (component-wise) multiplication with the Vector3 on the other Vector3 provided.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Mult(other Vector3) ModVector3 {
+func (ip *ModVector3) Mult(other Vector3) *ModVector3 {
 	ip.X *= other.X
 	ip.Y *= other.Y
 	ip.Z *= other.Z
@@ -561,7 +667,7 @@ func (ip ModVector3) Mult(other Vector3) ModVector3 {
 // Unit normalizes the ModVector3 (sets it to be of unit length).
 // It does not alter the W component of the Vector.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Unit() ModVector3 {
+func (ip *ModVector3) Unit() *ModVector3 {
 	l := ip.Magnitude()
 	if l < 1e-8 || l == 1 {
 		// If it's 0, then don't modify the vector
@@ -576,7 +682,7 @@ func (ip ModVector3) Unit() ModVector3 {
 // The string should be composed of the axes of a vector, i.e. 'x', 'y', 'z', or 'w'.
 // Example: `vec := Vector{1, 2, 3}.Swizzle("zxy") // Returns a Vector3 of {3, 1, 2}.`
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Swizzle(swizzleString string) ModVector3 {
+func (ip *ModVector3) Swizzle(swizzleString string) *ModVector3 {
 	vec := ip.Vector3.Swizzle(swizzleString)
 	ip.X = vec.X
 	ip.Y = vec.Y
@@ -586,8 +692,8 @@ func (ip ModVector3) Swizzle(swizzleString string) ModVector3 {
 
 // Cross performs a cross-product multiplication on the ModVector.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Cross(other Vector3) ModVector3 {
-	cross := (*ip.Vector3).Cross(other)
+func (ip *ModVector3) Cross(other Vector3) *ModVector3 {
+	cross := ip.Vector3.Cross(other)
 	ip.X = cross.X
 	ip.Y = cross.Y
 	ip.Z = cross.Z
@@ -596,8 +702,8 @@ func (ip ModVector3) Cross(other Vector3) ModVector3 {
 
 // RotateVec rotates the calling ModVector3 by the axis Vector3 and angle provided (in radians).
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) RotateVec(axis Vector3, angle float32) ModVector3 {
-	rot := (*ip.Vector3).RotateVec(axis, angle)
+func (ip *ModVector3) RotateVec(axis Vector3, angle float32) *ModVector3 {
+	rot := ip.Vector3.RotateVec(axis, angle)
 	ip.X = rot.X
 	ip.Y = rot.Y
 	ip.Z = rot.Z
@@ -607,8 +713,8 @@ func (ip ModVector3) RotateVec(axis Vector3, angle float32) ModVector3 {
 // RotateVec rotates the calling ModVector3 by an axis Vector3 composed of the x, y, and z components provided,
 // by the angle provided (in radians).
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Rotate(x, y, z, angle float32) ModVector3 {
-	rot := (*ip.Vector3).Rotate(x, y, z, angle)
+func (ip *ModVector3) Rotate(x, y, z, angle float32) *ModVector3 {
+	rot := ip.Vector3.Rotate(x, y, z, angle)
 	ip.X = rot.X
 	ip.Y = rot.Y
 	ip.Z = rot.Z
@@ -617,7 +723,7 @@ func (ip ModVector3) Rotate(x, y, z, angle float32) ModVector3 {
 
 // Invert inverts all components of the calling ModVector.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Invert() ModVector3 {
+func (ip *ModVector3) Invert() *ModVector3 {
 	ip.X = -ip.X
 	ip.Y = -ip.Y
 	ip.Z = -ip.Z
@@ -627,8 +733,8 @@ func (ip ModVector3) Invert() ModVector3 {
 // Round rounds off the ModVector's components to the given space in world units.
 // For example, Vector{0.1, 1.27, 3.33}.Modify().Round(0.25) will return Vector{0, 1.25, 3.25}.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Round(roundToUnits float32) ModVector3 {
-	snapped := (*ip.Vector3).Round(roundToUnits)
+func (ip *ModVector3) Round(roundToUnits float32) *ModVector3 {
+	snapped := ip.Vector3.Round(roundToUnits)
 	ip.X = snapped.X
 	ip.Y = snapped.Y
 	ip.Z = snapped.Z
@@ -638,8 +744,8 @@ func (ip ModVector3) Round(roundToUnits float32) ModVector3 {
 // Floor floors the ModVector's components off, returning a new Vector.
 // For example, Vector{0.1, 1.27, 3.33}.Modify().Floor() will return Vector{0, 1, 3}.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Floor() ModVector3 {
-	snapped := (*ip.Vector3).Floor()
+func (ip *ModVector3) Floor() *ModVector3 {
+	snapped := ip.Vector3.Floor()
 	ip.X = snapped.X
 	ip.Y = snapped.Y
 	ip.Z = snapped.Z
@@ -649,8 +755,8 @@ func (ip ModVector3) Floor() ModVector3 {
 // Ceil ceils the ModVector's components off, returning a new Vector.
 // For example, Vector{0.1, 1.27, 3.33}.Modify().Ceil() will return Vector{1, 2, 4}.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Ceil() ModVector3 {
-	snapped := (*ip.Vector3).Ceil()
+func (ip *ModVector3) Ceil() *ModVector3 {
+	snapped := ip.Vector3.Ceil()
 	ip.X = snapped.X
 	ip.Y = snapped.Y
 	ip.Z = snapped.Z
@@ -659,8 +765,8 @@ func (ip ModVector3) Ceil() ModVector3 {
 
 // ClampMagnitude clamps the overall magnitude of the Vector3 to the maximum magnitude specified.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) ClampMagnitude(maxMag float32) ModVector3 {
-	clamped := (*ip.Vector3).ClampMagnitude(maxMag)
+func (ip *ModVector3) ClampMagnitude(maxMag float32) *ModVector3 {
+	clamped := ip.Vector3.ClampMagnitude(maxMag)
 	ip.X = clamped.X
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
@@ -670,9 +776,9 @@ func (ip ModVector3) ClampMagnitude(maxMag float32) ModVector3 {
 // SubMagnitude subtacts the given magnitude from the Vector's. If the vector's magnitude is less than the given magnitude to subtract,
 // a zero-length Vector3 will be returned.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) SubMagnitude(mag float32) ModVector3 {
+func (ip *ModVector3) SubMagnitude(mag float32) *ModVector3 {
 	if ip.Magnitude() > mag {
-		ip.Sub(ip.Vector3.Unit().Scale(mag))
+		ip.Sub(ip.ToVector().Unit().Scale(mag))
 	} else {
 		ip.X = 0
 		ip.Y = 0
@@ -685,8 +791,8 @@ func (ip ModVector3) SubMagnitude(mag float32) ModVector3 {
 // Lerp performs a linear interpolation between the starting ModVector3 and the provided
 // other Vector, to the given percentage.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Lerp(other Vector3, percentage float32) ModVector3 {
-	lerped := (*ip.Vector3).Lerp(other, percentage)
+func (ip *ModVector3) Lerp(other Vector3, percentage float32) *ModVector3 {
+	lerped := ip.Vector3.Lerp(other, percentage)
 	ip.X = lerped.X
 	ip.Y = lerped.Y
 	ip.Z = lerped.Z
@@ -696,8 +802,8 @@ func (ip ModVector3) Lerp(other Vector3, percentage float32) ModVector3 {
 // Slerp performs a spherical linear interpolation between the starting ModVector3 and the provided
 // other Vector, to the given percentage.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Slerp(other Vector3, percentage float32) ModVector3 {
-	slerped := (*ip.Vector3).Slerp(other, percentage)
+func (ip *ModVector3) Slerp(other Vector3, percentage float32) *ModVector3 {
+	slerped := ip.Vector3.Slerp(other, percentage)
 	ip.X = slerped.X
 	ip.Y = slerped.Y
 	ip.Z = slerped.Z
@@ -706,8 +812,8 @@ func (ip ModVector3) Slerp(other Vector3, percentage float32) ModVector3 {
 
 // Clamp clamps the Vector3 to the maximum values provided.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Clamp(x, y, z float32) ModVector3 {
-	clamped := (*ip.Vector3).Clamp(x, y, z)
+func (ip *ModVector3) Clamp(x, y, z float32) *ModVector3 {
+	clamped := (ip.Vector3).Clamp(x, y, z)
 	ip.X = clamped.X
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
@@ -716,8 +822,8 @@ func (ip ModVector3) Clamp(x, y, z float32) ModVector3 {
 
 // ClampVec clamps the Vector3 to the maximum values in the Vector3 provided.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) ClampVec(extents Vector3) ModVector3 {
-	clamped := (*ip.Vector3).ClampVec(extents)
+func (ip *ModVector3) ClampVec(extents Vector3) *ModVector3 {
+	clamped := ip.Vector3.ClampVec(extents)
 	ip.X = clamped.X
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
@@ -726,8 +832,8 @@ func (ip ModVector3) ClampVec(extents Vector3) ModVector3 {
 
 // ClampAngle clamps the Vector3 such that it doesn't exceed the angle specified (in radians).
 // This function returns a normalized (unit) ModVector3 for method chaining.
-func (ip ModVector3) ClampAngle(baselineVec Vector3, maxAngle float32) ModVector3 {
-	clamped := (*ip.Vector3).ClampAngle(baselineVec, maxAngle)
+func (ip *ModVector3) ClampAngle(baselineVec Vector3, maxAngle float32) *ModVector3 {
+	clamped := ip.Vector3.ClampAngle(baselineVec, maxAngle)
 	ip.X = clamped.X
 	ip.Y = clamped.Y
 	ip.Z = clamped.Z
@@ -735,19 +841,19 @@ func (ip ModVector3) ClampAngle(baselineVec Vector3, maxAngle float32) ModVector
 }
 
 // String converts the ModVector3 to a string. Because it's a ModVector, it's represented with a *.
-func (ip ModVector3) String() string {
+func (ip *ModVector3) String() string {
 	return fmt.Sprintf("*{%.2f, %.2f, %.2f}", ip.X, ip.Y, ip.Z)
 }
 
 // Clone returns a ModVector3 of a clone of its backing Vector.
 // This function returns the calling ModVector3 for method chaining.
-func (ip ModVector3) Clone() ModVector3 {
-	v := *ip.Vector3
-	return v.Modify()
+func (ip *ModVector3) Clone() *ModVector3 {
+	v := *ip
+	return &v
 }
 
 // ToVector3 returns a copy of the Vector3 that the ModVector3 is modifying.
-func (ip ModVector3) ToVector() Vector3 {
+func (ip *ModVector3) ToVector() Vector3 {
 	return *ip.Vector3
 }
 
@@ -911,6 +1017,12 @@ func (vec Vector2) Set(x, y float32) Vector2 {
 	vec.X = x
 	vec.Y = y
 	return vec
+}
+
+// SetTo sets the values in the Vector3 to the values in the other Vector2.
+func (vec *Vector2) SetTo(other Vector2) {
+	vec.X = other.X
+	vec.Y = other.Y
 }
 
 // Reflect reflects the vector against the given surface normal.

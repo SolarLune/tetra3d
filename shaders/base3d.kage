@@ -10,6 +10,9 @@ var Fogless float
 var PerspectiveCorrection int
 var TextureFilterMode int
 
+var TextureMapMode int
+var TextureMapScreenSize float
+
 var BayerMatrix [16]float
 
 func decodeDepth(rgba vec4) float {
@@ -69,7 +72,9 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 		// This gives us the actual pixel coordinates.
 		tx := srcPos - srcOrigin
 
-		if PerspectiveCorrection > 0 {
+		if TextureMapMode == 1 {
+			tx = (dstPos.xy * TextureMapScreenSize) + (srcPos - srcOrigin)
+		} else if PerspectiveCorrection > 0 {
 			tx *= 1.0 / custom.x // depth is stored in ebiten.Vertex.Custom0
 		}
 

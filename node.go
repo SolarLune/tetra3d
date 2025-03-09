@@ -266,10 +266,7 @@ type INode interface {
 	VectorTo(otherNode INode) Vector3
 
 	// Callbacks returns a Node's callbacks object. This object represents the callbacks that a Node has access to when events happen.
-	Callbacks() *Callbacks
-
-	getRunCallbacks() bool
-	setRunCallbacks(bool)
+	Callbacks() *NodeCallbacks
 }
 
 var nodeID uint64 = 0
@@ -306,8 +303,7 @@ type Node struct {
 
 	cachedSector *Sector
 
-	runCallbacks bool
-	callbacks    *Callbacks
+	callbacks *NodeCallbacks
 }
 
 // NewNode returns a new Node.
@@ -325,8 +321,7 @@ func NewNode(name string) *Node {
 		props:            NewProperties(),
 		// We set this just in case we call a transform property getter before setting it and caching anything
 		cachedTransform: NewMatrix4(),
-		runCallbacks:    true,
-		callbacks:       &Callbacks{},
+		callbacks:       &NodeCallbacks{},
 		// originalLocalPosition: NewVectorZero(),
 		// sectorType: NewBitMask(0 + 1 + 2 + 3 + 4 + 5 + 6 + 7),
 	}
@@ -339,16 +334,8 @@ func NewNode(name string) *Node {
 }
 
 // Callbacks returns a Node's callbacks object. This object represents the callbacks that a Node has access to when events happen.
-func (node *Node) Callbacks() *Callbacks {
+func (node *Node) Callbacks() *NodeCallbacks {
 	return node.callbacks
-}
-
-func (node *Node) getRunCallbacks() bool {
-	return node.runCallbacks
-}
-
-func (node *Node) setRunCallbacks(run bool) {
-	node.runCallbacks = run
 }
 
 // ID returns the object's unique ID.
@@ -398,7 +385,6 @@ func (node *Node) clone(newOwner INode) INode {
 	newNode.sectorType = node.sectorType
 	newNode.cachedSector = node.cachedSector
 	newNode.library = node.library
-	newNode.runCallbacks = node.runCallbacks
 
 	// Clone the callbacks as well.
 	newCallbacks := *node.callbacks
@@ -430,7 +416,8 @@ func (node *Node) clone(newOwner INode) INode {
 		newNode.inverseBindMatrix = node.inverseBindMatrix.Clone()
 	}
 
-	if newOwner == nil && newNode.Callbacks() != nil && newNode.Callbacks().OnClone != nil {
+	// If newOwner != nil, then that object that is cloning will call the callback
+	if runCallbacks && newOwner == nil && newNode.Callbacks().OnClone != nil {
 		newNode.Callbacks().OnClone(newNode)
 	}
 
@@ -879,18 +866,22 @@ func (node *Node) AddChildren(children ...INode) {
 				continue
 			}
 
-			runCallbacks := child.getRunCallbacks()
+			runningCallbacks := runCallbacks
 
-			child.setRunCallbacks(false) // Override the on tree change rq
+			// If they are running, set it to false specifically for removing children because they should just get the "reparented" callback, not
+			// the "removed" callback
+			runCallbacks = false
 			prevParent.RemoveChildren(child.getOwner())
-			child.setRunCallbacks(runCallbacks) // Override the on tree change rq
+
+			// set it back to original value
+			runCallbacks = runningCallbacks
 		}
 
 		child.setParent(me)
 		child.dirtyTransform()
 		node.children = append(node.children, child.getOwner())
 
-		if child.Callbacks() != nil && child.Callbacks().OnReparent != nil {
+		if runCallbacks && child.Callbacks().OnReparent != nil {
 			child.Callbacks().OnReparent(child, prevParent, me)
 		}
 
@@ -928,7 +919,7 @@ func (node *Node) RemoveChildren(children ...INode) {
 				node.children[i] = nil
 				node.children = append(node.children[:i], node.children[i+1:]...)
 
-				if child1.Callbacks() != nil && child1.Callbacks().OnReparent != nil {
+				if runCallbacks && child1.Callbacks().OnReparent != nil {
 					child1.Callbacks().OnReparent(child1, prevParent, nil)
 				}
 				break
@@ -1351,13 +1342,13 @@ func (node *Node) SetSectorType(sectorType SectorType) {
 // DistanceTo returns the distance between the given Nodes' centers.
 // Quick syntactic sugar for Node.WorldPosition().Distance(otherNode.WorldPosition()).
 func (node *Node) DistanceTo(other INode) float32 {
-	return node.WorldPosition().Distance(other.WorldPosition())
+	return node.WorldPosition().DistanceTo(other.WorldPosition())
 }
 
 // DistanceSquaredTo returns the squared distance between the given Nodes' centers.
 // Quick syntactic sugar for Node.WorldPosition().DistanceSquared(otherNode.WorldPosition()).
 func (node *Node) DistanceSquaredTo(other INode) float32 {
-	return node.WorldPosition().DistanceSquared(other.WorldPosition())
+	return node.WorldPosition().DistanceSquaredTo(other.WorldPosition())
 }
 
 // VectorTo returns a vector from one Node to another.

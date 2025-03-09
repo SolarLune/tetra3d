@@ -22,9 +22,6 @@ type Game struct {
 
 	Camera examples.BasicFreeCam
 	System examples.BasicSystemHandler
-
-	GameObjects []GameObject
-	ToRemove    []GameObject
 }
 
 //go:embed engine.gltf
@@ -47,7 +44,7 @@ func (g *Game) Init() {
 
 	// This example's focus is on creating an "engine" to easily update game objects.
 
-	// There's two ways to do this. One is to create data objects that represent our game objects, and then place our models in our scenes from there,
+	// There's a few ways to do this. One is to create data objects that represent our game objects, and then place our models in our scenes from there,
 	// or to go in the reverse direction and create models in our game scenes, and then create data objects to match. This example uses the latter approach.
 
 	// We will treat the original scenes in our tetra3d.Library as "prototype" scenes that we clone to instantiate your game level / map.
@@ -55,28 +52,28 @@ func (g *Game) Init() {
 	// them from a GameObjects slice. You could also just loop through the scene tree directly for a simpler approach, but you would be leaving performance
 	// on the table in that case.
 
+	// You could also use a scripting language to execute game logic on the objects in the scene.
+
 	for _, scene := range library.Scenes {
 
-		// Set up callbacks for each relevant node that creates the necessary data.
+		// Set up callbacks for each relevant node that creates the necessary game object logic.
 		scene.Root.SearchTree().ByPropNameRegex("gameobject").ForEach(func(node tetra3d.INode) bool {
+
 			switch node.Properties().Get("gameobject").AsString() {
+
 			case "player":
 
 				node.Callbacks().OnClone = func(newNode tetra3d.INode) {
-					// When the Player node is cloned, we create a new Player object for its data holder.
-					p := NewPlayer(newNode)
-					newNode.SetData(p)
-					g.GameObjects = append(g.GameObjects, p)
-				}
+					// When the Player node is cloned, we create a new Player object for its data holder -
+					// this is essentially the "script" running the Player.
 
-				node.Callbacks().OnReparent = func(node, oldParent, newParent tetra3d.INode) {
-					// When the Player node is unparented, we remove the Player game object from the GameObjects slice.
-					if newParent == nil {
-						g.ToRemove = append(g.ToRemove, node.Data().(GameObject))
-					}
+					// (We could also add logic objects to a slice to iterate over, but we'll do it
+					// via the scene tree directly for simplicity here.
+					newNode.SetData(NewPlayer(newNode))
 				}
 
 			}
+
 			return true
 		})
 
@@ -85,6 +82,7 @@ func (g *Game) Init() {
 	g.Library = library
 
 	// We clone the scene, and that's it!
+	// The Player model will get a new *Player{} instance created and assigned to its Data() field,
 	g.Scene = library.Scenes[0].Clone()
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
@@ -102,9 +100,14 @@ func (g *Game) Update() error {
 		g.Scene.Root.AddChildren(player.Clone())
 	}
 
-	for i := len(g.GameObjects) - 1; i >= 0; i-- {
-		g.GameObjects[i].Update()
-	}
+	// Loop through the scene tree and call Update on objects that can be updated.
+	g.Scene.Root.SearchTree().ForEach(func(node tetra3d.INode) bool {
+		if gameObj, ok := node.Data().(GameObject); ok {
+			gameObj.Update()
+		}
+
+		return true
+	})
 
 	g.Camera.Update()
 
@@ -137,15 +140,6 @@ Arrow keys: Move player(s)
 Touch spikes to destroy player(s)`
 
 		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
-	}
-
-	for _, r := range g.ToRemove {
-		for i, obj := range g.GameObjects {
-			if obj == r {
-				g.GameObjects[i] = nil
-				g.GameObjects = append(g.GameObjects[:i], g.GameObjects[i+1:]...)
-			}
-		}
 	}
 
 }

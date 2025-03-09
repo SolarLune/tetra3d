@@ -41,14 +41,14 @@ func (intersection *Intersection) SlideAgainstNormal(movementVec Vector3) Vector
 // colliding sphere / aabb, the closest point in the capsule, the center of the closest triangle, etc) to the
 // contact point.
 type Collision struct {
-	BoundingObject IBoundingObject // The BoundingObject collided with
-	Intersections  []*Intersection // The slice of Intersections, one for each object or triangle intersected with, arranged in order of distance (far to close).
+	Object        IBoundingObject // The BoundingObject collided with
+	Intersections []*Intersection // The slice of Intersections, one for each object or triangle intersected with, arranged in order of distance (far to close).
 }
 
 func newCollision(collidedObject IBoundingObject) *Collision {
 	return &Collision{
-		BoundingObject: collidedObject,
-		Intersections:  []*Intersection{},
+		Object:        collidedObject,
+		Intersections: []*Intersection{},
 	}
 }
 
@@ -60,8 +60,8 @@ func (col *Collision) add(intersection *Intersection) *Collision {
 // sort the intersections by distance from starting point (which should be the same for all collisions except for triangle-triangle) to contact point.
 func (col *Collision) sortResults() {
 	sort.Slice(col.Intersections, func(i, j int) bool {
-		return col.Intersections[i].StartingPoint.DistanceSquared(col.Intersections[i].ContactPoint) >
-			col.Intersections[j].StartingPoint.DistanceSquared(col.Intersections[j].ContactPoint)
+		return col.Intersections[i].StartingPoint.DistanceSquaredTo(col.Intersections[i].ContactPoint) >
+			col.Intersections[j].StartingPoint.DistanceSquaredTo(col.Intersections[j].ContactPoint)
 	})
 }
 
@@ -219,7 +219,7 @@ func btSphereAABB(sphere *BoundingSphere, aabb *BoundingAABB) *Collision {
 
 	intersection := aabb.ClosestPoint(spherePos)
 
-	distance := spherePos.Distance(intersection)
+	distance := spherePos.DistanceTo(intersection)
 
 	if distance > sphereRadius {
 		return nil
@@ -255,16 +255,14 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.TrianglesFromBoundingObject(sphere)
-
-	for triID := range tris {
+	triangles.Broadphase.ForEachTriangleFromBoundingObject(sphere, func(triID int) bool {
 
 		tri := triangles.Mesh.Triangles[triID]
 
 		// MaxSpan / 0.66 because if you have a triangle where the two vertices are very close to each other, they'll pull the triangle center
 		// towards them by twice as much as the third vertex (i.e. the center won't be in the center)
-		if spherePos.Distance(tri.Center) > (tri.MaxSpan*0.66)+sphereRadius {
-			continue
+		if spherePos.DistanceTo(tri.Center) > (tri.MaxSpan*0.66)+sphereRadius {
+			return true // Skip
 		}
 
 		v0 := triangles.Mesh.VertexPositions[tri.VertexIndices[0]]
@@ -286,7 +284,9 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 			)
 		}
 
-	}
+		return true
+
+	})
 
 	if len(result.Intersections) == 0 {
 		return nil
@@ -391,9 +391,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.TrianglesFromBoundingObject(box)
-
-	for triID := range tris {
+	triangles.Broadphase.ForEachTriangleFromBoundingObject(box, func(triID int) bool {
 
 		tri := triangles.Mesh.Triangles[triID]
 
@@ -433,7 +431,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 		for _, axis := range axes {
 
 			if axis.IsZero() {
-				return nil
+				return false
 			}
 
 			axis = axis.Unit()
@@ -475,7 +473,9 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 			})
 		}
 
-	}
+		return true
+
+	})
 
 	if len(result.Intersections) == 0 {
 		return nil
@@ -650,7 +650,7 @@ func btCapsuleCapsule(capsuleA, capsuleB *BoundingCapsule) *Collision {
 
 	col := btSphereSphere(capsuleA.internalSphere, capsuleB.internalSphere)
 	if col != nil {
-		col.BoundingObject = capsuleB
+		col.Object = capsuleB
 	}
 	return col
 }
@@ -661,7 +661,7 @@ func btSphereCapsule(sphere *BoundingSphere, capsule *BoundingCapsule) *Collisio
 	capsule.internalSphere.Radius = capsule.Radius
 	col := btSphereSphere(sphere, capsule.internalSphere)
 	if col != nil {
-		col.BoundingObject = capsule
+		col.Object = capsule
 	}
 	return col
 }
@@ -702,21 +702,19 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	result := newCollision(triangles)
 
-	tris := triangles.Broadphase.TrianglesFromBoundingObject(capsule)
-
 	spherePos := Vector3{}
 
 	closestSub := Vector3{}
 
-	for triID := range tris {
+	triangles.Broadphase.ForEachTriangleFromBoundingObject(capsule, func(triID int) bool {
 
 		tri := triangles.Mesh.Triangles[triID]
 
-		if capsulePosition.DistanceSquared(tri.Center) > math32.Pow((tri.MaxSpan*0.66)+capSpread, 2) {
-			continue
+		if capsulePosition.DistanceSquaredTo(tri.Center) > math32.Pow((tri.MaxSpan*0.66)+capSpread, 2) {
+			return true
 		}
 
-		if tri.Center.DistanceSquared(capsuleTop) < tri.Center.DistanceSquared(capsuleBottom) {
+		if tri.Center.DistanceSquaredTo(capsuleTop) < tri.Center.DistanceSquaredTo(capsuleBottom) {
 			closestCapsulePoint = capsuleTop
 		} else {
 			closestCapsulePoint = capsuleBottom
@@ -762,45 +760,9 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 		}
 
-		// if fastVectorSub(capsulePosition, tri.Center).Magnitude() > (tri.MaxSpan*0.66)+capSpread {
-		// 	continue
-		// }
+		return true
 
-		// if fastVectorDistanceSquared(tri.Center, capsuleTop) < fastVectorDistanceSquared(tri.Center, capsuleBottom) {
-		// 	closestCapsulePoint = capsuleTop
-		// } else {
-		// 	closestCapsulePoint = capsuleBottom
-		// }
-
-		// v0 := triangles.Mesh.VertexPositions[tri.ID*3]
-		// v1 := triangles.Mesh.VertexPositions[tri.ID*3+1]
-		// v2 := triangles.Mesh.VertexPositions[tri.ID*3+2]
-
-		// closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
-
-		// // Doing this manually to avoid doing as much as possible~
-
-		// t := dot(closest.Sub(capsuleBottom), capsuleLine) / capDot
-		// t = Max(Min(t, 1), 0)
-		// spherePos := capsuleBottom.Add(capsuleLine.Scale(t))
-
-		// delta := fastVectorSub(spherePos, closest)
-
-		// if mag := delta.Magnitude(); mag <= capsuleRadius {
-
-		// 	result.add(
-		// 		&Intersection{
-		// 			StartingPoint: closest,
-		// 			ContactPoint:  triangles.Transform().MultVec(closest),
-		// 			MTV:           transformNoLoc.MultVec(delta.Unit().Scale(capsuleRadius - mag)),
-		// 			Triangle:      tri,
-		// 			Normal:        transformNoLoc.MultVec(tri.Normal).Unit(),
-		// 		},
-		// 	)
-
-		// }
-
-	}
+	})
 
 	if len(result.Intersections) == 0 {
 		return nil
@@ -838,8 +800,8 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) bool {
 
 		// Sort the IntersectionResults by distance (closer intersections come up "sooner").
 		sort.Slice(internalCollisionList, func(i, j int) bool {
-			return internalCollisionList[i].AverageContactPoint().DistanceSquared(internalCollisionList[i].Intersections[0].StartingPoint) >
-				internalCollisionList[j].AverageContactPoint().DistanceSquared(internalCollisionList[j].Intersections[0].StartingPoint)
+			return internalCollisionList[i].AverageContactPoint().DistanceSquaredTo(internalCollisionList[i].Intersections[0].StartingPoint) >
+				internalCollisionList[j].AverageContactPoint().DistanceSquaredTo(internalCollisionList[j].Intersections[0].StartingPoint)
 		})
 
 		for i, c := range internalCollisionList {

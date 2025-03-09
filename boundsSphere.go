@@ -22,7 +22,7 @@ func NewBoundingSphere(name string, radius float32) *BoundingSphere {
 func (sphere *BoundingSphere) Clone() INode {
 	clone := NewBoundingSphere(sphere.name, sphere.Radius)
 	clone.Node = sphere.Node.clone(clone).(*Node)
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 	return clone

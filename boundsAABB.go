@@ -118,7 +118,7 @@ func (box *BoundingAABB) Clone() INode {
 	clone := NewBoundingAABB(box.name, box.internalSize.X, box.internalSize.Y, box.internalSize.Z)
 	clone.Node = box.Node.clone(clone).(*Node)
 	clone.Node.onTransformUpdate = clone.updateSize
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 	return clone
@@ -221,7 +221,7 @@ func (box *BoundingAABB) Collision(other IBoundingObject) *Collision {
 				inter.MTV = inter.MTV.Invert()
 				inter.Normal = inter.Normal.Invert()
 			}
-			intersection.BoundingObject = otherBounds
+			intersection.Object = otherBounds
 		}
 		return intersection
 
@@ -235,7 +235,7 @@ func (box *BoundingAABB) Collision(other IBoundingObject) *Collision {
 				inter.MTV = inter.MTV.Invert()
 				inter.Normal = inter.Normal.Invert()
 			}
-			intersection.BoundingObject = otherBounds
+			intersection.Object = otherBounds
 		}
 		return intersection
 

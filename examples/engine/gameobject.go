@@ -56,7 +56,7 @@ func (player *Player) Update() {
 
 			OnCollision: func(col *tetra3d.Collision, index, count int) bool {
 
-				if col.BoundingObject.Parent().Properties().Has("death") {
+				if col.Object.Parent().Properties().Has("death") {
 					player.node.Unparent() // Unparenting is the equivalent of destroying the node
 				}
 

@@ -373,11 +373,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				}
 
-				if s, exists := dataMap["t3dCustomDepthOn__"]; exists {
-					newMat.CustomDepthOffsetOn = s.(float64) > 0
-				}
-				if s, exists := dataMap["t3dCustomDepthValue__"]; exists {
-					newMat.CustomDepthOffsetValue = float32(s.(float64))
+				if s, exists := dataMap["t3dDepthMode__"]; exists {
+					newMat.DepthMode = int(s.(float64))
 				}
 				if s, exists := dataMap["t3dMaterialLightingMode__"]; exists {
 					// newMat.NormalsAlwaysFaceLights = s.(float64) > 0

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"sort"
 	"time"
 
@@ -53,7 +54,8 @@ type Camera struct {
 	currentSector                      *Sector
 	// How many lights (sorted by distance) should be used to render each object, maximum. If it's greater than 0,
 	// then only that many lights will be considered. If less than or equal to 0 (the default), then all available lights will be used.
-	MaxLightCount int
+	MaxLightCount           int
+	MaxLightCountFocusPoint INode // The focus point for determining light culling based on distance from the camera; when this is nil, the camera's world position is used
 
 	resultColorTexture  *ebiten.Image // ColorTexture holds the color results of rendering any models.
 	resultDepthTexture  *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
@@ -81,7 +83,9 @@ type Camera struct {
 	// Defaults to 0 (off).
 	VertexSnapping float32
 
-	DebugInfo DebugInfo
+	DebugInfo        DebugInfo
+	PrevFrametimes   []float32
+	PrevDebugInfoCap int
 
 	depthShader     *ebiten.Shader
 	clipAlphaShader *ebiten.Shader
@@ -123,6 +127,8 @@ func NewCamera(w, h int) *Camera {
 
 		SectorRendering:   false,
 		SectorRenderDepth: 1,
+
+		PrevDebugInfoCap: 20,
 	}
 
 	cam.owner = cam
@@ -175,6 +181,8 @@ func NewCamera(w, h int) *Camera {
 		package main
 
 		var PerspectiveCorrection int
+		var TextureMapMode int
+		var TextureMapScreenSize float
 
 		func encodeDepth(depth float) vec4 {
 			r := floor(depth * 255) / 255
@@ -201,12 +209,14 @@ func NewCamera(w, h int) *Camera {
 			// This gives us the actual pixel coordinates.
 			tx := srcPos
 
-			// Divide by the source image size to get the UV coordinates.
-			tx /= srcSize
-
-			if PerspectiveCorrection > 0 {
+			if TextureMapMode == 1 {
+				tx = (dstPos.xy * TextureMapScreenSize) + (srcPos - imageSrc0Origin())
+			} else if PerspectiveCorrection > 0 {
 				tx *= 1.0 / custom.x
 			}
+
+			// Divide by the source image size to get the UV coordinates.
+			tx /= srcSize
 
 			// Apply fract() to loop the UV coords around [0-1].
 			tx = fract(tx)
@@ -313,8 +323,11 @@ func (camera *Camera) Clone() INode {
 
 	clone.Node = camera.Node.clone(clone).(*Node)
 	clone.MaxLightCount = camera.MaxLightCount
+	if camera.MaxLightCountFocusPoint != nil {
+		clone.MaxLightCountFocusPoint = camera.MaxLightCountFocusPoint
+	}
 
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 
@@ -775,6 +788,13 @@ func (camera *Camera) ClearWithColor(clear Color) {
 	}
 
 	if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
+
+		camera.PrevFrametimes = append(camera.PrevFrametimes, float32(camera.DebugInfo.FrameTime.Seconds()))
+
+		for len(camera.PrevFrametimes) > camera.PrevDebugInfoCap {
+			camera.PrevFrametimes = camera.PrevFrametimes[1:]
+		}
+
 		camera.DebugInfo.FrameTime = camera.DebugInfo.currentFrameTime
 		camera.DebugInfo.AnimationTime = camera.DebugInfo.currentAnimationTime
 		camera.DebugInfo.LightTime = camera.DebugInfo.currentLightTime
@@ -977,7 +997,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		camera.DebugInfo.LightCount++
 		if scene.World.LightingOn && scene.World.AmbientLight.IsOn() {
-			camera.DebugInfo.ActiveLightCount++
 			scene.World.AmbientLight.beginRender()
 			sceneLights = append(sceneLights, scene.World.AmbientLight)
 		}
@@ -987,13 +1006,10 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 	for _, light := range lights {
 		camera.DebugInfo.LightCount++
 		if (scene.World == nil || scene.World.LightingOn) && light.IsOn() {
-			camera.DebugInfo.ActiveLightCount++
 			light.beginRender()
 			sceneLights = append(sceneLights, light)
 		}
 	}
-
-	originalSceneLights := sceneLights
 
 	// if scene.World == nil || scene.World.LightingOn {
 
@@ -1081,7 +1097,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				}
 
 				if !camera.RenderDepth || modelIsTransparent {
-					depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
+					depths[model] = cameraPos.DistanceSquaredTo(model.WorldPosition())
 					// depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
 				}
 
@@ -1122,11 +1138,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 				if transparent {
 					transparents = append(transparents, renderPair{model, meshPart})
-					depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
+					depths[model] = cameraPos.DistanceSquaredTo(model.WorldPosition())
 				} else {
 					solids = append(solids, renderPair{model, meshPart})
 					if !camera.RenderDepth {
-						depths[model] = cameraPos.DistanceSquared(model.WorldPosition())
+						depths[model] = cameraPos.DistanceSquaredTo(model.WorldPosition())
 					}
 				}
 
@@ -1149,6 +1165,37 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	camWidth := camera.resultColorTexture.Bounds().Dx()
 	camHeight := camera.resultColorTexture.Bounds().Dy()
+
+	if camera.MaxLightCount > 0 {
+
+		var pos Vector3
+		if camera.MaxLightCountFocusPoint != nil {
+			pos = camera.MaxLightCountFocusPoint.WorldPosition()
+		} else {
+			pos = camera.WorldPosition()
+		}
+
+		sort.SliceStable(sceneLights, func(i, j int) bool {
+			// We sort ambient lights and directional lights as being closest to the camera, naturally
+			if _, ok := sceneLights[i].(*AmbientLight); ok {
+				return true
+			} else if _, ok := sceneLights[j].(*AmbientLight); ok {
+				return false
+			} else if _, ok := sceneLights[i].(*DirectionalLight); ok {
+				return true
+			} else if _, ok := sceneLights[j].(*DirectionalLight); ok {
+				return false
+			}
+			return pos.DistanceSquaredTo(sceneLights[i].WorldPosition()) < pos.DistanceSquaredTo(sceneLights[j].WorldPosition())
+		})
+		sceneLights = sceneLights[:math32.Min(camera.MaxLightCount, len(sceneLights))]
+	}
+
+	for _, light := range sceneLights {
+		if scene.World != nil && scene.World.LightingOn && light.IsOn() {
+			camera.DebugInfo.ActiveLightCount++
+		}
+	}
 
 	render := func(rp renderPair) {
 
@@ -1194,11 +1241,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			srcH = float32(mat.Texture.Bounds().Dy())
 		}
 
-		depthOffsetValue := float32(0.0)
-		if mat != nil && mat.CustomDepthOffsetOn {
-			depthOffsetValue = camera.WorldUnitToViewRangePercentage(mat.CustomDepthOffsetValue)
-		}
-
 		if lighting {
 
 			t := time.Now()
@@ -1208,13 +1250,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				for _, l := range sceneLights {
 					l.beginRender() // Call this because it's relatively cheap and necessary if a light doesn't exist in the Scene
 				}
-			} else if camera.MaxLightCount > 0 {
-				sort.SliceStable(sceneLights, func(i, j int) bool {
-					// We sort ambient lights as being closest to the camera, naturally
-					_, iOK := sceneLights[i].(*AmbientLight)
-					return iOK || camera.DistanceSquaredTo(sceneLights[i]) < camera.DistanceSquaredTo(sceneLights[j])
-				})
-				sceneLights = sceneLights[:math32.Min(camera.MaxLightCount, len(sceneLights))]
 			}
 
 			for _, light := range sceneLights {
@@ -1251,7 +1286,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				// Skip calculating lighting for objects that are too far away from light sources.
 				if point, ok := light.(*PointLight); ok && point.Range > 0 {
 					dist := maxSpan + point.Range
-					if modelPos.DistanceSquared(point.WorldPosition()) > dist*dist {
+					if modelPos.DistanceSquaredTo(point.WorldPosition()) > dist*dist {
 						continue
 					}
 					// } else if cube, ok := light.(*CubeLight); ok && cube.Range > 0 {
@@ -1269,19 +1304,12 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		}
 
-		sceneLights = originalSceneLights
-
-		if camera.MaxLightCount > 0 {
-			sceneLights = sceneLights[:math32.Min(camera.MaxLightCount, len(sceneLights))]
-		}
-
 		halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
 
 		// TODO: Implement PS1-style automatic tesselation
 
 		meshPartVertexIndexStart := meshPart.VertexIndexStart
 
-		customDepthOffsetOn := mat != nil && mat.CustomDepthOffsetOn
 		customDepthFunctionSet := mat != nil && mat.CustomDepthFunction != nil
 		vertexClipFunctionOn := model != nil && model.VertexClipFunction != nil
 
@@ -1331,6 +1359,11 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			} else {
 				uvU = float32(mesh.VertexUVs[vertIndex].X * srcW)
 				uvV = float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
+			}
+
+			if mat != nil && mat.TextureMapMode == TextureMapModeScreen {
+				uvU = mat.TextureMapScreenOffset.X
+				uvV = mat.TextureMapScreenOffset.Y
 			}
 
 			colorVertexList[vertexListIndex].SrcX = uvU
@@ -1396,14 +1429,13 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 				// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
 
-				depth := (mesh.vertexTransforms[vertIndex].Z + depthMarginPercentage) / camSpread
+				vertexDepth := mesh.vertexTransforms[vertIndex].Z
 
-				if customDepthOffsetOn {
-					depth += depthOffsetValue
-				}
 				if customDepthFunctionSet {
-					depth = mat.CustomDepthFunction(depth)
+					vertexDepth = mat.CustomDepthFunction(model, camera, meshPart, vertIndex, vertexDepth)
 				}
+
+				depth := (vertexDepth + depthMarginPercentage) / camSpread
 
 				if depth < 0 {
 					depth = 0
@@ -1418,15 +1450,13 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			} else if scene.World != nil && scene.World.FogOn {
 
-				depth := (mesh.vertexTransforms[vertIndex].Z + depthMarginPercentage) / camSpread
-				if mat != nil {
-					if mat.CustomDepthOffsetOn {
-						depth += depthOffsetValue
-					}
-					if mat.CustomDepthFunction != nil {
-						depth = mat.CustomDepthFunction(depth)
-					}
+				vertexDepth := mesh.vertexTransforms[vertIndex].Z
+
+				if customDepthFunctionSet {
+					vertexDepth = mat.CustomDepthFunction(model, camera, meshPart, vertIndex, vertexDepth)
 				}
+
+				depth := (vertexDepth + depthMarginPercentage) / camSpread
 
 				if depth < 0 {
 					depth = 0
@@ -1503,6 +1533,28 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			perspectiveCorrection = 1
 		}
 
+		colorPassOptions := &ebiten.DrawTrianglesOptions{}
+
+		textureFilterMode := 0
+		textureMapMode := 0
+		textureMapScreenSize := float32(1.0)
+
+		if mat != nil {
+			colorPassOptions.Filter = mat.TextureFilterMode
+			colorPassOptions.Address = mat.textureWrapMode
+
+			textureMapMode = mat.TextureMapMode
+			textureMapScreenSize = mat.TextureMapScreenSize
+
+			switch mat.TextureFilterMode {
+			case ebiten.FilterNearest:
+				textureFilterMode = 0
+			case ebiten.FilterLinear:
+				textureFilterMode = 1
+			}
+
+		}
+
 		// Render the depth map here
 		if camera.RenderDepth {
 
@@ -1538,6 +1590,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 					Images: [4]*ebiten.Image{camera.resultDepthTexture, img},
 					Uniforms: map[string]any{
 						"PerspectiveCorrection": perspectiveCorrection,
+						"TextureMapMode":        textureMapMode,
+						"TextureMapScreenSize":  textureMapScreenSize,
 					},
 				}
 				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:indexListIndex], camera.clipAlphaShader, shaderOpt)
@@ -1552,22 +1606,6 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			if !model.isTransparent(meshPart) {
 				camera.resultDepthTexture.DrawImage(camera.depthIntermediate, nil)
-			}
-
-		}
-
-		colorPassOptions := &ebiten.DrawTrianglesOptions{}
-
-		textureFilterMode := 0
-		if mat != nil {
-			colorPassOptions.Filter = mat.TextureFilterMode
-			colorPassOptions.Address = mat.textureWrapMode
-
-			switch mat.TextureFilterMode {
-			case ebiten.FilterNearest:
-				textureFilterMode = 0
-			case ebiten.FilterLinear:
-				textureFilterMode = 1
 			}
 
 		}
@@ -1602,6 +1640,8 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				"BayerMatrix":           bayerMatrix,
 				"PerspectiveCorrection": perspectiveCorrection,
 				"TextureFilterMode":     textureFilterMode,
+				"TextureMapMode":        textureMapMode,
+				"TextureMapScreenSize":  textureMapScreenSize,
 			}
 
 		} else {
@@ -1783,6 +1823,7 @@ var spriteRender3DIndices = []uint16{
 func (camera *Camera) RenderSprite3D(screen *ebiten.Image, renderSettings ...DrawSprite3dSettings) {
 
 	// TODO: Replace this with a more performant alternative, where we minimize shader / texture switches.
+	// TODO 2: Add the ability to resize sprites rendered through this function.
 
 	depthMarginPercentage := (camera.far - camera.near) * camera.DepthMargin
 
@@ -1913,7 +1954,7 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 // Note that the frame-time mentioned here is purely the time that Tetra3D spends sending render commands to the command queue.
 // Any additional time that Ebitengine takes to flush that queue is not included in this average frame-time value, and is not
 // visible outside of debugging and profiling, like with pprof.
-func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float32, color Color) {
+func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float32, col Color) {
 
 	m := camera.DebugInfo.FrameTime.Round(time.Microsecond).Microseconds()
 	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
@@ -1952,7 +1993,33 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float3
 		sectorName,
 	)
 
-	camera.DrawDebugText(screen, debugText, 0, 0, textScale, color)
+	camera.DrawDebugText(screen, debugText, 0, 0, textScale, col)
+
+	barWidth := float32(64)
+	barHeight := float32(24)
+
+	vector.StrokeRect(screen, 128, 16, barWidth, barHeight, 1, color.White, false)
+
+	for i := 0; i < len(camera.PrevFrametimes)-1; i++ {
+
+		ip := 1.0 / float32(camera.PrevDebugInfoCap)
+
+		db := camera.PrevFrametimes[i]
+		nextdb := camera.PrevFrametimes[i+1]
+
+		maxFt := 1.0 / float32(ebiten.TPS())
+
+		drawColor := color.RGBA{128, 255, 0, 255}
+
+		if db/maxFt > 1 {
+			drawColor = color.RGBA{255, 0, 0, 255}
+		}
+
+		cappedFrametimePerc := math32.Clamp(db/maxFt, 0, 1) * (barHeight - 3)
+		cappedNextFrametimePerc := math32.Clamp((nextdb)/maxFt, 0, 1) * (barHeight - 3)
+
+		vector.StrokeLine(screen, 128+1+(float32(i)*ip*barWidth), 38-cappedFrametimePerc, 128+1+(float32(i+1)*ip*barWidth), 38-cappedNextFrametimePerc, 2, drawColor, false)
+	}
 
 }
 

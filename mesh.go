@@ -188,12 +188,12 @@ type Mesh struct {
 	vertexSkinnedNormals     []Vector3
 	vertexSkinnedPositions   []Vector3
 	vertexTransformedNormals []Vector3
-	VertexUVs                []Vector2 // The UV values for each vertex
-	VertexUVOriginalValues   []Vector2 // The original UV values for each vertex
-	VertexColors             []VertexColorChannel
-	VertexGroupNames         []string    // The names of the vertex groups applies to the Mesh; this is only populated if the Mesh is affected by an armature
-	VertexWeights            [][]float32 // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
-	VertexBones              [][]uint16  // TODO: Replace this with [][8]uint16 (or however many the maximum number of bones affecting a single vertex is for GLTF)
+	VertexUVs                []Vector2            // The UV values for each vertex
+	VertexUVOriginalValues   []Vector2            // The original UV values for each vertex
+	VertexColors             []VertexColorChannel // A slice of channels for the mesh
+	VertexGroupNames         []string             // The names of the vertex groups applies to the Mesh; this is only populated if the Mesh is affected by an armature
+	VertexWeights            [][]float32          // TODO: Replace this with [][8]float32 (or however many the maximum is for GLTF)
+	VertexBones              [][]uint16           // TODO: Replace this with [][8]uint16 (or however many the maximum number of bones affecting a single vertex is for GLTF)
 	visibleVertices          []bool
 	maxTriangleSpan          float32
 	VertexActiveColorChannel int // VertexActiveColorChannel is the active vertex color used for coloring the mesh
@@ -1749,6 +1749,17 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 		}
 
 		newTri := NewTriangle(part, indices[i]+part.VertexIndexStart, indices[i+1]+part.VertexIndexStart, indices[i+2]+part.VertexIndexStart)
+
+		// Slight UV adjustment to not have invisibility in-between seams
+		uvcenter := mesh.VertexUVs[indices[i]].Add(mesh.VertexUVs[indices[i+1]]).Add(mesh.VertexUVs[indices[i+2]]).Divide(3)
+
+		mesh.VertexUVs[indices[i]].X += (uvcenter.X - mesh.VertexUVs[indices[i]].X) * 0.0001
+		mesh.VertexUVs[indices[i]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i]].Y) * 0.0001
+		mesh.VertexUVs[indices[i+1]].X += (uvcenter.X - mesh.VertexUVs[indices[i+1]].X) * 0.0001
+		mesh.VertexUVs[indices[i+1]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+1]].Y) * 0.0001
+		mesh.VertexUVs[indices[i+2]].X += (uvcenter.X - mesh.VertexUVs[indices[i+2]].X) * 0.0001
+		mesh.VertexUVs[indices[i+2]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+2]].Y) * 0.0001
+
 		newTri.RecalculateCenter()
 		newTri.RecalculateNormal()
 		mesh.Triangles = append(mesh.Triangles, newTri)

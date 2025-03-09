@@ -27,7 +27,7 @@ func (r RayHit) Slope() float32 {
 
 // Distance returns the distance from the RayHit's originating ray source point to the struck position.
 func (r RayHit) Distance() float32 {
-	return r.from.Distance(r.Position)
+	return r.from.DistanceTo(r.Position)
 }
 
 const ErrorObjectHitNotBoundingTriangles = "error: object hit not a BoundingTriangles instance; no UV or vertex color data can be pulled from RayHit result"
@@ -253,9 +253,9 @@ func boundingAABBRayTest(from, to Vector3, test *BoundingAABB) (RayHit, bool) {
 
 }
 
-func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doublesided bool) []RayHit {
+var boundingTriangleRayTestSphere = NewBoundingSphere("bounding triangle raytest sphere", 1)
 
-	rayDistSquared := to.DistanceSquared(from)
+func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doublesided bool) []RayHit {
 
 	check := false
 
@@ -264,6 +264,9 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 	} else if _, ok := boundingAABBRayTest(from, to, test.BoundingAABB); ok {
 		check = true
 	}
+
+	boundingTriangleRayTestSphere.SetLocalPositionVec(from.MoveTowards(to, from.DistanceTo(to)/2))
+	boundingTriangleRayTestSphere.Radius = from.DistanceTo(to) / 2
 
 	results := []RayHit{}
 
@@ -276,13 +279,9 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 		invTo := invertedTransform.MultVec(to)
 		plane := newCollisionPlane()
 
-		for _, tri := range test.Mesh.Triangles {
+		test.Broadphase.ForEachTriangleFromBoundingObject(boundingTriangleRayTestSphere, func(triID int) bool {
 
-			// If the distance from the start point to the triangle is longer than the ray,
-			// then we know it can't be struck and we can bail early
-			if invFrom.DistanceSquared(tri.Center) > rayDistSquared+(tri.MaxSpan*tri.MaxSpan) {
-				continue
-			}
+			tri := test.Mesh.Triangles[triID]
 
 			fs := tri.Normal.Dot(invFrom.Sub(tri.Center))
 			ts := tri.Normal.Dot(invTo.Sub(tri.Center))
@@ -290,7 +289,7 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 			// If the start and end points of the ray lie on the same side of the triangle,
 			// then we know the triangle can't be struck and we can bail early
 			if (fs > 0 && ts > 0) || (fs < 0 && ts < 0) {
-				continue
+				return true
 			}
 
 			v0 := test.Mesh.VertexPositions[tri.VertexIndices[0]]
@@ -315,7 +314,10 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 				}
 
 			}
-		}
+
+			return true
+
+		})
 
 	}
 
@@ -409,7 +411,7 @@ func RayTest(options RayTestOptions) bool {
 	if options.OnHit != nil {
 
 		sort.Slice(internalRayTest, func(i, j int) bool {
-			return internalRayTest[i].Position.DistanceSquared(options.From) < internalRayTest[j].Position.DistanceSquared(options.From)
+			return internalRayTest[i].Position.DistanceSquaredTo(options.From) < internalRayTest[j].Position.DistanceSquaredTo(options.From)
 		})
 
 		for i, r := range internalRayTest {

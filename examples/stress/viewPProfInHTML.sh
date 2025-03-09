@@ -1,1 +1,0 @@
-go tool pprof -http=localhost:8080 ./cpu.pprof

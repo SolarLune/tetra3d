@@ -131,7 +131,7 @@ type Game struct {
 	GridPointMarkers []*GridPointMarker
 }
 
-//go:embed grids.gltf
+//go:embed grids.glb
 var grids []byte
 
 func NewGame() *Game {

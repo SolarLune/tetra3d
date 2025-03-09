@@ -27,7 +27,7 @@ func NewBoundingCapsule(name string, height, radius float32) *BoundingCapsule {
 func (capsule *BoundingCapsule) Clone() INode {
 	clone := NewBoundingCapsule(capsule.name, capsule.Height, capsule.Radius)
 	clone.Node = capsule.Node.clone(clone).(*Node)
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 	return clone
@@ -68,7 +68,7 @@ func (capsule *BoundingCapsule) Collision(other IBoundingObject) *Collision {
 				inter.MTV = inter.MTV.Invert()
 				inter.Normal = inter.Normal.Invert()
 			}
-			intersection.BoundingObject = otherBounds
+			intersection.Object = otherBounds
 		}
 		return intersection
 

@@ -60,7 +60,7 @@ func (point *GridPoint) Clone() INode {
 	newPoint.Connections = append([]*GridConnection{}, point.Connections...)
 	newPoint.sortedConnections = append([]*GridConnection{}, point.Connections...)
 
-	if newPoint.Callbacks() != nil && newPoint.Callbacks().OnClone != nil {
+	if runCallbacks && newPoint.Callbacks().OnClone != nil {
 		newPoint.Callbacks().OnClone(newPoint)
 	}
 
@@ -283,10 +283,6 @@ func (grid *Grid) Clone() INode {
 	newGrid := &Grid{}
 	newGrid.Node = grid.Node.clone(newGrid).(*Node)
 
-	for _, child := range newGrid.children {
-		child.setParent(newGrid)
-	}
-
 	for _, c := range newGrid.Points() {
 		c.Connections = []*GridConnection{}
 	}
@@ -301,7 +297,7 @@ func (grid *Grid) Clone() INode {
 
 	}
 
-	if newGrid.Callbacks() != nil && newGrid.Callbacks().OnClone != nil {
+	if runCallbacks && newGrid.Callbacks().OnClone != nil {
 		newGrid.Callbacks().OnClone(newGrid)
 	}
 
@@ -344,7 +340,7 @@ func (grid *Grid) MergeDuplicatePoints(margin float32) {
 				return
 			}
 
-			if point.WorldPosition().DistanceSquared(point2.WorldPosition()) < margin {
+			if point.WorldPosition().DistanceSquaredTo(point2.WorldPosition()) < margin {
 				for _, c := range point2.Connections {
 					nc := c.Clone()
 					point.Connections = append(point.Connections, nc)
@@ -420,7 +416,7 @@ func (grid *Grid) ClosestPositionOnGrid(position Vector3) Vector3 {
 		newPos.Y = start.Y + segment.Y*t
 		newPos.Z = start.Z + segment.Z*t
 
-		nd := newPos.DistanceSquared(position)
+		nd := newPos.DistanceSquaredTo(position)
 		if nd < dist {
 			dist = nd
 			endPos = newPos

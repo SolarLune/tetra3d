@@ -18,6 +18,8 @@ type Scene struct {
 	updateAutobatch     bool
 	autobatchDynamicMap map[*Material]*Model
 	autobatchStaticMap  map[*Material]*Model
+
+	callbacks *SceneCallbacks
 }
 
 // NewScene creates a new Scene by the name given.
@@ -30,6 +32,7 @@ func NewScene(name string) *Scene {
 		props:               NewProperties(),
 		autobatchDynamicMap: map[*Material]*Model{},
 		autobatchStaticMap:  map[*Material]*Model{},
+		callbacks:           &SceneCallbacks{},
 	}
 
 	scene.Root.scene = scene
@@ -44,7 +47,16 @@ func (scene *Scene) Clone() *Scene {
 	newScene := NewScene(scene.Name)
 	newScene.library = scene.library
 
+	// Just for when you clone
+	scene.Root.scene = newScene
+
+	runCallbacks = false
+
 	newScene.Root = scene.Root.Clone().(*Node)
+
+	runCallbacks = true
+
+	scene.Root.scene = scene
 
 	newScene.Root.scene = newScene
 	newScene.Root.cachedSceneRootNode = newScene.Root
@@ -70,6 +82,28 @@ func (scene *Scene) Clone() *Scene {
 	}
 
 	newScene.data = scene.data
+
+	// Make a copy of the callbacks object
+	cb := *scene.callbacks
+	newScene.callbacks = &cb
+
+	if runCallbacks {
+
+		// We wait to call the onclone callbacks manually here because we want, for example, an "OnClone()" callback that triggers for a scene duplication
+		// to trigger once all nodes have been cloned.
+		if newScene.Callbacks().OnClone != nil {
+			newScene.Callbacks().OnClone(newScene)
+		}
+
+		// Loop through and call OnClone for each Node that has it set in the tree.
+		newScene.Root.SearchTree().ForEach(func(node INode) bool {
+			if node.Callbacks().OnClone != nil {
+				node.Callbacks().OnClone(node)
+			}
+			return true
+		})
+
+	}
 
 	return newScene
 
@@ -187,4 +221,8 @@ func (scene *Scene) Get(nodePath string) INode {
 // Node.SearchTree().ByName(nodeName).First().
 func (scene *Scene) FindNode(nodeName string) INode {
 	return scene.Root.SearchTree().ByName(nodeName).First()
+}
+
+func (scene *Scene) Callbacks() *SceneCallbacks {
+	return scene.callbacks
 }

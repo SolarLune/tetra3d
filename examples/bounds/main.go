@@ -81,12 +81,7 @@ func (g *Game) Update() error {
 		movement.Z += accel
 	}
 
-	if movement.Magnitude() > friction {
-		fr := movement.Clone().Unit().Scale(friction).ToVector()
-		movement.Sub(fr)
-	} else {
-		movement.SetZero()
-	}
+	movement.SubMagnitude(friction)
 
 	movement.ClampMagnitude(maxSpd)
 

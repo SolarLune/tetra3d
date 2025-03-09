@@ -130,7 +130,7 @@ func (model *Model) Clone() INode {
 		newModel.sector.Model = newModel
 	}
 
-	if newModel.Callbacks() != nil && newModel.Callbacks().OnClone != nil {
+	if runCallbacks && newModel.Callbacks().OnClone != nil {
 		newModel.Callbacks().OnClone(newModel)
 	}
 
@@ -543,6 +543,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	mvp := base.Mult(vpMatrix)
 
+	var unalteredMVP Matrix4
+	unbillboarded := false
+
+	if mat != nil && mat.DepthMode == CustomDepthModeUnbillboarded {
+		unbillboarded = true
+		unalteredMVP = modelTransform.Mult(vpMatrix)
+	}
+
 	var mvJustRForNormals Matrix4
 	if camera.RenderNormals {
 		_, _, mvJustRForNormals = modelTransform.Mult(camera.ViewMatrix()).Decompose()
@@ -607,8 +615,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			vertexTransforms[vertexIndex].X = mvp[0][0]*vert.X + mvp[1][0]*vert.Y + mvp[2][0]*vert.Z + mvp[3][0]
 			vertexTransforms[vertexIndex].Y = mvp[0][1]*vert.X + mvp[1][1]*vert.Y + mvp[2][1]*vert.Z + mvp[3][1]
-			vertexTransforms[vertexIndex].Z = mvp[0][2]*vert.X + mvp[1][2]*vert.Y + mvp[2][2]*vert.Z + mvp[3][2]
-			vertexTransforms[vertexIndex].W = mvp[0][3]*vert.X + mvp[1][3]*vert.Y + mvp[2][3]*vert.Z + mvp[3][3]
+
+			if unbillboarded {
+				vertexTransforms[vertexIndex].Z = unalteredMVP[0][2]*vert.X + unalteredMVP[1][2]*vert.Y + unalteredMVP[2][2]*vert.Z + unalteredMVP[3][2]
+				vertexTransforms[vertexIndex].W = unalteredMVP[0][3]*vert.X + unalteredMVP[1][3]*vert.Y + unalteredMVP[2][3]*vert.Z + unalteredMVP[3][3]
+			} else {
+				vertexTransforms[vertexIndex].Z = mvp[0][2]*vert.X + mvp[1][2]*vert.Y + mvp[2][2]*vert.Z + mvp[3][2]
+				vertexTransforms[vertexIndex].W = mvp[0][3]*vert.X + mvp[1][3]*vert.Y + mvp[2][3]*vert.Z + mvp[3][3]
+			}
 
 		}
 
@@ -786,23 +800,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	}
 
-	// if model.name == "Suzanne" {
-	// 	fmt.Println(minDepth, maxDepth)
-	// }
-
 	globalSortingTriangleBucket.Sort(minDepth, maxDepth)
-
-	// meshPart.sortingTriangles = meshPart.sortingTriangles[:sortingTriIndex]
-
-	// if sortMode == TriangleSortModeBackToFront {
-	// 	sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
-	// 		return meshPart.sortingTriangles[i].depth > meshPart.sortingTriangles[j].depth
-	// 	})
-	// } else if sortMode == TriangleSortModeFrontToBack {
-	// 	sort.Slice(meshPart.sortingTriangles, func(i, j int) bool {
-	// 		return meshPart.sortingTriangles[i].depth < meshPart.sortingTriangles[j].depth
-	// 	})
-	// }
 
 }
 
@@ -890,7 +888,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 			span := math32.Max(tri.MaxSpan, other.MaxSpan) * 0.66
 
-			if tri.Center.DistanceSquared(other.Center) > span*span {
+			if tri.Center.DistanceSquaredTo(other.Center) > span*span {
 				continue
 			}
 
@@ -945,7 +943,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 			if or := other.frustumCullingSphere.WorldRadius(); or > rad {
 				rad = or
 			}
-			if model == other || model.WorldPosition().DistanceSquared(other.WorldPosition()) > rad*rad {
+			if model == other || model.WorldPosition().DistanceSquaredTo(other.WorldPosition()) > rad*rad {
 				return true
 			}
 
@@ -974,7 +972,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 					span *= 0.66
 
-					if transform.MultVec(tri.Center).DistanceSquared(otherTransform.MultVec(otherTri.Center)) > span {
+					if transform.MultVec(tri.Center).DistanceSquaredTo(otherTransform.MultVec(otherTri.Center)) > span {
 						continue
 					}
 
@@ -986,7 +984,7 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 					for i := 0; i < 3; i++ {
 						for j := 0; j < 3; j++ {
-							if transformedTriVerts[i].DistanceSquared(transformedOtherVerts[j]) <= distanceSquared {
+							if transformedTriVerts[i].DistanceSquaredTo(transformedOtherVerts[j]) <= distanceSquared {
 								ao[i] = 1
 								break
 							}

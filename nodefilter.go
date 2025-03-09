@@ -52,6 +52,7 @@ type NodeFilter struct {
 	MaxDepth       int                // How deep the node filter should search in the starting node's hierarchy; a value that is less than zero means the entire tree will be traversed.
 	depth          int
 	sortMode       int
+	includeStart   bool
 	reverseSort    bool
 	sortTo         Vector3
 
@@ -71,7 +72,7 @@ func (nf *NodeFilter) execute(node INode) []INode {
 	nf.depth++
 	out := []INode{}
 	added := true
-	if node != nf.Start {
+	if nf.includeStart || node != nf.Start {
 		add := true
 		for _, filter := range nf.Filters {
 			if !filter(node) {
@@ -97,7 +98,7 @@ func (nf *NodeFilter) execute(node INode) []INode {
 
 	nf.depth--
 
-	// If the depth is at -1, then this should be the end
+	// If the depth is at -1 again, then this should be the end
 	if nf.depth == -1 && nf.sortMode != nfSortModeNone {
 
 		switch nf.sortMode {
@@ -125,9 +126,9 @@ func (nf *NodeFilter) execute(node INode) []INode {
 		case nfSortModeDistance:
 			sort.SliceStable(out, func(i, j int) bool {
 				if nf.reverseSort {
-					return out[i].WorldPosition().DistanceSquared(nf.sortTo) > out[j].WorldPosition().DistanceSquared(nf.sortTo)
+					return out[i].WorldPosition().DistanceSquaredTo(nf.sortTo) > out[j].WorldPosition().DistanceSquaredTo(nf.sortTo)
 				}
-				return out[i].WorldPosition().DistanceSquared(nf.sortTo) < out[j].WorldPosition().DistanceSquared(nf.sortTo)
+				return out[i].WorldPosition().DistanceSquaredTo(nf.sortTo) < out[j].WorldPosition().DistanceSquaredTo(nf.sortTo)
 			})
 		case nfSortModeRandom:
 			localRandom.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
@@ -154,7 +155,7 @@ func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool, multi
 	nf.depth++
 
 	successfulFilter := true
-	if node != nf.Start {
+	if nf.includeStart || node != nf.Start {
 		ok := true
 		for _, filter := range nf.Filters {
 			if !filter(node) {
@@ -473,6 +474,12 @@ func (nf NodeFilter) Grids() NodeCollection[*Grid] {
 		}
 	}
 	return grids
+}
+
+// When called, the filter will include the starting Node as well.
+func (nf NodeFilter) IncludeStart() NodeFilter {
+	nf.includeStart = true
+	return nf
 }
 
 // SortByX applies an X-axis sort on the results of the NodeFilter.

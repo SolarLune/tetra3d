@@ -68,6 +68,11 @@ materialTransparencyModes = [
     ("TRANSPARENT", "Transparent", "Partial transparency. Renders after all opaque objects and is sorted from back-to-front", 0, 3),
 ]
 
+depthModes = [
+    ("DEFAULT", "Default", "The default for writing depth; writes depth according to what is rendered", 0, 0),
+    ("UNBILLBOARDED", "Unbillboarded", "When set, all vertices render depth using the unbillboarded-version of the mesh, meaning that their depth renders as though the mesh were not billboarded", 0, 1),
+]
+
 materialBillboardModes = [
     ("NONE", "None", "No billboarding - the (unskinned) object with this material does not rotate to face the camera.", 0, 0),
     ("FIXEDVERTICAL", "Fixed Vertical", "Fixed Vertical billboarding - the (unskinned) object with this material faces the camera, with up always pointing towards the camera's local up vector (+Y). Good for top-down games.", 0, 1),
@@ -697,7 +702,7 @@ class ACTION_PT_tetra3d(bpy.types.Panel):
 
         # row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
 
-        handleT3DProperties(self, None, context.active_action.t3dGameProperties__, "action")
+        handleT3DProperties(self, context.active_action.t3dGameProperties__, "action")
 
         row = self.layout.row()
 
@@ -804,12 +809,11 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                         box.label(text="Object: " + object.name)
                         box.row().separator()
                             
-                        handleT3DProperties(self, box, object.t3dGameProperties__, "object", False)
+                        handleT3DProperties(self, object.t3dGameProperties__, "object", False, objectIndex)
 
         row = self.layout.row()
         row.label(text="Game Properties")
         row.prop(context.scene, "t3dExpandGameProps__", icon="TRIA_DOWN" if context.scene.t3dExpandGameProps__ else "TRIA_RIGHT", icon_only=True, emboss=False)
-
 
         if context.scene.t3dExpandGameProps__:
 
@@ -820,7 +824,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
 
             row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
 
-            handleT3DProperties(self, None, context.active_object.t3dGameProperties__, "object")
+            handleT3DProperties(self, context.active_object.t3dGameProperties__, "object")
 
             row = self.layout.row()
 
@@ -846,7 +850,7 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
         add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
         add.mode = "scene"
 
-        handleT3DProperties(self, None, context.scene.t3dGameProperties__, "scene")
+        handleT3DProperties(self, context.scene.t3dGameProperties__, "scene")
         
         row = self.layout.row()
         clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
@@ -891,14 +895,14 @@ class CAMERA_PT_tetra3d(bpy.types.Panel):
         row.prop(context.object.data, "t3dPerspectiveCorrectedTextureMapping__")
 
 
-def handleT3DProperties(self, box, props, operatorType, enabled=True):
+def handleT3DProperties(self, props, operatorType, enabled=True, objectIndex=0):
 
     for index, prop in enumerate(props):
 
-        if box is None:
-            box = self.layout.box()
+        box = self.layout.box()
 
         row = box.row()
+        row.enabled = enabled # Don't forget to disable the row for all operators if it's an instance property
         row.prop(prop, "name")
 
         op = row.operator(OBJECT_OT_tetra3dSearchStringProperties.bl_idname, text="", icon="VIEWZOOM")
@@ -980,7 +984,14 @@ def handleT3DProperties(self, box, props, operatorType, enabled=True):
                     playButton.filepath = prop.valueFilepath
         elif prop.valueType == "directory":
             row.prop(prop, "valueDirpath")
-        
+
+        # If not enabled, it's because the properties belong to sub-objects in an instance group
+        if not enabled:
+            row = box.row()
+            op = row.operator(OBJECT_OT_tetra3dOverrideProp.bl_idname)
+            op.propIndex = index
+            op.objectIndex = objectIndex
+
 class MATERIAL_PT_tetra3d(bpy.types.Panel):
     bl_idname = "MATERIAL_PT_tetra3d"
     bl_label = "Tetra3d Material Properties"
@@ -1027,10 +1038,7 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
 
         box = self.layout.box()
         row = box.row()
-        row.prop(context.material, "t3dCustomDepthOn__")
-        row = box.row()
-        row.enabled = context.material.t3dCustomDepthOn__
-        row.prop(context.material, "t3dCustomDepthValue__")
+        row.prop(context.material, "t3dDepthMode__")
         row = box.row()
         row.label(text="Lighting Mode:")
         row.prop(context.material, "t3dMaterialLightingMode__", text="")
@@ -1043,7 +1051,7 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
 
             row.operator("material.tetra3dcopyprops", icon="COPYDOWN")
             
-            handleT3DProperties(self, None, context.object.active_material.t3dGameProperties__, "material")
+            handleT3DProperties(self, context.object.active_material.t3dGameProperties__, "material")
 
             row = self.layout.row()
             clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
@@ -2049,8 +2057,7 @@ def register():
     bpy.types.Material.t3dBlendMode__ = bpy.props.EnumProperty(items=materialBlendModes, name="Blend Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dTransparencyMode__ = bpy.props.EnumProperty(items=materialTransparencyModes, name="Transparency Mode", description="Transparency mode for this material", default="AUTO")
     bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material; doesn't take effect on armature skinned meshes", default="NONE")
-    bpy.types.Material.t3dCustomDepthOn__ = bpy.props.BoolProperty(name="Custom Depth", description="Whether custom depth offsetting should be enabled", default=False)
-    bpy.types.Material.t3dCustomDepthValue__ = bpy.props.FloatProperty(name="Depth Offset Value", description="How far in world units the material should offset when rendering (negative values are closer to the camera, positive values are further)")
+    bpy.types.Material.t3dDepthMode__ = bpy.props.EnumProperty(items=depthModes, name="Depth Rendering Modes", description="How depth should be rendered for meshes that use this materials", default="DEFAULT")
     bpy.types.Material.t3dMaterialLightingMode__ = bpy.props.EnumProperty(items=materialLightingModes, name="Lighting mode", description="How materials should be lit", default="DEFAULT")
     bpy.types.Material.t3dVisible__ = bpy.props.BoolProperty(name="Visible", description="Whether this material is visible", default=True)
 
@@ -2167,8 +2174,7 @@ def unregister():
     del bpy.types.Material.t3dTransparencyMode__
     del bpy.types.Material.t3dMaterialLightingMode__
 
-    del bpy.types.Material.t3dCustomDepthOn__
-    del bpy.types.Material.t3dCustomDepthValue__
+    del bpy.types.Material.t3dDepthMode__
     del bpy.types.Material.t3dGameProperties__
     del bpy.types.Material.t3dAutoUV__
     del bpy.types.Material.t3dAutoUVUnitSize__

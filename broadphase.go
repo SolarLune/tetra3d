@@ -9,13 +9,14 @@ package tetra3d
 // If so, it proceeds to the broadphase check, where it sees which set(s) of triangles the colliding
 // object could be colliding with, and then returns that set for finer examination.
 type Broadphase struct {
-	GridCellCount int           // The number of cells in the broadphase grid
-	cellSize      float32       // The size of each cell in the grid
-	center        *Node         // The center node of the broadphase
-	workingAABB   *BoundingAABB // The working-process AABB used to determine which triangles belong in which cells
-	TriSets       [][][][]int   // The sets of triangles
-	allTriSet     Set[int]      // A set containing all triangles
-	mesh          *Mesh         // The mesh used for the Broadphase object
+	GridCellCount      int           // The number of cells in the broadphase grid
+	cellSize           float32       // The size of each cell in the grid
+	center             *Node         // The center node of the broadphase
+	workingAABB        *BoundingAABB // The working-process AABB used to determine which triangles belong in which cells
+	TriSets            [][][][]int   // The sets of triangles
+	allTriSet          Set[int]      // A set containing all triangles
+	mesh               *Mesh         // The mesh used for the Broadphase object
+	workingTriangleSet Set[int]      // The set of triangles to use for collision testing
 }
 
 // NewBroadphase returns a new Broadphase object.
@@ -27,9 +28,10 @@ type Broadphase struct {
 func NewBroadphase(gridCellCount int, worldPosition Vector3, mesh *Mesh) *Broadphase {
 
 	b := &Broadphase{
-		mesh:        mesh,
-		center:      NewNode("broadphase center"),
-		workingAABB: NewBoundingAABB("bounding aabb", 1, 1, 1),
+		mesh:               mesh,
+		center:             NewNode("broadphase center"),
+		workingAABB:        NewBoundingAABB("bounding aabb", 1, 1, 1),
+		workingTriangleSet: newSet[int](),
 	}
 
 	b.center.AddChildren(b.workingAABB)
@@ -135,13 +137,17 @@ func (b *Broadphase) Mesh() *Mesh {
 // in relation to the Broadphase owning BoundingTriangles instance. The returned set contains each triangle only
 // once, of course.
 // TODO: Maybe replace this with something that doesn't need to allocate a new Set?
-func (b *Broadphase) TrianglesFromBoundingObject(boundingObject IBoundingObject) Set[int] {
+func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingObject, forEach func(triID int) bool) {
+
+	b.workingTriangleSet.Clear()
 
 	if b.GridCellCount <= 1 {
-		return b.allTriSet
+		for t := range b.allTriSet {
+			if !forEach(t) {
+				return
+			}
+		}
 	}
-
-	trianglesSet := make(Set[int], len(b.TriSets))
 
 	hg := float32(b.GridCellCount) / 2
 
@@ -164,14 +170,18 @@ func (b *Broadphase) TrianglesFromBoundingObject(boundingObject IBoundingObject)
 				if b.workingAABB.Colliding(boundingObject) {
 					// triangles = append(triangles, bp.TriSets[i][j][k]...)
 					for _, triID := range b.TriSets[i][j][k] {
-						trianglesSet.Add(triID)
+						b.workingTriangleSet.Add(triID)
 					}
 				}
 			}
 		}
 	}
 
-	return trianglesSet
+	for t := range b.workingTriangleSet {
+		if !forEach(t) {
+			break
+		}
+	}
 
 }
 

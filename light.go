@@ -59,7 +59,7 @@ func (amb *AmbientLight) Clone() INode {
 
 	clone.Node = amb.Node.clone(clone).(*Node)
 
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 
@@ -153,7 +153,7 @@ func (p *PointLight) Clone() INode {
 
 	clone.Node = p.Node.clone(clone).(*Node)
 
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 
@@ -202,7 +202,7 @@ func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors Vertex
 			vertNormal = model.Mesh.VertexNormals[index]
 		}
 
-		distance := p.workingPosition.DistanceSquared(vertPos)
+		distance := p.workingPosition.DistanceSquaredTo(vertPos)
 
 		if p.Range > 0 {
 
@@ -331,7 +331,7 @@ func (sun *DirectionalLight) Clone() INode {
 	clone.On = sun.On
 
 	clone.Node = sun.Node.clone(clone).(*Node)
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 
@@ -464,7 +464,7 @@ func (cube *CubeLight) Clone() INode {
 	newCube.LightingAngle = cube.LightingAngle
 	newCube.SetWorldTransform(cube.Transform())
 	newCube.Node = cube.Node.clone(newCube).(*Node)
-	if newCube.Callbacks() != nil && newCube.Callbacks().OnClone != nil {
+	if runCallbacks && newCube.Callbacks().OnClone != nil {
 		newCube.Callbacks().OnClone(newCube)
 	}
 	return newCube

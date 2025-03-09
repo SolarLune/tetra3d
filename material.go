@@ -39,6 +39,16 @@ const (
 	LightingModeDoubleSided         // Lighting applies for double-sided faces
 )
 
+const (
+	TextureMapModeUV     = iota // Default texture mapping mode. The UV values on the model impact where the texture renders.
+	TextureMapModeScreen        // Screen-space texture mapping mode. The texture renders plainly to the screen.
+)
+
+const (
+	DepthModeDefault             = iota // Default custom depth mode; unaltered depth writing
+	CustomDepthModeUnbillboarded        // Unbillboarded depth mode; depth is written as though the mesh were not transformed
+)
+
 type Material struct {
 	library           *Library       // library is a reference to the Library that this Material came from.
 	Name              string         // Name is the name of the Material.
@@ -48,14 +58,19 @@ type Material struct {
 	TexturePath       string         // The path to the texture, if it was not packed into the exporter.
 	TextureFilterMode ebiten.Filter  // Texture filtering mode
 	textureWrapMode   ebiten.Address // Texture wrapping mode; this is ignored currently, as all triangles render through shaders, where looping is enforced.
-	properties        Properties     // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
-	BackfaceCulling   bool           // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
-	TriangleSortMode  int            // TriangleSortMode influences how triangles with this Material are sorted.
-	Shadeless         bool           // If the material should be shadeless (unlit) or not
-	Fogless           bool           // If the material should be fogless or not
-	Blend             ebiten.Blend   // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
-	BillboardMode     int            // Billboard mode
-	Visible           bool           // Whether the material is visible or not
+
+	TextureMapMode         int     // Texture mapping mode.
+	TextureMapScreenSize   float32 // The size multiplier of the texture when mapping to the screen in pixels. 1.0 means a 32px texture will appear 32px onscreen.
+	TextureMapScreenOffset Vector2 // Offset for screenspace texture mapping in pixels.
+
+	properties       Properties   // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
+	BackfaceCulling  bool         // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
+	TriangleSortMode int          // TriangleSortMode influences how triangles with this Material are sorted.
+	Shadeless        bool         // If the material should be shadeless (unlit) or not
+	Fogless          bool         // If the material should be fogless or not
+	Blend            ebiten.Blend // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
+	BillboardMode    int          // Billboard mode
+	Visible          bool         // Whether the material is visible or not
 
 	// fragmentShader represents a shader used to render the material with. This shader is activated after rendering
 	// to the depth texture, but before compositing the finished render to the screen after fog.
@@ -77,16 +92,18 @@ type Material struct {
 	// all non-transparent materials.
 	TransparencyMode int
 
-	CustomDepthOffsetOn    bool    // Whether custom depth offset is on or not.
-	CustomDepthOffsetValue float32 // How many world units to offset the depth of the material by.
-	LightingMode           int     // How materials are lit
+	DepthMode    int // What depth mode to use for writing depth for this material
+	LightingMode int // How materials are lit
 
 	// CustomDepthFunction is a customizeable function that takes the depth value of each vertex of a rendered MeshPart and
-	// transforms it, returning a different value.
-	// A good use for this would be to render sprites on billboarded planes with a higher depth, thereby fixing them
+	// optionally transforms it, returning a different value.
+	// A good use for this would be to render sprites on billboarded planes with a higher or fixed depth, thereby fixing them
 	// "cutting" into geometry that's further back.
+	// model is a reference to the rendering model, camera the rendering camera, meshPart the rendering mesh part, vertIndex
+	// the depth for the vertex being rendered of the given index, and originalDepth being the vertex's original transformed
+	// depth. The function should return the ideal depth of the vertex from the camera in world units.
 	// The default value for CustomDepthFunction is nil.
-	CustomDepthFunction func(originalDepth float32) float32
+	CustomDepthFunction func(model *Model, camera *Camera, meshPart *MeshPart, vertIndex int, originalDepth float32) float32
 }
 
 // NewMaterial creates a new Material with the name given.
@@ -105,6 +122,7 @@ func NewMaterial(name string) *Material {
 		FragmentShaderOn:      true,
 		Blend:                 ebiten.BlendSourceOver,
 		Visible:               true,
+		TextureMapScreenSize:  1,
 	}
 }
 
@@ -119,6 +137,9 @@ func (m *Material) Clone() *Material {
 	newMat.TexturePath = m.TexturePath
 	newMat.TextureFilterMode = m.TextureFilterMode
 	newMat.textureWrapMode = m.textureWrapMode
+	newMat.TextureMapMode = m.TextureMapMode
+	newMat.TextureMapScreenSize = m.TextureMapScreenSize
+	newMat.TextureMapScreenOffset = m.TextureMapScreenOffset
 
 	newMat.properties = m.properties.Clone()
 	newMat.BackfaceCulling = m.BackfaceCulling
@@ -132,15 +153,20 @@ func (m *Material) Clone() *Material {
 	newMat.SetShaderText(m.fragmentSrc)
 	newMat.FragmentShaderOn = m.FragmentShaderOn
 
-	newMat.FragmentShaderOptions.CompositeMode = m.FragmentShaderOptions.CompositeMode
-	newMat.FragmentShaderOptions.FillRule = m.FragmentShaderOptions.FillRule
+	f := *m.FragmentShaderOptions
+	newMat.FragmentShaderOptions = &f
 	for i := range m.FragmentShaderOptions.Images {
 		newMat.FragmentShaderOptions.Images[i] = m.FragmentShaderOptions.Images[i]
 	}
 	for k, v := range newMat.FragmentShaderOptions.Uniforms {
 		newMat.FragmentShaderOptions.Uniforms[k] = v
 	}
+
 	newMat.TransparencyMode = m.TransparencyMode
+	newMat.DepthMode = m.DepthMode
+	newMat.LightingMode = m.LightingMode
+
+	newMat.CustomDepthFunction = m.CustomDepthFunction
 
 	return newMat
 }

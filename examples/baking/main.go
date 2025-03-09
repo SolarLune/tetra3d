@@ -163,7 +163,7 @@ ambient occlusion can be baked into vertex colors.
 1 Key: Switch to vertex color-only channel 
 2 Key: Switch to only AO
 3 key: Switch to only lighting
-4 Key: Switch to combined vertex color
+4 Key: Switch to VC + AO + Lighting
 5 Key: Enable / disable texture channel`
 		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}

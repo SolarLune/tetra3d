@@ -237,7 +237,7 @@ func (color Color) String() string {
 // Cribbed from: https://github.com/lucasb-eyer/go-colorful/blob/master/colors.go
 func NewColorFromHSV(h, s, v float32) Color {
 
-	for h > 1 {
+	for h >= 1 {
 		h--
 	}
 	for h < 0 {

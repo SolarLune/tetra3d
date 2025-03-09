@@ -1,6 +1,8 @@
 package tetra3d
 
-import "github.com/solarlune/tetra3d/math32"
+import (
+	"github.com/solarlune/tetra3d/math32"
+)
 
 // BoundingTriangles is a Node specifically for detecting a collision between any of the triangles from a mesh instance and another BoundingObject.
 type BoundingTriangles struct {
@@ -75,7 +77,7 @@ func (bt *BoundingTriangles) Clone() INode {
 	clone.Broadphase = bt.Broadphase.Clone()
 	clone.Node = bt.Node.clone(clone).(*Node)
 	clone.Node.onTransformUpdate = clone.UpdateTransform
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 	return clone
@@ -103,7 +105,7 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 				inter.MTV = inter.MTV.Invert()
 				inter.Normal = inter.Normal.Invert()
 			}
-			intersection.BoundingObject = otherBounds
+			intersection.Object = otherBounds
 		}
 		return intersection
 
@@ -114,7 +116,7 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 				inter.MTV = inter.MTV.Invert()
 				inter.Normal = inter.Normal.Invert()
 			}
-			intersection.BoundingObject = otherBounds
+			intersection.Object = otherBounds
 		}
 		return intersection
 
@@ -128,7 +130,7 @@ func (bt *BoundingTriangles) Collision(other IBoundingObject) *Collision {
 				inter.MTV = inter.MTV.Invert()
 				inter.Normal = inter.Normal.Invert()
 			}
-			intersection.BoundingObject = otherBounds
+			intersection.Object = otherBounds
 		}
 		return intersection
 
@@ -209,10 +211,10 @@ func closestPointOnTri(point, v0, v1, v2 Vector3) Vector3 {
 	ca := colPlane.closestPointOnLine(point, v2, v0)
 
 	closest := ab
-	closestDist := point.DistanceSquared(ab)
+	closestDist := point.DistanceSquaredTo(ab)
 
-	bcDist := point.DistanceSquared(bc)
-	caDist := point.DistanceSquared(ca)
+	bcDist := point.DistanceSquaredTo(bc)
+	caDist := point.DistanceSquaredTo(ca)
 
 	if bcDist < closestDist {
 		closest = bc

@@ -168,7 +168,7 @@ func (path *Path) Clone() INode {
 
 	clone.Node = path.Node.clone(clone).(*Node)
 
-	if clone.Callbacks() != nil && clone.Callbacks().OnClone != nil {
+	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
 
