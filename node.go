@@ -618,16 +618,34 @@ func (node *Node) SetLocalPositionVec(position Vector3) {
 	node.SetLocalPosition(position.X, position.Y, position.Z)
 }
 
+// SetLocalX sets the X component of the object's local position.
+func (node *Node) SetLocalX(x float32) {
+	node.position.X = x
+	node.dirtyTransform()
+}
+
+// SetLocalY sets the Y component of the object's local position.
+func (node *Node) SetLocalY(y float32) {
+	node.position.Y = y
+	node.dirtyTransform()
+}
+
+// SetLocalZ sets the Z component of the object's local position.
+func (node *Node) SetLocalZ(z float32) {
+	node.position.Z = z
+	node.dirtyTransform()
+}
+
 // SetWorldPositionVec sets the object's world position (position relative to the world origin point of {0, 0, 0}).
 // position needs to be a 3D vector (i.e. X, Y, and Z components).
-func (node *Node) SetWorldPositionVec(position Vector3) {
+func (node *Node) SetWorldPosition(x, y, z float32) {
 
 	if node.parent != nil {
 
 		parentTransform := node.parent.Transform()
 		parentPos, parentScale, parentRot := parentTransform.Decompose()
 
-		pr := parentRot.Transposed().MultVec(position.Sub(parentPos))
+		pr := parentRot.Transposed().MultVec(Vector3{X: x, Y: y, Z: z}.Sub(parentPos))
 		pr.X /= parentScale.X
 		pr.Y /= parentScale.Y
 		pr.Z /= parentScale.Z
@@ -635,9 +653,9 @@ func (node *Node) SetWorldPositionVec(position Vector3) {
 		node.position = pr
 
 	} else {
-		node.position.X = position.X
-		node.position.Y = position.Y
-		node.position.Z = position.Z
+		node.position.X = x
+		node.position.Y = y
+		node.position.Z = z
 	}
 
 	node.dirtyTransform()
@@ -645,8 +663,8 @@ func (node *Node) SetWorldPositionVec(position Vector3) {
 }
 
 // SetWorldPosition sets the object's world position (position relative to the world origin point of {0, 0, 0}).
-func (node *Node) SetWorldPosition(x, y, z float32) {
-	node.SetWorldPositionVec(Vector3{x, y, z})
+func (node *Node) SetWorldPositionVec(vec Vector3) {
+	node.SetWorldPosition(vec.X, vec.Y, vec.Z)
 }
 
 // SetWorldX sets the X component of the object's world position.
