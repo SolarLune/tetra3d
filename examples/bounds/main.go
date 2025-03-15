@@ -9,6 +9,7 @@ import (
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"
+	"github.com/solarlune/tetra3d/math32"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -49,7 +50,6 @@ func (g *Game) Init() {
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
 	g.Camera.SetLocalPosition(0, 6, 15)
-	g.Camera.SetFar(40)
 
 	g.System = examples.NewBasicSystemHandler(g)
 
@@ -63,7 +63,7 @@ func (g *Game) Update() error {
 	gravity := float32(0.05)
 
 	bounds := g.Controlling.Children()[0].(tetra3d.IBoundingObject)
-	solids := g.Scene.Root.SearchTree().IBoundingObjects()
+	solids := g.Scene.Root.SearchTree().Not(bounds) // Either not the bounds or just the solid objects; either would work here
 
 	movement := g.Movement.Modify() // Modification Vector
 
@@ -81,9 +81,7 @@ func (g *Game) Update() error {
 		movement.Z += accel
 	}
 
-	movement.SubMagnitude(friction)
-
-	movement.ClampMagnitude(maxSpd)
+	movement.SubMagnitude(friction).ClampMagnitude(maxSpd)
 
 	if g.VerticalSpeed < -0.3 {
 		g.VerticalSpeed = -0.3
@@ -91,35 +89,36 @@ func (g *Game) Update() error {
 
 	g.VerticalSpeed -= gravity
 
+	boundsHalfHeight := float32(0)
+	switch b := bounds.(type) {
+	case *tetra3d.BoundingSphere:
+		boundsHalfHeight = b.Radius
+	case *tetra3d.BoundingCapsule:
+		boundsHalfHeight = b.Height / 2
+	}
+
+	from := g.Controlling.WorldPosition()
+
+	if ray := tetra3d.RayTest(tetra3d.RayTestOptions{
+		From:        from,
+		To:          from.SubY(boundsHalfHeight + math32.Abs(g.VerticalSpeed) + 0.25),
+		Doublesided: true,
+		TestAgainst: solids,
+	}); ray != nil {
+		margin := float32(0.1)
+		g.Controlling.SetWorldY(ray.Position.Y + boundsHalfHeight + margin)
+		g.VerticalSpeed = 0
+	}
+
+	// Now move. Vertical speed is separate so that jumping or falling isn't clamped by move speed.
+	g.Controlling.Move(g.Movement.X, g.VerticalSpeed, g.Movement.Z)
+
 	// Now, check for collisions.
 
-	// Horizontal check (walls):
-
-	g.Controlling.MoveVec(g.Movement)
-
-	margin := float32(0.01)
-
 	bounds.CollisionTest(tetra3d.CollisionTestSettings{
 
 		OnCollision: func(col *tetra3d.Collision, index, count int) bool {
-			mtv := col.AverageMTV()
-			mtv.Y = 0                                       // We don't want to move up to avoid collision
-			g.Controlling.MoveVec(mtv.Expand(margin, 0.01)) // Move out of the collision, but add a little margin
-			return true
-		},
-
-		TestAgainst: solids,
-	})
-
-	// Vertical check (floors):
-
-	g.Controlling.Move(0, g.VerticalSpeed, 0)
-
-	bounds.CollisionTest(tetra3d.CollisionTestSettings{
-
-		OnCollision: func(col *tetra3d.Collision, index, count int) bool {
-			g.Controlling.Move(0, col.AverageMTV().Y+margin, 0) // Move the object up, so that it's on the ground, plus a little margin
-			g.VerticalSpeed = 0
+			g.Controlling.MoveVec(col.AverageMTV())
 			return true
 		},
 

@@ -8,6 +8,8 @@ import (
 	_ "embed"
 )
 
+const MaxFloat32 = float32(math.MaxFloat32)
+
 // ToRadians is a helper function to easily convert degrees to radians (which is what the rotation-oriented functions in Tetra3D use).
 func ToRadians(degrees float32) float32 {
 	return math.Pi * degrees / 180

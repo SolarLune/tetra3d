@@ -350,13 +350,11 @@ type RayTestOptions struct {
 
 // RayTest casts a ray from the "from" world position to the "to" world position, testing against the provided
 // IBoundingObjects.
-// RayTest returns a boolean indicating if any objects were struck with the given RayTestOptions options set.
-func RayTest(options RayTestOptions) bool {
+// The function returns the first struck object; if none were struck, it returns nil.
+func RayTest(options RayTestOptions) *RayHit {
 
 	// We re-use the internal raytest function to avoid reallocating a slice.
 	internalRayTest = internalRayTest[:0]
-
-	quitEarly := false
 
 	options.TestAgainst.ForEach(func(node INode) bool {
 
@@ -393,26 +391,15 @@ func RayTest(options RayTestOptions) bool {
 
 		}
 
-		// If we're not paying attention to the ray test results specifically, then we can bail after any valid
-		// ray test result.
-		if options.OnHit == nil && len(internalRayTest) > 0 {
-			quitEarly = true
-			return false
-		}
-
 		return true
 
 	})
 
-	if quitEarly {
-		return true
-	}
+	sort.Slice(internalRayTest, func(i, j int) bool {
+		return internalRayTest[i].Position.DistanceSquaredTo(options.From) < internalRayTest[j].Position.DistanceSquaredTo(options.From)
+	})
 
 	if options.OnHit != nil {
-
-		sort.Slice(internalRayTest, func(i, j int) bool {
-			return internalRayTest[i].Position.DistanceSquaredTo(options.From) < internalRayTest[j].Position.DistanceSquaredTo(options.From)
-		})
 
 		for i, r := range internalRayTest {
 			if !options.OnHit(r, i, len(internalRayTest)) {
@@ -422,7 +409,10 @@ func RayTest(options RayTestOptions) bool {
 
 	}
 
-	return len(internalRayTest) > 0
+	if len(internalRayTest) > 0 {
+		return &internalRayTest[0]
+	}
+	return nil
 
 }
 
@@ -446,10 +436,10 @@ type MouseRayTestOptions struct {
 // MouseRayTest casts a ray forward from the mouse's position onscreen, testing against the provided
 // IBoundingObjects found in the MouseRayTestOptions struct.
 // The function calls the callback found in the MouseRayTestOptions struct for each object struck by the ray.
-// The function returns a boolean indicating if any objects were struck at all.
+// The function returns the first struck object; if none were struck, it returns nil.
 // Note that each object can only be struck once by the raycast, with the exception of BoundingTriangles
 // objects (since a single ray may strike multiple triangles).
-func (camera *Camera) MouseRayTest(options MouseRayTestOptions) bool {
+func (camera *Camera) MouseRayTest(options MouseRayTestOptions) *RayHit {
 
 	if options.Depth <= 0 {
 		options.Depth = camera.far

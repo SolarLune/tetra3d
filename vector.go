@@ -113,19 +113,19 @@ func (vec Vector3) Sub(other Vector3) Vector3 {
 
 // SubX returns a copy of the calling vector, with the value provided subtracted from the X component.
 func (vec Vector3) SubX(value float32) Vector3 {
-	vec.X += value
+	vec.X -= value
 	return vec
 }
 
 // SubY returns a copy of the calling vector, with the value provided subtracted from the Y component.
 func (vec Vector3) SubY(value float32) Vector3 {
-	vec.Y += value
+	vec.Y -= value
 	return vec
 }
 
 // SubZ returns a copy of the calling vector, with the value provided subtracted from the Z component.
 func (vec Vector3) SubZ(value float32) Vector3 {
-	vec.Z += value
+	vec.Z -= value
 	return vec
 }
 

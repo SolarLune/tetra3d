@@ -76,8 +76,8 @@ func (sphere *BoundingSphere) Collision(other IBoundingObject) *Collision {
 
 // CollisionTest performs a collision test using the provided collision test settings structure.
 // Collisions reported will be sorted in distance from closest to furthest.
-// The function will return if a collision was found with the sphere at the settings specified.
-func (sphere *BoundingSphere) CollisionTest(settings CollisionTestSettings) bool {
+// The function will return the first collision found with the object; if no collision is found, then it returns nil.
+func (sphere *BoundingSphere) CollisionTest(settings CollisionTestSettings) *Collision {
 	return commonCollisionTest(sphere, settings)
 }
 

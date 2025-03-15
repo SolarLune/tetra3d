@@ -1,6 +1,8 @@
 package tetra3d
 
-import "github.com/solarlune/tetra3d/math32"
+import (
+	"github.com/solarlune/tetra3d/math32"
+)
 
 // BoundingCapsule represents a 3D capsule, whose primary purpose is to perform intersection testing between itself and other Bounding Nodes.
 type BoundingCapsule struct {
@@ -86,8 +88,8 @@ func (capsule *BoundingCapsule) Collision(other IBoundingObject) *Collision {
 
 // CollisionTest performs a collision test using the provided collision test settings structure.
 // Collisions reported will be sorted in distance from closest to furthest.
-// The function will return if a collision was found with the sphere at the settings specified.
-func (capsule *BoundingCapsule) CollisionTest(settings CollisionTestSettings) bool {
+// The function will return the first collision found with the object; if no collision is found, then it returns nil.
+func (capsule *BoundingCapsule) CollisionTest(settings CollisionTestSettings) *Collision {
 	return commonCollisionTest(capsule, settings)
 }
 
@@ -224,6 +226,7 @@ func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector3) 
 	if heightScale < 0 {
 		heightScale = 0
 	}
+
 	capStart := capsule.Node.WorldPosition().Add(up.Scale(-heightScale))
 	capEnd := capsule.Node.WorldPosition().Add(up.Scale(heightScale))
 
@@ -241,7 +244,8 @@ func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector3) 
 	var t float32
 	var s float32
 
-	if det < eps*uu*vv {
+	// If determinant is 0, then go with the first calculation because number / 0 makes s and t NaNs.
+	if det < eps*uu*vv || det == 0 {
 		s = math32.Clamp(ru/uu, 0, 1)
 		t = 0
 	} else {
