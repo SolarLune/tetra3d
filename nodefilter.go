@@ -22,6 +22,10 @@ const (
 
 // NodeIterator is an interface that allows calling a callback for each node in a collection.
 type NodeIterator interface {
+	// ForEach is a method to iterate through a selection of Nodes, calling the callback
+	// function (forEachFunc) for each Node along the way.
+	// If the given function returns false, the iteration stops. If it returns true, it continues
+	// until the end.
 	ForEach(forEachFunc func(node INode) bool)
 }
 
@@ -246,25 +250,31 @@ func (nf NodeFilter) ByFunc(filterFunc func(node INode) bool) NodeFilter {
 	return nf
 }
 
-// ByPropNameRegex allows you to filter a given selection of nodes by the provided set of property names,
-// evaluated as regex strings.
-// If the Nodes in the filter have any property that satisfy one of the supplied regex string, they pass
+// ByProp allows you to filter a given selection of nodes by if the node has a property
+// of the provided name.
+// If no matching Nodes are found, an empty NodeFilter is returned.
+func (nf NodeFilter) ByProp(propName string) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		return node.Properties().Has(propName)
+	})
+	return nf
+}
+
+// ByPropRegex allows you to filter a given selection of nodes by the provided regex string.
+// If the Nodes in the filter have any property that satisfy the supplied regex string, they pass
 // the filter and are included.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByPropNameRegex(propNameRegexStrings ...string) NodeFilter {
+func (nf NodeFilter) ByPropRegex(propNameRegexString string) NodeFilter {
 
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 
-		for _, propName := range propNameRegexStrings {
-
-			for existingName := range node.Properties() {
-				match, _ := regexp.MatchString(propName, existingName)
-				if match {
-					return true
-				}
+		for existingName := range node.Properties() {
+			match, _ := regexp.MatchString(propNameRegexString, existingName)
+			if match {
+				return true
 			}
-
 		}
+
 		return false
 
 	})
@@ -276,7 +286,7 @@ func (nf NodeFilter) ByPropNameRegex(propNameRegexStrings ...string) NodeFilter 
 // ByProp allows you to filter a given selection of nodes by a property value check - if the nodes filtered
 // have a property with the given value, they are included.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByProp(propName string, propValue any) NodeFilter {
+func (nf NodeFilter) ByPropValue(propName string, propValue any) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		value := node.Properties().Get(propName)
 		return value != nil && value.Value == propValue
@@ -284,27 +294,34 @@ func (nf NodeFilter) ByProp(propName string, propValue any) NodeFilter {
 	return nf
 }
 
-// ByParentProps allows you to filter a given selection of nodes if the node has a parent with the provided
-// set of property names.
-// If anyProp is true, then any matching Node will be added if it has any of the properties provided;
-// otherwise, the Node would have to have all of the properties provided.
+// ByParentProp allows you to filter a given selection of nodes if the node has a parent with a property
+// of the provided name, regardless of actual value.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByParentProps(anyProp bool, propNames ...string) NodeFilter {
+func (nf NodeFilter) ByParentProp(propName string) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
-		if anyProp {
-
-			if node.Parent() != nil {
-				parent := node.Parent()
-				for _, p := range propNames {
-					if parent.Properties().Has(p) {
-						return true
-					}
-				}
+		if node.Parent() != nil {
+			props := node.Parent().Properties()
+			if props.Has(propName) {
+				return true
 			}
-			return false
-
 		}
-		return node.Parent() != nil && node.Parent().Properties().Has(propNames...)
+		return false
+	})
+	return nf
+}
+
+// ByParentPropAndValue allows you to filter a given selection of nodes if the node has a parent with a property
+// of the provided name and value.
+// If no matching Nodes are found, an empty NodeFilter is returned.
+func (nf NodeFilter) ByParentPropValue(propName string, propValue any) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		if node.Parent() != nil {
+			props := node.Parent().Properties()
+			if props.Has(propName) && props.Get(propName).Value == propValue {
+				return true
+			}
+		}
+		return false
 	})
 	return nf
 }
@@ -317,13 +334,13 @@ func (nf NodeFilter) ByName(name string) NodeFilter {
 	return nf
 }
 
-// ByRegex allows you to filter a given selection of nodes by their names using the given regex string.
+// ByNameRegex allows you to filter a given selection of nodes by their names using the given regex string.
 // If you want to filter a selection of nodes in such a way that only nodes that have names that
 // >contain< the given text (i.e. strings.Contains()) are selected for filtering, you can just pass
-// that string into ByRegex directly.
+// that string into ByNameRegex directly.
 // If the regexp string is invalid or no matching Nodes are found, the node isn't
 // added to the filter results. See https://regexr.com/ for regex help / reference.
-func (nf NodeFilter) ByRegex(regexString string) NodeFilter {
+func (nf NodeFilter) ByNameRegex(regexString string) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		match, _ := regexp.MatchString(regexString, node.Name())
 		return match
@@ -351,6 +368,24 @@ func (nf NodeFilter) Not(others ...INode) NodeFilter {
 			}
 		}
 		return true
+	})
+	return nf
+}
+
+// NotIterator allows you to filter OUT a NodeFilter of nodes from another NodeFilter.
+// In other words, any node that is included in the given NodeIterator (which could even be
+// another NodeFilter) is NOT included in the starting NodeFilter.
+func (nf NodeFilter) NotIterator(others NodeIterator) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		filteredOut := false
+		others.ForEach(func(other INode) bool {
+			if other == node {
+				filteredOut = true
+				return false
+			}
+			return true
+		})
+		return filteredOut
 	})
 	return nf
 }

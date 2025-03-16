@@ -37,14 +37,9 @@ func (props Properties) Remove(tag string) {
 	delete(props, tag)
 }
 
-// Has returns true if the Properties object has properties by all of the names specified, and false otherwise.
-func (props Properties) Has(propNames ...string) bool {
-	for _, propName := range propNames {
-		if props.Get(propName) == nil {
-			return false
-		}
-	}
-	return true
+// Has returns true if the Properties object has a property by the name specified.
+func (props Properties) Has(propName string) bool {
+	return props.Get(propName) != nil
 }
 
 // Add adds a property to the Properties map using the given name.
