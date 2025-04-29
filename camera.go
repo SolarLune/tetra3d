@@ -2343,8 +2343,9 @@ type DrawDebugBoundsColoredSettings struct {
 	RenderCapsules bool  // Whether BoundingCapsules should be rendered or not
 	CapsuleColor   Color // The color used to render BoundingSpheres
 
-	RenderTriangles bool  // Whether BoundingTriangles should be rendered or not
-	TrianglesColor  Color // The color used to render BoundingTriangles
+	RenderTriangles               bool  // Whether BoundingTriangles should be rendered or not
+	TrianglesColor                Color // The color used to render BoundingTriangles
+	RenderTrianglesBackfaceCulled bool
 
 	RenderTrianglesAABB bool  // Whether the AABB surrounding BoundingTriangles should be rendered not
 	TrianglesAABBColor  Color // The color used to render the AABB surrounding BoundingTriangles
@@ -2360,6 +2361,10 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
 
 	for _, n := range allModels {
+
+		p, s, r := n.Transform().Inverted().Decompose()
+		invertedCamPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector3{1 / s.X, 1 / s.Y, 1 / s.Z}))
+		invertedCamForward := camera.WorldRotation().Forward().Invert()
 
 		if b, isBounds := n.(IBoundingObject); isBounds {
 
@@ -2478,9 +2483,16 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 					halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
 
+					transformNoLoc := bounds.Transform()
+					transformNoLoc.SetRow(3, Vector4{0, 0, 0, 1})
+
 					for _, tri := range mesh.Triangles {
 
 						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
+
+						if options.RenderTrianglesBackfaceCulled && ((camera.perspective && tri.Normal.Dot(invertedCamPos.Sub(tri.Center)) < 0) || (!camera.perspective && tri.Normal.Dot(invertedCamForward) > 0)) {
+							continue
+						}
 
 						v0 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, false).To3D()
 						v1 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, false).To3D()
@@ -2543,13 +2555,13 @@ func DefaultDrawDebugBoundsSettings() DrawDebugBoundsColoredSettings {
 		RenderSpheres:       true,
 		RenderCapsules:      true,
 		RenderTriangles:     true,
-		RenderTrianglesAABB: false,
+		RenderTrianglesAABB: true,
 		RenderBroadphases:   false,
 
-		AABBColor:          NewColor(0, 0.25, 1, 1),
-		SphereColor:        NewColor(0.5, 0.25, 1.0, 1),
-		CapsuleColor:       NewColor(0.25, 1, 0, 1),
-		TrianglesColor:     NewColor(0, 0, 0, 0.5),
+		AABBColor:          NewColor(0, 0.25, 1, 0.5),
+		SphereColor:        NewColor(0.5, 0.25, 1.0, 0.5),
+		CapsuleColor:       NewColor(0.25, 1, 0, 0.5),
+		TrianglesColor:     NewColor(0, 0, 0, 0.25),
 		TrianglesAABBColor: NewColor(1, 0.5, 0, 0.25),
 		BroadphaseColor:    NewColor(1, 0, 0, 0.1),
 	}

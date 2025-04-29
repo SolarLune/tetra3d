@@ -438,7 +438,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			newMat.Color.A = float32(color[3])
 		}
 
-		newMat.Color.ConvertTosRGB()
+		newMat.Color = newMat.Color.ConvertTosRGB()
 
 		library.Materials[gltfMat.Name] = newMat
 
@@ -937,18 +937,21 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			color := *lightData.Color
 
 			if lightData.Type == lightspunctual.TypeDirectional {
-				directionalLight := NewDirectionalLight(node.Name, float32(color[0]), float32(color[1]), float32(color[2]), float32(*lightData.Intensity)) // Sun is in "energy"
+				directionalLight := NewDirectionalLight(node.Name, 1, 1, 1, float32(*lightData.Intensity)) // Sun is in "energy"
+				directionalLight.color = NewColor(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
 				obj = directionalLight
 			} else if lightData.Type == lightspunctual.TypePoint {
-				pointLight := NewPointLight(node.Name, float32(color[0]), float32(color[1]), float32(color[2]), float32(*lightData.Intensity)/80) // Point lights have wattage energy
+				pointLight := NewPointLight(node.Name, 1, 1, 1, float32(*lightData.Intensity)/80) // Point lights have wattage energy
+				pointLight.color = NewColor(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
 				if !math.IsInf(*lightData.Range, 0) {
 					pointLight.Range = float32(*lightData.Range)
 				}
 				obj = pointLight
 			} else {
-				// Any unsupported light type just gets turned into an ambient light
-				pointLight := NewAmbientLight(node.Name, float32(color[0]), float32(color[1]), float32(color[2]), float32(*lightData.Intensity)/80)
-				obj = pointLight
+				// Any other unsupported light type just gets turned into an ambient light (along with ambient lights)
+				light := NewAmbientLight(node.Name, 1, 1, 1, float32(*lightData.Intensity)/80)
+				light.color = NewColor(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
+				obj = light
 			}
 
 		} else if node.Extras != nil && nodeHasProp(node, "t3dPathPoints__") {

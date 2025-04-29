@@ -11,22 +11,22 @@ import (
 
 // Much of the harder code taken with HEAVY appreciation from quartercastle: https://github.com/quartercastle/vector
 
-// WorldRight represents a unit vector in the global direction of WorldRight on the right-handed OpenGL / Tetra3D's coordinate system (+X).
+// WorldRight represents a unit vector in the global direction of rightward on the right-handed OpenGL / Tetra3D's coordinate system (+X).
 var WorldRight = NewVector3(1, 0, 0)
 
-// WorldLeft represents a unit vector in the global direction of WorldLeft on the right-handed OpenGL / Tetra3D's coordinate system (-X).
+// WorldLeft represents a unit vector in the global direction of leftward on the right-handed OpenGL / Tetra3D's coordinate system (-X).
 var WorldLeft = WorldRight.Invert()
 
-// WorldUp represents a unit vector in the global direction of WorldUp on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
+// WorldUp represents a unit vector in the global direction of upward on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
 var WorldUp = NewVector3(0, 1, 0)
 
-// WorldDown represents a unit vector in the global direction of WorldDown on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
+// WorldDown represents a unit vector in the global direction of downward on the right-handed OpenGL / Tetra3D's coordinate system (+Y).
 var WorldDown = WorldUp.Invert()
 
-// WorldBackward represents a unit vector in the global direction of WorldBackward on the right-handed OpenGL / Tetra3D's coordinate system (+Z).
+// WorldBackward represents a unit vector in the global direction of backwards (towards the camera, assuming no rotations) on the right-handed OpenGL / Tetra3D's coordinate system (+Z).
 var WorldBackward = NewVector3(0, 0, 1)
 
-// WorldForward represents a unit vector in the global direction of WorldForward on the right-handed OpenGL / Tetra3D's coordinate system (-Z).
+// WorldForward represents a unit vector in the global direction of forwards (away from the camera, assuming no rotations) on the right-handed OpenGL / Tetra3D's coordinate system (-Z).
 var WorldForward = WorldBackward.Invert()
 
 // Vector3 represents a 3D Vector3, which can be used for usual 3D applications (position, direction, velocity, etc).
@@ -310,16 +310,16 @@ func (vec Vector3) SetZ(z float32) Vector3 {
 	return vec
 }
 
-// Set sets the values in the Vector3 to the x, y, and z values provided.
-func (vec Vector3) Set(x, y, z float32) Vector3 {
+// SetXYZ sets the values in the Vector3 to the x, y, and z values provided.
+func (vec Vector3) SetXYZ(x, y, z float32) Vector3 {
 	vec.X = x
 	vec.Y = y
 	vec.Z = z
 	return vec
 }
 
-// SetTo sets the values in the Vector3 to the values in the other Vector3.
-func (vec *Vector3) SetTo(other Vector3) {
+// Set sets the values in the Vector3 to the values in the other Vector3.
+func (vec *Vector3) Set(other Vector3) {
 	vec.X = other.X
 	vec.Y = other.Y
 	vec.Z = other.Z
@@ -534,16 +534,16 @@ func NewModVector3(x, y, z float32) *ModVector3 {
 	}
 }
 
-// Set sets the values in the Vector to the x, y, and z values provided.
-func (ip *ModVector3) Set(x, y, z float32) *ModVector3 {
+// SetXYZ sets the values in the Vector to the x, y, and z values provided.
+func (ip *ModVector3) SetXYZ(x, y, z float32) *ModVector3 {
 	ip.Vector3.X = x
 	ip.Vector3.Y = y
 	ip.Vector3.Z = z
 	return ip
 }
 
-// SetTo sets the values in the Vector3 to the values in the other Vector2.
-func (vec *ModVector3) SetTo(other Vector3) {
+// Set sets the values in the Vector3 to the values in the other Vector2.
+func (vec *ModVector3) Set(other Vector3) {
 	vec.Vector3.X = other.X
 	vec.Vector3.Y = other.Y
 	vec.Vector3.Z = other.Z
@@ -1012,15 +1012,15 @@ func (vec Vector2) SetY(y float32) Vector2 {
 	return vec
 }
 
-// Set sets the values in the Vector to the x, y, and z values provided.
-func (vec Vector2) Set(x, y float32) Vector2 {
+// SetXY sets the values in the Vector to the x, y, and z values provided.
+func (vec Vector2) SetXY(x, y float32) Vector2 {
 	vec.X = x
 	vec.Y = y
 	return vec
 }
 
-// SetTo sets the values in the Vector3 to the values in the other Vector2.
-func (vec *Vector2) SetTo(other Vector2) {
+// Set sets the values in the Vector3 to the values in the other Vector2.
+func (vec *Vector2) Set(other Vector2) {
 	vec.X = other.X
 	vec.Y = other.Y
 }

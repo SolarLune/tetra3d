@@ -310,17 +310,20 @@ class OBJECT_OT_tetra3dFocusObject(bpy.types.Operator):
 
         return {'FINISHED'}
 
-search_name = False
+search_mode = "name"
 
 def enum_search(scene, context):
 
     options = set()
 
     def check_properties(o):
-        global search_name
+        global search_mode
         for p in o.t3dGameProperties__:
-            if search_name:
+            if search_mode == "name":
                 options.add((p.name, p.name, ""))
+            elif search_mode == "filepath":
+                if p.valueType == "file":
+                    options.add((p.valueFilepath, p.valueFilepath, ""))
             else:
                 if p.valueType == "string":
                     options.add((p.valueString, p.valueString, ""))
@@ -349,7 +352,7 @@ class OBJECT_OT_tetra3dSearchStringProperties(bpy.types.Operator):
     index : bpy.props.IntProperty()
     search_options: bpy.props.EnumProperty(name="Search Options", items=enum_search)
     mode : bpy.props.StringProperty()
-    search_name : bpy.props.BoolProperty()
+    search_mode : bpy.props.StringProperty()
 
     def execute(self, context):
 
@@ -362,19 +365,18 @@ class OBJECT_OT_tetra3dSearchStringProperties(bpy.types.Operator):
         elif self.mode == "action":
             target = context.active_action
 
-        if self.search_name:
+        if self.search_mode == "name":
             target.t3dGameProperties__[self.index].name = self.search_options
+        elif self.search_mode == "filepath":
+            target.t3dGameProperties__[self.index].valueFilepath = self.search_options
         else:
             target.t3dGameProperties__[self.index].valueString = self.search_options
 
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        global search_name
-        if self.search_name:
-            search_name = True
-        else:
-            search_name = False
+        global search_mode
+        search_mode = self.search_mode
         context.window_manager.invoke_search_popup(self)
         return {'FINISHED'}
 
@@ -906,7 +908,7 @@ def handleT3DProperties(self, props, operatorType, enabled=True, objectIndex=0):
         row.prop(prop, "name")
 
         op = row.operator(OBJECT_OT_tetra3dSearchStringProperties.bl_idname, text="", icon="VIEWZOOM")
-        op.search_name = True
+        op.search_mode = "name"
         op.index = index
         op.mode = operatorType
         
@@ -942,7 +944,7 @@ def handleT3DProperties(self, props, operatorType, enabled=True, objectIndex=0):
             op = row.operator(OBJECT_OT_tetra3dSearchStringProperties.bl_idname, text="", icon="VIEWZOOM")
             op.index = index
             op.mode = operatorType
-            op.search_name = False
+            op.search_mode = "string"
         elif prop.valueType == "reference":
             row.prop(prop, "valueReferenceScene")
             if prop.valueReferenceScene != None:
@@ -972,6 +974,10 @@ def handleT3DProperties(self, props, operatorType, enabled=True, objectIndex=0):
             setCur.buttonMode = "3D cursor"
         elif prop.valueType == "file":
             row.prop(prop, "valueFilepath")
+            op = row.operator(OBJECT_OT_tetra3dSearchStringProperties.bl_idname, text="", icon="VIEWZOOM")
+            op.index = index
+            op.mode = operatorType
+            op.search_mode = "filepath"
             ext = os.path.splitext(prop.valueFilepath)[1]
 
             if ext in bpy.path.extensions_audio:

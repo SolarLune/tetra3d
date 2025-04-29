@@ -76,6 +76,11 @@ func (nf *NodeFilter) execute(node INode) []INode {
 	nf.depth++
 	out := []INode{}
 	added := true
+
+	if nf.includeStart && node == nf.Start {
+		node = node.getOwner()
+	}
+
 	if nf.includeStart || node != nf.Start {
 		add := true
 		for _, filter := range nf.Filters {
@@ -154,6 +159,10 @@ func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool, multi
 
 	if nf.depth < 0 && nf.sortMode != nfSortModeNone {
 		log.Printf("Warning: NodeFilter executing on Node < %s > has sorting on it, but ForEach() cannot be used with sorting.\n", nf.Start.Path())
+	}
+
+	if nf.includeStart && node == nf.Start {
+		node = node.getOwner()
 	}
 
 	nf.depth++
