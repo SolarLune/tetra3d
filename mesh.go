@@ -488,7 +488,7 @@ func (mesh *Mesh) AddMeshPart(material *Material, indices ...int) *MeshPart {
 // FindMeshPart allows you to retrieve a MeshPart by its material's name. If no material with the provided name is given, the function returns nil.
 func (mesh *Mesh) FindMeshPart(materialName string) *MeshPart {
 	for _, mp := range mesh.MeshParts {
-		if mp.Material != nil && mp.Material.Name == materialName {
+		if mp.Material != nil && mp.Material.name == materialName {
 			return mp
 		}
 	}
@@ -1772,7 +1772,7 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 	if part.TriangleCount() >= MaxTriangleCount {
 		matName := "nil"
 		if part.Material != nil {
-			matName = part.Material.Name
+			matName = part.Material.name
 		}
 		log.Println("warning: mesh [" + part.Mesh.Name + "] has part with material named [" + matName + "], which has " + fmt.Sprintf("%d", part.TriangleCount()) + " triangles. This exceeds the renderable maximum of 21845 triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into multiple models. Otherwise, the game will crash if it renders over the maximum number of triangles.")
 	}

@@ -230,7 +230,7 @@ func NewParticleSystem(baseModel *Model, particles ...*Model) *ParticleSystem {
 
 	for _, part := range particles {
 		mat := part.Mesh.MeshParts[0].Material
-		if baseModel.Mesh.FindMeshPart(mat.Name) == nil {
+		if baseModel.Mesh.FindMeshPart(mat.name) == nil {
 			baseModel.Mesh.AddMeshPart(part.Mesh.MeshParts[0].Material)
 		}
 	}

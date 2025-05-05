@@ -1,11 +1,13 @@
 # Add-on for Tetra3D > Blender exporting
 
-import bpy, os, bmesh, math, mathutils, aud, bpy_extras
+import bpy, os, bmesh, math, mathutils, aud, blf
+from bpy_extras import io_utils, view3d_utils
 from bpy.app.handlers import persistent
 
 currentlyPlayingAudioName = None
 currentlyPlayingAudioHandle = None
 audioPaused = False
+fontHandler = None
 
 bl_info = {
     "name" : "Tetra3D Addon",                        # The name in the addon search menu
@@ -116,6 +118,12 @@ batchModes = [
     ("OFF", "Off", "No automatic batching.", 0, 0), 
     ("DYNAMIC", "Dynamic Batching", "Dynamic batching based off of one material (the first one).", 0, 1), 
     ("STATIC", "Static Merging", "Static merging; merged objects cannot move or deviate in any way. After automatic static merging, the merged models will be automatically set to invisible.", 0, 2),
+]
+
+t3dDrawObjectPropertiesModes = [
+    ("OFF", "Off", "Don't draw any Tetra3D object properties.", 0, 0),
+    ("REAL", "Real", "Only draw Tetra3D object properties on the currently selected object(s), not including default properties on collection instances.", 0, 1),
+    ("ALL", "All", "Draw all Tetra3d object properties on the currently selected object(s), including default, un-overridden properties on collection instances.", 0, 2),
 ]
 
 def filepathSet(self, value):
@@ -1463,7 +1471,7 @@ def export():
             if space.type == "VIEW_3D":
 
                 # HUGE thanks to ryan halliday's blog for mentioning bpy_extras' axis conversion: https://blog.ryanhalliday.com/2023/04/three-blender-co-ordinates.html
-                conversion = bpy_extras.io_utils.axis_conversion(from_forward="-Y", from_up="Z", to_forward="Z", to_up="Y")
+                conversion = io_utils.axis_conversion(from_forward="-Y", from_up="Z", to_forward="Z", to_up="Y")
 
                 decomposed = space.region_3d.view_matrix.inverted().decompose()
 
@@ -2090,6 +2098,9 @@ def register():
     bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
     bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
 
+    bpy.types.View3DShading.t3dDrawProperties__ = bpy.props.EnumProperty(items=t3dDrawObjectPropertiesModes, name="Draw Object Properties", description="Whether to draw Tetra3D object properties for selected objects in the 3D view")
+    bpy.types.VIEW3D_HT_header.append(T3D_DRAW_GAME_PROPERTIES)
+
     # Handlers and callbacks
 
     if not exportOnSave in bpy.app.handlers.save_post:
@@ -2102,8 +2113,118 @@ def register():
     kc = keyconfig.keymaps.new(name="Window", space_type='EMPTY')
     shortcut = kc.keymap_items.new("export.tetra3dgltf", 'E', 'PRESS', ctrl=True, shift=True)
 
-    global keymaps
+    global keymaps, fontHandler
     keymaps.append((kc, shortcut))
+
+    fontHandler = bpy.types.SpaceView3D.draw_handler_add(drawGameProperties, (None, None), "WINDOW", "POST_PIXEL")
+
+@persistent
+def T3D_DRAW_GAME_PROPERTIES(self, context):
+    self.layout.label(text="Draw T3D Properties")
+    self.layout.prop(bpy.context.area.spaces[0].shading, "t3dDrawProperties__", expand=True) 
+
+def drawGameProperties(self, context):
+
+    if bpy.context.area.spaces[0].shading.t3dDrawProperties__ == 'OFF':
+        return
+
+    fontID = 0 # Default font
+
+    scene = bpy.context.scene
+
+    for layer in scene.view_layers:
+
+        for obj in layer.objects:
+
+            if obj is None or not obj.select_get():
+                continue
+
+            loc = view3d_utils.location_3d_to_region_2d(bpy.context.region, bpy.context.space_data.region_3d, obj.location, default=(0,0,0))
+
+            blf.size(fontID, 30.0)
+
+            properties = set()
+
+            def writePropText(obj, propText, isCollection):
+
+                for prop in obj.t3dGameProperties__:
+
+                    if isCollection:
+                        # Property exists in a collection instance; already is in properties set, so it's been overridden
+                        if prop.name in properties:
+                            continue
+
+                    properties.add(prop.name)
+
+                    propText += prop.name + " : "
+
+                    if prop.valueType == "bool":
+                        propText += str(prop.valueBool)
+                    elif prop.valueType == "int":
+                        propText += str(prop.valueInt)
+                    elif prop.valueType == "float":
+                        propText += str(prop.valueFloat)
+                    elif prop.valueType == "string":
+                        propText += '"' + prop.valueString + '"'
+                    elif prop.valueType == "reference":
+                        if prop.valueReference:
+                            propText += prop.valueReference.name
+                        else:
+                            propText += "< No Object >"
+                    elif prop.valueType == "color":
+                        propText += str(prop.valueColor)
+                    elif prop.valueType == "vector3d":
+                        propText += str(prop.valueVector3D)
+                    elif prop.valueType == "file":
+                        propText += "'" + prop.valueFilepath + '"'
+                    elif prop.valueType == "directory":
+                        propText += "'" + prop.valueDirpath + '"'
+
+                    propText += '\n'
+
+                return propText
+
+            propText = writePropText(obj, "", False)
+
+            if obj.instance_collection and bpy.context.area.spaces[0].shading.t3dDrawProperties__ == 'ALL':
+                col = obj.instance_collection
+                for collectionObject in col.objects:
+                    if collectionObject.parent == None:
+                        propText = writePropText(collectionObject, propText, True)
+
+            longestStart = 0
+            longestEnd = 0
+            
+            start = 0
+            end = 0
+            while True:
+                end = propText.find('\n', start)
+                if end >= 0:
+                    if end - start > longestEnd-longestStart:
+                        longestStart = start
+                        longestEnd = end
+                    start = end+1
+                else:
+                    end = len(propText)
+                    if end - start > longestEnd-longestStart:
+                        longestStart = start
+                        longestEnd = end
+                    break
+
+            dim = blf.dimensions(0, propText[longestStart:longestEnd])
+
+            blf.position(fontID, loc[0] - (dim[0]/2), loc[1], 0)
+
+            blf.shadow(0, 6, 0, 0.1, 0.2, 1)
+            
+            blf.word_wrap(0, 10000)
+            blf.enable(0, blf.SHADOW)
+            blf.enable(0, blf.WORD_WRAP)
+            blf.draw(fontID, propText)
+            blf.disable(0, blf.WORD_WRAP)
+            blf.disable(0, blf.SHADOW)
+
+    return
 
 def unregister():
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
@@ -2206,6 +2327,7 @@ def unregister():
     del bpy.types.Camera.t3dFOV__
     del bpy.types.Camera.t3dMaxLightCount__
 
+
     if exportOnSave in bpy.app.handlers.save_post:
         bpy.app.handlers.save_post.remove(exportOnSave)
     if onLoad in bpy.app.handlers.load_post:
@@ -2219,6 +2341,13 @@ def unregister():
     keymaps.clear()
 
     bpy.msgbus.clear_by_owner("tetra3d")
+
+    global fontHandler
+    
+    bpy.types.SpaceView3D.draw_handler_remove(fontHandler, "WINDOW")
+    bpy.types.VIEW3D_HT_header.remove(T3D_DRAW_GAME_PROPERTIES)
+
+    del bpy.types.View3DShading.t3dDrawProperties__
 
 if __name__ == "__main__":
     register()

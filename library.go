@@ -25,7 +25,7 @@ func NewLibrary() *Library {
 // SceneByName will return nil.
 func (lib *Library) SceneByName(name string) *Scene {
 	for _, scene := range lib.Scenes {
-		if scene.Name == name {
+		if scene.name == name {
 			return scene
 		}
 	}

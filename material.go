@@ -51,7 +51,7 @@ const (
 
 type Material struct {
 	library           *Library       // library is a reference to the Library that this Material came from.
-	Name              string         // Name is the name of the Material.
+	name              string         // Name is the name of the Material.
 	Color             Color          // The overall color of the Material.
 	Texture           *ebiten.Image  // The texture applied to the Material.
 	UseTexture        bool           // Whether to use the texture while rendering or not.
@@ -109,7 +109,7 @@ type Material struct {
 // NewMaterial creates a new Material with the name given.
 func NewMaterial(name string) *Material {
 	return &Material{
-		Name:                  name,
+		name:                  name,
 		Color:                 NewColor(1, 1, 1, 1),
 		properties:            NewProperties(),
 		TextureFilterMode:     ebiten.FilterNearest,
@@ -128,7 +128,7 @@ func NewMaterial(name string) *Material {
 
 // Clone creates a clone of the specified Material. Note that Clone() cannot clone the Material's fragment shader or shader options.
 func (m *Material) Clone() *Material {
-	newMat := NewMaterial(m.Name)
+	newMat := NewMaterial(m.name)
 	newMat.library = m.library
 	newMat.Color = m.Color
 
@@ -169,6 +169,16 @@ func (m *Material) Clone() *Material {
 	newMat.CustomDepthFunction = m.CustomDepthFunction
 
 	return newMat
+}
+
+// Name returns the name of the material.
+func (m *Material) Name() string {
+	return m.name
+}
+
+// SetName sets the name of the material to the specified value.
+func (m *Material) SetName(name string) {
+	m.name = name
 }
 
 // SetShaderText creates a new custom Kage fragment shader for the Material if provided the shader's source code as a []byte.
@@ -235,7 +245,7 @@ func (m *Material) Library() *Library {
 
 func (m *Material) String() string {
 	if ReadableReferences {
-		return "<" + m.Name + ">"
+		return "<" + m.name + ">"
 	} else {
 		return fmt.Sprintf("%p", m)
 	}

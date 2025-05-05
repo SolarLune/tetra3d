@@ -1,9 +1,14 @@
 package tetra3d
 
+import "fmt"
+
+var sceneID uint64 = 0
+
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
-// graph of parents and children. Models (visual instances of Meshes), Cameras, and "empty" NodeBases all are kinds of Nodes.
+// graph of parents and children.
 type Scene struct {
-	Name    string   // The name of the Scene. Set automatically to the scene name in your 3D modeler if the DAE file exports it.
+	id      uint64   // Unique ID for this scene
+	name    string   // The name of the Scene. Set automatically to the scene name in your 3D modeler if the DAE file exports it.
 	library *Library // The library from which this Scene was created. If the Scene was instantiated through code, this will be nil.
 	// Root indicates the root node for the scene hierarchy. For visual Models to be displayed, they must be added to the
 	// scene graph by simply adding them into the tree via parenting anywhere under the Root. For them to be removed from rendering,
@@ -26,7 +31,8 @@ type Scene struct {
 func NewScene(name string) *Scene {
 
 	scene := &Scene{
-		Name:                name,
+		id:                  sceneID,
+		name:                name,
 		Root:                NewNode("Root"),
 		World:               NewWorld("World"),
 		props:               NewProperties(),
@@ -34,6 +40,8 @@ func NewScene(name string) *Scene {
 		autobatchStaticMap:  map[*Material]*Model{},
 		callbacks:           &SceneCallbacks{},
 	}
+
+	sceneID++
 
 	scene.Root.scene = scene
 	scene.Root.cachedSceneRootNode = scene.Root
@@ -44,7 +52,7 @@ func NewScene(name string) *Scene {
 // Clone clones the Scene, returning a copy. Models and Meshes are shared between them.
 func (scene *Scene) Clone() *Scene {
 
-	newScene := NewScene(scene.Name)
+	newScene := NewScene(scene.name)
 	newScene.library = scene.library
 
 	// Just for when you clone
@@ -107,6 +115,31 @@ func (scene *Scene) Clone() *Scene {
 
 	return newScene
 
+}
+
+// ID returns the unique ID for this specific scene. Each scene has its own ID.
+func (s *Scene) ID() uint64 {
+	return s.id
+}
+
+// SetName sets the name of the scene to the specified desired value.
+func (s *Scene) SetName(name string) {
+	s.name = name
+}
+
+// Name returns the name of the Scene.
+func (s *Scene) Name() string {
+	return s.name
+}
+
+// String returns the scene as a string in a human-readable format if ReadableReferences is on.
+// Otherwise, it returns the pointer value, as usual.
+func (scene *Scene) String() string {
+	if ReadableReferences {
+		return "Scene { Name: " + scene.name + ", ID: " + fmt.Sprintf("%d", scene.id) + " }"
+	} else {
+		return fmt.Sprintf("%p", scene)
+	}
 }
 
 // Data returns the Scene's user-customizeable data.

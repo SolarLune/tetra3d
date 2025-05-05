@@ -1141,9 +1141,9 @@ func (node *Node) String() string {
 	if ReadableReferences {
 		path := node.Path()
 		if path == "" {
-			path = "{ no path }"
+			path = "No path"
 		}
-		return "< " + node.Name() + " : " + path + " : " + fmt.Sprintf("%d", node.id) + " >"
+		return "Node { Name: " + node.Name() + ", Path: " + path + ", ID: " + fmt.Sprintf("%d", node.id) + " }"
 	} else {
 		return fmt.Sprintf("%p", node)
 	}
