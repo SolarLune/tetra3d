@@ -249,22 +249,20 @@ func (vec Vector3) Unit() Vector3 {
 	return vec
 }
 
-// Swizzle swizzles the Vector3 using the string provided, returning the swizzled copy.
-// The string can be of length 3 ("xyz") or 4 ("xyzw").
-// The string should be composed of the axes of a vector, i.e. 'x', 'y', 'z', or 'w'.
-// Example: `vec := Vector{1, 2, 3}.Swizzle("zxy") // Returns a Vector3 of {3, 1, 2}.`
-func (vec Vector3) Swizzle(swizzleString string) Vector3 {
-
-	if l := len(swizzleString); l < 3 || l > 4 {
-		panic("Error: Can't call Vec.Swizzle() with less than 3, or greater than 4 values")
-	}
+// Swizzle3 swizzles the Vector3 using the string provided, returning the swizzled copy.
+// The string should be composed of the axes of a vector, i.e. 'x', 'y', or 'z'.
+// If the string is shorter than 3 values, the remaining values are left at 0.
+// '-' negates the next axis.
+// Example: `vec := Vector{1, 2, 3}.Swizzle3("z x -y") // Returns a Vector3 of {3, 1, -2}.`
+func (vec Vector3) Swizzle3(swizzleString string) Vector3 {
 
 	swizzleString = strings.ToLower(swizzleString)
 
 	ogX := vec.X
 	ogY := vec.Y
 	ogZ := vec.Z
-	var targetValue float32
+	targetValue := float32(0)
+	negating := false
 
 	for i, v := range swizzleString {
 
@@ -275,6 +273,14 @@ func (vec Vector3) Swizzle(swizzleString string) Vector3 {
 			targetValue = ogY
 		case 'z':
 			targetValue = ogZ
+		case '-':
+			negating = true
+		default:
+			continue
+		}
+
+		if negating {
+			targetValue *= -1
 		}
 
 		switch i {
@@ -286,9 +292,61 @@ func (vec Vector3) Swizzle(swizzleString string) Vector3 {
 			vec.Z = targetValue
 		}
 
+		negating = false
+
 	}
 
 	return vec
+
+}
+
+// Swizzle2 swizzles the Vector3 using the string provided, returning the swizzled copy as a Vector2.
+// The string should be composed of the axes of a vector, i.e. 'x', 'y', 'z', or 'w'.
+// If the string is shorter than 3 values, the remaining values are left at 0.
+// Example: `vec := Vector{1, 2, 3}.Swizzle2("-z-x") // Returns a Vector2 of {-3, -1}.`
+func (vec Vector3) Swizzle2(swizzleString string) Vector2 {
+
+	out := Vector2{}
+
+	swizzleString = strings.ToLower(swizzleString)
+
+	ogX := vec.X
+	ogY := vec.Y
+	ogZ := vec.Z
+	targetValue := float32(0)
+	negating := false
+
+	for i, v := range swizzleString {
+
+		switch v {
+		case 'x':
+			targetValue = ogX
+		case 'y':
+			targetValue = ogY
+		case 'z':
+			targetValue = ogZ
+		case '-':
+			negating = true
+		default:
+			continue
+		}
+
+		if negating {
+			targetValue *= -1
+		}
+
+		switch i {
+		case 0:
+			out.X = targetValue
+		case 1:
+			out.Y = targetValue
+		}
+
+		negating = false
+
+	}
+
+	return out
 
 }
 
@@ -677,13 +735,13 @@ func (ip *ModVector3) Unit() *ModVector3 {
 	return ip
 }
 
-// Swizzle swizzles the ModVector3 using the string provided.
+// Swizzle3 swizzles the ModVector3 using the string provided.
 // The string can be of length 3 ("xyz") or 4 ("xyzw").
 // The string should be composed of the axes of a vector, i.e. 'x', 'y', 'z', or 'w'.
-// Example: `vec := Vector{1, 2, 3}.Swizzle("zxy") // Returns a Vector3 of {3, 1, 2}.`
+// Example: `vec := Vector{1, 2, 3}.Swizzle3("zxy") // Returns a Vector3 of {3, 1, 2}.`
 // This function returns the calling ModVector3 for method chaining.
-func (ip *ModVector3) Swizzle(swizzleString string) *ModVector3 {
-	vec := ip.Vector3.Swizzle(swizzleString)
+func (ip *ModVector3) Swizzle3(swizzleString string) *ModVector3 {
+	vec := ip.Vector3.Swizzle3(swizzleString)
 	ip.X = vec.X
 	ip.Y = vec.Y
 	ip.Z = vec.Z
