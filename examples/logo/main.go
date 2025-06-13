@@ -50,7 +50,7 @@ func (g *Game) Init() {
 	g.Offscreen = ebiten.NewImage(g.Camera.Size())
 
 	// Set the screen objects' screen texture to the offscreen buffer we just created above:
-	data.Materials["ScreenTexture"].Texture = g.Offscreen
+	data.MaterialByName("ScreenTexture").Texture = g.Offscreen
 
 	// This is another way to do it:
 

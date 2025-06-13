@@ -59,10 +59,10 @@ func (m *GridPointMarker) Update() {
 
 	for i, connection := range m.Gridpoint.Connections {
 		if connection.Passable {
-			m.lines[i].Mesh = lib.Meshes["Line"]
+			m.lines[i].Mesh = lib.MeshByName("Line")
 		} else {
 			red = true
-			m.lines[i].Mesh = lib.Meshes["BrokenLine"]
+			m.lines[i].Mesh = lib.MeshByName("BrokenLine")
 		}
 		if connection.Cost > 0 {
 			m.lines[i].Color = colors.Green()
@@ -221,7 +221,7 @@ func (g *Game) Update() error {
 			return false // Don't continue stepping through ray hits beyond the first one
 
 		},
-		TestAgainst: g.Scene.Root.SearchTree().ByParentProp("gridPoint"),
+		TestAgainst: g.Scene.Root.SearchTree().ByParentProps("gridPoint"),
 	})
 
 	g.Camera.Update()

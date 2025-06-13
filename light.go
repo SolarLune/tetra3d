@@ -642,7 +642,7 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors Vert
 			return
 		} else {
 
-			if !cube.workingDimensions.Inside(vertPos) {
+			if !vertPos.IsInsideDimensions(cube.workingDimensions) {
 				diffuseFactor = 0
 			} else {
 				diffuseFactor = diffuse

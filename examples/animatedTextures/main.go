@@ -54,7 +54,7 @@ func (g *Game) Init() {
 	// Firstly, we create a TexturePlayer, which animates a collection of vertices' UV values to
 	// animate a texture on them.
 
-	mesh := library.Meshes["Plane"]
+	mesh := library.MeshByName("Plane")
 
 	// We can select all vertices...
 	selection := tetra3d.NewVertexSelection().SelectMeshes(mesh)

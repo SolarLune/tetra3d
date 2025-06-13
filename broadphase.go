@@ -9,14 +9,13 @@ package tetra3d
 // If so, it proceeds to the broadphase check, where it sees which set(s) of triangles the colliding
 // object could be colliding with, and then returns that set for finer examination.
 type Broadphase struct {
-	GridCellCount      int           // The number of cells in the broadphase grid
-	cellSize           float32       // The size of each cell in the grid
-	center             *Node         // The center node of the broadphase
-	workingAABB        *BoundingAABB // The working-process AABB used to determine which triangles belong in which cells
-	TriSets            [][][][]int   // The sets of triangles
-	allTriSet          Set[int]      // A set containing all triangles
-	mesh               *Mesh         // The mesh used for the Broadphase object
-	workingTriangleSet Set[int]      // The set of triangles to use for collision testing
+	GridCellCount int           // The number of cells in the broadphase grid
+	cellSize      float32       // The size of each cell in the grid
+	center        *Node         // The center node of the broadphase
+	workingAABB   *BoundingAABB // The working-process AABB used to determine which triangles belong in which cells
+	TriSets       [][][][]int   // The sets of triangles
+	allTriSet     Set[int]      // A set containing all triangles
+	mesh          *Mesh         // The mesh used for the Broadphase object
 }
 
 // NewBroadphase returns a new Broadphase object.
@@ -28,10 +27,9 @@ type Broadphase struct {
 func NewBroadphase(gridCellCount int, worldPosition Vector3, mesh *Mesh) *Broadphase {
 
 	b := &Broadphase{
-		mesh:               mesh,
-		center:             NewNode("broadphase center"),
-		workingAABB:        NewBoundingAABB("bounding aabb", 1, 1, 1),
-		workingTriangleSet: newSet[int](),
+		mesh:        mesh,
+		center:      NewNode("broadphase center"),
+		workingAABB: NewBoundingAABB("bounding aabb", 1, 1, 1),
 	}
 
 	b.center.AddChildren(b.workingAABB)
@@ -105,15 +103,12 @@ func (b *Broadphase) Resize(gridSize int) {
 					(float32(k) - hg + 0.5) * b.cellSize,
 				})
 
-				center := b.workingAABB.WorldPosition()
-
 				for triID, tri := range b.mesh.Triangles {
 
-					v0 := b.mesh.VertexPositions[tri.VertexIndices[0]]
-					v1 := b.mesh.VertexPositions[tri.VertexIndices[1]]
-					v2 := b.mesh.VertexPositions[tri.VertexIndices[2]]
-					closestOnTri := closestPointOnTri(center, v0, v1, v2)
-					if b.workingAABB.PointInside(closestOnTri) {
+					// Triangles should not be able to be in multiple bins. This allows us
+					// to ensure checking triangles only if they could conceivably be struck by a ray,
+					// for example, without needing to use sets to ensure we check each triangle once.
+					if b.workingAABB.PointInside(tri.Center) {
 						b.TriSets[i][j][k] = append(b.TriSets[i][j][k], triID)
 					}
 					b.allTriSet.Add(triID)
@@ -136,11 +131,10 @@ func (b *Broadphase) Mesh() *Mesh {
 // TrianglesFromBoundingObject returns a set of triangle IDs, based on where the BoundingObject is
 // in relation to the Broadphase owning BoundingTriangles instance. The returned set contains each triangle only
 // once, of course.
-// TODO: Maybe replace this with something that doesn't need to allocate a new Set?
 func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingObject, forEach func(triID int) bool) {
 
-	b.workingTriangleSet.Clear()
-
+	// Previously, this used sets; this no longer does for optimization's sake.
+	// This works because triangles used to be able to be in multiple sets; this should no longer be the case.
 	if b.GridCellCount <= 1 {
 		for t := range b.allTriSet {
 			if !forEach(t) {
@@ -148,6 +142,12 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 			}
 		}
 	}
+
+	margin := float32(1.2)
+	b.workingAABB.internalSize.X = b.cellSize * margin
+	b.workingAABB.internalSize.Y = b.cellSize * margin
+	b.workingAABB.internalSize.Z = b.cellSize * margin
+	b.workingAABB.updateSize()
 
 	hg := float32(b.GridCellCount) / 2
 
@@ -168,18 +168,57 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 				})
 
 				if b.workingAABB.Colliding(boundingObject) {
-					// triangles = append(triangles, bp.TriSets[i][j][k]...)
 					for _, triID := range b.TriSets[i][j][k] {
-						b.workingTriangleSet.Add(triID)
+						if !forEach(triID) {
+							break
+						}
 					}
 				}
 			}
 		}
 	}
 
-	for t := range b.workingTriangleSet {
-		if !forEach(t) {
-			break
+}
+
+func (b *Broadphase) ForEachTriangleInRange(pos Vector3, radius float32, forEach func(triID int) bool) {
+
+	if b.GridCellCount <= 1 {
+		for t := range b.allTriSet {
+			if !forEach(t) {
+				return
+			}
+		}
+	}
+
+	hg := float32(b.GridCellCount) / 2
+
+	transform := b.center.Transform()
+
+	rr2 := (radius + b.cellSize) * (radius + b.cellSize)
+
+	for i := 0; i < b.GridCellCount; i++ {
+		for j := 0; j < b.GridCellCount; j++ {
+			for k := 0; k < b.GridCellCount; k++ {
+
+				// We can skip empty sets
+				if len(b.TriSets[i][j][k]) == 0 {
+					continue
+				}
+
+				vp := transform.MultVec(Vector3{
+					(float32(i) - hg + 0.5) * b.cellSize,
+					(float32(j) - hg + 0.5) * b.cellSize,
+					(float32(k) - hg + 0.5) * b.cellSize,
+				})
+
+				if vp.DistanceSquaredTo(pos) <= rr2 {
+					for _, triID := range b.TriSets[i][j][k] {
+						if !forEach(triID) {
+							return
+						}
+					}
+				}
+			}
 		}
 	}
 

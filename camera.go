@@ -24,6 +24,7 @@ type DebugInfo struct {
 	currentLightTime     time.Duration
 	currentFrameTime     time.Duration
 	tickTime             time.Time
+	NodeCount            int
 	DrawnParts           int // Number of draw calls, excluding those invisible or culled based on distance
 	TotalParts           int // Total number of draw calls
 	BatchedParts         int // Total batched number of draw calls
@@ -804,6 +805,7 @@ func (camera *Camera) ClearWithColor(clear Color) {
 	camera.DebugInfo.currentFrameTime = 0
 	camera.DebugInfo.currentAnimationTime = 0
 	camera.DebugInfo.currentLightTime = 0
+	camera.DebugInfo.NodeCount = 0
 	camera.DebugInfo.DrawnParts = 0
 	camera.DebugInfo.BatchedParts = 0
 	camera.DebugInfo.TotalParts = 0
@@ -833,6 +835,8 @@ var lights []ILight
 // is false, scenes rendered one after another in multiple RenderScene() calls will be rendered on top of each other in the Camera's texture buffers.
 // Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
 func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
+
+	camera.DebugInfo.NodeCount = rootNode.SearchTree().Count() + 1
 
 	meshes = meshes[:0]
 	lights = lights[:0]
@@ -1975,13 +1979,14 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float3
 	}
 
 	debugText := fmt.Sprintf(
-		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d"+
+		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nNode Count: %d\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d"+
 			"\nCamera World Position: %s\nCurrent Sector: %s",
 		ebiten.ActualTPS(),
 		ebiten.ActualFPS(),
 		ft,
 		at,
 		lt,
+		camera.DebugInfo.NodeCount,
 		camera.DebugInfo.DrawnParts,
 		camera.DebugInfo.TotalParts,
 		camera.DebugInfo.BatchedParts,

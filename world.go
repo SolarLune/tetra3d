@@ -21,6 +21,7 @@ type FogMode int
 // mode, and range, whether lighting is globally enabled or not, and finally the ambient lighting level (using the World's AmbientLight).
 type World struct {
 	Name       string
+	id         uint32
 	ClearColor Color // The clear color of the screen; note that this doesn't clear the color of the camera buffer or screen automatically;
 	// this is just what the color is if the scene was exported using the Tetra3D addon from Blender. It's up to you as to how you'd like to
 	// use it.
@@ -37,10 +38,12 @@ type World struct {
 	AmbientLight    *AmbientLight // Ambient lighting for this world
 }
 
+var worldID uint32 = 1
+
 // NewWorld creates a new World with the specified name and default values for fog, lighting, etc).
 func NewWorld(name string) *World {
 
-	return &World{
+	w := &World{
 		Name:            name,
 		FogColor:        NewColor(0, 0, 0, 0),
 		FogRange:        []float32{0, 1},
@@ -50,6 +53,9 @@ func NewWorld(name string) *World {
 		ClearColor:      NewColor(0.08, 0.09, 0.1, 1),
 		AmbientLight:    NewAmbientLight("ambient light", 1, 1, 1, 0),
 	}
+
+	worldID++
+	return w
 
 }
 
@@ -70,6 +76,10 @@ func (world *World) Clone() *World {
 
 	return newWorld
 
+}
+
+func (w *World) ID() uint32 {
+	return w.id
 }
 
 func (world *World) fogAsFloatSlice() []float32 {

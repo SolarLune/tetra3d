@@ -62,6 +62,13 @@ func (matrix *Matrix4) Set(other Matrix4) {
 	}
 }
 
+func (matrix *Matrix4) SetFloats(floats []float32) Matrix4 {
+	for x := range 16 {
+		matrix.SetByIndex(x, floats[x])
+	}
+	return *matrix
+}
+
 // BlenderToTetra returns a Matrix with the rows altered such that Blender's +Z is now Tetra's +Y and Blender's +Y is now Tetra's -Z.
 func (matrix Matrix4) BlenderToTetra() Matrix4 {
 	prevRow := matrix.Row(1)
@@ -281,6 +288,15 @@ func (matrix Matrix4) Inverted() Matrix4 {
 
 }
 
+func (matrix Matrix4) Round(unitSize float32) Matrix4 {
+	for i := range 4 {
+		for j := range 4 {
+			matrix[i][j] = math32.Round(matrix[i][j]*unitSize) / unitSize
+		}
+	}
+	return matrix
+}
+
 // Inverted returns an inverted (reversed) clone of a Matrix4. See the above StackOverflow link.
 // func (matrix Matrix4) oldInverted() Matrix4 {
 
@@ -403,8 +419,7 @@ func (matrix Matrix4) Inverted() Matrix4 {
 // 	det := m(0)*inv.Index(0) + m(1)*inv.Index(4) + m(2)*inv.Index(8) + m(3)*inv.Index(12)
 
 // 	if det == 0 {
-// 		return NewMatrix4()
-// 	}
+// 		return NewMatrix4()exports.
 
 // 	det = 1.0 / det
 
@@ -416,7 +431,7 @@ func (matrix Matrix4) Inverted() Matrix4 {
 
 // }
 
-func (matrix *Matrix4) setIndex(index int, value float32) {
+func (matrix *Matrix4) SetByIndex(index int, value float32) {
 	matrix[index/4][index%4] = value
 }
 
@@ -424,6 +439,54 @@ func (matrix *Matrix4) Index(index int) float32 {
 	y := index / 4
 	x := index % 4
 	return matrix[y][x]
+}
+
+func (matrix Matrix4) ToFloats() [16]float32 {
+	return [16]float32{
+		matrix[0][0],
+		matrix[0][1],
+		matrix[0][2],
+		matrix[0][3],
+
+		matrix[1][0],
+		matrix[1][1],
+		matrix[1][2],
+		matrix[1][3],
+
+		matrix[2][0],
+		matrix[2][1],
+		matrix[2][2],
+		matrix[2][3],
+
+		matrix[3][0],
+		matrix[3][1],
+		matrix[3][2],
+		matrix[3][3],
+	}
+}
+
+func (matrix Matrix4) ToFloatSlice() []float32 {
+	return []float32{
+		matrix[0][0],
+		matrix[0][1],
+		matrix[0][2],
+		matrix[0][3],
+
+		matrix[1][0],
+		matrix[1][1],
+		matrix[1][2],
+		matrix[1][3],
+
+		matrix[2][0],
+		matrix[2][1],
+		matrix[2][2],
+		matrix[2][3],
+
+		matrix[3][0],
+		matrix[3][1],
+		matrix[3][2],
+		matrix[3][3],
+	}
 }
 
 // Equals returns true if the matrix equals the same values in the provided Other Matrix4.
@@ -454,6 +517,16 @@ func (matrix Matrix4) Row(rowIndex int) Vector4 {
 		Y: matrix[rowIndex][1],
 		Z: matrix[rowIndex][2],
 		W: matrix[rowIndex][3],
+	}
+	return vec
+}
+
+// Row returns the indiced row from the Matrix4 as a Vector3.
+func (matrix Matrix4) RowAsVector3(rowIndex int) Vector3 {
+	vec := Vector3{
+		X: matrix[rowIndex][0],
+		Y: matrix[rowIndex][1],
+		Z: matrix[rowIndex][2],
 	}
 	return vec
 }
@@ -588,7 +661,7 @@ func (matrix Matrix4) Add(other Matrix4) Matrix4 {
 
 }
 
-func (matrix Matrix4) ScaleByScalar(scalar float32) Matrix4 {
+func (matrix Matrix4) Scale(scalar float32) Matrix4 {
 
 	for i := 0; i < len(matrix); i++ {
 		for j := 0; j < len(matrix[i]); j++ {

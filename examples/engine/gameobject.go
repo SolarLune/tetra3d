@@ -52,7 +52,7 @@ func (player *Player) Update() {
 
 		tetra3d.CollisionTestSettings{
 
-			TestAgainst: player.node.Root().SearchTree().ByParentProp("solid"),
+			TestAgainst: player.node.Root().SearchTree().ByParentProps("solid"),
 
 			OnCollision: func(col *tetra3d.Collision, index, count int) bool {
 

@@ -32,12 +32,11 @@ func (sphere *BoundingSphere) Clone() INode {
 func (sphere *BoundingSphere) WorldRadius() float32 {
 	var scale Vector3
 	maxScale := float32(1.0)
-	if sphere.Node.Parent() != nil {
-		scale = sphere.Node.WorldScale() // We don't want to have to decompose the transform if we can help it
-	} else {
-		scale = sphere.Node.scale // We don't want to have to make a memory duplicate if we don't have to
-	}
+
+	scale = sphere.Node.WorldScale() // We don't want to have to decompose the transform if we can help it
+
 	maxScale = math32.Max(math32.Max(math32.Abs(scale.X), math32.Abs(scale.Y)), math32.Abs(scale.Z))
+
 	return sphere.Radius * maxScale
 }
 

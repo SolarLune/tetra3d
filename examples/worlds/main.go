@@ -51,16 +51,16 @@ func (g *Game) Init() {
 func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.Scene.World = g.Library.Worlds["Dark"]
+		g.Scene.World = g.Library.WorldByName("Dark")
 	}
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		g.Scene.World = g.Library.Worlds["Bright"]
+		g.Scene.World = g.Library.WorldByName("Bright")
 	}
 	if inpututil.IsKeyJustPressed(ebiten.Key3) {
-		g.Scene.World = g.Library.Worlds["Blue"]
+		g.Scene.World = g.Library.WorldByName("Blue")
 	}
 	if inpututil.IsKeyJustPressed(ebiten.Key4) {
-		g.Scene.World = g.Library.Worlds["Red"]
+		g.Scene.World = g.Library.WorldByName("Red")
 	}
 
 	g.Camera.Update()

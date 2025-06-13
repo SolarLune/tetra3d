@@ -199,8 +199,9 @@ type Marker struct {
 
 // Animation represents an animation of some description; it can have multiple channels, indicating movement, scale, or rotational change of one or more Nodes in the Animation.
 type Animation struct {
-	library *Library
 	Name    string
+	id      uint32
+	library *Library
 	// A Channel represents a set of tracks (one for position, scale, and rotation) for the various nodes contained within the Animation.
 	Channels   map[string]*AnimationChannel
 	Length     float32    // Length of the animation in seconds
@@ -217,14 +218,19 @@ type Animation struct {
 	RelativeMotion bool
 }
 
+var animationID uint32 = 1
+
 // NewAnimation creates a new Animation of the name specified.
 func NewAnimation(name string) *Animation {
-	return &Animation{
+	anim := &Animation{
 		Name:       name,
+		id:         animationID,
 		Channels:   map[string]*AnimationChannel{},
 		Markers:    []Marker{},
 		properties: NewProperties(),
 	}
+	animationID++
+	return anim
 }
 
 func (animation *Animation) AddChannel(name string) *AnimationChannel {
@@ -388,11 +394,11 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 // PlayByName plays back an animation by name, accessing it through the AnimationPlayer's root node's library. If the animation isn't found,
 // it will return an error.
 func (ap *AnimationPlayer) PlayByName(animationName string) error {
-	anim, ok := ap.RootNode.Library().Animations[animationName]
-	if !ok {
+	if anim := ap.RootNode.Library().AnimationByName(animationName); anim == nil {
 		return errors.New("Animation named {" + animationName + "} not found in node's owning Library")
+	} else {
+		ap.Play(anim)
 	}
-	ap.Play(anim)
 	return nil
 }
 

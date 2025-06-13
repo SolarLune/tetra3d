@@ -253,8 +253,6 @@ func boundingAABBRayTest(from, to Vector3, test *BoundingAABB) (RayHit, bool) {
 
 }
 
-var boundingTriangleRayTestSphere = NewBoundingSphere("bounding triangle raytest sphere", 1)
-
 func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doublesided bool) []RayHit {
 
 	check := false
@@ -265,12 +263,12 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 		check = true
 	}
 
-	boundingTriangleRayTestSphere.SetLocalPositionVec(from.MoveTowards(to, from.DistanceTo(to)/2))
-	boundingTriangleRayTestSphere.Radius = from.DistanceTo(to) / 2
-
 	results := []RayHit{}
 
 	if check {
+
+		center := from.Lerp(to, 0.5)
+		radius := from.DistanceTo(to)
 
 		_, _, r := test.Transform().Decompose()
 
@@ -279,7 +277,7 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 		invTo := invertedTransform.MultVec(to)
 		plane := newCollisionPlane()
 
-		test.Broadphase.ForEachTriangleFromBoundingObject(boundingTriangleRayTestSphere, func(triID int) bool {
+		test.Broadphase.ForEachTriangleInRange(center, radius, func(triID int) bool {
 
 			tri := test.Mesh.Triangles[triID]
 

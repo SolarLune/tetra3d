@@ -109,6 +109,7 @@ gamePropTypes = [
     ("string", "String", "String data type", 0, 3),
     ("reference", "Object", "Object reference data type; converted to a string composed as follows on export - [SCENE NAME]:[OBJECT NAME]", 0, 4),
     ("color", "Color", "Color data type", 0, 5),
+    ("vector2d", "2D Vector", "2D vector data type", 0, 9),
     ("vector3d", "3D Vector", "3D vector data type", 0, 6),
     ("file", "Filepath", "Filepath as a string", 0, 7),
     ("directory", "Directory Path", "Directory Path as a string", 0, 8),
@@ -153,7 +154,8 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueReference: bpy.props.PointerProperty(name = "", type=bpy.types.Object, description="The object to reference")
     valueReferenceScene: bpy.props.PointerProperty(name = "", type=bpy.types.Scene, description="The scene to search for an object to reference; if this is blank, all objects from all scenes will appear in the object search field")
     valueColor: bpy.props.FloatVectorProperty(name = "", description="The color value of the property", subtype="COLOR", default=[1, 1, 1, 1], size=4, min=0, max=1)
-    valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="XYZ")
+    valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="COORDINATES")
+    valueVector2D: bpy.props.FloatVectorProperty(name = "", description="The 2D vector value of the property", size=2)
 
     valueFilepath: bpy.props.StringProperty(name = "", description="The filepath of the property", subtype="FILE_PATH", set=filepathSet, get=filepathGet)
     valueDirpath: bpy.props.StringProperty(name = "", description="The directory path of the property", subtype="DIR_PATH")
@@ -398,6 +400,7 @@ def copyProp(fromProp, toProp):
     toProp.valueReference = fromProp.valueReference
     toProp.valueReferenceScene = fromProp.valueReferenceScene
     toProp.valueColor = fromProp.valueColor
+    toProp.valueVector2D = fromProp.valueVector2D
     toProp.valueVector3D = fromProp.valueVector3D
     toProp.valueFilepath = fromProp.valueFilepath
     toProp.valueDirpath = fromProp.valueDirpath
@@ -964,6 +967,8 @@ def handleT3DProperties(self, props, operatorType, enabled=True, objectIndex=0):
                 op.target = prop.valueReference.name
         elif prop.valueType == "color":
             row.prop(prop, "valueColor")
+        elif prop.valueType == "vector2d":
+            row.prop(prop, "valueVector2D")
         elif prop.valueType == "vector3d":
             row = box.row()
             row.enabled = enabled
@@ -2170,11 +2175,13 @@ def drawGameProperties(self, context):
                         if prop.valueReference:
                             propText += prop.valueReference.name
                         else:
-                            propText += "< No Object >"
+                            propText += "( No Object )"
                     elif prop.valueType == "color":
                         propText += str(prop.valueColor)
+                    elif prop.valueType == "vector2d":
+                        propText += "( {:.2f}, {:.2f} )".format(prop.valueVector2D[0], prop.valueVector2D[1])
                     elif prop.valueType == "vector3d":
-                        propText += str(prop.valueVector3D)
+                        propText += "( {:.2f}, {:.2f}, {:.2f} )".format(prop.valueVector3D[0], prop.valueVector3D[1], prop.valueVector3D[2])
                     elif prop.valueType == "file":
                         propText += "'" + prop.valueFilepath + '"'
                     elif prop.valueType == "directory":

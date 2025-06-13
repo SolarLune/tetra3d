@@ -2,12 +2,13 @@ package tetra3d
 
 import "fmt"
 
-var sceneID uint64 = 0
+// There is no zero ID; this is to make it so that systems that reference scenes by id can use 0 as an invalid reference.
+var sceneID uint32 = 1
 
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
 // graph of parents and children.
 type Scene struct {
-	id      uint64   // Unique ID for this scene
+	id      uint32   // Unique ID for this scene
 	name    string   // The name of the Scene. Set automatically to the scene name in your 3D modeler if the DAE file exports it.
 	library *Library // The library from which this Scene was created. If the Scene was instantiated through code, this will be nil.
 	// Root indicates the root node for the scene hierarchy. For visual Models to be displayed, they must be added to the
@@ -49,7 +50,7 @@ func NewScene(name string) *Scene {
 	return scene
 }
 
-// Clone clones the Scene, returning a copy. Models and Meshes are shared between them.
+// Clone clones the Scene, returning a copy. Meshes are shared between them.
 func (scene *Scene) Clone() *Scene {
 
 	newScene := NewScene(scene.name)
@@ -118,7 +119,7 @@ func (scene *Scene) Clone() *Scene {
 }
 
 // ID returns the unique ID for this specific scene. Each scene has its own ID.
-func (s *Scene) ID() uint64 {
+func (s *Scene) ID() uint32 {
 	return s.id
 }
 

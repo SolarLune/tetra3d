@@ -146,13 +146,13 @@ func (prop *Property) IsColor() bool {
 	return false
 }
 
-// AsColor returns the value associated with the Property as a Color clone.
+// AsColor returns the value associated with the Property as a Color.
 // Note that this does not sanity check to ensure the Property is a Color first.
 func (prop *Property) AsColor() Color {
 	return prop.Value.(Color)
 }
 
-// IsVector3 returns true if the Property is a vector.
+// IsVector3 returns true if the Property is a Vector3.
 func (prop *Property) IsVector3() bool {
 	if _, ok := prop.Value.(Vector3); ok {
 		return true
@@ -160,10 +160,24 @@ func (prop *Property) IsVector3() bool {
 	return false
 }
 
-// AsVector3 returns the value associated with the Property as a 3D position Vector clone.
+// AsVector3 returns the value associated with the Property as a 3D position Vector.
 // The axes are corrected to account for the difference between Blender's axis order and Tetra3D's (i.e.
 // Blender's +X, +Y, +Z becomes Tetra3D's +X, +Z, +Y).
-// Note that this does not sanity check to ensure the Property is a vector first.
+// Note that this does not sanity check to ensure the Property is a Vector3 first.
 func (prop *Property) AsVector3() Vector3 {
 	return prop.Value.(Vector3)
+}
+
+// IsVector2 returns true if the Property is a Vector2.
+func (prop *Property) IsVector2() bool {
+	if _, ok := prop.Value.(Vector2); ok {
+		return true
+	}
+	return false
+}
+
+// AsVector3 returns the value associated with the Property as a 2D Vector.
+// Note that this does not sanity check to ensure the Property is a Vector2 first.
+func (prop *Property) AsVector2() Vector2 {
+	return prop.Value.(Vector2)
 }

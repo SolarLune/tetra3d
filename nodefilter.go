@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -63,8 +64,8 @@ type NodeFilter struct {
 	multithreadingWG *sync.WaitGroup
 }
 
-func newNodeFilter(startingNode INode) *NodeFilter {
-	return &NodeFilter{
+func newNodeFilter(startingNode INode) NodeFilter {
+	return NodeFilter{
 		Start:            startingNode,
 		depth:            -1,
 		MaxDepth:         -1,
@@ -72,7 +73,7 @@ func newNodeFilter(startingNode INode) *NodeFilter {
 	}
 }
 
-func (nf *NodeFilter) execute(node INode) []INode {
+func (nf NodeFilter) execute(node INode) []INode {
 	nf.depth++
 	out := []INode{}
 	added := true
@@ -152,7 +153,7 @@ func (nf *NodeFilter) execute(node INode) []INode {
 	return out
 }
 
-func (nf *NodeFilter) executeFilters(node INode, execute func(INode) bool, multithreading bool) bool {
+func (nf NodeFilter) executeFilters(node INode, execute func(INode) bool, multithreading bool) bool {
 
 	// TODO: Append filtered nodes to an internal shared slice so sorting could be available
 	// while also not allocating memory constantly unnecessarily.
@@ -303,16 +304,19 @@ func (nf NodeFilter) ByPropValue(propName string, propValue any) NodeFilter {
 	return nf
 }
 
-// ByParentProp allows you to filter a given selection of nodes if the node has a parent with a property
+// ByParentProps allows you to filter a given selection of nodes if the node has a parent with all properties
 // of the provided name, regardless of actual value.
 // If no matching Nodes are found, an empty NodeFilter is returned.
-func (nf NodeFilter) ByParentProp(propName string) NodeFilter {
+func (nf NodeFilter) ByParentProps(propNames ...string) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		if node.Parent() != nil {
 			props := node.Parent().Properties()
-			if props.Has(propName) {
-				return true
+			for _, p := range propNames {
+				if !props.Has(p) {
+					return false
+				}
 			}
+			return true
 		}
 		return false
 	})
@@ -343,16 +347,28 @@ func (nf NodeFilter) ByName(name string) NodeFilter {
 	return nf
 }
 
+// ByID allows you to filter a given selection of nodes if their ID matches the provided ID number.
+// If a Node's ID doesn't match, it isn't added to the filter results.
+func (nf NodeFilter) ByID(id uint32) NodeFilter {
+	nf.Filters = append(nf.Filters, func(i INode) bool { return i.ID() == id })
+	return nf
+}
+
 // ByNameRegex allows you to filter a given selection of nodes by their names using the given regex string.
-// If you want to filter a selection of nodes in such a way that only nodes that have names that
-// >contain< the given text (i.e. strings.Contains()) are selected for filtering, you can just pass
-// that string into ByNameRegex directly.
-// If the regexp string is invalid or no matching Nodes are found, the node isn't
-// added to the filter results. See https://regexr.com/ for regex help / reference.
+// See https://regexr.com/ for regex help / reference.
 func (nf NodeFilter) ByNameRegex(regexString string) NodeFilter {
 	nf.Filters = append(nf.Filters, func(node INode) bool {
 		match, _ := regexp.MatchString(regexString, node.Name())
 		return match
+	})
+	return nf
+}
+
+// ByNamePartial allows you to filter a given selection of nodes by their names using the given partial name (strings.Contains()).
+// If the regexp string is invalid or no matching Nodes are found, the node isn't added to the filter results.
+func (nf NodeFilter) ByNamePartial(partialName string) NodeFilter {
+	nf.Filters = append(nf.Filters, func(node INode) bool {
+		return strings.Contains(node.Name(), partialName)
 	})
 	return nf
 }

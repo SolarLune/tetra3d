@@ -56,45 +56,6 @@ func (dim Dimensions) Depth() float32 {
 	return dim.Max.Z - dim.Min.Z
 }
 
-// Clamp limits the provided position vector to be within the dimensions set.
-func (dim Dimensions) Clamp(position Vector3) Vector3 {
-
-	if position.X < dim.Min.X {
-		position.X = dim.Min.X
-	} else if position.X > dim.Max.X {
-		position.X = dim.Max.X
-	}
-
-	if position.Y < dim.Min.Y {
-		position.Y = dim.Min.Y
-	} else if position.Y > dim.Max.Y {
-		position.Y = dim.Max.Y
-	}
-
-	if position.Z < dim.Min.Z {
-		position.Z = dim.Min.Z
-	} else if position.Z > dim.Max.Z {
-		position.Z = dim.Max.Z
-	}
-
-	return position
-}
-
-// Inside returns if a position is inside a set of dimensions.
-func (dim Dimensions) Inside(position Vector3) bool {
-
-	if position.X < dim.Min.X ||
-		position.X > dim.Max.X ||
-		position.Y < dim.Min.Y ||
-		position.Y > dim.Max.Y ||
-		position.Z < dim.Min.Z ||
-		position.Z > dim.Max.Z {
-		return false
-	}
-
-	return true
-}
-
 func (dim Dimensions) Size() Vector3 {
 	return Vector3{dim.Width(), dim.Height(), dim.Depth()}
 }
@@ -172,6 +133,8 @@ type VertexColorChannel []Color
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one
 // manually if you want to construct a Mesh via code).
 type Mesh struct {
+	ID uint32
+
 	Name    string   // The name of the Mesh resource
 	library *Library // A reference to the Library this Mesh came from.
 
@@ -211,12 +174,15 @@ type Mesh struct {
 	Unique MeshUniqueType
 }
 
+var meshID uint32 = 1
+
 // NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,
 // or NewMesh will panic.
 func NewMesh(name string, verts ...VertexInfo) *Mesh {
 
 	mesh := &Mesh{
 		Name:                    name,
+		ID:                      meshID,
 		MeshParts:               []*MeshPart{},
 		Dimensions:              Dimensions{Vector3{0, 0, 0}, Vector3{0, 0, 0}},
 		VertexColorChannelNames: map[string]int{},
@@ -240,6 +206,8 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 	if len(verts) > 0 {
 		mesh.AddVertices(verts...)
 	}
+
+	meshID++
 
 	return mesh
 
@@ -342,8 +310,14 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	if newMesh.Unique == MeshUniqueMeshAndMaterials {
 		for _, meshPart := range newMesh.MeshParts {
-			meshPart.Material = meshPart.Material.Clone()
+			newMat := meshPart.Material.Clone()
+			newMat.library.Materials = append(newMat.library.Materials, newMat)
+			meshPart.Material = newMat
 		}
+	}
+
+	if newMesh.Unique != MeshUniqueFalse {
+		newMesh.library.Meshes = append(newMesh.library.Meshes, newMesh)
 	}
 
 	newMesh.maxTriangleSpan = mesh.maxTriangleSpan
@@ -864,6 +838,11 @@ func (vs VertexSelection) MoveUVs(dx, dy float32) {
 
 }
 
+// MoveUVsVec moves the UV values by the Vector values specified.
+func (vs *VertexSelection) MoveUVsVec(vec Vector2) {
+	vs.MoveUVs(vec.X, vec.Y)
+}
+
 // ScaleUVs scales the UV values by the percentages specified.
 func (vs VertexSelection) ScaleUVs(px, py float32) {
 
@@ -874,9 +853,9 @@ func (vs VertexSelection) ScaleUVs(px, py float32) {
 
 }
 
-// MoveUVsVec moves the UV values by the Vector values specified.
-func (vs *VertexSelection) MoveUVsVec(vec Vector3) {
-	vs.MoveUVs(vec.X, vec.Y)
+// ScaleUVsVec scales the UV values by the Vector values specified.
+func (vs *VertexSelection) ScaleUVsVec(vec Vector2) {
+	vs.ScaleUVs(vec.X, vec.Y)
 }
 
 // SetUVOffset moves all UV values for vertices selected to be offset by the values specified, with [0, 0] being their original locations.
@@ -890,6 +869,12 @@ func (vs VertexSelection) SetUVOffset(x, y float32) {
 
 	})
 
+}
+
+// SetUVOffsetVec moves all UV values for vertices selected to be offset by the values specified, with [0, 0] being their original locations.
+// Note that for this to work, you would need to store and work with the same vertex selection over multiple frames.
+func (vs VertexSelection) SetUVOffsetVec(vec Vector2) {
+	vs.SetUVOffset(vec.X, vec.Y)
 }
 
 // RotateUVs rotates the UV values around the center of the UV values for the mesh in radians
@@ -975,8 +960,12 @@ func (vs VertexSelection) ForEachIndex(forEach func(mesh *Mesh, index int)) {
 // Count returns the number of indices selected in the VertexSelection.
 func (vs VertexSelection) Count() int {
 	count := 0
-	for _, set := range vs.SelectionSet {
-		count += len(set.Indices)
+	for mesh, set := range vs.SelectionSet {
+		if set.SelectAll {
+			count += len(mesh.VertexPositions)
+		} else {
+			count += len(set.Indices)
+		}
 	}
 	return count
 }

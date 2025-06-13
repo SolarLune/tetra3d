@@ -440,7 +440,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		newMat.Color = newMat.Color.ConvertTosRGB()
 
-		library.Materials[gltfMat.Name] = newMat
+		library.Materials = append(library.Materials, newMat)
 
 	}
 
@@ -460,7 +460,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		}
 
 		newMesh := NewMesh(mesh.Name)
-		library.Meshes[mesh.Name] = newMesh
+
+		library.Meshes = append(library.Meshes, newMesh)
 		newMesh.library = library
 
 		colorChannelNames := []string{}
@@ -650,7 +651,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if v.Material != nil {
 				gltfMat := doc.Materials[*v.Material]
-				mat = library.Materials[gltfMat.Name]
+				mat = library.MaterialByName(gltfMat.Name)
 			}
 
 			newIndices := make([]int, len(indices))
@@ -670,7 +671,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 	for _, gltfAnim := range doc.Animations {
 		anim := NewAnimation(gltfAnim.Name)
 		anim.library = library
-		library.Animations[gltfAnim.Name] = anim
+		library.Animations = append(library.Animations, anim)
 
 		animLength := float32(0)
 
@@ -865,7 +866,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		var mesh *Mesh
 
 		if node.Mesh != nil {
-			mesh = library.Meshes[doc.Meshes[*node.Mesh].Name]
+			mesh = library.MeshByName(doc.Meshes[*node.Mesh].Name)
 		}
 
 		if mesh != nil {
@@ -1492,7 +1493,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					world.FogRange[1] = float32(fogEnd)
 				}
 
-				library.Worlds[world.Name] = world
+				library.Worlds = append(library.Worlds, world)
 
 			}
 
@@ -1514,7 +1515,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		if s.Extras != nil {
 			extras := s.Extras.(map[string]any)
 			if wn, exists := extras["t3dCurrentWorld__"]; exists {
-				scene.World = library.Worlds[wn.(string)]
+				scene.World = library.WorldByName(wn.(string))
 			}
 
 			if gameProps, exists := extras["t3dGameProperties__"]; exists {
@@ -1722,6 +1723,9 @@ func handleGameProperties(p any) (string, any) {
 		if value != "" {
 			value = convertBlenderPath(value.(string))
 		}
+	} else if propType == 9 {
+		vecValues := getOrDefaultFloatArray(property, "valueVector2D", []float32{0, 0})
+		value = Vector2{vecValues[0], vecValues[1]}
 	}
 
 	return name, value

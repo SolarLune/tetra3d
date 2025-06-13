@@ -183,7 +183,6 @@ func (plane *collisionPlane) RayAgainstPlane(from, to Vector3, doublesided bool)
 	pn := from.Dot(plane.Normal)
 
 	if !doublesided && nd >= 0 {
-		// if !doublesided && nd <= 0 {
 		return Vector3{}, false
 	}
 

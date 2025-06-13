@@ -50,6 +50,7 @@ const (
 )
 
 type Material struct {
+	id                uint32
 	library           *Library       // library is a reference to the Library that this Material came from.
 	name              string         // Name is the name of the Material.
 	Color             Color          // The overall color of the Material.
@@ -106,9 +107,12 @@ type Material struct {
 	CustomDepthFunction func(model *Model, camera *Camera, meshPart *MeshPart, vertIndex int, originalDepth float32) float32
 }
 
+var materialID uint32 = 1
+
 // NewMaterial creates a new Material with the name given.
 func NewMaterial(name string) *Material {
-	return &Material{
+	mat := &Material{
+		id:                    materialID,
 		name:                  name,
 		Color:                 NewColor(1, 1, 1, 1),
 		properties:            NewProperties(),
@@ -124,6 +128,10 @@ func NewMaterial(name string) *Material {
 		Visible:               true,
 		TextureMapScreenSize:  1,
 	}
+
+	materialID++
+
+	return mat
 }
 
 // Clone creates a clone of the specified Material. Note that Clone() cannot clone the Material's fragment shader or shader options.
@@ -169,6 +177,10 @@ func (m *Material) Clone() *Material {
 	newMat.CustomDepthFunction = m.CustomDepthFunction
 
 	return newMat
+}
+
+func (m *Material) ID() uint32 {
+	return m.id
 }
 
 // Name returns the name of the material.

@@ -60,7 +60,7 @@ type INode interface {
 	// Name returns the object's name.
 	Name() string
 	// ID returns the object's unique ID.
-	ID() uint64
+	ID() uint32
 	// SetName sets the object's name.
 	SetName(name string)
 	// Clone returns a clone of the specified INode implementer.
@@ -90,7 +90,7 @@ type INode interface {
 	// Root returns the root node in this tree by recursively traversing this node's hierarchy of
 	// parents upwards.
 	Root() *Node
-	InSceneTree() bool // Returns if this node is in the scene tree.
+	IsInSceneTree() bool // Returns if this node is in the scene tree.
 	setCachedSceneRoot(root *Node)
 	cachedSceneRoot() *Node
 
@@ -111,7 +111,7 @@ type INode interface {
 	ForEachChild(func(child INode, index, size int) bool)
 
 	// SearchTree() returns a NodeFilter to search the given Node's hierarchical tree.
-	SearchTree() *NodeFilter
+	SearchTree() NodeFilter
 
 	// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 	// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
@@ -192,6 +192,8 @@ type INode interface {
 	WorldScale() Vector3
 	// SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
 	SetWorldScaleVec(scale Vector3)
+	// SetWorldScale sets the object's absolute world scale. scale should be three float32 values signifying the scale on the X, Y, and Z components.
+	SetWorldScale(x, y, z float32)
 
 	// Move moves a Node in local space by the x, y, and z values provided.
 	Move(x, y, z float32)
@@ -269,13 +271,13 @@ type INode interface {
 	Callbacks() *NodeCallbacks
 }
 
-var nodeID uint64 = 0
+// There is no zero ID; this is to make it so that systems that reference nodes by id can use 0 as an invalid reference.
+var nodeID uint32 = 1
 
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
 // into their structs to automatically easily implement Node.
-
 type Node struct {
-	id                uint64 // Unique ID for this node
+	id                uint32 // Unique ID for this node
 	owner             INode  // The owner; nil if this is a Node, set to the "owning" node type otherwise (e.g. node.owner = nil, model.owner (or model.Node.owner) = model)
 	name              string
 	position          Vector3
@@ -339,7 +341,7 @@ func (node *Node) Callbacks() *NodeCallbacks {
 }
 
 // ID returns the object's unique ID.
-func (node *Node) ID() uint64 {
+func (node *Node) ID() uint32 {
 	return node.id
 }
 
@@ -599,8 +601,7 @@ func (node *Node) setOriginalTransform() {
 
 // WorldPosition returns a 3D Vector consisting of the object's world position (position relative to the world origin point of {0, 0, 0}).
 func (node *Node) WorldPosition() Vector3 {
-	position := node.Transform().Row(3) // We don't want to have to decompose if we don't have to
-	return position.To3D()
+	return node.Transform().RowAsVector3(3) // We don't want to have to decompose if we don't have to
 }
 
 // SetLocalPosition sets the object's local position (position relative to its parent). If this object has no parent, the position should be
@@ -710,8 +711,28 @@ func (node *Node) SetLocalScale(w, h, d float32) {
 // WorldScale returns the object's absolute world scale as a 3D vector (i.e. X, Y, and Z components). Note that this is a bit slow as it
 // requires decomposing the node's world transform, so you want to use node.LocalScale() if you can and performacne is a concern.
 func (node *Node) WorldScale() Vector3 {
-	_, scale, _ := node.Transform().Decompose()
-	return scale
+
+	needToDecompose := false
+
+	parent := node.parent
+	for parent != nil {
+
+		if scale := parent.LocalScale(); scale.X != 1 || scale.Y != 1 || scale.Z != 1 {
+			needToDecompose = true
+			break
+		}
+
+		parent = parent.Parent()
+	}
+
+	// Only decompose if we absolutely need to
+	if needToDecompose {
+		_, scale, _ := node.Transform().Decompose()
+		return scale
+	}
+
+	return node.LocalScale()
+
 }
 
 // SetWorldScaleVec sets the object's absolute world scale. scale should be a 3D vector (i.e. X, Y, and Z components).
@@ -760,8 +781,28 @@ func (node *Node) SetLocalRotation(rotation Matrix4) {
 // WorldRotation returns an absolute rotation Matrix4 representing the object's rotation. Note that this is a bit slow as it
 // requires decomposing the node's world transform, so you want to use node.LocalRotation() if you can and performacne is a concern.
 func (node *Node) WorldRotation() Matrix4 {
-	_, _, rotation := node.Transform().Decompose()
-	return rotation
+
+	needToDecompose := false
+
+	parent := node.parent
+	for parent != nil {
+
+		if rot := parent.LocalRotation(); !rot.IsIdentity() {
+			needToDecompose = true
+			break
+		}
+
+		parent = parent.Parent()
+	}
+
+	// Only decompose if we absolutely need to
+	if needToDecompose {
+		_, _, rotation := node.Transform().Decompose()
+		return rotation
+	}
+
+	return node.LocalRotation()
+
 }
 
 // SetWorldRotation sets an object's rotation to the provided rotation Matrix4.
@@ -1016,7 +1057,7 @@ func (node *Node) ForEachChild(forEach func(child INode, index, size int) bool) 
 }
 
 // SearchTree returns a NodeFilter to search through and filter a Node's hierarchy.
-func (node *Node) SearchTree() *NodeFilter {
+func (node *Node) SearchTree() NodeFilter {
 	return newNodeFilter(node)
 }
 
@@ -1121,7 +1162,7 @@ func (node *Node) HierarchyAsString() string {
 		if level > 0 {
 			str += "-"
 		}
-		str += " [" + prefix + "] " + node.Name() + " : " + wpStr + "\n"
+		str += " [" + prefix + "] " + node.Name() + fmt.Sprintf(" : %d : ", node.ID()) + wpStr + "\n"
 
 		for _, child := range node.Children() {
 			str += printNode(child, level+1)
@@ -1251,7 +1292,7 @@ func (node *Node) Root() *Node {
 }
 
 // InSceneTree returns if a Node is connected to the scene's root node through hierarchy.
-func (node *Node) InSceneTree() bool {
+func (node *Node) IsInSceneTree() bool {
 	return node.Root() != nil
 }
 

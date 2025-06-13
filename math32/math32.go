@@ -494,4 +494,4 @@ func Trunc(x float32) float32 {
 	return float32(math.Trunc(float64(x)))
 }
 
-const Pi = math.Pi
+const Pi = float32(math.Pi)

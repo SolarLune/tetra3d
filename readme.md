@@ -254,153 +254,153 @@ For more information, check out the [Wiki](https://github.com/SolarLune/Tetra3d/
 
 The following is a rough to-do list (tasks with checks have been implemented):
 
-- [x] **3D rendering**
-- [x] -- Perspective projection
-- [x] -- Orthographic projection (it's kinda jank, but it works)
-- [x] -- Automatic billboarding
-- [x] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space) (not sure?)
-- [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
-- [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
-- [x] -- A more advanced / accurate depth buffer
-- [x] -- ~~Writing depth through some other means than vertex colors for precision~~ _This is fine for now, I think._
-- [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
-- [x] -- Offscreen Rendering
-- [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
-- [x] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
-- [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
-- [ ] -- Draw ~~triangles~~ shapes in 3D space through a function (could be useful for 3D lines, for example)
-- [x] -- 3D Text (2D text, rendered on an appropriately-sized 3D plane)
-- [x] -- -- Typewriter effect
-- [x] -- -- Customizeable cursor
-- [x] -- -- Horizontal alignment
-- [ ] -- -- Vertical alignment
-- [ ] -- -- Vertical Scrolling
-- [ ] -- -- Replace style setting system with dedicated Style object, with a function to flush various style changes to batch and update the Text texture all at once?
-- [x] -- -- Outlines
-- [x] -- -- Shadows
-- [ ] -- -- Gradients
-- [ ] -- -- -- Per-letter gradient
-- [ ] -- -- -- Per-sentence gradient?
-- [ ] -- -- -- Per-block gradient?
-- [ ] -- -- -- Other patterns?
-- [ ] -- -- Parsing text for per-letter effects (this would probably require rendering the glyphs from a font to individual images to render; could also involve shaders?)
-- [ ] -- -- -- Per-letter colors
-- [ ] -- -- -- Bold
-- [ ] -- -- -- Italics
-- [ ] -- -- -- Strikethrough
-- [ ] -- -- -- Letters fading in or out, flickering?
-- [ ] -- -- -- Letters changing to other glyphs randomly
-- [ ] -- -- Additional effects? (Wavy text, shaky text, etc.)
-- [x] -- Multitexturing / Per-triangle Materials
-- [x] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
-- [ ] -- Automatic triangle / mesh subdivision depending on distance
-- [ ] -- Automatic level of detail
-- [ ] -- Manual level of detail (ability to render a model using various meshes in stages); note that these stages should be accessible at runtime to allow cloning meshes, for example
-- [ ] -- Possibly some UI utilities?
-- [x] **Culling**
-- [x] -- Backface culling
-- [x] -- Frustum culling
-- [x] -- Far triangle culling
-- [ ] -- Triangle clipping to view (this isn't implemented, but not having it doesn't seem to be too much of a problem for now)
-- [x] -- Sectors - The general idea is that the camera can be set up to only render sectors that it's in / neighboring (up to a customizeable depth)
-- [ ] -- -- Some method to have objects appear in multiple Sectors, but not others?
-- [ ] -- Occlusion culling - this should be possible using octrees to determine if an object is visible before rendering it; see: https://www.gamedeveloper.com/programming/occlusion-culling-algorithms
-- [ ] -- -- Something to reduce overdraw
-- [x] **Debug**
-- [x] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
-- [x] -- Wireframe debug rendering
-- [ ] -- TODO: Utilize depth testing and backface culling for wireframe rendering. Also replace ebitenutil.DrawLine() with the non-deprecated vector package usage.
-- [x] -- Normal debug rendering
-- [x] -- Bounding object debug rendering
-- [x] **Materials**
-- [x] -- Basic Texturing
-- [ ] -- Ability to use screen coordinates instead of just UV texturing (useful for repeating patterns)
-- [ ] -- Replace opaque transparency mode with just automatic transparency mode? I feel like there might be a reason to have opaque separate, but I can't imagine a normal situation where you'd want it when you could just go with auto + setting alpha to 1
-- [x] **Animations**
-- [x] -- Armature-based animations
-- [x] -- Object transform-based animations
-- [x] -- Blending between animations
-- [x] -- Linear keyframe interpolation
-- [x] -- Constant keyframe interpolation
-- [ ] -- Bezier keyframe interpolation
-- [ ] -- Morph (mesh-based / shape key) animations (See: https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_017_SimpleMorphTarget.md)
-- [ ] -- Mesh swapping during animations, primarily for 2D skeletal animation? (Can be worked around using bones.)
-- [x] **Scenes**
-- [x] -- Fog
-- [x] -- A node or scenegraph for parenting and simple visibility culling
-- [x] -- Ambient vertex coloring
-- [x] **GLTF / GLB model loading**
-- [x] -- Vertex colors loading
-- [x] -- Multiple vertex color channels
-- [x] -- UV map loading
-- [x] -- Normal loading
-- [x] -- Transform / full scene loading
-- [x] -- Animation loading
-- [x] -- Camera loading
-- [x] -- Loading world color in as ambient lighting
-- [ ] -- Separate .bin loading
-- [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
-- [x] **Blender Add-on**
-- [x] -- Export 3D view camera to Scenes for quick iteration
-- [ ] -- Object-level color option
-- [ ] -- Object-level shadeless checkbox
-- [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices (SolarLune 3/3/24: Doesn't seem to be possible outside of vertex colors)
-- [ ] -- Exporting animations and auto-subdivided mesh data doesn't work properly when the scene is not focused in Blender
-- [ ] -- Sharing materials and textures doesn't work properly
-- [x] -- Export GLTF on save / on command via button
-- [x] -- Bounds node creation
-- [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
-- [x] -- Collection / group substitution
-- [x] -- -- Overwriting properties through collection instance objects (it would be nice to do this cleanly with a nice UI, but just hamfisting it is fine for now)
-- [x] -- -- Collection instances instantiate their objects in the same location in the tree
-- [x] -- Optional camera size export
-- [x] -- Linking collections from external files
-- [x] -- Material data export
-- [x] -- Option to pack textures or leave them as a path
-- [x] -- Path / 3D Curve support
-- [x] -- Grid support (for pathfinding / linking 3D points together)
-- [ ] -- -- Adding costs to pathfinding (should be as simple as adding a cost and currentcost to each GridPoint, then sorting the points to check by cost when pathfinding, then reduce all costs greater than 1 by 1 ) (7/5/23, SolarLune: This works currently, but the pathfinding is still a bit wonky, so it should be looked at again)
-- [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
-- [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values. (5/22/23, SolarLune: should it be?)
-- [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose? It would be great if the models looked the way you'd expect)
-- [ ] -- Components (This would also require meta-programming; it'd be nice if components could have elements that were adjustable in Blender. Maybe a "game object" can have a dynamically-written "Components" struct, with space for one of each kind of component, for simplicity (i.e. one physics controller, one gameplay controller, one animation component, etc). There doesn't need to be ways to add or remove components from an object, and components can have any of OnInit, OnAdd, OnRemove, or Update functions to be considered components).
-- [x] **DAE model loading**
-- [x] -- Vertex colors loading
-- [x] -- UV map loading
-- [x] -- Normal loading
-- [x] -- Transform / full scene loading
-- [x] **Lighting**
-- [x] -- Smooth shading
-- [x] -- Ambient lights
-- [x] -- Point lights
-- [x] -- Directional lights
-- [x] -- Cube (AABB volume) lights
-- [x] -- Lighting Groups
-- [x] -- Ability to bake lighting to vertex colors
-- [x] -- Ability to bake ambient occlusion to vertex colors
-- [ ] -- Specular lighting (shininess)
-- [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
-- [ ] -- Lightmaps - might be possible with being able to use multiple textures at the same time now?
-- [ ] -- Baking AO and lighting into vertex colors? from Blender? It's possible to do already using Cycles, but not very easy or simple.
-- [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
-- [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
-- [x] **Particles**
-- [x] -- Basic particle system support
-- [ ] -- Fix layering issue when rendering a particle system underneath another one (visible in the Particles example)
-- [ ] -- Implement soft particles (see [this article](https://dev.to/keaukraine/implementing-soft-particles-in-webgl-and-opengl-es-3l6e))
-- [x] **Shaders**
-- [x] -- Custom fragment shaders
-- [x] -- Normal rendering (useful for, say, screen-space shaders)
-- [x] **Collision Testing**
-- [x] -- Normal reporting
-- [x] -- Slope reporting
-- [x] -- Contact point reporting
-- [x] -- Varying collision shapes
-- [x] -- Checking multiple collisions at the same time
-- [x] -- Composing collision shapes out of multiple sub-shapes (this can be done by simply creating them, parenting them to some node, and then testing against that node)
-- [x] -- Bounding / Broadphase collision checking
+-   [x] **3D rendering**
+-   [x] -- Perspective projection
+-   [x] -- Orthographic projection (it's kinda jank, but it works)
+-   [x] -- Automatic billboarding
+-   [x] -- Sprites (a way to draw 2D images with no perspective changes (if desired), but within 3D space) (not sure?)
+-   [x] -- Basic depth sorting (sorting vertices in a model according to distance, sorting models according to distance)
+-   [x] -- A depth buffer and [depth testing](https://learnopengl.com/Advanced-OpenGL/Depth-testing) - This is now implemented by means of a depth texture and [Kage shader](https://ebiten.org/documents/shader.html#Shading_language_Kage), though the downside is that it requires rendering and compositing the scene into textures _twice_. Also, it doesn't work on triangles from the same object (as we can't render to the depth texture while reading it for existing depth).
+-   [x] -- A more advanced / accurate depth buffer
+-   [x] -- ~~Writing depth through some other means than vertex colors for precision~~ _This is fine for now, I think._
+-   [ ] -- Depth testing within the same object - I'm unsure if I will be able to implement this.
+-   [x] -- Offscreen Rendering
+-   [x] -- Mesh merging - Meshes can be merged together to lessen individual object draw calls.
+-   [x] -- Render batching - We can avoid calling Image.DrawTriangles between objects if they share properties (blend mode, material, etc) and it's not too many triangles to push before flushing to the GPU. Perhaps these Materials can have a flag that you can toggle to enable this behavior? (EDIT: This has been partially added by dynamic batching of Models.)
+-   [ ] -- Texture wrapping (will require rendering with shaders) - This is kind of implemented, but I don't believe it's been implemented for alpha clip materials.
+-   [ ] -- Draw ~~triangles~~ shapes in 3D space through a function (could be useful for 3D lines, for example)
+-   [x] -- 3D Text (2D text, rendered on an appropriately-sized 3D plane)
+-   [x] -- -- Typewriter effect
+-   [x] -- -- Customizeable cursor
+-   [x] -- -- Horizontal alignment
+-   [ ] -- -- Vertical alignment
+-   [ ] -- -- Vertical Scrolling
+-   [ ] -- -- Replace style setting system with dedicated Style object, with a function to flush various style changes to batch and update the Text texture all at once?
+-   [x] -- -- Outlines
+-   [x] -- -- Shadows
+-   [ ] -- -- Gradients
+-   [ ] -- -- -- Per-letter gradient
+-   [ ] -- -- -- Per-sentence gradient?
+-   [ ] -- -- -- Per-block gradient?
+-   [ ] -- -- -- Other patterns?
+-   [ ] -- -- Parsing text for per-letter effects (this would probably require rendering the glyphs from a font to individual images to render; could also involve shaders?)
+-   [ ] -- -- -- Per-letter colors
+-   [ ] -- -- -- Bold
+-   [ ] -- -- -- Italics
+-   [ ] -- -- -- Strikethrough
+-   [ ] -- -- -- Letters fading in or out, flickering?
+-   [ ] -- -- -- Letters changing to other glyphs randomly
+-   [ ] -- -- Additional effects? (Wavy text, shaky text, etc.)
+-   [x] -- Multitexturing / Per-triangle Materials
+-   [x] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
+-   [ ] -- Automatic triangle / mesh subdivision depending on distance
+-   [ ] -- Automatic level of detail
+-   [ ] -- Manual level of detail (ability to render a model using various meshes in stages); note that these stages should be accessible at runtime to allow cloning meshes, for example
+-   [ ] -- Possibly some UI utilities?
+-   [x] **Culling**
+-   [x] -- Backface culling
+-   [x] -- Frustum culling
+-   [x] -- Far triangle culling
+-   [ ] -- Triangle clipping to view (this isn't implemented, but not having it doesn't seem to be too much of a problem for now)
+-   [x] -- Sectors - The general idea is that the camera can be set up to only render sectors that it's in / neighboring (up to a customizeable depth)
+-   [ ] -- -- Some method to have objects appear in multiple Sectors, but not others?
+-   [ ] -- Occlusion culling - this should be possible using octrees to determine if an object is visible before rendering it; see: https://www.gamedeveloper.com/programming/occlusion-culling-algorithms
+-   [ ] -- -- Something to reduce overdraw
+-   [x] **Debug**
+-   [x] -- Debug text: overall render time, FPS, render call count, vertex count, triangle count, skipped triangle count
+-   [x] -- Wireframe debug rendering
+-   [ ] -- TODO: Utilize depth testing and backface culling for wireframe rendering. Also replace ebitenutil.DrawLine() with the non-deprecated vector package usage.
+-   [x] -- Normal debug rendering
+-   [x] -- Bounding object debug rendering
+-   [x] **Materials**
+-   [x] -- Basic Texturing
+-   [ ] -- Ability to use screen coordinates instead of just UV texturing (useful for repeating patterns)
+-   [ ] -- Replace opaque transparency mode with just automatic transparency mode? I feel like there might be a reason to have opaque separate, but I can't imagine a normal situation where you'd want it when you could just go with auto + setting alpha to 1
+-   [x] **Animations**
+-   [x] -- Armature-based animations
+-   [x] -- Object transform-based animations
+-   [x] -- Blending between animations
+-   [x] -- Linear keyframe interpolation
+-   [x] -- Constant keyframe interpolation
+-   [ ] -- Bezier keyframe interpolation
+-   [ ] -- Morph (mesh-based / shape key) animations (See: https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_017_SimpleMorphTarget.md)
+-   [ ] -- Mesh swapping during animations, primarily for 2D skeletal animation? (Can be worked around using bones.)
+-   [x] **Scenes**
+-   [x] -- Fog
+-   [x] -- A node or scenegraph for parenting and simple visibility culling
+-   [x] -- Ambient vertex coloring
+-   [x] **GLTF / GLB model loading**
+-   [x] -- Vertex colors loading
+-   [x] -- Multiple vertex color channels
+-   [x] -- UV map loading
+-   [x] -- Normal loading
+-   [x] -- Transform / full scene loading
+-   [x] -- Animation loading
+-   [x] -- Camera loading
+-   [x] -- Loading world color in as ambient lighting
+-   [ ] -- Separate .bin loading
+-   [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
+-   [x] **Blender Add-on**
+-   [x] -- Export 3D view camera to Scenes for quick iteration
+-   [ ] -- Object-level color option
+-   [ ] -- Object-level shadeless checkbox
+-   [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices (SolarLune 3/3/24: Doesn't seem to be possible outside of vertex colors)
+-   [ ] -- Exporting animations and auto-subdivided mesh data doesn't work properly when the scene is not focused in Blender
+-   [ ] -- Sharing materials and textures doesn't work properly
+-   [x] -- Export GLTF on save / on command via button
+-   [x] -- Bounds node creation
+-   [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
+-   [x] -- Collection / group substitution
+-   [x] -- -- Overwriting properties through collection instance objects (it would be nice to do this cleanly with a nice UI, but just hamfisting it is fine for now)
+-   [x] -- -- Collection instances instantiate their objects in the same location in the tree
+-   [x] -- Optional camera size export
+-   [x] -- Linking collections from external files
+-   [x] -- Material data export
+-   [x] -- Option to pack textures or leave them as a path
+-   [x] -- Path / 3D Curve support
+-   [x] -- Grid support (for pathfinding / linking 3D points together)
+-   [ ] -- -- Adding costs to pathfinding (should be as simple as adding a cost and currentcost to each GridPoint, then sorting the points to check by cost when pathfinding, then reduce all costs greater than 1 by 1 ) (7/5/23, SolarLune: This works currently, but the pathfinding is still a bit wonky, so it should be looked at again)
+-   [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
+-   [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values. (5/22/23, SolarLune: should it be?)
+-   [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose? It would be great if the models looked the way you'd expect)
+-   [ ] -- Components (This would also require meta-programming; it'd be nice if components could have elements that were adjustable in Blender. Maybe a "game object" can have a dynamically-written "Components" struct, with space for one of each kind of component, for simplicity (i.e. one physics controller, one gameplay controller, one animation component, etc). There doesn't need to be ways to add or remove components from an object, and components can have any of OnInit, OnAdd, OnRemove, or Update functions to be considered components).
+-   [x] **DAE model loading**
+-   [x] -- Vertex colors loading
+-   [x] -- UV map loading
+-   [x] -- Normal loading
+-   [x] -- Transform / full scene loading
+-   [x] **Lighting**
+-   [x] -- Smooth shading
+-   [x] -- Ambient lights
+-   [x] -- Point lights
+-   [x] -- Directional lights
+-   [x] -- Cube (AABB volume) lights
+-   [x] -- Lighting Groups
+-   [x] -- Ability to bake lighting to vertex colors
+-   [x] -- Ability to bake ambient occlusion to vertex colors
+-   [ ] -- Specular lighting (shininess)
+-   [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
+-   [ ] -- Lightmaps - might be possible with being able to use multiple textures at the same time now?
+-   [ ] -- Baking AO and lighting into vertex colors? from Blender? It's possible to do already using Cycles, but not very easy or simple.
+-   [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
+-   [ ] -- Per-fragment lighting (by pushing it to the GPU, it would be more efficient and look better, of course)
+-   [x] **Particles**
+-   [x] -- Basic particle system support
+-   [ ] -- Fix layering issue when rendering a particle system underneath another one (visible in the Particles example)
+-   [ ] -- Implement soft particles (see [this article](https://dev.to/keaukraine/implementing-soft-particles-in-webgl-and-opengl-es-3l6e))
+-   [x] **Shaders**
+-   [x] -- Custom fragment shaders
+-   [x] -- Normal rendering (useful for, say, screen-space shaders)
+-   [x] **Collision Testing**
+-   [x] -- Normal reporting
+-   [x] -- Slope reporting
+-   [x] -- Contact point reporting
+-   [x] -- Varying collision shapes
+-   [x] -- Checking multiple collisions at the same time
+-   [x] -- Composing collision shapes out of multiple sub-shapes (this can be done by simply creating them, parenting them to some node, and then testing against that node)
+-   [x] -- Bounding / Broadphase collision checking
 
-- -- Supported collision types:
+-   -- Supported collision types:
 
 | Collision Type | Sphere | AABB | Triangle | Capsule |
 | -------------- | ------ | ---- | -------- | ------- |
@@ -413,47 +413,49 @@ The following is a rough to-do list (tasks with checks have been implemented):
 ✅ = Fully supported, should be working without issues
 ⛔ = Partially supported; somewhat buggy
 
-- [ ] -- An actual collision system, rather than simply doing basic collision checks?
+-   [ ] -- An actual collision system, rather than simply doing basic collision checks?
+-   [ ] -- Scaling triangle mesh objects won't work (particularly the broadphase object)
 
-- [ ] **3D Sound** (adjusting panning of sound sources based on 3D location?)
-- [ ] **Optimization**
-- [ ] -- Try using [avo](https://github.com/mmcloughlin/avo) to generate assembly for SIMD-ing, particularly Matrix x Vector multiplication
-- [ ] -- Try using ebiten.Vertex directly, rather than storing data in Mesh.VertexTransforms and then copying that to the vertex list. Maybe the W component could be stored in the current Custom0 attribute and perspective divide could be done in the Kage shader.
-- [ ] -- It might be possible to not have to write depth manually (5/22/23, SolarLune: Not sure what past me meant by this)
-- [ ] -- Minimize texture-swapping - should be possible to do now that Kage shaders can handle images of multiple sizes.
-- [x] -- Make NodeFilters work lazily, rather than gathering all nodes in the filter at once
-      -- [x] -- Optimize NodeFilters to avoid creating slices unnecessarily by avoiding using Node.Children() and instead use callbacks
-      -- [ ] -- Allow NodeFilters to append filtered nodes to a shared slice to have sorting available while still not allocating new memory unless the internal slice grows
-- [x] -- Reusing vertex indices for adjacent triangles
-- [ ] -- Multithreading (particularly for vertex transformations)
-- [x] -- Armature animation improvements?
-- [x] -- Custom Vectors
-- [ ] -- -- Move Vector and Matrix to external package for simplicity / resuability / create separate Vector types for 2D / 4D (?) Vectors. Maybe Colors as well?
-- [ ] -- Investigate replacing vector multiplaction with in-place vector multiplication
-- [ ] -- -- Vector pools again?
-- [ ] -- -- Move over to float32 for mathematics - seems like it should be faster? Should be possible with math32 : https://github.com/chewxy/math32
-- [ ] -- -- Maybe make Vectors generic, so you could have float32 / int Vectors? Or something like that?
-- [ ] -- Matrix pools?
-- [ ] -- Raytest optimization
-- [ ] -- -- Reduce memory allocation by not using functions that return new Vectors, but rather simply perform math within the Vectors themselves
-- [ ] -- -- Sphere?
-- [ ] -- -- AABB?
-- [ ] -- -- Capsule?
-- [ ] -- -- Triangles
-- [ ] -- -- -- Maybe we can combine contiguous triangles into faces and just check faces?
-- [ ] -- -- -- We could use the broadphase system to find triangles that are in the raycast's general area, specifically
-- [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
-- [ ] -- Lighting speed improvements
-- [ ] -- Resource tracking system to ease cloning elements (i.e. rather than live-cloning Meshes, it would be faster to re-use "dead" Meshes)
-- [ ] -- -- Model
-- [ ] -- -- Mesh
-- [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
-- [x] -- Replace \*Color with just the plain Color struct (this would be a breaking change)
-- [ ] -- Replace color usage with HTML or W3C colors? : https://www.computerhope.com/htmcolor.htm#gray / https://www.computerhope.com/jargon/w/w3c-color-names.htm
-- [ ] -- Update to use Generics where possible; we're already on Go 1.18.
-- [ ] -- Move utility objects (quaternion, vector, color, text, matrix, treewatcher, etc) to utility package.
-- [ ] -- Optimize getting an object by path; maybe this could be done with some kind of string serialization, rather than text parsing?
-- [ ] -- Replace panics / log.prints with error returns (e.g. gltf.go)
+-   [ ] **3D Sound** (adjusting panning of sound sources based on 3D location?)
+-   [ ] **Optimization / Bugfixes**
+-   [ ] -- It's currently problematic to set world scale and rotation (and possible position as well) at the same time.
+-   [ ] -- Try using [avo](https://github.com/mmcloughlin/avo) to generate assembly for SIMD-ing, particularly Matrix x Vector multiplication
+-   [ ] -- Try using ebiten.Vertex directly, rather than storing data in Mesh.VertexTransforms and then copying that to the vertex list. Maybe the W component could be stored in the current Custom0 attribute and perspective divide could be done in the Kage shader.
+-   [ ] -- It might be possible to not have to write depth manually (5/22/23, SolarLune: Not sure what past me meant by this)
+-   [ ] -- Minimize texture-swapping - should be possible to do now that Kage shaders can handle images of multiple sizes.
+-   [x] -- Make NodeFilters work lazily, rather than gathering all nodes in the filter at once
+        -- [x] -- Optimize NodeFilters to avoid creating slices unnecessarily by avoiding using Node.Children() and instead use callbacks
+        -- [ ] -- Allow NodeFilters to append filtered nodes to a shared slice to have sorting available while still not allocating new memory unless the internal slice grows
+-   [x] -- Reusing vertex indices for adjacent triangles
+-   [ ] -- Multithreading (particularly for vertex transformations)
+-   [x] -- Armature animation improvements?
+-   [x] -- Custom Vectors
+-   [ ] -- -- Move Vector and Matrix to external package for simplicity / resuability / create separate Vector types for 2D / 4D (?) Vectors. Maybe Colors as well?
+-   [ ] -- Investigate replacing vector multiplaction with in-place vector multiplication
+-   [ ] -- -- Vector pools again?
+-   [ ] -- -- Move over to float32 for mathematics - seems like it should be faster? Should be possible with math32 : https://github.com/chewxy/math32
+-   [ ] -- -- Maybe make Vectors generic, so you could have float32 / int Vectors? Or something like that?
+-   [ ] -- Matrix pools?
+-   [ ] -- Raytest optimization
+-   [ ] -- -- Reduce memory allocation by not using functions that return new Vectors, but rather simply perform math within the Vectors themselves
+-   [ ] -- -- Sphere?
+-   [ ] -- -- AABB?
+-   [ ] -- -- Capsule?
+-   [ ] -- -- Triangles
+-   [ ] -- -- -- Maybe we can combine contiguous triangles into faces and just check faces?
+-   [ ] -- -- -- We could use the broadphase system to find triangles that are in the raycast's general area, specifically
+-   [ ] -- Instead of doing collision testing using triangles directly, we can test against planes / faces if possible to reduce checks?
+-   [ ] -- Lighting speed improvements
+-   [ ] -- Resource tracking system to ease cloning elements (i.e. rather than live-cloning Meshes, it would be faster to re-use "dead" Meshes)
+-   [ ] -- -- Model
+-   [ ] -- -- Mesh
+-   [ ] -- [Prefer Discrete GPU](https://github.com/silbinarywolf/preferdiscretegpu) for computers with both discrete and integrated graphics cards
+-   [x] -- Replace \*Color with just the plain Color struct (this would be a breaking change)
+-   [ ] -- Replace color usage with HTML or W3C colors? : https://www.computerhope.com/htmcolor.htm#gray / https://www.computerhope.com/jargon/w/w3c-color-names.htm
+-   [ ] -- Update to use Generics where possible; we're already on Go 1.18.
+-   [ ] -- Move utility objects (quaternion, vector, color, text, matrix, treewatcher, etc) to utility package.
+-   [ ] -- Optimize getting an object by path; maybe this could be done with some kind of string serialization, rather than text parsing?
+-   [ ] -- Replace panics / log.prints with error returns (e.g. gltf.go)
 
 Again, it's incomplete and jank. However, it's also pretty cool!
 
@@ -461,13 +463,13 @@ Again, it's incomplete and jank. However, it's also pretty cool!
 
 Huge shout-out to the open-source community:
 
-- StackOverflow, in general, _FOR REAL_ - this would've been impossible otherwise
-- [quartercastle's vector package](https://github.com/quartercastle/vector)
-- [fauxgl](https://github.com/fogleman/fauxgl)
-- [tinyrenderer](https://github.com/ssloy/tinyrenderer)
-- [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems)
-- [3DCollisions](https://gdbooks.gitbooks.io/3dcollisions/content/)
-- [Simon Rodriguez's "Writing a Small Software Renderer" article](http://blog.simonrodriguez.fr/articles/2017/02/writing_a_small_software_renderer.html)
-- And many other articles that I've forgotten to note down
+-   StackOverflow, in general, _FOR REAL_ - this would've been impossible otherwise
+-   [quartercastle's vector package](https://github.com/quartercastle/vector)
+-   [fauxgl](https://github.com/fogleman/fauxgl)
+-   [tinyrenderer](https://github.com/ssloy/tinyrenderer)
+-   [learnopengl.com](https://learnopengl.com/Getting-started/Coordinate-Systems)
+-   [3DCollisions](https://gdbooks.gitbooks.io/3dcollisions/content/)
+-   [Simon Rodriguez's "Writing a Small Software Renderer" article](http://blog.simonrodriguez.fr/articles/2017/02/writing_a_small_software_renderer.html)
+-   And many other articles that I've forgotten to note down
 
 ... For sharing the information and code to make this possible; I would definitely have never been able to create this otherwise.

@@ -449,7 +449,7 @@ func (model *Model) skinVertex(vertID int) (Vector3, Vector3) {
 			model.skinMatrix = bone.boneInfluence
 			break // I think we can end here if the weight percentage is 100%, right?
 		} else {
-			model.skinMatrix = model.skinMatrix.Add(bone.boneInfluence.ScaleByScalar(weightPerc))
+			model.skinMatrix = model.skinMatrix.Add(bone.boneInfluence.Scale(weightPerc))
 		}
 
 	}
