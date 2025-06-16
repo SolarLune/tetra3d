@@ -294,6 +294,12 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 			v1 := test.Mesh.VertexPositions[tri.VertexIndices[1]]
 			v2 := test.Mesh.VertexPositions[tri.VertexIndices[2]]
 
+			// Skip because the triangle is degenerate and a collision plane cannot be set from it
+			// (i.e. for whatever reason, at least two vertices share location, so it's no longer a pure triangle)
+			if v0.Equals(v1) || v1.Equals(v2) || v2.Equals(v0) {
+				return true
+			}
+
 			plane.Set(v0, v1, v2)
 
 			if vec, ok := plane.RayAgainstPlane(invFrom, invTo, doublesided); ok {

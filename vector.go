@@ -397,7 +397,7 @@ func (vec Vector3) Equals(other Vector3) bool {
 
 	eps := float32(1e-4)
 
-	if math32.Abs(float32(vec.X-other.X)) > eps || math32.Abs(float32(vec.Y-other.Y)) > eps || math32.Abs(float32(vec.Z-other.Z)) > eps {
+	if math32.Abs(vec.X-other.X) > eps || math32.Abs(vec.Y-other.Y) > eps || math32.Abs(vec.Z-other.Z) > eps {
 		return false
 	}
 
@@ -414,7 +414,7 @@ func (vec Vector3) IsZero() bool {
 
 	eps := float32(1e-4)
 
-	if math32.Abs(float32(vec.X)) > eps || math32.Abs(float32(vec.Y)) > eps || math32.Abs(float32(vec.Z)) > eps {
+	if math32.Abs(vec.X) > eps || math32.Abs(vec.Y) > eps || math32.Abs(vec.Z) > eps {
 		return false
 	}
 
@@ -455,7 +455,7 @@ func (vec Vector3) Angle(other Vector3) float32 {
 	d := vec.Dot(other)
 	d /= vec.MagnitudeSquared() * other.MagnitudeSquared() // REVIEW
 	d = math32.Clamp(d, -1, 1)                             // Acos returns NaN if value < -1 or > 1
-	return math32.Acos(float32(d))
+	return math32.Acos(d)
 }
 
 // AngleSigned returns the signed angle between the calling Vector and the other Vector, with planeNormal indicating the plane that both vectors share.

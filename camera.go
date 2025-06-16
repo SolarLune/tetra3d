@@ -2170,6 +2170,52 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 }
 
+// Draws the IDs of all triangles of all visible Models underneath the rootNode in the color provided to the screen
+// image provided.
+func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode, textScale float32, color Color) {
+
+	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
+
+	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
+
+	for _, m := range allModels {
+
+		if model, isModel := m.(*Model); isModel {
+
+			if model.FrustumCulling {
+
+				model.Transform()
+				if !camera.SphereInFrustum(model.frustumCullingSphere) {
+					continue
+				}
+
+			}
+
+			for _, meshPart := range model.Mesh.MeshParts {
+
+				globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
+				if meshPart.Material != nil {
+					globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
+				}
+
+				model.ProcessVertices(vpMatrix, camera, meshPart, false)
+
+				globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
+
+					screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.Mesh.Triangles[triID].Center))
+
+					camera.DrawDebugText(screen, fmt.Sprintf("%d", model.Mesh.Triangles[triID].ID()), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+
+				})
+
+			}
+
+		}
+
+	}
+
+}
+
 // DrawDebugDrawCallCount draws the draw call count of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
 func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float32, color Color) {

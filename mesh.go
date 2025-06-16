@@ -438,6 +438,24 @@ func (mesh *Mesh) Select() VertexSelection {
 	return NewVertexSelection().SelectMeshes(mesh)
 }
 
+// TriangleByID returns a triangle by the given ID, if it exists.
+func (mesh *Mesh) TriangleByID(id uint32) *Triangle {
+	for _, t := range mesh.Triangles {
+		if t.id == id {
+			return t
+		}
+	}
+	return nil
+}
+
+// TriangleByIndex returns a triangle by its index in the mesh's triangles slice.
+func (mesh *Mesh) TriangleByIndex(index int) *Triangle {
+	if index >= 0 && index < len(mesh.Triangles)-1 {
+		return mesh.Triangles[index]
+	}
+	return nil
+}
+
 // Materials returns a slice of the materials present in the Mesh's MeshParts.
 func (mesh *Mesh) Materials() []*Material {
 	mats := []*Material{}
@@ -459,8 +477,8 @@ func (mesh *Mesh) AddMeshPart(material *Material, indices ...int) *MeshPart {
 	return mp
 }
 
-// FindMeshPart allows you to retrieve a MeshPart by its material's name. If no material with the provided name is given, the function returns nil.
-func (mesh *Mesh) FindMeshPart(materialName string) *MeshPart {
+// MeshPartByMaterialName allows you to retrieve a MeshPart by its material's name. If no material with the provided name is given, the function returns nil.
+func (mesh *Mesh) MeshPartByMaterialName(materialName string) *MeshPart {
 	for _, mp := range mesh.MeshParts {
 		if mp.Material != nil && mp.Material.name == materialName {
 			return mp
@@ -742,7 +760,7 @@ func (vs VertexSelection) SelectMeshPartByName(mesh *Mesh, materialNames ...stri
 
 	vs.ensureSelectionSetExists(mesh)
 	for _, matName := range materialNames {
-		if mp := mesh.FindMeshPart(matName); mp != nil {
+		if mp := mesh.MeshPartByMaterialName(matName); mp != nil {
 			vs.SelectMeshPart(mp)
 		}
 	}
@@ -1394,6 +1412,7 @@ func NewCylinderMesh(sideCount int, radius, height float32, createCaps bool) *Me
 
 // A Triangle represents the smallest renderable object in Tetra3D. A triangle contains very little data, and is mainly used to help identify triads of vertices.
 type Triangle struct {
+	id            uint32    // The ID of the triangle
 	VertexIndices []int     // Vertex indices that compose the triangle
 	MaxSpan       float32   // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
 	Center        Vector3   // The untransformed center of the Triangle.
@@ -1414,11 +1433,26 @@ func NewTriangle(meshPart *MeshPart, indices ...int) *Triangle {
 // Clone clones the Triangle, keeping a reference to the same Material.
 func (tri *Triangle) Clone() *Triangle {
 	newTri := NewTriangle(tri.MeshPart, tri.VertexIndices...)
+	newTri.id = tri.id
 	newTri.MaxSpan = tri.MaxSpan
 	newTri.Center = tri.Center
 	newTri.Normal = tri.Normal
 	newTri.MeshPart = tri.MeshPart
 	return newTri
+}
+
+// ID returns the ID of the triangle in the Mesh, with 1 being the first available ID.
+func (t *Triangle) ID() uint32 {
+	return t.id
+}
+
+// IsDegenerate returns if the Triangle is composed of vertices where two or more of the vertices
+// share the same position (and so the triangle has no real normal).
+func (t *Triangle) IsDegenerate() bool {
+	v1 := t.MeshPart.Mesh.VertexPositions[t.VertexIndices[0]]
+	v2 := t.MeshPart.Mesh.VertexPositions[t.VertexIndices[1]]
+	v3 := t.MeshPart.Mesh.VertexPositions[t.VertexIndices[2]]
+	return v1.Equals(v2) || v2.Equals(v3) || v3.Equals(v1)
 }
 
 // RecalculateCenter recalculates the center for the Triangle. Note that this should only be called if you manually change a vertex's
@@ -1481,6 +1515,10 @@ func (tri *Triangle) RecalculateCenter() {
 func (tri *Triangle) RecalculateNormal() {
 	verts := tri.MeshPart.Mesh.VertexPositions
 	tri.Normal = calculateNormal(verts[tri.VertexIndices[0]], verts[tri.VertexIndices[1]], verts[tri.VertexIndices[2]])
+	// Sometimes a triangle is composed of three vertices where two share positions exactly; not sure why.
+	if tri.Normal.IsZero() {
+		tri.Normal = tri.MeshPart.Mesh.VertexNormals[tri.VertexIndices[0]]
+	}
 }
 
 // ResetVertexNormals sets all vertex normals associated with the triangle to the triangle's normal.
@@ -1620,8 +1658,9 @@ func calculateNormal(p1, p2, p3 Vector3) Vector3 {
 
 	v0 := p2.Sub(p1)
 	v1 := p3.Sub(p2)
+	normal := v0.Cross(v1).Unit()
 
-	return v0.Cross(v1).Unit()
+	return normal
 
 }
 
@@ -1738,6 +1777,7 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 		}
 
 		newTri := NewTriangle(part, indices[i]+part.VertexIndexStart, indices[i+1]+part.VertexIndexStart, indices[i+2]+part.VertexIndexStart)
+		newTri.id = uint32(len(mesh.Triangles) + 1)
 
 		// Slight UV adjustment to not have invisibility in-between seams
 		uvcenter := mesh.VertexUVs[indices[i]].Add(mesh.VertexUVs[indices[i+1]]).Add(mesh.VertexUVs[indices[i+2]]).Divide(3)

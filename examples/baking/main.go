@@ -84,9 +84,9 @@ func (g *Game) Init() {
 	// for each Model.
 	bakeOptions := tetra3d.NewDefaultAOBakeOptions()
 	bakeOptions.TargetMeshParts = []*tetra3d.MeshPart{ // Bake AO only to meshparts with the following materials
-		model.Mesh.FindMeshPart("BrickTile"),
-		model.Mesh.FindMeshPart("GroundTile"),
-		model.Mesh.FindMeshPart("Cube"),
+		model.Mesh.MeshPartByMaterialName("BrickTile"),
+		model.Mesh.MeshPartByMaterialName("GroundTile"),
+		model.Mesh.MeshPartByMaterialName("Cube"),
 	}
 	bakeOptions.OcclusionAngle = math32.ToRadians(60)
 	bakeOptions.TargetChannel = ChannelAO // Set the target baking channel (as it's not 0)
