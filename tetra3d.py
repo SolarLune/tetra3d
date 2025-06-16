@@ -10,13 +10,13 @@ audioPaused = False
 fontHandler = None
 
 bl_info = {
-    "name" : "Tetra3D Addon",                        # The name in the addon search menu
+    "name" : "Tetra3D",                        # The name in the addon search menu
     "author" : "SolarLune Games",
     "description" : "An addon for exporting GLTF content from Blender for use with Tetra3D.",
     "blender" : (3, 0, 1),                             # Lowest version to use
     "location" : "View3D",
     "category" : "Gamedev",
-    "version" : (0, 16, 0),
+    "version" : (0, 17, 0),
     "support" : "COMMUNITY",
     "doc_url" : "https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon",
 }
