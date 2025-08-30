@@ -320,6 +320,70 @@ class OBJECT_OT_tetra3dFocusObject(bpy.types.Operator):
 
         return {'FINISHED'}
 
+class OBJECT_OT_tetra3dSelectWithSameProperty(bpy.types.Operator):
+
+    bl_idname = "object.t3dselectwithsameproperty"
+    bl_label = "" ## We don't want the label to show
+    bl_description= "Selects objeccts with the same property as the specified object. The properties must share names, types, and values"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+
+    def execute(self, context):
+
+        bpy.ops.object.select_all(action='DESELECT')
+
+        selected = bpy.context.object
+
+        prop = selected.t3dGameProperties__[self.index]
+
+        name = prop.name
+        valueType = prop.valueType
+        value = valueFromProp(prop)
+
+        scene = bpy.context.scene
+
+        for layer in scene.view_layers:
+
+            for obj in layer.objects:
+
+                for otherProp in obj.t3dGameProperties__:
+
+                    if otherProp.name == name and \
+                    otherProp.valueType == valueType and \
+                    valueFromProp(otherProp) == value:
+                        obj.select_set(True)
+                        break
+
+        return {'FINISHED'}
+
+def valueFromProp(prop):
+
+    value = None
+
+    if prop.valueType == "bool":
+        value = prop.valueBool
+    elif prop.valueType == "int":
+        value = prop.valueInt
+    elif prop.valueType == "float":
+        value = prop.valueFloat
+    elif prop.valueType == "string":
+        value = prop.valueString
+    elif prop.valueType == "reference":
+        value = prop.valueReference
+    elif prop.valueType == "color":
+        value = prop.valueColor
+    elif prop.valueType == "vector2d":
+        value = prop.valueVector2D
+    elif prop.valueType == "vector3d":
+        value = prop.valueVector3D
+    elif prop.valueType == "file":
+        value = prop.valueFilepath
+    elif prop.valueType == "directory":
+        value = prop.valueDirpath
+
+    return value
+
 search_mode = "name"
 
 def enum_search(scene, context):
@@ -939,6 +1003,9 @@ def handleT3DProperties(self, props, operatorType, enabled=True, objectIndex=0):
         deleteOptions = row.operator(OBJECT_OT_tetra3dDeleteProp.bl_idname, text="", icon="TRASH")
         deleteOptions.index = index
         deleteOptions.mode = operatorType
+
+        selectAllWithSameProperty = row.operator(OBJECT_OT_tetra3dSelectWithSameProperty.bl_idname, text="", icon="VIS_SEL_11")
+        selectAllWithSameProperty.index = index
         
         row = box.row()
         row.enabled = enabled
@@ -1982,6 +2049,7 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
     bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
     bpy.utils.register_class(OBJECT_OT_tetra3dFocusObject)
+    bpy.utils.register_class(OBJECT_OT_tetra3dSelectWithSameProperty)
     bpy.utils.register_class(OBJECT_OT_tetra3dSearchStringProperties)
 
     for propName, prop in objectProps.items():
@@ -2272,6 +2340,7 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
     bpy.utils.unregister_class(OBJECT_OT_tetra3dFocusObject)
+    bpy.utils.unregister_class(OBJECT_OT_tetra3dSelectWithSameProperty)
 
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSearchStringProperties)
     

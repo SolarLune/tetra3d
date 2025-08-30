@@ -342,10 +342,12 @@ The following is a rough to-do list (tasks with checks have been implemented):
 -   [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
 -   [x] **Blender Add-on**
 -   [x] -- Export 3D view camera to Scenes for quick iteration
+-   [x] -- Auto mesh subdivision based on edge length
+-         [ ] -- Looks weird currently after a new update (since Blender ~4.4)
 -   [ ] -- Object-level color option
 -   [ ] -- Object-level shadeless checkbox
 -   [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices (SolarLune 3/3/24: Doesn't seem to be possible outside of vertex colors)
--   [ ] -- Exporting animations and auto-subdivided mesh data doesn't work properly when the scene is not focused in Blender
+-   [x] -- Exporting animations and auto-subdivided mesh data doesn't work properly when the scene is not focused in Blender
 -   [ ] -- Sharing materials and textures doesn't work properly
 -   [x] -- Export GLTF on save / on command via button
 -   [x] -- Bounds node creation
@@ -418,7 +420,10 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 -   [ ] **3D Sound** (adjusting panning of sound sources based on 3D location?)
 -   [ ] **Optimization / Bugfixes**
+-   [ ] -- Use BVH acceleration structures for raycasting / looping through triangles
 -   [ ] -- It's currently problematic to set world scale and rotation (and possible position as well) at the same time.
+-   [ ] -- Reuse buffers when reading data from GLTF
+-   [ ] -- Fix sort mode not being usable with NodeFilter.First() / Last()
 -   [ ] -- Try using [avo](https://github.com/mmcloughlin/avo) to generate assembly for SIMD-ing, particularly Matrix x Vector multiplication
 -   [ ] -- Try using ebiten.Vertex directly, rather than storing data in Mesh.VertexTransforms and then copying that to the vertex list. Maybe the W component could be stored in the current Custom0 attribute and perspective divide could be done in the Kage shader.
 -   [ ] -- It might be possible to not have to write depth manually (5/22/23, SolarLune: Not sure what past me meant by this)

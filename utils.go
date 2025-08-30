@@ -170,6 +170,26 @@ func (s Set[E]) ForEach(f func(element E)) {
 	}
 }
 
+func BlendModeDefault() ebiten.Blend {
+	return ebiten.BlendSourceOver
+}
+func BlendModeAdditive() ebiten.Blend {
+	return ebiten.BlendLighter
+}
+func BlendModeMultiply() ebiten.Blend {
+	return ebiten.Blend{
+		BlendFactorSourceRGB:        ebiten.BlendFactorDestinationColor,
+		BlendFactorSourceAlpha:      ebiten.BlendFactorDestinationColor,
+		BlendFactorDestinationRGB:   ebiten.BlendFactorZero,
+		BlendFactorDestinationAlpha: ebiten.BlendFactorZero,
+		BlendOperationRGB:           ebiten.BlendOperationAdd,
+		BlendOperationAlpha:         ebiten.BlendOperationAdd,
+	}
+}
+func BlendModeClear() ebiten.Blend {
+	return ebiten.BlendDestinationOut
+}
+
 /////
 
 // func alignmentCheck(s any) {

@@ -107,7 +107,7 @@ func (g *Game) Update() error {
 
 			if time.Since(blinkStart) > dur {
 				props.Set("blink-start", time.Now())
-				o.SetVisible(!o.Visible(), false)
+				o.SetVisible(!o.IsVisible(), false)
 			}
 
 			// o.SetVisible()

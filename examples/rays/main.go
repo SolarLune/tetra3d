@@ -73,7 +73,7 @@ func (g *Game) Update() error {
 
 			marker.SetWorldPositionVec(hit.Position.Add(hit.Normal.Scale(0.5)))
 
-			mat := tetra3d.NewLookAtMatrix(marker.WorldPosition(), hit.Position, tetra3d.WorldUp)
+			mat := tetra3d.NewMatrix4LookAt(marker.WorldPosition(), hit.Position, tetra3d.WorldUp)
 
 			marker.SetWorldRotation(mat)
 

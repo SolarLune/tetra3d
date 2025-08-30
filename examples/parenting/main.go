@@ -107,7 +107,7 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyI) {
-		parent.SetVisible(!parent.Visible(), true)
+		parent.SetVisible(!parent.IsVisible(), true)
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyO) {

@@ -514,11 +514,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		if mat.BillboardMode == BillboardModeFixedVertical {
 
 			out := camera.cameraForward.Invert()
-			lookat = NewLookAtMatrix(Vector3{}, out, camera.cameraUp)
+			lookat = NewMatrix4LookAt(Vector3{}, out, camera.cameraUp)
 
 		} else if mat.BillboardMode != BillboardModeNone {
 
-			lookat = NewLookAtMatrix(model.WorldPosition(), camPos, WorldUp)
+			lookat = NewMatrix4LookAt(model.WorldPosition(), camPos, WorldUp)
 
 			if mat.BillboardMode == BillboardModeHorizontal {
 				lookat.SetRow(1, Vector4{0, 1, 0, 0})
@@ -771,6 +771,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			dz := invertedCamPos.Z - tri.Center.Z
 			depth = float32(dx*dx + dy*dy + dz*dz)
 
+		}
+
+		if math32.IsNaN(depth) || math32.IsInf(depth, -1) || math32.IsInf(depth, 1) {
+			continue
 		}
 
 		if depth < minDepth {

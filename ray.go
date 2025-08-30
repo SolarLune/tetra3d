@@ -333,9 +333,17 @@ var internalRayTest = []RayHit{}
 
 // TODO: Add SphereCast?
 
+// RayTestLocationPair represents a pair of locations to test against.
+type RayTestLocationPair struct {
+	From, To Vector3 // From and To are the starting and ending points of the ray tests.
+}
+
 // RayTestOptions is a struct designed to control what options to use when performing a ray test.
 type RayTestOptions struct {
-	From, To Vector3 // From and To are the starting and ending points of the ray test.
+
+	// The positions to cast rays from and to.
+	// By specifying multiple locations in this location pair set, you can cast multiple rays at the same time.
+	Positions []RayTestLocationPair
 
 	// If cast rays can strike both sides of BoundingTriangles triangles or not.
 	// TODO: Implement this for all collision types, not just triangles.
@@ -352,8 +360,33 @@ type RayTestOptions struct {
 	OnHit func(hit RayHit, index, count int) bool
 }
 
-// RayTest casts a ray from the "from" world position to the "to" world position, testing against the provided
-// IBoundingObjects.
+// AddPosition adds a position pair to cast rays from and to.
+func (r RayTestOptions) AddPosition(from, to Vector3) RayTestOptions {
+	r.Positions = append(r.Positions, RayTestLocationPair{
+		From: from,
+		To:   to,
+	})
+	return r
+}
+
+// WithOnHit sets the callback to be called for each hit a cast Ray returns, sorted by distance from the starting point.
+func (r RayTestOptions) WithOnHit(onHit func(hit RayHit, index, count int) bool) RayTestOptions {
+	r.OnHit = onHit
+	return r
+}
+
+func (r RayTestOptions) WithDoublesided(doubleSided bool) RayTestOptions {
+	r.Doublesided = doubleSided
+	return r
+}
+
+func (r RayTestOptions) WithTestAgainst(iterator NodeIterator) RayTestOptions {
+	r.TestAgainst = iterator
+	return r
+}
+
+// RayTest casts a ray from the "from" world position to the "to" world position for each position pair
+// while testing against the provided IBoundingObjects.
 // The function returns the first struck object; if none were struck, it returns nil.
 func RayTest(options RayTestOptions) *RayHit {
 
@@ -362,36 +395,40 @@ func RayTest(options RayTestOptions) *RayHit {
 
 	options.TestAgainst.ForEach(func(node INode) bool {
 
-		node.Transform() // Make sure the transform is updated before the test
+		for _, pos := range options.Positions {
 
-		switch test := node.(type) {
+			node.Transform() // Make sure the transform is updated before the test
 
-		case *BoundingSphere:
+			switch test := node.(type) {
 
-			if result, ok := boundingSphereRayTest(test.WorldPosition(), test.WorldRadius(), options.From, options.To); ok {
-				result.Object = test
-				internalRayTest = append(internalRayTest, result)
+			case *BoundingSphere:
+
+				if result, ok := boundingSphereRayTest(test.WorldPosition(), test.WorldRadius(), pos.From, pos.To); ok {
+					result.Object = test
+					internalRayTest = append(internalRayTest, result)
+				}
+
+			case *BoundingCapsule:
+
+				closestPoint, _ := test.nearestPointsToLine(pos.From, pos.To)
+
+				if result, ok := boundingSphereRayTest(closestPoint, test.WorldRadius(), pos.From, pos.To); ok {
+					result.Object = test
+					internalRayTest = append(internalRayTest, result)
+				}
+
+			case *BoundingAABB:
+
+				if result, ok := boundingAABBRayTest(pos.From, pos.To, test); ok {
+					internalRayTest = append(internalRayTest, result)
+				}
+
+			case *BoundingTriangles:
+
+				// Raycasting against triangles can hit multiple triangles, so we can't bail early and have to return all potential hits
+				internalRayTest = append(internalRayTest, boundingTrianglesRayTest(pos.From, pos.To, test, options.Doublesided)...)
+
 			}
-
-		case *BoundingCapsule:
-
-			closestPoint, _ := test.nearestPointsToLine(options.From, options.To)
-
-			if result, ok := boundingSphereRayTest(closestPoint, test.WorldRadius(), options.From, options.To); ok {
-				result.Object = test
-				internalRayTest = append(internalRayTest, result)
-			}
-
-		case *BoundingAABB:
-
-			if result, ok := boundingAABBRayTest(options.From, options.To, test); ok {
-				internalRayTest = append(internalRayTest, result)
-			}
-
-		case *BoundingTriangles:
-
-			// Raycasting against triangles can hit multiple triangles, so we can't bail early and have to return all potential hits
-			internalRayTest = append(internalRayTest, boundingTrianglesRayTest(options.From, options.To, test, options.Doublesided)...)
 
 		}
 
@@ -400,7 +437,7 @@ func RayTest(options RayTestOptions) *RayHit {
 	})
 
 	sort.Slice(internalRayTest, func(i, j int) bool {
-		return internalRayTest[i].Position.DistanceSquaredTo(options.From) < internalRayTest[j].Position.DistanceSquaredTo(options.From)
+		return internalRayTest[i].Position.DistanceSquaredTo(internalRayTest[i].from) < internalRayTest[j].Position.DistanceSquaredTo(internalRayTest[j].from)
 	})
 
 	if options.OnHit != nil {
@@ -437,6 +474,30 @@ type MouseRayTestOptions struct {
 	OnHit func(hit RayHit, hitIndex int, hitCount int) bool
 }
 
+// WithDepth controls the maximum distance out from the camera the ray is cast.
+func (r MouseRayTestOptions) WithDepth(depth float32) MouseRayTestOptions {
+	r.Depth = depth
+	return r
+}
+
+// WithOnHit sets the callback to be called for each hit a cast Ray returns, sorted by distance from the starting point.
+func (r MouseRayTestOptions) WithOnHit(onHit func(hit RayHit, index, count int) bool) MouseRayTestOptions {
+	r.OnHit = onHit
+	return r
+}
+
+// WithDoublesided indicates if the ray test is double-sided or single-sided.
+func (r MouseRayTestOptions) WithDoublesided(doubleSided bool) MouseRayTestOptions {
+	r.Doublesided = doubleSided
+	return r
+}
+
+// WithTestAgainst sets the test against iterator for the mouse raytest option set.
+func (r MouseRayTestOptions) WithTestAgainst(iterator NodeIterator) MouseRayTestOptions {
+	r.TestAgainst = iterator
+	return r
+}
+
 // MouseRayTest casts a ray forward from the mouse's position onscreen, testing against the provided
 // IBoundingObjects found in the MouseRayTestOptions struct.
 // The function calls the callback found in the MouseRayTestOptions struct for each object struck by the ray.
@@ -461,8 +522,9 @@ func (camera *Camera) MouseRayTest(options MouseRayTestOptions) *RayHit {
 	to := camera.ScreenToWorldPixels(mx, my, options.Depth)
 
 	return RayTest(RayTestOptions{
-		From:        from,
-		To:          to,
+		Positions: []RayTestLocationPair{
+			{from, to},
+		},
 		OnHit:       options.OnHit,
 		TestAgainst: options.TestAgainst,
 		Doublesided: options.Doublesided,

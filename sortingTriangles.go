@@ -1,6 +1,8 @@
 package tetra3d
 
-import "github.com/solarlune/tetra3d/math32"
+import (
+	"github.com/solarlune/tetra3d/math32"
+)
 
 // sortingTriangle is used specifically for sorting triangles when rendering. Less data means more data fits in cache,
 // which means sorting is faster.

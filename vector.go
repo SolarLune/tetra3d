@@ -198,6 +198,15 @@ func (vec Vector3) ClampMagnitude(maxMag float32) Vector3 {
 	return vec
 }
 
+// AddMagnitude returns a copy of the Vector3 with the given magnitude subtracted from it. If the vector's magnitude is less than the given magnitude to subtract,
+// a zero-length Vector3 will be returned.
+func (vec Vector3) AddMagnitude(mag float32) Vector3 {
+	if vec.Magnitude() > mag {
+		return vec.Add(vec.Unit().Scale(mag))
+	}
+	return Vector3{0, 0, 0}
+}
+
 // SubMagnitude returns a copy of the Vector3 with the given magnitude subtracted from it. If the vector's magnitude is less than the given magnitude to subtract,
 // a zero-length Vector3 will be returned.
 func (vec Vector3) SubMagnitude(mag float32) Vector3 {
@@ -205,7 +214,6 @@ func (vec Vector3) SubMagnitude(mag float32) Vector3 {
 		return vec.Sub(vec.Unit().Scale(mag))
 	}
 	return Vector3{0, 0, 0}
-
 }
 
 // MoveTowards moves a Vector3 towards another Vector3 given a specific magnitude. If the distance is less than that magnitude, it returns the target vector.
@@ -456,6 +464,12 @@ func (vec Vector3) Angle(other Vector3) float32 {
 	d /= vec.MagnitudeSquared() * other.MagnitudeSquared() // REVIEW
 	d = math32.Clamp(d, -1, 1)                             // Acos returns NaN if value < -1 or > 1
 	return math32.Acos(d)
+}
+
+// Reflect reflects the vector against the given surface normal.
+func (vec Vector3) Reflect(normal Vector3) Vector3 {
+	n := normal.Unit()
+	return vec.Sub(n.Scale(2 * n.Dot(vec)))
 }
 
 // AngleSigned returns the signed angle between the calling Vector and the other Vector, with planeNormal indicating the plane that both vectors share.

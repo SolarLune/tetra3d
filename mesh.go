@@ -130,6 +130,10 @@ const (
 // Each value in the color channel is a color for the vertex in the associated index.
 type VertexColorChannel []Color
 
+func (v VertexColorChannel) Clone() VertexColorChannel {
+	return append(VertexColorChannel{}, v...)
+}
+
 // Mesh represents a mesh that can be represented visually in different locations via Models. By default, a new Mesh has no MeshParts (so you would need to add one
 // manually if you want to construct a Mesh via code).
 type Mesh struct {
@@ -215,6 +219,7 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 
 // Clone clones the Mesh, creating a new Mesh that has cloned MeshParts.
 func (mesh *Mesh) Clone() *Mesh {
+
 	newMesh := NewMesh(mesh.Name)
 	newMesh.library = mesh.library
 	newMesh.properties = mesh.properties.Clone()
@@ -242,11 +247,9 @@ func (mesh *Mesh) Clone() *Mesh {
 		newMesh.VertexUVOriginalValues = append(newMesh.VertexUVOriginalValues, mesh.VertexUVs[i])
 	}
 
-	newMesh.VertexColors = append(newMesh.VertexColors, make(VertexColorChannel, len(mesh.VertexColors)))
-	for channelIndex, channel := range mesh.VertexColors {
-		for vertIndex := range channel {
-			channel = append(channel, mesh.VertexColors[channelIndex][vertIndex])
-		}
+	newMesh.VertexColors = make([]VertexColorChannel, 0, len(mesh.VertexColors))
+	for _, channel := range mesh.VertexColors {
+		newMesh.VertexColors = append(newMesh.VertexColors, channel.Clone())
 	}
 
 	newMesh.VertexActiveColorChannel = mesh.VertexActiveColorChannel
@@ -1782,12 +1785,14 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 		// Slight UV adjustment to not have invisibility in-between seams
 		uvcenter := mesh.VertexUVs[indices[i]].Add(mesh.VertexUVs[indices[i+1]]).Add(mesh.VertexUVs[indices[i+2]]).Divide(3)
 
-		mesh.VertexUVs[indices[i]].X += (uvcenter.X - mesh.VertexUVs[indices[i]].X) * 0.0001
-		mesh.VertexUVs[indices[i]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i]].Y) * 0.0001
-		mesh.VertexUVs[indices[i+1]].X += (uvcenter.X - mesh.VertexUVs[indices[i+1]].X) * 0.0001
-		mesh.VertexUVs[indices[i+1]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+1]].Y) * 0.0001
-		mesh.VertexUVs[indices[i+2]].X += (uvcenter.X - mesh.VertexUVs[indices[i+2]].X) * 0.0001
-		mesh.VertexUVs[indices[i+2]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+2]].Y) * 0.0001
+		uvadjustment := float32(0.01)
+
+		mesh.VertexUVs[indices[i]].X += (uvcenter.X - mesh.VertexUVs[indices[i]].X) * uvadjustment
+		mesh.VertexUVs[indices[i]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i]].Y) * uvadjustment
+		mesh.VertexUVs[indices[i+1]].X += (uvcenter.X - mesh.VertexUVs[indices[i+1]].X) * uvadjustment
+		mesh.VertexUVs[indices[i+1]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+1]].Y) * uvadjustment
+		mesh.VertexUVs[indices[i+2]].X += (uvcenter.X - mesh.VertexUVs[indices[i+2]].X) * uvadjustment
+		mesh.VertexUVs[indices[i+2]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+2]].Y) * uvadjustment
 
 		newTri.RecalculateCenter()
 		newTri.RecalculateNormal()

@@ -100,11 +100,9 @@ func (g *Game) Update() error {
 	from := g.Controlling.WorldPosition()
 
 	if ray := tetra3d.RayTest(tetra3d.RayTestOptions{
-		From:        from,
-		To:          from.SubY(boundsHalfHeight + math32.Abs(g.VerticalSpeed) + 0.25),
 		Doublesided: true,
 		TestAgainst: solids,
-	}); ray != nil {
+	}.AddPosition(from, from.SubY(boundsHalfHeight+math32.Abs(g.VerticalSpeed)+0.25))); ray != nil {
 		margin := float32(0.1)
 		g.Controlling.SetWorldY(ray.Position.Y + boundsHalfHeight + margin)
 		g.VerticalSpeed = 0

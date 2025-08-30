@@ -796,9 +796,9 @@ func NewMatrix4RotateFromEuler(euler Vector3) Matrix4 {
 	return mat
 }
 
-// NewLookAtMatrix generates a new Matrix4 to rotate an object to point towards another object. to is the target's world position,
+// NewMatrix4LookAt generates a new Matrix4 to rotate an object to point towards another object. to is the target's world position,
 // from is the world position of the object looking towards the target, and up is the upward vector ( usually +Y, or [0, 1, 0] ).
-func NewLookAtMatrix(from, to, up Vector3) Matrix4 {
+func NewMatrix4LookAt(from, to, up Vector3) Matrix4 {
 
 	// If from and to are the same, then an identity Matrix4 should be a sensible default
 	if from.Equals(to) {

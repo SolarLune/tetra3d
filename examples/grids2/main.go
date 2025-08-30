@@ -41,7 +41,7 @@ func NewGridPointMarker(gridPoint *tetra3d.GridPoint) *GridPointMarker {
 		line := scene.Get("Line").Clone()
 		line.SetLocalPosition(0, 0, 0)
 		model.AddChildren(line)
-		rot := tetra3d.NewLookAtMatrix(gridPoint.WorldPosition(), connection.To.WorldPosition(), tetra3d.WorldUp)
+		rot := tetra3d.NewMatrix4LookAt(gridPoint.WorldPosition(), connection.To.WorldPosition(), tetra3d.WorldUp)
 		dist := gridPoint.DistanceTo(connection.To)
 		line.SetLocalScale(1, 1, dist)
 		line.SetWorldRotation(rot)

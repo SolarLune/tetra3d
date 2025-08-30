@@ -60,8 +60,9 @@ func (col *Collision) add(intersection *Intersection) *Collision {
 // sort the intersections by distance from starting point (which should be the same for all collisions except for triangle-triangle) to contact point.
 func (col *Collision) sortResults() {
 	sort.Slice(col.Intersections, func(i, j int) bool {
-		return col.Intersections[i].StartingPoint.DistanceSquaredTo(col.Intersections[i].ContactPoint) >
-			col.Intersections[j].StartingPoint.DistanceSquaredTo(col.Intersections[j].ContactPoint)
+		return col.Intersections[i].MTV.MagnitudeSquared() > col.Intersections[j].MTV.MagnitudeSquared()
+		// return col.Intersections[i].StartingPoint.DistanceSquaredTo(col.Intersections[i].ContactPoint) >
+		// 	col.Intersections[j].StartingPoint.DistanceSquaredTo(col.Intersections[j].ContactPoint)
 	})
 }
 
@@ -394,86 +395,116 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 	result := newCollision(triangles)
 
-	triangles.Broadphase.ForEachTriangleFromBoundingObject(box, func(triID int) bool {
+	// aabbWorldRight := project(WorldRight, NewVector3(boxSize.X, 0, 0))
+	// aabbWorldUp := project(WorldUp, NewVector3(0, boxSize.Y, 0))
+	// aabbWorldForward := project(WorldDown, NewVector3(0, 0, boxSize.Z))
+
+	// Pretty sure I can avoid transforming the vertices (and normal) by transforming the AABB axes by an inverse
+
+	triangles.Broadphase.ForEachTriangleInRange(boxPos, box.Dimensions.MaxSpan()/2, func(triID int) bool {
 
 		tri := triangles.Mesh.Triangles[triID]
 
-		v0 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[0]]).Sub(boxPos)
-		v1 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[1]]).Sub(boxPos)
-		v2 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[2]]).Sub(boxPos)
-		// tc := v0.Add(v1).Add(v2).Scale(1.0 / 3.0)
-
-		ab := v1.Sub(v0).Unit()
-		bc := v2.Sub(v1).Unit()
-		ca := v0.Sub(v2).Unit()
+		v0 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[0]])
+		v1 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[1]])
+		v2 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[2]])
 
 		axes := []Vector3{
 
 			WorldRight,
+			WorldLeft,
 			WorldUp,
+			WorldDown,
+			WorldForward,
 			WorldBackward,
-
-			WorldRight.Cross(ab),
-			WorldRight.Cross(bc),
-			WorldRight.Cross(ca),
-
-			WorldUp.Cross(ab),
-			WorldUp.Cross(bc),
-			WorldUp.Cross(ca),
-
-			WorldBackward.Cross(ab),
-			WorldBackward.Cross(bc),
-			WorldBackward.Cross(ca),
 
 			transformNoLoc.MultVec(tri.Normal),
 		}
 
 		var overlapAxis Vector3
-		smallestOverlap := float32(math.MaxFloat32)
+		smallestOverlap := math32.MaxFloat32
 
 		for _, axis := range axes {
 
-			if axis.IsZero() {
-				return false
-			}
+			projectA := project(axis,
+				// boxPos,
+				boxPos.Add(WorldRight.Scale(boxSize.X)).Add(WorldUp.Scale(boxSize.Y)).Add(WorldForward.Scale(boxSize.Z)),
+				boxPos.Add(WorldRight.Scale(-boxSize.X)).Add(WorldUp.Scale(boxSize.Y)).Add(WorldForward.Scale(boxSize.Z)),
+				boxPos.Add(WorldRight.Scale(boxSize.X)).Add(WorldUp.Scale(boxSize.Y)).Add(WorldForward.Scale(-boxSize.Z)),
+				boxPos.Add(WorldRight.Scale(-boxSize.X)).Add(WorldUp.Scale(boxSize.Y)).Add(WorldForward.Scale(-boxSize.Z)),
 
-			axis = axis.Unit()
+				boxPos.Add(WorldRight.Scale(boxSize.X)).Add(WorldUp.Scale(-boxSize.Y)).Add(WorldForward.Scale(boxSize.Z)),
+				boxPos.Add(WorldRight.Scale(-boxSize.X)).Add(WorldUp.Scale(-boxSize.Y)).Add(WorldForward.Scale(boxSize.Z)),
+				boxPos.Add(WorldRight.Scale(boxSize.X)).Add(WorldUp.Scale(-boxSize.Y)).Add(WorldForward.Scale(-boxSize.Z)),
+				boxPos.Add(WorldRight.Scale(-boxSize.X)).Add(WorldUp.Scale(-boxSize.Y)).Add(WorldForward.Scale(-boxSize.Z)),
+			)
+			projectB := project(axis, v0, v1, v2)
 
-			p1 := project(axis, v0, v1, v2)
+			overlap := projectA.Overlap(projectB)
 
-			r := boxSize.X*math32.Abs(WorldRight.Dot(axis)) +
-				boxSize.Y*math32.Abs(WorldUp.Dot(axis)) +
-				boxSize.Z*math32.Abs(WorldBackward.Dot(axis))
+			if projectA.IsOverlapping(projectB) {
 
-			p2 := projection{
-				Max: r,
-				Min: -r,
-			}
+				if math32.Abs(overlap) < smallestOverlap {
+					overlapAxis = axis.Invert()
+					smallestOverlap = overlap
+				}
 
-			overlap := p1.Overlap(p2)
-
-			if !p1.IsOverlapping(p2) {
-				overlapAxis = Vector3{}
-				break
-			}
-
-			if overlap < smallestOverlap {
-				smallestOverlap = overlap
-				overlapAxis = axis
+			} else {
+				return true // Move on to next tri
 			}
 
 		}
 
+		// for _, axis := range axes {
+
+		// 	if axis.IsZero() {
+		// 		return false
+		// 	}
+
+		// 	axis = axis.Unit()
+
+		// 	p1 := project(axis, v0, v1, v2)
+
+		// 	r := boxSize.X*math32.Abs(WorldRight.Dot(axis)) +
+		// 		boxSize.Y*math32.Abs(WorldUp.Dot(axis)) +
+		// 		boxSize.Z*math32.Abs(WorldBackward.Dot(axis))
+
+		// 	p2 := projection{
+		// 		Max: r,
+		// 		Min: -r,
+		// 	}
+
+		// 	overlap := p1.Overlap(p2)
+
+		// 	if !p1.IsOverlapping(p2) {
+		// 		overlapAxis = Vector3{}
+		// 		break
+		// 	}
+
+		// 	if overlap < smallestOverlap {
+		// 		smallestOverlap = overlap
+		// 		overlapAxis = axis
+		// 	}
+
+		// }
+
 		if !overlapAxis.IsZero() {
+
+			// smallestOverlap += math32.Sign(smallestOverlap) * 0.1
+
 			mtv := overlapAxis.Scale(smallestOverlap)
+
+			triCenter := v0.Add(v1).Add(v2).Scale(1.0 / 3.0)
+			boxPoint := box.ClosestPoint(triCenter)
 
 			result.add(&Intersection{
 				StartingPoint: boxPos,
-				ContactPoint:  closestPointOnTri(Vector3{0, 0, 0}, v0, v1, v2).Add(boxPos),
+				ContactPoint:  closestPointOnTri(boxPoint, v0, v1, v2),
 				MTV:           mtv,
 				Triangle:      tri,
-				Normal:        axes[12],
+				Normal:        axes[6],
 			})
+
 		}
 
 		return true
@@ -834,8 +865,8 @@ func project(axis Vector3, points ...Vector3) projection {
 	projection.Min = axis.Dot(points[0])
 	projection.Max = projection.Min
 
-	for _, point := range points[1:] {
-		p := axis.Dot(point)
+	for i := 1; i < len(points); i++ {
+		p := axis.Dot(points[i])
 		if p < projection.Min {
 			projection.Min = p
 		} else if p > projection.Max {
@@ -853,19 +884,27 @@ func project(axis Vector3, points ...Vector3) projection {
 }
 
 func (projection projection) Overlap(other projection) float32 {
-	if !projection.IsOverlapping(other) {
+
+	if projection.Min > other.Max {
+		return 0
+	} else if projection.Max < other.Min {
 		return 0
 	}
 
-	if projection.Max > other.Min {
-		return projection.Max - other.Min
-	}
-	return projection.Min - other.Max
+	return math32.Max(other.Max, projection.Max) - math32.Max(other.Min, projection.Min)
 
+	// if projection.Max > other.Min {
+	// 	return projection.Max - other.Min
+	// }
+	// return projection.Min - other.Max
 }
 
 func (projection projection) IsOverlapping(other projection) bool {
 	return !(projection.Min > other.Max || other.Min > projection.Max)
+}
+
+func (p projection) Distance() float32 {
+	return p.Max - p.Min
 }
 
 var sphereTestObject = NewBoundingSphere("sphere check", 1)

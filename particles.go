@@ -278,6 +278,7 @@ func (ps *ParticleSystem) Update(dt float32) {
 	furthestDist := float32(0.0)
 	largestParticle := float32(0.0)
 
+	// This could be multithreaded if the particles don't interact at all
 	for _, part := range ps.LivingParticles {
 		part.Update(dt)
 		furthestDist = math32.Max(furthestDist, ps.Root.DistanceSquaredTo(part.Model))

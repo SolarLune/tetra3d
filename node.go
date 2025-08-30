@@ -199,6 +199,12 @@ type INode interface {
 	Move(x, y, z float32)
 	// MoveVec moves a Node in local space using the vector provided.
 	MoveVec(moveVec Vector3)
+	// MoveTowardsNode moves a Node towards the node provided by the distance given in world space.
+	MoveTowardsNode(target INode, distance float32)
+	// MoveTowardsVec moves a Node towards the node provided by the distance given in world space.
+	MoveTowardsVec(target Vector3, distance float32)
+	// MoveTowardsXYZ moves a Node towards the node provided by the distance given in world space.
+	MoveTowards(x, y, z, distance float32)
 	// Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
 	Rotate(x, y, z, angle float32)
 	// RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
@@ -213,8 +219,8 @@ type INode interface {
 	// transform for efficiency.
 	Transform() Matrix4
 
-	// Visible returns whether the Object is visible.
-	Visible() bool
+	// IsVisible returns whether the Object is visible.
+	IsVisible() bool
 	// SetVisible sets the object's visibility. If recursive is true, all recursive children of this Node will have their visibility set the same way.
 	SetVisible(visible, recursive bool)
 
@@ -837,6 +843,24 @@ func (node *Node) MoveVec(vec Vector3) {
 	node.Move(vec.X, vec.Y, vec.Z)
 }
 
+// MoveTowardsNode moves the node towards the specified target Node in world space by the distance provided.
+// The movement is capped to the distance to the target location.
+func (node *Node) MoveTowardsNode(target INode, distance float32) {
+	node.SetWorldPositionVec(node.WorldPosition().MoveTowards(target.WorldPosition(), distance))
+}
+
+// MoveTowards moves the node towards a given location in world space by the distance provided.
+// The movement is capped to the distance to the target location.
+func (node *Node) MoveTowards(x, y, z float32, distance float32) {
+	node.SetWorldPositionVec(node.WorldPosition().MoveTowards(NewVector3(x, y, z), distance))
+}
+
+// MoveTowardsVec moves the node towards the target vector in world space by the distance provided.
+// The movement is capped to the distance to the target location.
+func (node *Node) MoveTowardsVec(vec Vector3, distance float32) {
+	node.SetWorldPositionVec(node.WorldPosition().MoveTowards(vec, distance))
+}
+
 // Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
 func (node *Node) Rotate(x, y, z, angle float32) {
 	if x == 0 && y == 0 && z == 0 {
@@ -1067,8 +1091,8 @@ func (node *Node) FindNode(nodeName string) INode {
 	return node.SearchTree().ByName(nodeName).First()
 }
 
-// Visible returns whether the Object is visible.
-func (node *Node) Visible() bool {
+// IsVisible returns whether the Object is visible.
+func (node *Node) IsVisible() bool {
 	return node.visible
 }
 
