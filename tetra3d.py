@@ -16,7 +16,7 @@ bl_info = {
     "blender" : (3, 0, 1),                             # Lowest version to use
     "location" : "View3D",
     "category" : "Gamedev",
-    "version" : (0, 17, 0),
+    "version" : (0, 17, 1),
     "support" : "COMMUNITY",
     "doc_url" : "https://github.com/SolarLune/Tetra3d/wiki/Blender-Addon",
 }
