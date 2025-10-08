@@ -814,6 +814,23 @@ func (model *Model) Dimensions() Dimensions {
 	transform := model.Transform()
 	dim.Min = transform.MultVec(dim.Min)
 	dim.Max = transform.MultVec(dim.Max)
+
+	dMinX := dim.Min.X
+	dMinY := dim.Min.Y
+	dMinZ := dim.Min.Z
+
+	dMaxX := dim.Max.X
+	dMaxY := dim.Max.Y
+	dMaxZ := dim.Max.Z
+
+	dim.Min.X = min(dMinX, dMaxX)
+	dim.Min.Y = min(dMinY, dMaxY)
+	dim.Min.Z = min(dMinZ, dMaxZ)
+
+	dim.Max.X = max(dMinX, dMaxX)
+	dim.Max.Y = max(dMinY, dMaxY)
+	dim.Max.Z = max(dMinZ, dMaxZ)
+
 	return dim
 }
 
