@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"fmt"
 	"image/color"
 
 	_ "embed"
@@ -59,8 +58,6 @@ func (g *Game) Update() error {
 
 	forward := g.CamHandle.WorldRotation().Forward().Scale(-moveSpd)
 	right := g.CamHandle.WorldRotation().Right().Scale(moveSpd)
-
-	fmt.Println(g.CamHandle.WorldRotation().Forward())
 
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
 		g.CamHandle.MoveVec(forward)
