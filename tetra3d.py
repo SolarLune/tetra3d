@@ -1584,6 +1584,7 @@ def export():
         export_animations=True,
         export_frame_range=False,
         export_force_sampling=scene.t3dAnimationSampling__, # When enabled, animations are sampled / baked. This is slow, but accurate. When disabled, only linear and constant keyframes are exported and interpolated for animation.
+        export_sampling_interpolation_fallback="LINEAR",
 
         export_extras=True,
         export_yup=True,
