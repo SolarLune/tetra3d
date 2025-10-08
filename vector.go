@@ -201,10 +201,7 @@ func (vec Vector3) ClampMagnitude(maxMag float32) Vector3 {
 // AddMagnitude returns a copy of the Vector3 with the given magnitude subtracted from it. If the vector's magnitude is less than the given magnitude to subtract,
 // a zero-length Vector3 will be returned.
 func (vec Vector3) AddMagnitude(mag float32) Vector3 {
-	if vec.Magnitude() > mag {
-		return vec.Add(vec.Unit().Scale(mag))
-	}
-	return Vector3{0, 0, 0}
+	return vec.Add(vec.Unit().Scale(mag))
 }
 
 // SubMagnitude returns a copy of the Vector3 with the given magnitude subtracted from it. If the vector's magnitude is less than the given magnitude to subtract,
