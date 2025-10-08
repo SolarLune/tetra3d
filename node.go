@@ -83,14 +83,14 @@ type INode interface {
 	Unparent()
 	getOwner() INode
 	// IsDescendantOf returns if a Node is a descendant child of a parent Node.
-	IsDescendantOf(parent INode) bool
+	DescendantOf(parent INode) bool
 	// Scene looks for the Node's parents recursively to return what scene it exists in.
 	// If the node is not within a tree (i.e. unparented), this will return nil.
 	Scene() *Scene
 	// Root returns the root node in this tree by recursively traversing this node's hierarchy of
 	// parents upwards.
 	Root() *Node
-	IsInSceneTree() bool // Returns if this node is in the scene tree.
+	InSceneTree() bool // Returns if this node is in the scene tree.
 	setCachedSceneRoot(root *Node)
 	cachedSceneRoot() *Node
 
@@ -1316,12 +1316,12 @@ func (node *Node) Root() *Node {
 }
 
 // InSceneTree returns if a Node is connected to the scene's root node through hierarchy.
-func (node *Node) IsInSceneTree() bool {
+func (node *Node) InSceneTree() bool {
 	return node.Root() != nil
 }
 
-// IsDescendantOf returns if a Node is a descendant of a parent Node.
-func (node *Node) IsDescendantOf(parent INode) bool {
+// DescendantOf returns if a Node is a descendant of a parent Node.
+func (node *Node) DescendantOf(parent INode) bool {
 	p := node.Parent()
 	for p != nil {
 		if p == parent {
