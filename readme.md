@@ -343,7 +343,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 -   [x] **Blender Add-on**
 -   [x] -- Export 3D view camera to Scenes for quick iteration
 -   [x] -- Auto mesh subdivision based on edge length
--         [ ] -- Looks weird currently after a new update (since Blender ~4.4)
+-                       [ ] -- Looks weird currently after a new update (since Blender ~4.4)
 -   [ ] -- Object-level color option
 -   [ ] -- Object-level shadeless checkbox
 -   [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices (SolarLune 3/3/24: Doesn't seem to be possible outside of vertex colors)
@@ -420,6 +420,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 
 -   [ ] **3D Sound** (adjusting panning of sound sources based on 3D location?)
 -   [ ] **Optimization / Bugfixes**
+-   [ ] -- Fix depth textures being incorrect for orthographic cameras
+-   [ ] -- Review Camera.ScreenToWorld() and Camera.WorldToScreen()
 -   [ ] -- Use BVH acceleration structures for raycasting / looping through triangles
 -   [ ] -- It's currently problematic to set world scale and rotation (and possible position as well) at the same time.
 -   [ ] -- Reuse buffers when reading data from GLTF
