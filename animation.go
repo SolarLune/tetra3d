@@ -322,6 +322,7 @@ func NewAnimationPlayer(node INode) *AnimationPlayer {
 		AnimatedProperties:     map[INode]AnimationValues{},
 		currentProperties:      map[INode]AnimationValues{},
 		prevAnimatedProperties: map[INode]AnimationValues{},
+		ChannelsToNodes:        map[*AnimationChannel]INode{},
 		PlayLastFrame:          false,
 	}
 }
@@ -330,7 +331,6 @@ func NewAnimationPlayer(node INode) *AnimationPlayer {
 func (ap *AnimationPlayer) Clone() *AnimationPlayer {
 	newAP := NewAnimationPlayer(ap.RootNode)
 
-	newAP.ChannelsToNodes = map[*AnimationChannel]INode{}
 	for channel, node := range ap.ChannelsToNodes {
 		newAP.ChannelsToNodes[channel] = node
 	}
@@ -382,7 +382,7 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 	ap.ChannelsUpdated = false
 
 	if ap.BlendTime > 0 {
-		ap.prevAnimatedProperties = map[INode]AnimationValues{}
+		clear(ap.prevAnimatedProperties)
 		for n, v := range ap.currentProperties {
 			ap.prevAnimatedProperties[n] = v
 		}
@@ -415,10 +415,9 @@ func (ap *AnimationPlayer) assignChannels() {
 
 		if ap.Animation != nil {
 
-			ap.AnimatedProperties = map[INode]AnimationValues{}
-			ap.currentProperties = map[INode]AnimationValues{}
-
-			ap.ChannelsToNodes = map[*AnimationChannel]INode{}
+			clear(ap.AnimatedProperties)
+			clear(ap.currentProperties)
+			clear(ap.ChannelsToNodes)
 
 			childrenRecursive := ap.RootNode.SearchTree().INodes()
 
@@ -619,7 +618,7 @@ func (ap *AnimationPlayer) Update(dt float32) {
 
 	if !ap.Playing && !ap.blendStart.IsZero() {
 		ap.blendStart = time.Time{}
-		ap.prevAnimatedProperties = map[INode]AnimationValues{}
+		clear(ap.prevAnimatedProperties)
 	}
 
 	if ap.Animation == nil || !ap.Playing {
@@ -661,7 +660,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float32) {
 
 			start := ap.prevAnimatedProperties[node]
 
-			if start.PositionExists && props.PositionExists && props.PositionInterpolation != InterpolationConstant {
+			if start.PositionExists && props.PositionExists {
 				diff := props.Position.Sub(start.Position)
 				targetPosition = start.Position.Add(diff.Scale(bp))
 				posSet = true
@@ -673,7 +672,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float32) {
 				posSet = true
 			}
 
-			if start.ScaleExists && props.ScaleExists && props.ScaleInterpolation != InterpolationConstant {
+			if start.ScaleExists && props.ScaleExists {
 				diff := props.Scale.Sub(start.Scale)
 				targetScale = start.Scale.Add(diff.Scale(bp))
 				scaleSet = true
@@ -685,7 +684,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float32) {
 				scaleSet = true
 			}
 
-			if start.RotationExists && props.RotationExists && props.RotationInterpolation != InterpolationConstant {
+			if start.RotationExists && props.RotationExists {
 				targetRotation = start.Rotation.Lerp(props.Rotation, bp).Normalized()
 				rotSet = true
 			} else if props.RotationExists {
@@ -698,7 +697,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float32) {
 
 			if bp == 1 {
 				ap.blendStart = time.Time{}
-				ap.prevAnimatedProperties = map[INode]AnimationValues{}
+				clear(ap.prevAnimatedProperties)
 			}
 
 		} else {
