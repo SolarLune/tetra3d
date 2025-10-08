@@ -500,33 +500,33 @@ func (camera *Camera) SetFar(far float32) {
 // does this by taking outVec, a vertex (Vector) that it stores the values in and returns, which avoids reallocation.
 func (camera *Camera) clipToScreen(vert Vector4, vertID int, model *Model, width, height, halfWidth, halfHeight float32, limitW bool) Vector4 {
 
-	v3 := vert.W
+	w := vert.W
 
 	if limitW {
 
 		if !camera.perspective {
-			v3 = 1.0
+			w = 1.0
 		}
 
 		// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
 		// If it's too small, there will be visual artifacts when the camera is right up against surfaces
 		// If it's too large, then textures and vertices will appear to warp and bend "around" the screen, towards the "back" of the camera
-		if v3 < 0 {
-			v3 = 0.00005
+		if w < 0 {
+			w = 0.00005
 		}
 
 	} else {
-		if v3 < 0 {
-			v3 *= -1
+		if w < 0 {
+			w *= -1
 		}
 	}
 
 	// Again, this function should only be called with pre-transformed 4D vertex arguments.
 
 	// It's 1 frame faster on the stress test not to have to calculate the half screen width and height here.
-	vert.X = (vert.X/v3)*width + halfWidth
-	vert.Y = (vert.Y/-v3)*height + halfHeight
-	vert.Z = vert.Z / v3
+	vert.X = (vert.X/w)*width + halfWidth
+	vert.Y = (vert.Y/-w)*height + halfHeight
+	vert.Z = vert.Z / w
 	vert.W = 1
 
 	return vert
@@ -577,12 +577,10 @@ func (camera *Camera) ScreenToWorldPixels(x, y int, depth float32) Vector3 {
 }
 
 // ScreenToWorld converts an x and y position on screen to a 3D point in front of the camera.
-// x and y are values ranging between -0.5 and 0.5 for both the horizontal and vertical axes.
+// x and y are values ranging between -1 and 1 for both the horizontal and vertical axes.
 // The depth argument changes how deep the returned Vector is in 3D world units.
 func (camera *Camera) ScreenToWorld(x, y, depth float32) Vector3 {
-	// x = math32.Clamp(x, -0.5, 0.5)
-	// y = math32.Clamp(y, -0.5, 0.5)
-	vec := Vector3{x, y, -1}
+	vec := Vector3{x / 2, y / 2, -1}
 	return camera.screenToWorldTransform(vec, depth)
 }
 
@@ -670,12 +668,14 @@ func (camera *Camera) PointInFrustum(point Vector3) bool {
 
 }
 
-// SphereInFrustum returns true if the sphere would be visible through the camera frustum.
-func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
+func (camera *Camera) boundingSphereInFrustum(sphere *BoundingSphere) bool {
+	return camera.SphereInFrustum(sphere.WorldPosition(), sphere.WorldRadius())
+}
 
-	radius := sphere.WorldRadius()
+// SphereInFrustum returns true if a sphere at the given location with the given radius would be visible through the camera frustum.
+func (camera *Camera) SphereInFrustum(position Vector3, radius float32) bool {
 
-	diff := sphere.WorldPosition().Sub(camera.WorldPosition())
+	diff := position.Sub(camera.WorldPosition())
 	pcZ := diff.Dot(camera.cameraForward)
 
 	if pcZ > camera.far+radius || pcZ < camera.near-radius {
@@ -728,7 +728,7 @@ func (camera *Camera) SphereInFrustum(sphere *BoundingSphere) bool {
 // ModelInFrustum returns if a model is onscreen when viewed through a Camera.
 func (camera *Camera) ModelInFrustum(model *Model) bool {
 	model.Transform() // Make sure to update the transform of the Model as necessary.
-	return camera.SphereInFrustum(model.frustumCullingSphere)
+	return camera.boundingSphereInFrustum(model.frustumCullingSphere)
 }
 
 // AspectRatio returns the camera's aspect ratio (width / height).
@@ -1765,7 +1765,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 					if merged.FrustumCulling {
 						merged.Transform()
-						if !camera.SphereInFrustum(merged.frustumCullingSphere) {
+						if !camera.boundingSphereInFrustum(merged.frustumCullingSphere) {
 							continue
 						}
 					}
@@ -2046,7 +2046,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			if model.FrustumCulling {
 				model.Transform()
-				if !camera.SphereInFrustum(model.frustumCullingSphere) {
+				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
@@ -2139,7 +2139,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 			if model.FrustumCulling {
 
 				model.Transform()
-				if !camera.SphereInFrustum(model.frustumCullingSphere) {
+				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
@@ -2185,7 +2185,7 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 			if model.FrustumCulling {
 
 				model.Transform()
-				if !camera.SphereInFrustum(model.frustumCullingSphere) {
+				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
@@ -2229,7 +2229,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 			if model.FrustumCulling {
 
 				model.Transform()
-				if !camera.SphereInFrustum(model.frustumCullingSphere) {
+				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
@@ -2258,7 +2258,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 			if model.FrustumCulling {
 
 				model.Transform()
-				if !camera.SphereInFrustum(model.frustumCullingSphere) {
+				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
 					continue
 				}
 
