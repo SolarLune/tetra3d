@@ -80,6 +80,7 @@ func (lib *Library) WorldByID(id uint32) *World {
 func (lib *Library) AddScene(sceneName string) *Scene {
 	newScene := NewScene(sceneName)
 	newScene.library = lib
+	newScene.Root.library = lib
 	lib.Scenes = append(lib.Scenes, newScene)
 	return newScene
 }
