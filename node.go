@@ -199,6 +199,10 @@ type INode interface {
 	Move(x, y, z float32)
 	// MoveVec moves a Node in local space using the vector provided.
 	MoveVec(moveVec Vector3)
+	// MoveByOrientation moves a Node in local space, by the object's world orientation, by the x, y, and z values provided.
+	MoveByOrientation(x, y, z float32)
+	// MoveByOrientationVec moves a Node in local space, by the object's world orientation, using the vector provided.
+	MoveByOrientationVec(moveVec Vector3)
 	// MoveTowardsNode moves a Node towards the node provided by the distance given in world space.
 	MoveTowardsNode(target INode, distance float32)
 	// MoveTowardsVec moves a Node towards the node provided by the distance given in world space.
@@ -841,6 +845,39 @@ func (node *Node) Move(x, y, z float32) {
 // MoveVec moves a Node in local space using the vector provided.
 func (node *Node) MoveVec(vec Vector3) {
 	node.Move(vec.X, vec.Y, vec.Z)
+}
+
+// MoveByOrientation moves a Node in local space by the x, y, and z values provided.
+func (node *Node) MoveByOrientation(x, y, z float32) {
+
+	if x == 0 && y == 0 && z == 0 {
+		return
+	}
+
+	rot := node.WorldRotation()
+	right := rot.Right().Scale(x)
+	up := rot.Up().Scale(y)
+	forward := rot.Forward().Scale(z)
+
+	node.position.X += right.X
+	node.position.Y += right.Y
+	node.position.Z += right.Z
+
+	node.position.X += up.X
+	node.position.Y += up.Y
+	node.position.Z += up.Z
+
+	node.position.X += forward.X
+	node.position.Y += forward.Y
+	node.position.Z += forward.Z
+
+	node.dirtyTransform()
+
+}
+
+// MoveByOrientationVec moves a Node in local space using the vector provided.
+func (node *Node) MoveByOrientationVec(vec Vector3) {
+	node.MoveByOrientation(vec.X, vec.Y, vec.Z)
 }
 
 // MoveTowardsNode moves the node towards the specified target Node in world space by the distance provided.
