@@ -48,7 +48,7 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	scene := g.Library.Scenes[0]
+	scene := g.Camera.Scene
 
 	armature := scene.Root.SearchTree().ByName("Armature").First()
 	armature.Rotate(0, 1, 0, 0.01)
@@ -85,7 +85,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
-	scene := g.Library.Scenes[0]
+	scene := g.Camera.Scene
 
 	// Clear, but with a color
 	screen.Fill(scene.World.ClearColor.ToRGBA64())
