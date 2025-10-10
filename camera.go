@@ -2409,9 +2409,14 @@ type DrawDebugBoundsColoredSettings struct {
 // be drawn in the color provided for each kind of bounding object to the screen image provided.
 func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, options DrawDebugBoundsColoredSettings) {
 
-	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
+	// Custom WorldToScreenPixels function that limits W
+	worldToScreenPixels := func(vert Vector3) Vector3 {
+		v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
+		width, height := camera.Size()
+		return camera.clipToScreen(v.MultVecW(Vector3{}), 0, nil, float32(width), float32(height), float32(width)/2, float32(height)/2, true).To3D()
+	}
 
-	for _, n := range allModels {
+	rootNode.SearchTree().ForEach(func(n INode) bool {
 
 		p, s, r := n.Transform().Inverted().Decompose()
 		invertedCamPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector3{1 / s.X, 1 / s.Y, 1 / s.Z}))
@@ -2439,19 +2444,19 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 					rv := bounds.WorldRotation().Right()
 					fv := bounds.WorldRotation().Forward()
 
-					u := camera.WorldToScreenPixels(pos.Add(uv.Scale(height)))
+					u := worldToScreenPixels(pos.Add(uv.Scale(height)))
 
-					ur := camera.WorldToScreenPixels(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(radius)))
-					ul := camera.WorldToScreenPixels(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(-radius)))
-					uf := camera.WorldToScreenPixels(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(radius)))
-					ub := camera.WorldToScreenPixels(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(-radius)))
+					ur := worldToScreenPixels(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(radius)))
+					ul := worldToScreenPixels(pos.Add(uv.Scale(height - radius)).Add(rv.Scale(-radius)))
+					uf := worldToScreenPixels(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(radius)))
+					ub := worldToScreenPixels(pos.Add(uv.Scale(height - radius)).Add(fv.Scale(-radius)))
 
-					d := camera.WorldToScreenPixels(pos.Add(uv.Scale(-height)))
+					d := worldToScreenPixels(pos.Add(uv.Scale(-height)))
 
-					dr := camera.WorldToScreenPixels(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(radius)))
-					dl := camera.WorldToScreenPixels(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(-radius)))
-					df := camera.WorldToScreenPixels(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(radius)))
-					db := camera.WorldToScreenPixels(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(-radius)))
+					dr := worldToScreenPixels(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(radius)))
+					dl := worldToScreenPixels(pos.Add(uv.Scale(-(height - radius))).Add(rv.Scale(-radius)))
+					df := worldToScreenPixels(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(radius)))
+					db := worldToScreenPixels(pos.Add(uv.Scale(-(height - radius))).Add(fv.Scale(-radius)))
 
 					lines := []Vector3{
 						u, ur, dr, d, dl, ul,
@@ -2468,6 +2473,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
+
 						vector.StrokeLine(screen, start.X, start.Y, end.X, end.Y, 1, options.CapsuleColor.ToNRGBA64(), false)
 
 					}
@@ -2481,15 +2487,15 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 					pos := bounds.WorldPosition()
 					size := bounds.Dimensions.Size().Scale(0.5)
 
-					ufr := camera.WorldToScreenPixels(pos.Add(Vector3{size.X, size.Y, size.Z}))
-					ufl := camera.WorldToScreenPixels(pos.Add(Vector3{-size.X, size.Y, size.Z}))
-					ubr := camera.WorldToScreenPixels(pos.Add(Vector3{size.X, size.Y, -size.Z}))
-					ubl := camera.WorldToScreenPixels(pos.Add(Vector3{-size.X, size.Y, -size.Z}))
+					ufr := worldToScreenPixels(pos.Add(Vector3{size.X, size.Y, size.Z}))
+					ufl := worldToScreenPixels(pos.Add(Vector3{-size.X, size.Y, size.Z}))
+					ubr := worldToScreenPixels(pos.Add(Vector3{size.X, size.Y, -size.Z}))
+					ubl := worldToScreenPixels(pos.Add(Vector3{-size.X, size.Y, -size.Z}))
 
-					dfr := camera.WorldToScreenPixels(pos.Add(Vector3{size.X, -size.Y, size.Z}))
-					dfl := camera.WorldToScreenPixels(pos.Add(Vector3{-size.X, -size.Y, size.Z}))
-					dbr := camera.WorldToScreenPixels(pos.Add(Vector3{size.X, -size.Y, -size.Z}))
-					dbl := camera.WorldToScreenPixels(pos.Add(Vector3{-size.X, -size.Y, -size.Z}))
+					dfr := worldToScreenPixels(pos.Add(Vector3{size.X, -size.Y, size.Z}))
+					dfl := worldToScreenPixels(pos.Add(Vector3{-size.X, -size.Y, size.Z}))
+					dbr := worldToScreenPixels(pos.Add(Vector3{size.X, -size.Y, -size.Z}))
+					dbl := worldToScreenPixels(pos.Add(Vector3{-size.X, -size.Y, -size.Z}))
 
 					lines := []Vector3{
 						ufr, ufl, ubl, ubr, ufr,
@@ -2505,6 +2511,11 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 						start := lines[i]
 						end := lines[i+1]
+
+						if start.Z < 0 && end.Z < 0 {
+							continue
+						}
+
 						vector.StrokeLine(screen, start.X, start.Y, end.X, end.Y, 1, options.AABBColor.ToNRGBA64(), false)
 
 					}
@@ -2534,9 +2545,6 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 					halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
 
-					transformNoLoc := bounds.Transform()
-					transformNoLoc.SetRow(3, Vector4{0, 0, 0, 1})
-
 					for _, tri := range mesh.Triangles {
 
 						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
@@ -2545,9 +2553,9 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 							continue
 						}
 
-						v0 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, false).To3D()
-						v1 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, false).To3D()
-						v2 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, false).To3D()
+						v0 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
+						v1 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
+						v2 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
 
 						if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 							(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
@@ -2595,7 +2603,9 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 		}
 
-	}
+		return true
+
+	})
 
 }
 
@@ -2612,8 +2622,8 @@ func DefaultDrawDebugBoundsSettings() DrawDebugBoundsColoredSettings {
 		AABBColor:          NewColor(0, 0.25, 1, 0.5),
 		SphereColor:        NewColor(0.5, 0.25, 1.0, 0.5),
 		CapsuleColor:       NewColor(0.25, 1, 0, 0.5),
-		TrianglesColor:     NewColor(0, 0, 0, 0.25),
-		TrianglesAABBColor: NewColor(1, 0.5, 0, 0.25),
+		TrianglesColor:     NewColor(1, 1, 1, 0.5),
+		TrianglesAABBColor: NewColor(1, 0.5, 0, 0.5),
 		BroadphaseColor:    NewColor(1, 0, 0, 0.1),
 	}
 }
