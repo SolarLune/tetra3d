@@ -395,7 +395,7 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 // it will return an error.
 func (ap *AnimationPlayer) PlayByName(animationName string) error {
 	if anim := ap.RootNode.Library().AnimationByName(animationName); anim == nil {
-		return errors.New("Animation named {" + animationName + "} not found in node's owning Library")
+		return errors.New("Animation named {" + animationName + "} not found in node's owning Library; did you export it and stash its action?")
 	} else {
 		ap.Play(anim)
 	}
