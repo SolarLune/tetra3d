@@ -183,7 +183,6 @@ class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
 
         # target = getattr(context, self.mode)
         target.t3dGameProperties__.add()
-        target.t3dGameProperties__.move(len(target.t3dGameProperties__)-1, 0)
         return {'FINISHED'}
 
 class OBJECT_OT_tetra3dDeleteProp(bpy.types.Operator):
