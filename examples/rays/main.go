@@ -69,7 +69,7 @@ func (g *Game) Update() error {
 				vc = hit.Object.Parent().(*tetra3d.Model).Mesh.MeshParts[0].Material.Color
 			}
 
-			tetra3d.NewVertexSelection().SelectMeshPartByIndex(marker.(*tetra3d.Model).Mesh, 1).SetColor(0, vc)
+			tetra3d.NewVertexSelection().SelectByMeshPartIndex(marker.(*tetra3d.Model).Mesh, 1).SetColor(0, vc)
 
 			marker.SetWorldPositionVec(hit.Position.Add(hit.Normal.Scale(0.5)))
 

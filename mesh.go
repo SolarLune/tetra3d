@@ -427,18 +427,18 @@ func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, so
 
 // SetVertexColor sets the specified vertex color for all vertices in the mesh for the target color channel.
 func (mesh *Mesh) SetVertexColor(targetChannel int, color Color) {
-	NewVertexSelection().SelectMeshes(mesh).SetColor(targetChannel, color)
+	NewVertexSelection().SelectByMeshes(mesh).SetColor(targetChannel, color)
 }
 
 // SetActiveColorChannel sets the active color channel for all vertices in the mesh to the specified channel index.
 func (mesh *Mesh) SetActiveColorChannel(targetChannel int) {
-	NewVertexSelection().SelectMeshes(mesh).SetActiveColorChannel(targetChannel)
+	NewVertexSelection().SelectByMeshes(mesh).SetActiveColorChannel(targetChannel)
 }
 
 // Select allows you to easily select the vertices associated with the Mesh.
 // Select is just syntactic sugar for tetra3d.NewVertexSelection().SelectMeshes(mesh).
 func (mesh *Mesh) Select() VertexSelection {
-	return NewVertexSelection().SelectMeshes(mesh)
+	return NewVertexSelection().SelectByMeshes(mesh)
 }
 
 // TriangleByID returns a triangle by the given ID, if it exists.
@@ -620,10 +620,10 @@ func (vs VertexSelection) ensureSelectionSetExists(mesh *Mesh) {
 	}
 }
 
-// SelectInVertexColorChannel selects all vertices in the Mesh that have a non-pure black color in the vertex color channel
+// SelectByVertexColorChannelNames selects all vertices in the Mesh that have a non-pure black color in the vertex color channel
 // with the specified index. If the index is over the number of vertex colors currently on the Mesh, then the function
 // will not alter the VertexSelection and will return an error.
-func (vs VertexSelection) SelectInVertexColorChannel(mesh *Mesh, channelNames ...string) (VertexSelection, error) {
+func (vs VertexSelection) SelectByVertexColorChannelNames(mesh *Mesh, channelNames ...string) (VertexSelection, error) {
 
 	vs.ensureSelectionSetExists(mesh)
 
@@ -656,9 +656,9 @@ func (vs VertexSelection) SelectInVertexColorChannel(mesh *Mesh, channelNames ..
 
 const ErrorVertexGroupNotFound = "error: vertex channel name not found"
 
-// SelectInVertexGroup selects all vertices in the Mesh that are assigned to the specifiefd vertex groups.
+// SelectByVertexGroupNames selects all vertices in the Mesh that are assigned to the specifiefd vertex groups.
 // If any of the vertex groups are not found, the function will return an error.
-func (vs VertexSelection) SelectInVertexGroup(mesh *Mesh, vertexGroupNames ...string) (VertexSelection, error) {
+func (vs VertexSelection) SelectByVertexGroupNames(mesh *Mesh, vertexGroupNames ...string) (VertexSelection, error) {
 
 	vs.ensureSelectionSetExists(mesh)
 
@@ -697,8 +697,8 @@ func (vs VertexSelection) SelectInVertexGroup(mesh *Mesh, vertexGroupNames ...st
 
 }
 
-// SelectMeshes selects all vertices on the target meshes.
-func (vs VertexSelection) SelectMeshes(meshes ...*Mesh) VertexSelection {
+// SelectByMeshes selects all vertices on the target meshes.
+func (vs VertexSelection) SelectByMeshes(meshes ...*Mesh) VertexSelection {
 
 	for _, mesh := range meshes {
 
@@ -713,9 +713,7 @@ func (vs VertexSelection) SelectMeshes(meshes ...*Mesh) VertexSelection {
 }
 
 func (vs VertexSelection) Clear() VertexSelection {
-	for m := range vs.SelectionSet {
-		delete(vs.SelectionSet, m)
-	}
+	clear(vs.SelectionSet)
 	return vs
 }
 
@@ -723,8 +721,8 @@ func (vs VertexSelection) IsEmpty() bool {
 	return len(vs.SelectionSet) == 0
 }
 
-// SelectMeshPart selects all vertices in the Mesh belonging to any of the specified MeshParts.
-func (vs VertexSelection) SelectMeshPart(meshParts ...*MeshPart) VertexSelection {
+// SelectByMeshPart selects all vertices in the Mesh belonging to any of the specified MeshParts.
+func (vs VertexSelection) SelectByMeshPart(meshParts ...*MeshPart) VertexSelection {
 
 	for _, meshPart := range meshParts {
 
@@ -747,29 +745,51 @@ func (vs VertexSelection) SelectMeshPart(meshParts ...*MeshPart) VertexSelection
 
 }
 
-// SelectMeshPartByIndex selects all vertices in the Mesh belonging to the specified MeshPart by
+// SelectByMeshPartIndex selects all vertices in the Mesh belonging to the specified MeshPart by
 // index.
 // If the MeshPart doesn't exist, this function will panic.
-func (vs VertexSelection) SelectMeshPartByIndex(mesh *Mesh, indexNumber int) VertexSelection {
+func (vs VertexSelection) SelectByMeshPartIndex(mesh *Mesh, indexNumber int) VertexSelection {
 	vs.ensureSelectionSetExists(mesh)
-	vs.SelectMeshPart(mesh.MeshParts[indexNumber])
+	vs.SelectByMeshPart(mesh.MeshParts[indexNumber])
 	return vs
 
 }
 
-// SelectMeshPartByName selects all vertices in the Mesh belonging to materials with the specified
+// SelectByMeshPartName selects all vertices in the Mesh belonging to materials with the specified
 // name.
-func (vs VertexSelection) SelectMeshPartByName(mesh *Mesh, materialNames ...string) VertexSelection {
+func (vs VertexSelection) SelectByMeshPartName(mesh *Mesh, materialNames ...string) VertexSelection {
 
 	vs.ensureSelectionSetExists(mesh)
 	for _, matName := range materialNames {
 		if mp := mesh.MeshPartByMaterialName(matName); mp != nil {
-			vs.SelectMeshPart(mp)
+			vs.SelectByMeshPart(mp)
 		}
 	}
 
 	return vs
 
+}
+
+// SelectByNormal selects vertex indices that belong to vertices that point in a specific direction.
+func (vs VertexSelection) SelectByNormal(mesh *Mesh, normal Vector3) VertexSelection {
+	vs.ensureSelectionSetExists(mesh)
+	for i, v := range mesh.VertexNormals {
+		if v.Equals(normal) {
+			vs.SelectionSet[mesh].Indices.Add(i)
+		}
+	}
+	return vs
+}
+
+// SelectByFunc selects vertex indices for vertices that pass a custom callback function.
+func (vs VertexSelection) SelectByFunc(mesh *Mesh, function func(index int) bool) VertexSelection {
+	vs.ensureSelectionSetExists(mesh)
+	for i := range mesh.VertexPositions {
+		if function(i) {
+			vs.SelectionSet[mesh].Indices.Add(i)
+		}
+	}
+	return vs
 }
 
 // SelectIndices selects the passed vertex indices in the Mesh.
@@ -1782,17 +1802,20 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 		newTri := NewTriangle(part, indices[i]+part.VertexIndexStart, indices[i+1]+part.VertexIndexStart, indices[i+2]+part.VertexIndexStart)
 		newTri.id = uint32(len(mesh.Triangles) + 1)
 
+		// TODO: Replace this with an in-shader solution, as this created weird "scruggling" on larger face-numbered meshes.
+		// Maybe sample the four texture pixels around the target and lean away from a transparent / differently-colored one?
+
 		// Slight UV adjustment to not have invisibility in-between seams
-		uvcenter := mesh.VertexUVs[indices[i]].Add(mesh.VertexUVs[indices[i+1]]).Add(mesh.VertexUVs[indices[i+2]]).Divide(3)
+		// uvcenter := mesh.VertexUVs[indices[i]].Add(mesh.VertexUVs[indices[i+1]]).Add(mesh.VertexUVs[indices[i+2]]).Divide(3)
 
-		uvadjustment := float32(0.01)
+		// uvadjustment := float32(0.04)
 
-		mesh.VertexUVs[indices[i]].X += (uvcenter.X - mesh.VertexUVs[indices[i]].X) * uvadjustment
-		mesh.VertexUVs[indices[i]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i]].Y) * uvadjustment
-		mesh.VertexUVs[indices[i+1]].X += (uvcenter.X - mesh.VertexUVs[indices[i+1]].X) * uvadjustment
-		mesh.VertexUVs[indices[i+1]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+1]].Y) * uvadjustment
-		mesh.VertexUVs[indices[i+2]].X += (uvcenter.X - mesh.VertexUVs[indices[i+2]].X) * uvadjustment
-		mesh.VertexUVs[indices[i+2]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+2]].Y) * uvadjustment
+		// mesh.VertexUVs[indices[i]].X += (uvcenter.X - mesh.VertexUVs[indices[i]].X) * uvadjustment
+		// mesh.VertexUVs[indices[i]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i]].Y) * uvadjustment
+		// mesh.VertexUVs[indices[i+1]].X += (uvcenter.X - mesh.VertexUVs[indices[i+1]].X) * uvadjustment
+		// mesh.VertexUVs[indices[i+1]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+1]].Y) * uvadjustment
+		// mesh.VertexUVs[indices[i+2]].X += (uvcenter.X - mesh.VertexUVs[indices[i+2]].X) * uvadjustment
+		// mesh.VertexUVs[indices[i+2]].Y += (uvcenter.Y - mesh.VertexUVs[indices[i+2]].Y) * uvadjustment
 
 		newTri.RecalculateCenter()
 		newTri.RecalculateNormal()
