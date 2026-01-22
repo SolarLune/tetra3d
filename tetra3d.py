@@ -72,14 +72,12 @@ materialTransparencyModes = [
 
 depthModes = [
     ("DEFAULT", "Default", "The default for writing depth; writes depth according to what is rendered", 0, 0),
-    ("UNBILLBOARDED", "Unbillboarded", "When set, all vertices render depth using the unbillboarded-version of the mesh, meaning that their depth renders as though the mesh were not billboarded", 0, 1),
+    ("UNBILLBOARDED", "Unbillboarded", "When set, all vertices render depth as though the mesh were not billboarded", 0, 1),
 ]
 
-materialBillboardModes = [
-    ("NONE", "None", "No billboarding - the (unskinned) object with this material does not rotate to face the camera.", 0, 0),
-    ("FIXEDVERTICAL", "Fixed Vertical", "Fixed Vertical billboarding - the (unskinned) object with this material faces the camera, with up always pointing towards the camera's local up vector (+Y). Good for top-down games.", 0, 1),
-    ("HORIZONTAL", "Horizontal", "Horizontal billboarding - the (unskinned) object with this material rotates around to the face the camera only on the X and Z axes (not the Y axis).", 0, 2),
-    ("FULL", "Full", "Full billboarding - the (unskinned) object rotates fully to face the camera.", 0, 3),
+billboardingYDirections = [
+    ("GLOBAL_Y", "Global Y-Up", "Upwards is global, world-up", 0, 0),
+    ("CAMERA_Y", "Camera Y-Up", "Upwards is relative to the camera's local Y-up direction heading", 0, 1),
 ]
 
 materialLightingModes = [
@@ -128,6 +126,9 @@ t3dDrawObjectPropertiesModes = [
 ]
 
 def filepathSet(self, value):
+
+    value = bpy.path.relpath(value)
+
     global currentlyPlayingAudioHandle, currentlyPlayingAudioName, audioPaused
     if "valueFilepath" in self and self["valueFilepath"] == currentlyPlayingAudioName and value != self["valueFilepath"]:
         currentlyPlayingAudioHandle.stop()
@@ -157,7 +158,7 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="COORDINATES")
     valueVector2D: bpy.props.FloatVectorProperty(name = "", description="The 2D vector value of the property", size=2)
 
-    valueFilepath: bpy.props.StringProperty(name = "", description="The filepath of the property", subtype="FILE_PATH", set=filepathSet, get=filepathGet)
+    valueFilepath: bpy.props.StringProperty(name = "", description="The filepath of the property", subtype="FILE_PATH", set=filepathSet, get=filepathGet, options={"PATH_SUPPORTS_BLEND_RELATIVE"})
     valueDirpath: bpy.props.StringProperty(name = "", description="The directory path of the property", subtype="DIR_PATH")
     # valueFilepathAbsolute
     # valueVector4D: bpy.props.FloatVectorProperty(name = "", description="The 4D vector value of the property")
@@ -1106,9 +1107,21 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row = self.layout.row()
         row.label(text="Blend Mode:")
         row.prop(context.material, "t3dBlendMode__", text="")
-        row = self.layout.row()
-        row.label(text="Billboard Mode:")
-        row.prop(context.material, "t3dBillboardMode__", text="")
+        box = self.layout.box()
+        row = box.row()
+        row.prop(context.material, "t3dBillboardEnabled__")
+        row = box.row()
+        row.enabled = context.material.t3dBillboardEnabled__
+        row.label(text="Lock global axes:")
+        row = box.row()
+        row.enabled = context.material.t3dBillboardEnabled__
+        row.prop(context.material, "t3dBillboardLockX__", text="X")
+        row.prop(context.material, "t3dBillboardLockY__", text="Y")
+        row.prop(context.material, "t3dBillboardLockZ__", text="Z")
+        row = box.row()
+        row.enabled = context.material.t3dBillboardEnabled__
+        row.label(text="Up Direction:")
+        row.prop(context.material, "t3dBillboardUpDirection__", text="")
 
         box = self.layout.box()
         row = box.row()
@@ -1723,83 +1736,112 @@ class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        
-        obj = bpy.context.object
-        
-        # If there's no polygons, we'll just return early
-        if len(obj.data.polygons) == 0:
-            return {'FINISHED'}
-        
-        ogMode = bpy.context.object.mode
 
-        prevActiveMaterialIndex = obj.active_material_index
+        old_selected = bpy.context.selected_objects.copy()
 
-        # We need to be in Object mode to get vertex / edge / polygon selection data
-        bpy.ops.object.mode_set(mode='OBJECT')
-        selectedVertices = [v.index for v in obj.data.vertices if v.select]
-        selectedEdges = [e.index for e in obj.data.edges if e.select]
-        selectedPolygons = [p.index for p in obj.data.polygons if p.select]
+        bpy.ops.object.select_all(action='DESELECT')
 
-        for matIndex, mat in enumerate(obj.data.materials):
+        for scene in bpy.data.scenes:
 
-            # mat could be None if it's just the slot and no Material is selected
-            if mat and mat.t3dAutoUV__:
+            if scene.users > 0:
 
-                bpy.ops.object.mode_set(mode='EDIT')
+                for layer in scene.view_layers:
 
-                bpy.ops.mesh.select_all(action='DESELECT')
+                    if layer != bpy.context.view_layer:
+                        continue
 
-                obj.active_material_index = matIndex
-                bpy.ops.object.material_slot_select()
+                    for obj in layer.objects:
 
-                # TODO: Replace cube_project with maybe manually stretching the UV values to be able to handle walls that have fixed widths or heights better (e.g. walls with trim)?
-                bpy.ops.uv.cube_project(cube_size=mat.t3dAutoUVUnitSize__)
+                        obj.select_set(True)
 
-                bpy.ops.mesh.select_all(action='DESELECT')
+                        # If there's no polygons, we'll just return early
+                        if obj.type != "MESH" or len(obj.data.polygons) == 0:
+                            continue
+                        
+                        ogMode = obj.mode
 
-                # Return to object mode to alter the UV map
-                bpy.ops.object.mode_set(mode='OBJECT')
+                        prevActiveMaterialIndex = obj.active_material_index
 
-                uvMap = obj.data.uv_layers.active.uv
+                        # We need to be in Object mode to get vertex / edge / polygon selection data
+                        bpy.ops.object.mode_set(mode='OBJECT')
+                        selectedVertices = [v.index for v in obj.data.vertices if v.select]
+                        selectedEdges = [e.index for e in obj.data.edges if e.select]
+                        selectedPolygons = [p.index for p in obj.data.polygons if p.select]
 
-                for poly in obj.data.polygons:
-                    if poly.material_index == matIndex:
-                        for loopIndex in poly.loop_indices:
-                            vec = uvMap[loopIndex].vector
-                            vec.x -= 0.5
-                            vec.y -= 0.5
-                            vec.rotate(mathutils.Matrix.Rotation(math.radians(mat.t3dAutoUVRotation__), 2))
-                            vec.x += 0.5
-                            vec.y += 0.5
+                        for matIndex, mat in enumerate(obj.data.materials):
 
-                            vec.x -= mat.t3dAutoUVOffset__[0]
-                            vec.y -= mat.t3dAutoUVOffset__[1]
+                            # mat could be None if it's just the slot and no Material is selected
+                            if mat and mat.t3dAutoUV__:
 
-        bpy.ops.object.mode_set(mode='OBJECT')
+                                bpy.ops.object.mode_set(mode='EDIT')
 
-        # Restore selection
-        for v in obj.data.vertices:
-            v.select = False
-            if v.index in selectedVertices:
-                v.select = True
+                                bpy.ops.mesh.select_all(action='DESELECT')
 
-        for e in obj.data.edges:
-            e.select = False
-            if e.index in selectedEdges:
-                e.select = True
+                                obj.active_material_index = matIndex
+                                bpy.ops.object.material_slot_select()
 
-        for p in obj.data.polygons:
-            p.select = False
-            if p.index in selectedPolygons:
-                p.select = True
+                                # TODO: Replace cube_project with maybe manually stretching the UV values to be able to handle walls that have fixed widths or heights better (e.g. walls with trim)?
+                                bpy.ops.uv.cube_project(cube_size=mat.t3dAutoUVUnitSize__)
 
-        obj.active_material_index = prevActiveMaterialIndex
+                                bpy.ops.mesh.select_all(action='DESELECT')
 
-        bpy.ops.object.mode_set(mode=ogMode)
+                                # Return to object mode to alter the UV map
+                                bpy.ops.object.mode_set(mode='OBJECT')
+
+                                uvMap = obj.data.uv_layers.active.uv
+
+                                for poly in obj.data.polygons:
+                                    if poly.material_index == matIndex:
+                                        for loopIndex in poly.loop_indices:
+                                            vec = uvMap[loopIndex].vector
+                                            vec.x -= 0.5
+                                            vec.y -= 0.5
+                                            vec.rotate(mathutils.Matrix.Rotation(math.radians(mat.t3dAutoUVRotation__), 2))
+                                            vec.x += 0.5
+                                            vec.y += 0.5
+
+                                            vec.x -= mat.t3dAutoUVOffset__[0]
+                                            vec.y -= mat.t3dAutoUVOffset__[1]
+
+                        bpy.ops.object.mode_set(mode='OBJECT')
+
+                        # Restore selection
+                        for v in obj.data.vertices:
+                            v.select = False
+                            if v.index in selectedVertices:
+                                v.select = True
+
+                        for e in obj.data.edges:
+                            e.select = False
+                            if e.index in selectedEdges:
+                                e.select = True
+
+                        for p in obj.data.polygons:
+                            p.select = False
+                            if p.index in selectedPolygons:
+                                p.select = True
+
+                        obj.active_material_index = prevActiveMaterialIndex
+
+                        bpy.ops.object.mode_set(mode=ogMode)
+
+        bpy.ops.object.select_all(action='DESELECT')
+
+        for obj in old_selected:
+            obj.select_set(True)
 
         return {'FINISHED'}
 
+inAutoUVUpdate = False
+
 def onModeChange():
+
+    ## AUTO UV UPDATE ON MODE CHANGE
+    
+    global inAutoUVUpdate
+    if inAutoUVUpdate:
+        return
+
     obj = bpy.context.object
     if obj and obj.data and obj.type == 'MESH':
         for mat in obj.data.materials:
@@ -1808,12 +1850,17 @@ def onModeChange():
                 break
 
 def autoUVChange(self, context):
+    global inAutoUVUpdate
+
+    inAutoUVUpdate = True
     obj = context.object
     if obj and obj.data and obj.type == 'MESH':
         for mat in obj.data.materials:
             if mat.t3dAutoUV__:
                 bpy.ops.material.t3dautouv()
                 break
+
+    inAutoUVChange = False
 
 class EXPORT_OT_tetra3d(bpy.types.Operator):
    bl_idname = "export.tetra3dgltf"
@@ -2143,7 +2190,11 @@ def register():
     bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
     bpy.types.Material.t3dBlendMode__ = bpy.props.EnumProperty(items=materialBlendModes, name="Blend Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
     bpy.types.Material.t3dTransparencyMode__ = bpy.props.EnumProperty(items=materialTransparencyModes, name="Transparency Mode", description="Transparency mode for this material", default="AUTO")
-    bpy.types.Material.t3dBillboardMode__ = bpy.props.EnumProperty(items=materialBillboardModes, name="Billboarding Mode", description="Billboard mode (i.e. if the object with this material should rotate to face the camera) for this material; doesn't take effect on armature skinned meshes", default="NONE")
+    bpy.types.Material.t3dBillboardEnabled__ = bpy.props.BoolProperty(name="Billboarding Enabled", description="If the object with this material should rotate to face the camera for this material; doesn't take effect on armature skinned meshes", default=False)
+    bpy.types.Material.t3dBillboardLockX__ = bpy.props.BoolProperty(name="Lock X Axis Rotation", description="If rotation is locked on the global X axis", default=False)
+    bpy.types.Material.t3dBillboardLockY__ = bpy.props.BoolProperty(name="Lock Y Axis Rotation", description="If rotation is locked on the global Y axis", default=False)
+    bpy.types.Material.t3dBillboardLockZ__ = bpy.props.BoolProperty(name="Lock Z Axis Rotation", description="If rotation is locked on the global Z axis", default=False)
+    bpy.types.Material.t3dBillboardUpDirection__ = bpy.props.EnumProperty(items=billboardingYDirections,name="Billboarding Y (Up) Direction", description="The direction for upwards direction for billboarding", default="GLOBAL_Y")
     bpy.types.Material.t3dDepthMode__ = bpy.props.EnumProperty(items=depthModes, name="Depth Rendering Modes", description="How depth should be rendered for meshes that use this materials", default="DEFAULT")
     bpy.types.Material.t3dMaterialLightingMode__ = bpy.props.EnumProperty(items=materialLightingModes, name="Lighting mode", description="How materials should be lit", default="DEFAULT")
     bpy.types.Material.t3dVisible__ = bpy.props.BoolProperty(name="Visible", description="Whether this material is visible", default=True)
@@ -2373,7 +2424,11 @@ def unregister():
     del bpy.types.Material.t3dMaterialShadeless__
     del bpy.types.Material.t3dMaterialFogless__
     del bpy.types.Material.t3dBlendMode__
-    del bpy.types.Material.t3dBillboardMode__
+    del bpy.types.Material.t3dBillboardEnabled__
+    del bpy.types.Material.t3dBillboardLockX__
+    del bpy.types.Material.t3dBillboardLockY__
+    del bpy.types.Material.t3dBillboardLockZ__
+    del bpy.types.Material.t3dBillboardUpDirection__
     del bpy.types.Material.t3dTransparencyMode__
     del bpy.types.Material.t3dMaterialLightingMode__
 

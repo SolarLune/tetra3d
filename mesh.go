@@ -149,12 +149,12 @@ type Mesh struct {
 	// Vertices are stored as a struct-of-arrays for simplified and faster rendering.
 	// Each vertex property (position, normal, UV, colors, weights, bones, etc) is stored
 	// here and indexed in order of vertex index.
-	vertexTransforms         []Vector4
-	VertexPositions          []Vector3
-	VertexNormals            []Vector3
-	vertexSkinnedNormals     []Vector3
-	vertexSkinnedPositions   []Vector3
-	vertexTransformedNormals []Vector3
+	// vertexTransforms         []Vector4
+	VertexPositions        []Vector3
+	VertexNormals          []Vector3
+	vertexSkinnedNormals   []Vector3
+	vertexSkinnedPositions []Vector3
+	// vertexTransformedNormals []Vector3
 	VertexUVs                []Vector2            // The UV values for each vertex
 	VertexUVOriginalValues   []Vector2            // The original UV values for each vertex
 	VertexColors             []VertexColorChannel // A slice of channels for the mesh
@@ -192,13 +192,13 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 		VertexColorChannelNames: map[string]int{},
 		properties:              NewProperties(),
 
-		vertexTransforms:         []Vector4{},
-		VertexPositions:          []Vector3{},
-		visibleVertices:          []bool{},
-		VertexNormals:            []Vector3{},
-		vertexSkinnedNormals:     []Vector3{},
-		vertexSkinnedPositions:   []Vector3{},
-		vertexTransformedNormals: []Vector3{},
+		// vertexTransforms:         []Vector4{},
+		VertexPositions:        []Vector3{},
+		visibleVertices:        []bool{},
+		VertexNormals:          []Vector3{},
+		vertexSkinnedNormals:   []Vector3{},
+		vertexSkinnedPositions: []Vector3{},
+		// vertexTransformedNormals: []Vector3{},
 		vertexLights:             []Color{},
 		VertexUVs:                []Vector2{},
 		VertexColors:             []VertexColorChannel{},
@@ -268,17 +268,17 @@ func (mesh *Mesh) Clone() *Mesh {
 		}
 	}
 
-	for v := range mesh.vertexTransforms {
-		newMesh.vertexTransforms = append(newMesh.vertexTransforms, mesh.vertexTransforms[v])
-	}
+	// for v := range mesh.vertexTransforms {
+	// 	newMesh.vertexTransforms = append(newMesh.vertexTransforms, mesh.vertexTransforms[v])
+	// }
 
 	for v := range mesh.vertexSkinnedNormals {
 		newMesh.vertexSkinnedNormals = append(newMesh.vertexSkinnedNormals, mesh.vertexSkinnedNormals[v])
 	}
 
-	for v := range mesh.vertexTransformedNormals {
-		newMesh.vertexTransformedNormals = append(newMesh.vertexTransformedNormals, mesh.vertexTransformedNormals[v])
-	}
+	// for v := range mesh.vertexTransformedNormals {
+	// 	newMesh.vertexTransformedNormals = append(newMesh.vertexTransformedNormals, mesh.vertexTransformedNormals[v])
+	// }
 
 	for v := range mesh.vertexSkinnedPositions {
 		newMesh.vertexSkinnedPositions = append(newMesh.vertexSkinnedPositions, mesh.vertexSkinnedPositions[v])
@@ -358,11 +358,11 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 
 	mesh.VertexWeights = append(make([][]float32, 0, vertexCount), mesh.VertexWeights...)
 
-	mesh.vertexTransforms = append(make([]Vector4, 0, vertexCount), mesh.vertexTransforms...)
+	// mesh.vertexTransforms = append(make([]Vector4, 0, vertexCount), mesh.vertexTransforms...)
 
 	mesh.vertexSkinnedNormals = append(make([]Vector3, 0, vertexCount), mesh.vertexSkinnedNormals...)
 
-	mesh.vertexTransformedNormals = append(make([]Vector3, 0, vertexCount), mesh.vertexTransformedNormals...)
+	// mesh.vertexTransformedNormals = append(make([]Vector3, 0, vertexCount), mesh.vertexTransformedNormals...)
 
 	mesh.vertexSkinnedPositions = append(make([]Vector3, 0, vertexCount), mesh.vertexSkinnedPositions...)
 
@@ -519,9 +519,9 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 		mesh.VertexWeights = append(mesh.VertexWeights, vertInfo.Weights)
 
 		mesh.vertexLights = append(mesh.vertexLights, NewColor(0, 0, 0, 1))
-		mesh.vertexTransforms = append(mesh.vertexTransforms, Vector4{}) // x, y, z, w
+		// mesh.vertexTransforms = append(mesh.vertexTransforms, Vector4{}) // x, y, z, w
 		mesh.vertexSkinnedNormals = append(mesh.vertexSkinnedNormals, Vector3{})
-		mesh.vertexTransformedNormals = append(mesh.vertexTransformedNormals, Vector3{})
+		// mesh.vertexTransformedNormals = append(mesh.vertexTransformedNormals, Vector3{})
 		mesh.vertexSkinnedPositions = append(mesh.vertexSkinnedPositions, Vector3{})
 
 	}
@@ -598,7 +598,14 @@ type VertexSelectionSet struct {
 	SelectAll bool
 }
 
-// VertexSelection represents a selection of vertices on a Mesh.
+func (vs *VertexSelectionSet) Clone() *VertexSelectionSet {
+	newVSS := &VertexSelectionSet{}
+	newVSS.Indices = vs.Indices.Clone()
+	newVSS.SelectAll = vs.SelectAll
+	return newVSS
+}
+
+// VertexSelection represents a selection of vertices on one or more Meshes.
 type VertexSelection struct {
 	SelectionSet map[*Mesh]*VertexSelectionSet
 }
@@ -608,6 +615,14 @@ func NewVertexSelection() VertexSelection {
 	return VertexSelection{
 		SelectionSet: map[*Mesh]*VertexSelectionSet{},
 	}
+}
+
+func (vs VertexSelection) Clone() VertexSelection {
+	newVS := NewVertexSelection()
+	for k, v := range vs.SelectionSet {
+		newVS.SelectionSet[k] = v.Clone()
+	}
+	return newVS
 }
 
 const ErrorVertexChannelOutsideRange = "error: vertex color channel not found by given name"

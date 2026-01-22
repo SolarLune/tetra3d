@@ -107,11 +107,11 @@ func (color Color) Sub(other Color) Color {
 // Mix mixes the calling Color with the other Color, mixed to the percentage given (ranging from 0 - 1).
 func (color Color) Mix(other Color, percentage float32) Color {
 
-	p := math32.Clamp(percentage, 0, 1)
-	color.R += (other.R - color.R) * p
-	color.G += (other.G - color.G) * p
-	color.B += (other.B - color.B) * p
-	color.A += (other.A - color.A) * p
+	// percentage = math32.Clamp(percentage, 0, 1)
+	color.R += (other.R - color.R) * percentage
+	color.G += (other.G - color.G) * percentage
+	color.B += (other.B - color.B) * percentage
+	color.A += (other.A - color.A) * percentage
 	return color
 
 }

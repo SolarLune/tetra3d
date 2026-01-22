@@ -27,10 +27,8 @@ const (
 )
 
 const (
-	BillboardModeNone          = iota // No billboarding
-	BillboardModeFixedVertical        // Billboard to face forward relative to the camera / screen under all circumstances; up is screen up / up relative to the camera, locally (local +Y)
-	BillboardModeHorizontal           // Billboard to face towards the camera, but skews as you go above / below the object)
-	BillboardModeAll                  // Billboard on all axes
+	BillboardYUpGlobalY = iota
+	BillboardYUpCameraY
 )
 
 const (
@@ -45,8 +43,8 @@ const (
 )
 
 const (
-	DepthModeDefault             = iota // Default custom depth mode; unaltered depth writing
-	CustomDepthModeUnbillboarded        // Unbillboarded depth mode; depth is written as though the mesh were not transformed
+	DepthModeDefault       = iota // Default custom depth mode; unaltered depth writing
+	DepthModeUnbillboarded        // Unbillboarded depth mode; depth is written as though the mesh were not transformed
 )
 
 type Material struct {
@@ -70,8 +68,14 @@ type Material struct {
 	Shadeless        bool         // If the material should be shadeless (unlit) or not
 	Fogless          bool         // If the material should be fogless or not
 	Blend            ebiten.Blend // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
-	BillboardMode    int          // Billboard mode
-	Visible          bool         // Whether the material is visible or not
+
+	BillboardEnabled     bool // Billboard mode
+	BillboardLockX       bool
+	BillboardLockY       bool
+	BillboardLockZ       bool
+	BillboardUpDirection int
+
+	Visible bool // Whether the material is visible or not
 
 	// fragmentShader represents a shader used to render the material with. This shader is activated after rendering
 	// to the depth texture, but before compositing the finished render to the screen after fog.
@@ -155,7 +159,11 @@ func (m *Material) Clone() *Material {
 	newMat.Shadeless = m.Shadeless
 	newMat.Fogless = m.Fogless
 	newMat.Blend = m.Blend
-	newMat.BillboardMode = m.BillboardMode
+	newMat.BillboardEnabled = m.BillboardEnabled
+	newMat.BillboardLockX = m.BillboardLockX
+	newMat.BillboardLockY = m.BillboardLockY
+	newMat.BillboardLockZ = m.BillboardLockZ
+	newMat.BillboardUpDirection = m.BillboardUpDirection
 	newMat.Visible = m.Visible
 
 	newMat.SetShaderText(m.fragmentSrc)

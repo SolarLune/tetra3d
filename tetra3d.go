@@ -22,6 +22,10 @@ var vertexListIndex = 0
 var indexListIndex = 0
 var indexListStart = 0
 
+var globalVertexTransforms = make([]Vector4, MaxTriangleCount*3)
+var globalVertexTransformedNormals = make([]Vector3, MaxTriangleCount*3)
+var globalVertexDepthUnbillboarded = make([]float32, MaxTriangleCount*3)
+
 func init() {
 	defaultImg.Fill(color.White)
 }

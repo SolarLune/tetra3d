@@ -73,6 +73,12 @@ func newNodeFilter(startingNode INode) NodeFilter {
 	}
 }
 
+func (nf NodeFilter) Clone() NodeFilter {
+	newNF := nf
+	newNF.multithreadingWG = &sync.WaitGroup{}
+	return newNF
+}
+
 func (nf NodeFilter) execute(node INode) []INode {
 	nf.depth++
 	out := []INode{}

@@ -620,7 +620,7 @@ func (camera *Camera) WorldToClip(vert Vector3) Vector3 {
 func (camera *Camera) PointInFrustum(point Vector3) bool {
 
 	diff := point.Sub(camera.WorldPosition())
-	pcZ := diff.Dot(camera.cameraForward)
+	pcZ := diff.Dot(camera.cameraForward.Invert())
 	aspectRatio := camera.AspectRatio()
 
 	if pcZ > camera.far || pcZ < camera.near {
@@ -676,7 +676,7 @@ func (camera *Camera) boundingSphereInFrustum(sphere *BoundingSphere) bool {
 func (camera *Camera) SphereInFrustum(position Vector3, radius float32) bool {
 
 	diff := position.Sub(camera.WorldPosition())
-	pcZ := diff.Dot(camera.cameraForward)
+	pcZ := diff.Dot(camera.cameraForward.Invert())
 
 	if pcZ > camera.far+radius || pcZ < camera.near-radius {
 		return false
@@ -815,7 +815,7 @@ func (camera *Camera) ClearWithColor(clear Color) {
 	camera.DebugInfo.ActiveLightCount = 0
 
 	cameraRot := camera.WorldRotation()
-	camera.cameraForward = cameraRot.Forward().Invert()
+	camera.cameraForward = cameraRot.Forward()
 	camera.cameraRight = cameraRot.Right()
 	camera.cameraUp = cameraRot.Up()
 
@@ -1323,7 +1323,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			// CLIP SCREEN START
 
-			w := mesh.vertexTransforms[vertIndex].W
+			w := globalVertexTransforms[vertIndex].W
 
 			if !camera.perspective {
 				w = 1.0
@@ -1333,24 +1333,24 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			// If it's too small, there will be visual artifacts when the camera is right up against surfaces
 			// If it's too large, then textures and vertices will appear to warp and bend "around" the screen, towards the "back" of the camera
 			if w < 0 {
-				w = 0.00005
+				w = 0.001
 			}
 
 			// It's 1 frame faster on the stress test not to have to calculate the half screen width and height here.
-			mesh.vertexTransforms[vertIndex].X = (mesh.vertexTransforms[vertIndex].X/w)*float32(camWidth) + halfCamWidth
-			mesh.vertexTransforms[vertIndex].Y = (mesh.vertexTransforms[vertIndex].Y/-w)*float32(camHeight) + halfCamHeight
-			// mesh.vertexTransforms[vertIndex].Z /= w
+			globalVertexTransforms[vertIndex].X = (globalVertexTransforms[vertIndex].X/w)*float32(camWidth) + halfCamWidth
+			globalVertexTransforms[vertIndex].Y = (globalVertexTransforms[vertIndex].Y/-w)*float32(camHeight) + halfCamHeight
+			// vertexTransforms[vertIndex].Z /= w
 
 			if vertexClipFunctionOn {
-				model.VertexClipFunction(&mesh.vertexTransforms[vertIndex], vertIndex)
+				model.VertexClipFunction(&globalVertexTransforms[vertIndex], vertIndex)
 			}
 
 			// CLIP SCREEN END
 
-			colorVertexList[vertexListIndex].DstX = float32(mesh.vertexTransforms[vertIndex].X)
-			colorVertexList[vertexListIndex].DstY = float32(mesh.vertexTransforms[vertIndex].Y)
-			depthVertexList[vertexListIndex].DstX = float32(mesh.vertexTransforms[vertIndex].X)
-			depthVertexList[vertexListIndex].DstY = float32(mesh.vertexTransforms[vertIndex].Y)
+			colorVertexList[vertexListIndex].DstX = float32(globalVertexTransforms[vertIndex].X)
+			colorVertexList[vertexListIndex].DstY = float32(globalVertexTransforms[vertIndex].Y)
+			depthVertexList[vertexListIndex].DstX = float32(globalVertexTransforms[vertIndex].X)
+			depthVertexList[vertexListIndex].DstY = float32(globalVertexTransforms[vertIndex].Y)
 
 			var uvU, uvV float32
 
@@ -1385,15 +1385,15 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			if camera.RenderNormals {
 
-				normalVertexList[vertexListIndex].DstX = float32(mesh.vertexTransforms[vertIndex].X)
-				normalVertexList[vertexListIndex].DstY = float32(mesh.vertexTransforms[vertIndex].Y)
+				normalVertexList[vertexListIndex].DstX = float32(globalVertexTransforms[vertIndex].X)
+				normalVertexList[vertexListIndex].DstY = float32(globalVertexTransforms[vertIndex].Y)
 
 				normalVertexList[vertexListIndex].SrcX = uvU
 				normalVertexList[vertexListIndex].SrcY = uvV
 
-				normalVertexList[vertexListIndex].ColorR = float32(mesh.vertexTransformedNormals[vertIndex].X*0.5 + 0.5)
-				normalVertexList[vertexListIndex].ColorG = float32(mesh.vertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
-				normalVertexList[vertexListIndex].ColorB = float32(mesh.vertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
+				normalVertexList[vertexListIndex].ColorR = float32(globalVertexTransformedNormals[vertIndex].X*0.5 + 0.5)
+				normalVertexList[vertexListIndex].ColorG = float32(globalVertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
+				normalVertexList[vertexListIndex].ColorB = float32(globalVertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
 
 			}
 
@@ -1433,7 +1433,12 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 				// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
 				// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
 
-				vertexDepth := mesh.vertexTransforms[vertIndex].Z
+				var vertexDepth float32
+				if rp.MeshPart.Material != nil && rp.MeshPart.Material.DepthMode == DepthModeUnbillboarded {
+					vertexDepth = globalVertexDepthUnbillboarded[vertIndex]
+				} else {
+					vertexDepth = globalVertexTransforms[vertIndex].Z
+				}
 
 				if customDepthFunctionSet {
 					vertexDepth = mat.CustomDepthFunction(model, camera, meshPart, vertIndex, vertexDepth)
@@ -1454,7 +1459,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 			} else if scene.World != nil && scene.World.FogOn {
 
-				vertexDepth := mesh.vertexTransforms[vertIndex].Z
+				vertexDepth := globalVertexTransforms[vertIndex].Z
 
 				if customDepthFunctionSet {
 					vertexDepth = mat.CustomDepthFunction(model, camera, meshPart, vertIndex, vertexDepth)
@@ -2073,9 +2078,9 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 				globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
 
-					v0 := camera.clipToScreen(model.Mesh.vertexTransforms[vertexIndices[0]], vertexIndices[0], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
-					v1 := camera.clipToScreen(model.Mesh.vertexTransforms[vertexIndices[1]], vertexIndices[1], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
-					v2 := camera.clipToScreen(model.Mesh.vertexTransforms[vertexIndices[2]], vertexIndices[2], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
+					v0 := camera.clipToScreen(globalVertexTransforms[vertexIndices[0]], vertexIndices[0], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
+					v1 := camera.clipToScreen(globalVertexTransforms[vertexIndices[1]], vertexIndices[1], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
+					v2 := camera.clipToScreen(globalVertexTransforms[vertexIndices[2]], vertexIndices[2], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
 
 					if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 						(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||

@@ -359,18 +359,29 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				}
 
-				if s, exists := dataMap["t3dBillboardMode__"]; exists {
+				if s, exists := dataMap["t3dBillboardEnabled__"]; exists {
+					newMat.BillboardEnabled = s.(float64) > 0
+				}
+
+				if s, exists := dataMap["t3dBillboardLockX__"]; exists {
+					newMat.BillboardLockX = s.(float64) > 0
+				}
+
+				if s, exists := dataMap["t3dBillboardLockY__"]; exists {
+					newMat.BillboardLockY = s.(float64) > 0
+				}
+
+				if s, exists := dataMap["t3dBillboardLockZ__"]; exists {
+					newMat.BillboardLockZ = s.(float64) > 0
+				}
+
+				if s, exists := dataMap["t3dBillboardUpDirection__"]; exists {
 					switch int(s.(float64)) {
 					case 0:
-						newMat.BillboardMode = BillboardModeNone
+						newMat.BillboardUpDirection = BillboardYUpGlobalY
 					case 1:
-						newMat.BillboardMode = BillboardModeFixedVertical
-					case 2:
-						newMat.BillboardMode = BillboardModeHorizontal
-					case 3:
-						newMat.BillboardMode = BillboardModeAll
+						newMat.BillboardUpDirection = BillboardYUpCameraY
 					}
-
 				}
 
 				if s, exists := dataMap["t3dDepthMode__"]; exists {

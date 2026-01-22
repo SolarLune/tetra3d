@@ -507,34 +507,60 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	// invertedCamPos := camPos
 
-	if mat != nil && mat.BillboardMode != BillboardModeNone {
+	if mat != nil && mat.BillboardEnabled {
 
 		var lookat Matrix4
 
-		if mat.BillboardMode == BillboardModeFixedVertical {
+		up := WorldUp
+		if mat.BillboardUpDirection == BillboardYUpCameraY {
+			up = camera.cameraUp
+		}
 
-			out := camera.cameraForward.Invert()
-			lookat = NewMatrix4LookAt(Vector3{}, out, camera.cameraUp)
+		lookat = NewMatrix4LookAt(model.WorldPosition(), camPos, up)
 
-		} else if mat.BillboardMode != BillboardModeNone {
+		if mat.BillboardLockX {
 
-			lookat = NewMatrix4LookAt(model.WorldPosition(), camPos, WorldUp)
+			lookat.SetRow(0, Vector4{1, 0, 0, 0})
 
-			if mat.BillboardMode == BillboardModeHorizontal {
-				lookat.SetRow(1, Vector4{0, 1, 0, 0})
-				x := lookat.Row(0)
-				x.Y = 0
-				lookat.SetRow(0, x.Unit())
+			row := lookat.Row(1)
+			row.X = 0
+			lookat.SetRow(1, row.Unit())
 
-				z := lookat.Row(2)
-				z.Y = 0
-				lookat.SetRow(2, z.Unit())
-			}
-
-			// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
+			row = lookat.Row(2)
+			row.X = 0
+			lookat.SetRow(2, row.Unit())
 
 		}
 
+		if mat.BillboardLockY {
+
+			lookat.SetRow(1, Vector4{0, 1, 0, 0})
+
+			row := lookat.Row(0)
+			row.Y = 0
+			lookat.SetRow(0, row.Unit())
+
+			row = lookat.Row(2)
+			row.Y = 0
+			lookat.SetRow(2, row.Unit())
+
+		}
+
+		if mat.BillboardLockZ {
+
+			lookat.SetRow(2, Vector4{0, 0, 1, 0})
+
+			row := lookat.Row(0)
+			row.Z = 0
+			lookat.SetRow(0, row.Unit())
+
+			row = lookat.Row(1)
+			row.Z = 0
+			lookat.SetRow(1, row.Unit())
+
+		}
+
+		// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
 		p, s, r := base.Decompose()
 		base = r.Mult(NewMatrix4Scale(s.X, s.Y, s.Z)).Mult(lookat)
 		base.SetRow(3, Vector4{p.X, p.Y, p.Z, 1})
@@ -546,7 +572,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	var unalteredMVP Matrix4
 	unbillboarded := false
 
-	if mat != nil && mat.DepthMode == CustomDepthModeUnbillboarded {
+	if mat != nil && mat.DepthMode == DepthModeUnbillboarded {
 		unbillboarded = true
 		unalteredMVP = modelTransform.Mult(vpMatrix)
 	}
@@ -576,7 +602,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	vertexPositions := mesh.VertexPositions
-	vertexTransforms := mesh.vertexTransforms
 
 	for vertexIndex := meshPart.VertexIndexStart; vertexIndex < meshPart.VertexIndexEnd; vertexIndex++ {
 
@@ -597,10 +622,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			mesh.vertexSkinnedPositions[vertexIndex].Z = vert.Z
 
 			// MultVecW() matrix multiplication, but faster to do it right here rather than using functions and/or pointers
-			mesh.vertexTransforms[vertexIndex].X = vpMatrix[0][0]*vert.X + vpMatrix[1][0]*vert.Y + vpMatrix[2][0]*vert.Z + vpMatrix[3][0]
-			mesh.vertexTransforms[vertexIndex].Y = vpMatrix[0][1]*vert.X + vpMatrix[1][1]*vert.Y + vpMatrix[2][1]*vert.Z + vpMatrix[3][1]
-			mesh.vertexTransforms[vertexIndex].Z = vpMatrix[0][2]*vert.X + vpMatrix[1][2]*vert.Y + vpMatrix[2][2]*vert.Z + vpMatrix[3][2]
-			mesh.vertexTransforms[vertexIndex].W = vpMatrix[0][3]*vert.X + vpMatrix[1][3]*vert.Y + vpMatrix[2][3]*vert.Z + vpMatrix[3][3]
+			globalVertexTransforms[vertexIndex].X = vpMatrix[0][0]*vert.X + vpMatrix[1][0]*vert.Y + vpMatrix[2][0]*vert.Z + vpMatrix[3][0]
+			globalVertexTransforms[vertexIndex].Y = vpMatrix[0][1]*vert.X + vpMatrix[1][1]*vert.Y + vpMatrix[2][1]*vert.Z + vpMatrix[3][1]
+			globalVertexTransforms[vertexIndex].Z = vpMatrix[0][2]*vert.X + vpMatrix[1][2]*vert.Y + vpMatrix[2][2]*vert.Z + vpMatrix[3][2]
+			globalVertexTransforms[vertexIndex].W = vpMatrix[0][3]*vert.X + vpMatrix[1][3]*vert.Y + vpMatrix[2][3]*vert.Z + vpMatrix[3][3]
 
 		} else {
 
@@ -613,25 +638,28 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				transformFunc(&vert, vertexIndex)
 			}
 
-			vertexTransforms[vertexIndex].X = mvp[0][0]*vert.X + mvp[1][0]*vert.Y + mvp[2][0]*vert.Z + mvp[3][0]
-			vertexTransforms[vertexIndex].Y = mvp[0][1]*vert.X + mvp[1][1]*vert.Y + mvp[2][1]*vert.Z + mvp[3][1]
+			globalVertexTransforms[vertexIndex].X = mvp[0][0]*vert.X + mvp[1][0]*vert.Y + mvp[2][0]*vert.Z + mvp[3][0]
+			globalVertexTransforms[vertexIndex].Y = mvp[0][1]*vert.X + mvp[1][1]*vert.Y + mvp[2][1]*vert.Z + mvp[3][1]
+
+			globalVertexTransforms[vertexIndex].Z = mvp[0][2]*vert.X + mvp[1][2]*vert.Y + mvp[2][2]*vert.Z + mvp[3][2]
+			globalVertexTransforms[vertexIndex].W = mvp[0][3]*vert.X + mvp[1][3]*vert.Y + mvp[2][3]*vert.Z + mvp[3][3]
 
 			if unbillboarded {
-				vertexTransforms[vertexIndex].Z = unalteredMVP[0][2]*vert.X + unalteredMVP[1][2]*vert.Y + unalteredMVP[2][2]*vert.Z + unalteredMVP[3][2]
-				vertexTransforms[vertexIndex].W = unalteredMVP[0][3]*vert.X + unalteredMVP[1][3]*vert.Y + unalteredMVP[2][3]*vert.Z + unalteredMVP[3][3]
-			} else {
-				vertexTransforms[vertexIndex].Z = mvp[0][2]*vert.X + mvp[1][2]*vert.Y + mvp[2][2]*vert.Z + mvp[3][2]
-				vertexTransforms[vertexIndex].W = mvp[0][3]*vert.X + mvp[1][3]*vert.Y + mvp[2][3]*vert.Z + mvp[3][3]
+				globalVertexDepthUnbillboarded[vertexIndex] = unalteredMVP[0][2]*vert.X + unalteredMVP[1][2]*vert.Y + unalteredMVP[2][2]*vert.Z + unalteredMVP[3][2]
+				// globalVertexDepthUnbillboarded[vertexIndex] = unalteredMVP[0][3]*vert.X + unalteredMVP[1][3]*vert.Y + unalteredMVP[2][3]*vert.Z + unalteredMVP[3][3]
 			}
 
 		}
 
 		if vertexSnappingOn {
-			mesh.vertexTransforms[vertexIndex] = mesh.vertexTransforms[vertexIndex].Round(camera.VertexSnapping)
+			// globalVertexTransforms[vertexIndex] = globalVertexTransforms[vertexIndex].Round(camera.VertexSnapping)
+			globalVertexTransforms[vertexIndex].X = math32.Round(globalVertexTransforms[vertexIndex].X*camera.VertexSnapping) / camera.VertexSnapping
+			globalVertexTransforms[vertexIndex].Y = math32.Round(globalVertexTransforms[vertexIndex].Y*camera.VertexSnapping) / camera.VertexSnapping
+			globalVertexTransforms[vertexIndex].Z = math32.Round(globalVertexTransforms[vertexIndex].Z*camera.VertexSnapping) / camera.VertexSnapping
 		}
 
 		if renderNormals {
-			mesh.vertexTransformedNormals[vertexIndex] = mvJustRForNormals.MultVec(mesh.VertexNormals[vertexIndex])
+			globalVertexTransformedNormals[vertexIndex] = mvJustRForNormals.MultVec(mesh.VertexNormals[vertexIndex])
 		}
 
 	}
@@ -689,7 +717,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				skinnedTriCenter = skinnedTriCenter.Add(mesh.vertexSkinnedPositions[vertIndices[i]])
 			}
 
-			w := mesh.vertexTransforms[vertIndices[i]].W
+			w := globalVertexTransforms[vertIndices[i]].W
 
 			// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
 			// TODO: Replace this with triangle clipping or fix whatever graphical glitch seems to arise periodically
@@ -697,10 +725,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				w = 0.000001
 			}
 
-			transformedVertexPositions[i].X = mesh.vertexTransforms[vertIndices[i]].X / w
-			transformedVertexPositions[i].Y = mesh.vertexTransforms[vertIndices[i]].Y / w
+			transformedVertexPositions[i].X = globalVertexTransforms[vertIndices[i]].X / w
+			transformedVertexPositions[i].Y = globalVertexTransforms[vertIndices[i]].Y / w
 
-			if mesh.vertexTransforms[vertIndices[i]].Z+1 >= camNear && mesh.vertexTransforms[vertIndices[i]].Z < camFar {
+			if globalVertexTransforms[vertIndices[i]].Z+1 >= camNear && globalVertexTransforms[vertIndices[i]].Z < camFar {
 				outOfBounds = false
 			}
 

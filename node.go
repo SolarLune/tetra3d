@@ -59,6 +59,8 @@ func (nt NodeType) Is(other NodeType) bool {
 type INode interface {
 	// Name returns the object's name.
 	Name() string
+	// String returns the object as a string.
+	String() string
 	// ID returns the object's unique ID.
 	ID() uint32
 	// SetName sets the object's name.
@@ -978,6 +980,10 @@ func (node *Node) AddChildren(children ...INode) {
 	me := node.getOwner()
 
 	for _, child := range children {
+
+		if child == me {
+			continue
+		}
 
 		prevParent := child.Parent()
 		if prevParent != nil {
