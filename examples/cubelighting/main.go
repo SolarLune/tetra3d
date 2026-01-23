@@ -65,10 +65,10 @@ func (g *Game) Update() error {
 	angle := cubeLight.LightingAngle.Modify()
 
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		angle.RotateVec(tetra3d.WorldRight, 0.1)
+		angle.RotateVec(tetra3d.WorldRight.Modify(), 0.1)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		angle.RotateVec(tetra3d.WorldRight, -0.1)
+		angle.RotateVec(tetra3d.WorldRight.Modify(), -0.1)
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
