@@ -797,6 +797,7 @@ func (vs VertexSelection) SelectByNormal(mesh *Mesh, normal Vector3) VertexSelec
 }
 
 // SelectByFunc selects vertex indices for vertices that pass a custom callback function.
+// Vertices be added to the selection only if the function returns true.
 func (vs VertexSelection) SelectByFunc(mesh *Mesh, function func(index int) bool) VertexSelection {
 	vs.ensureSelectionSetExists(mesh)
 	for i := range mesh.VertexPositions {
