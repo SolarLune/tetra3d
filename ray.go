@@ -32,10 +32,10 @@ func (r RayHit) Distance() float32 {
 
 const ErrorObjectHitNotBoundingTriangles = "error: object hit not a BoundingTriangles instance; no UV or vertex color data can be pulled from RayHit result"
 
-// VertexColor returns the vertex color from the given channel in the position struck on the object struck,
-// assuming it was a BoundingTriangles.
+// Returns the vertex color from the given channel in the position struck on the object struck.
+// Only works when testing against BoundingTriangles objects.
 // The returned vertex color is linearly interpolated across the triangle just like it would be when a triangle is rendered.
-// VertexColor will return a transparent color and an error if the BoundingObject hit was not a BoundingTriangles object, or if the channel index given
+// The function will return transparent black and an error if the BoundingObject hit was not a BoundingTriangles object, or if the channel index given
 // is higher than the number of vertex color channels on the BoundingTriangles' mesh.
 func (r RayHit) VertexColor(channelIndex int) (Color, error) {
 
@@ -55,6 +55,37 @@ func (r RayHit) VertexColor(channelIndex int) (Color, error) {
 	vc1 := mesh.VertexColors[channelIndex][tri.VertexIndices[0]]
 	vc2 := mesh.VertexColors[channelIndex][tri.VertexIndices[1]]
 	vc3 := mesh.VertexColors[channelIndex][tri.VertexIndices[2]]
+
+	output := vc1.Mix(vc2, float32(v)).Mix(vc3, float32(u))
+
+	return output, nil
+
+}
+
+// Returns the lighting color for the given position struck on the object struck.
+// Only works when testing against BoundingTriangles objects, and those for visible objects.
+// Note that this assumes the object rendered is rendered once; rendering multiple times will reset the lighting values between renders.
+// The function will return transparent black and an error if the BoundingObject hit was not a BoundingTriangles object.
+func (r RayHit) LightColor() (Color, error) {
+
+	if r.Triangle == nil {
+		return NewColor(0, 0, 0, 0), errors.New(ErrorObjectHitNotBoundingTriangles)
+	}
+
+	tri := r.Triangle
+
+	// Shadeless materials return full bright white
+	if tri.MeshPart.Material != nil && tri.MeshPart.Material.Shadeless {
+		return NewColor(1, 1, 1, 1), nil
+	}
+
+	mesh := r.Object.(*BoundingTriangles).Mesh
+
+	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndices[0]], mesh.VertexPositions[tri.VertexIndices[1]], mesh.VertexPositions[tri.VertexIndices[2]])
+
+	vc1 := mesh.vertexLights[tri.VertexIndices[0]]
+	vc2 := mesh.vertexLights[tri.VertexIndices[1]]
+	vc3 := mesh.vertexLights[tri.VertexIndices[2]]
 
 	output := vc1.Mix(vc2, float32(v)).Mix(vc3, float32(u))
 
