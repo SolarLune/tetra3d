@@ -257,6 +257,100 @@ func (cc *BasicFreeCam) Update() {
 
 }
 
+// BasicTargetedCam represents a target-following camera.
+type BasicTargetedCam struct {
+	*tetra3d.Camera
+	Orbiter           tetra3d.INode
+	Scene             *tetra3d.Scene
+	CameraTilt        float32
+	CameraRotate      float32
+	CameraTiltSpeed   float32
+	CameraRotateSpeed float32
+	PrevMousePosition tetra3d.Vector3
+	Locked            bool
+}
+
+// NewBasicTargetedCam creates a new BasicTargetedCam struct.
+func NewBasicTargetedCam(target tetra3d.INode) BasicTargetedCam {
+
+	cam := BasicTargetedCam{
+		Scene:   target.Scene(),
+		Orbiter: tetra3d.NewNode("Orbiter"),
+	}
+
+	cam.Camera = tetra3d.NewCamera(640, 360)
+	cam.Camera.SetFieldOfView(60)
+
+	cam.Orbiter.AddChildren(cam.Camera)
+	cam.Camera.SetLocalPosition(0, 0, 10)
+
+	target.AddChildren(cam.Orbiter)
+
+	// cam.Scene.Root.AddChildren(cam.Camera)
+
+	return cam
+
+}
+
+// Update updates the free cam.
+func (cc *BasicTargetedCam) Update() {
+
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
+		cc.Locked = !cc.Locked
+		if cc.Locked {
+			ebiten.SetCursorMode(ebiten.CursorModeCaptured)
+		} else {
+			ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		}
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyF6) {
+		cc.PerspectiveCorrectedTextureMapping = !cc.PerspectiveCorrectedTextureMapping
+	}
+
+	// Rotating the camera with the mouse
+
+	// Rotate and tilt the camera according to mouse movements
+	mx, my := ebiten.CursorPosition()
+
+	mv := tetra3d.NewVector3(float32(mx), float32(my), 0)
+
+	if cc.Locked {
+
+		// Divide by camera size to get hopefully screen size-independent movements;
+		// Note that using ebiten.WindowSize() may not work for this because it returns 0,0 on unsupported platforms (WASM, for example).
+		// All of the examples use the camera's size for the layout / "screen" size, so its' fine to use it as well here too.
+		w, h := cc.Camera.Size()
+
+		diff := mv.Sub(cc.PrevMousePosition)
+		diff.X /= float32(w)
+		diff.Y /= float32(h)
+
+		accel := float32(3)
+		friction := float32(0.6)
+
+		cc.CameraTiltSpeed *= friction
+		cc.CameraRotateSpeed *= friction
+
+		cc.CameraTiltSpeed -= diff.Y * accel
+		cc.CameraRotateSpeed -= diff.X * accel
+
+		cc.CameraTilt += cc.CameraTiltSpeed
+		cc.CameraRotate += cc.CameraRotateSpeed
+
+		cc.CameraTilt = math32.Clamp(cc.CameraTilt, -math.Pi/2+0.1, math.Pi/2-0.1)
+
+		// Order of this is important - tilt * rotate works, rotate * tilt does not, lol
+		rotate := tetra3d.NewMatrix4Rotate(0, 1, 0, cc.CameraRotate).Rotated(1, 0, 0, cc.CameraTilt)
+
+		cc.Orbiter.SetLocalRotation(rotate)
+
+	}
+
+	cc.PrevMousePosition = mv
+
+}
+
 func StartProfiling() {
 	outFile, err := os.Create("./cpu.pprof")
 	if err != nil {

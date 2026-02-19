@@ -364,17 +364,16 @@ var internalRayTest = []RayHit{}
 
 // TODO: Add SphereCast?
 
-// RayTestLocationPair represents a pair of locations to test against.
-type RayTestLocationPair struct {
-	From, To Vector3 // From and To are the starting and ending points of the ray tests.
-}
-
 // RayTestOptions is a struct designed to control what options to use when performing a ray test.
 type RayTestOptions struct {
+	From Vector3 // The position to cast rays from.
+	To   Vector3 // The position to cast rays to.
 
-	// The positions to cast rays from and to.
+	// The positions to cast rays from and to in pairs.
 	// By specifying multiple locations in this location pair set, you can cast multiple rays at the same time.
-	Positions []RayTestLocationPair
+	// If the number of positions provided is odd (e.g. only a From and no matching To), that ray is not cast.
+	// Overrides the options object's From and To properties.
+	Positions []Vector3
 
 	// If cast rays can strike both sides of BoundingTriangles triangles or not.
 	// TODO: Implement this for all collision types, not just triangles.
@@ -393,10 +392,7 @@ type RayTestOptions struct {
 
 // AddPosition adds a position pair to cast rays from and to.
 func (r RayTestOptions) AddPosition(from, to Vector3) RayTestOptions {
-	r.Positions = append(r.Positions, RayTestLocationPair{
-		From: from,
-		To:   to,
-	})
+	r.Positions = append(r.Positions, from, to)
 	return r
 }
 
@@ -426,41 +422,52 @@ func RayTest(options RayTestOptions) *RayHit {
 
 	options.TestAgainst.ForEach(func(node INode) bool {
 
-		for _, pos := range options.Positions {
+		node.Transform() // Make sure the transform is updated before the test
 
-			node.Transform() // Make sure the transform is updated before the test
+		testFunc := func(from, to Vector3) {
 
 			switch test := node.(type) {
 
 			case *BoundingSphere:
 
-				if result, ok := boundingSphereRayTest(test.WorldPosition(), test.WorldRadius(), pos.From, pos.To); ok {
+				if result, ok := boundingSphereRayTest(test.WorldPosition(), test.WorldRadius(), from, to); ok {
 					result.Object = test
 					internalRayTest = append(internalRayTest, result)
 				}
 
 			case *BoundingCapsule:
 
-				closestPoint, _ := test.nearestPointsToLine(pos.From, pos.To)
+				closestPoint, _ := test.nearestPointsToLine(from, to)
 
-				if result, ok := boundingSphereRayTest(closestPoint, test.WorldRadius(), pos.From, pos.To); ok {
+				if result, ok := boundingSphereRayTest(closestPoint, test.WorldRadius(), from, to); ok {
 					result.Object = test
 					internalRayTest = append(internalRayTest, result)
 				}
 
 			case *BoundingAABB:
 
-				if result, ok := boundingAABBRayTest(pos.From, pos.To, test); ok {
+				if result, ok := boundingAABBRayTest(from, to, test); ok {
 					internalRayTest = append(internalRayTest, result)
 				}
 
 			case *BoundingTriangles:
 
 				// Raycasting against triangles can hit multiple triangles, so we can't bail early and have to return all potential hits
-				internalRayTest = append(internalRayTest, boundingTrianglesRayTest(pos.From, pos.To, test, options.Doublesided)...)
+				internalRayTest = append(internalRayTest, boundingTrianglesRayTest(from, to, test, options.Doublesided)...)
 
 			}
 
+		}
+
+		if len(options.Positions) > 0 {
+			for i := 0; i < len(options.Positions); i += 2 {
+				if len(options.Positions) < i+1 { // Break out if it's not a pair
+					break
+				}
+				testFunc(options.Positions[i], options.Positions[i+1])
+			}
+		} else {
+			testFunc(options.From, options.To)
 		}
 
 		return true
@@ -553,9 +560,8 @@ func (camera *Camera) MouseRayTest(options MouseRayTestOptions) *RayHit {
 	to := camera.ScreenToWorldPixels(mx, my, options.Depth)
 
 	return RayTest(RayTestOptions{
-		Positions: []RayTestLocationPair{
-			{from, to},
-		},
+		From:        from,
+		To:          to,
 		OnHit:       options.OnHit,
 		TestAgainst: options.TestAgainst,
 		Doublesided: options.Doublesided,

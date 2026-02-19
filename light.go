@@ -1,6 +1,10 @@
 package tetra3d
 
 import (
+	"image/color"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/tetra3d/math32"
 )
 
@@ -17,7 +21,7 @@ type ILight interface {
 
 	Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) // Light lights the triangles in the MeshPart, storing the result in the targetColors
 	// color buffer. If onlyVisible is true, only the visible vertices will be lit; if it's false, they will all be lit.
-	IsOn() bool    // isOn is simply used tfo tell if a "generic" Light is on or not.
+	On() bool      // On is simply used to tell if a "generic" Light is on or not.
 	SetOn(on bool) // SetOn sets whether the light is on or not
 
 	Color() Color
@@ -82,7 +86,7 @@ func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors Ve
 	}, onlyVisible)
 }
 
-func (amb *AmbientLight) IsOn() bool {
+func (amb *AmbientLight) On() bool {
 	return amb.on && amb.energy > 0
 }
 
@@ -126,7 +130,7 @@ type PointLight struct {
 	// GLTF spec and 3D modelers.
 	energy float32
 	// If the light is on and contributing to the scene.
-	On bool
+	on bool
 
 	rangeSquared    float32
 	workingPosition Vector3
@@ -138,7 +142,7 @@ func NewPointLight(name string, r, g, b, energy float32) *PointLight {
 		Node:   NewNode(name),
 		energy: energy,
 		color:  NewColor(r, g, b, 1),
-		On:     true,
+		on:     true,
 	}
 	point.owner = point
 	return point
@@ -148,7 +152,7 @@ func NewPointLight(name string, r, g, b, energy float32) *PointLight {
 func (p *PointLight) Clone() INode {
 
 	clone := NewPointLight(p.name, p.color.R, p.color.G, p.color.B, p.energy)
-	clone.On = p.On
+	clone.on = p.on
 	clone.Range = p.Range
 
 	clone.Node = p.Node.clone(clone).(*Node)
@@ -267,12 +271,12 @@ func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors Vertex
 
 }
 
-func (p *PointLight) IsOn() bool {
-	return p.On && p.energy > 0
+func (p *PointLight) On() bool {
+	return p.on && p.energy > 0
 }
 
 func (p *PointLight) SetOn(on bool) {
-	p.On = on
+	p.on = on
 }
 
 func (p *PointLight) Color() Color {
@@ -305,7 +309,7 @@ type DirectionalLight struct {
 	// energy is the overall energy of the light. Internally, technically there's no difference between a brighter color and a
 	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
 	energy float32
-	On     bool // If the light is on and contributing to the scene.
+	on     bool // If the light is on and contributing to the scene.
 
 	workingForward       Vector3 // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
 	workingModelRotation Matrix4 // Similarly, this is an internal rotational transform (without the transformation row) for the Model being lit.
@@ -317,7 +321,7 @@ func NewDirectionalLight(name string, r, g, b, energy float32) *DirectionalLight
 		Node:   NewNode(name),
 		color:  NewColor(r, g, b, 1),
 		energy: energy,
-		On:     true,
+		on:     true,
 	}
 	sun.owner = sun
 	return sun
@@ -328,7 +332,7 @@ func (sun *DirectionalLight) Clone() INode {
 
 	clone := NewDirectionalLight(sun.name, sun.color.R, sun.color.G, sun.color.B, sun.energy)
 
-	clone.On = sun.On
+	clone.on = sun.on
 
 	clone.Node = sun.Node.clone(clone).(*Node)
 	if runCallbacks && clone.Callbacks().OnClone != nil {
@@ -384,12 +388,12 @@ func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColor
 
 }
 
-func (sun *DirectionalLight) IsOn() bool {
-	return sun.On && sun.energy > 0
+func (sun *DirectionalLight) On() bool {
+	return sun.on && sun.energy > 0
 }
 
 func (sun *DirectionalLight) SetOn(on bool) {
-	sun.On = on
+	sun.on = on
 }
 
 func (d *DirectionalLight) Color() Color {
@@ -419,7 +423,7 @@ type CubeLight struct {
 	Dimensions Dimensions // The overall dimensions of the CubeLight.
 	energy     float32    // The overall energy of the CubeLight
 	color      Color      // The color of the CubeLight
-	On         bool       // If the CubeLight is on or not
+	on         bool       // If the CubeLight is on or not
 	// A value between 0 and 1 indicating how much opposite faces are still lit within the volume (i.e. at LightBleed = 0.0,
 	// faces away from the light are dark; at 1.0, faces away from the light are fully illuminated)
 	Bleed             float32
@@ -437,7 +441,7 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 		Dimensions:    dimensions,
 		energy:        1,
 		color:         NewColor(1, 1, 1, 1),
-		On:            true,
+		on:            true,
 		LightingAngle: Vector3{0, -1, 0},
 	}
 	cube.owner = cube
@@ -459,7 +463,7 @@ func (cube *CubeLight) Clone() INode {
 	newCube := NewCubeLight(cube.name, cube.Dimensions)
 	newCube.energy = cube.energy
 	newCube.color = cube.color
-	newCube.On = cube.On
+	newCube.on = cube.on
 	newCube.Bleed = cube.Bleed
 	newCube.LightingAngle = cube.LightingAngle
 	newCube.SetWorldTransform(cube.Transform())
@@ -662,14 +666,14 @@ func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors Vert
 
 }
 
-// IsOn returns if the CubeLight is on or not.
-func (cube *CubeLight) IsOn() bool {
-	return cube.On
+// On returns if the CubeLight is on or not.
+func (cube *CubeLight) On() bool {
+	return cube.on
 }
 
 // SetOn sets the CubeLight to be on or off.
 func (cube *CubeLight) SetOn(on bool) {
-	cube.On = on
+	cube.on = on
 }
 
 func (cube *CubeLight) Color() Color {
@@ -688,12 +692,496 @@ func (cube *CubeLight) SetEnergy(energy float32) {
 	cube.energy = energy
 }
 
-/////
-
 // Type returns the type of INode this is (NodeTypeCubeLight).
 func (cube *CubeLight) Type() NodeType {
 	return NodeTypeCubeLight
 }
+
+/////
+
+// func LightVolumeSpecialCopy() Color {
+// 	return NewColor(lightVolumeSpecialCopy, 0, 0, 0)
+// }
+
+// const lightVolumeSpecialCopy = -99899
+
+// var LightVolumeSpecialCopy = NewColor(-9999, -8888, -7777, 0)
+
+// LightVolume represents a grid of colors representing light to color models that enter the space with.
+type LightVolume struct {
+	*Node
+
+	cellSizeX float32
+	cellSizeY float32
+	cellSizeZ float32
+
+	cellCountX int
+	cellCountY int
+	cellCountZ int
+
+	dimensions Dimensions
+
+	lightValues []Color
+
+	energy float32
+	color  Color
+	on     bool
+}
+
+// Creates a new light volume node of the given name, transformed dimensions, and light grid cellular size.
+func NewLightVolume(name string, volumeDim Dimensions, cellSizeX, cellSizeY, cellSizeZ float32) *LightVolume {
+	lv := &LightVolume{
+		Node:   NewNode(name),
+		energy: 1,
+		on:     true,
+		color:  NewColor(1, 1, 1, 1),
+	}
+
+	lv.owner = lv
+
+	lv.Resize(volumeDim, cellSizeX, cellSizeY, cellSizeZ)
+
+	return lv
+}
+
+// Creates a new light volume node from the given Model's name and dimensions, with the given cellular size.
+// Note that the model will still exist, so you'll need to dispose of it as you'd like.
+func NewLightVolumeFromModel(model *Model, cellSizeX, cellSizeY, cellSizeZ float32) *LightVolume {
+	vol := NewLightVolume(model.Name(), model.Dimensions(), cellSizeX, cellSizeY, cellSizeZ)
+	vol.Node.SetWorldTransform(model.Transform())
+	return vol
+}
+
+// Clones the LightVolume and returns another.
+func (l *LightVolume) Clone() INode {
+	newLightmap := NewLightVolume(l.Name(), l.dimensions, l.cellSizeX, l.cellSizeY, l.cellSizeZ)
+	newLightmap.lightValues = append(newLightmap.lightValues, l.lightValues...)
+	newLightmap.energy = l.energy
+	newLightmap.color = l.color
+	newLightmap.on = l.on
+	return newLightmap
+}
+
+// Resizes the LightVolume to be of the given transformed dimensions and cellular size.
+func (l *LightVolume) Resize(dimensions Dimensions, cellsizeX, cellsizeY, cellsizeZ float32) {
+
+	l.dimensions = dimensions
+	l.cellSizeX = cellsizeX
+	l.cellSizeY = cellsizeY
+	l.cellSizeZ = cellsizeZ
+
+	cellCountX := 0
+	cellCountY := 0
+	cellCountZ := 0
+
+	for z := dimensions.Min.Z; z < dimensions.Max.Z; z += cellsizeZ {
+		cellCountZ++
+		cellCountY = 0
+
+		for y := dimensions.Min.Y; y < dimensions.Max.Y; y += cellsizeY {
+			cellCountY++
+			cellCountX = 0
+
+			for x := dimensions.Min.X; x < dimensions.Max.X; x += cellsizeX {
+				cellCountX++
+				l.lightValues = append(l.lightValues, NewColor(0, 0, 0, 1))
+			}
+
+		}
+
+	}
+
+	l.cellCountX = cellCountX
+	l.cellCountY = cellCountY
+	l.cellCountZ = cellCountZ
+
+}
+
+func (l *LightVolume) beginRender() {}
+
+func (l *LightVolume) beginModel(model *Model) {}
+
+// Lights the mesh part of the model being rendered, placing the results into the targeted VertexColorChannel, only doing so
+// for the visible parts of the mesh if onlyVisible is set to true.
+func (l *LightVolume) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
+
+	cellColor := NewColor(0, 0, 0, 1)
+
+	// TODO: If distance from the mesh mesh part is too big, then we can just forget about it?
+
+	transform := model.Transform()
+
+	center := l.dimensions.Center()
+
+	// Half the max span so that each vertex is, at maximum, as far from the center
+	// as the distance from min corner to max corner / 2
+	d := l.dimensions.MaxSpan() / 2
+	maxDist := d * d
+
+	meshPart.ForEachVertexIndex(func(vertIndex int) {
+
+		var vertPos Vector3
+
+		if model.skinned {
+			vertPos = model.Mesh.vertexSkinnedPositions[vertIndex]
+		} else {
+			vertPos = transform.MultVec(model.Mesh.VertexPositions[vertIndex])
+		}
+
+		if vertPos.DistanceSquaredTo(center) > maxDist {
+			return
+		}
+
+		cellColor.R = 0
+		cellColor.G = 0
+		cellColor.B = 0
+
+		x, y, z := l.convertToXYZIndicesVec(vertPos)
+
+		if l.xyzIndicesInsideVolume(x, y, z) {
+
+			lvColor := l.getLightValue(x, y, z)
+
+			cellColor.R = lvColor.R
+			cellColor.G = lvColor.G
+			cellColor.B = lvColor.B
+
+		}
+
+		targetColors[vertIndex].R += l.color.R * cellColor.R * l.energy
+		targetColors[vertIndex].G += l.color.G * cellColor.G * l.energy
+		targetColors[vertIndex].B += l.color.B * cellColor.B * l.energy
+
+	}, onlyVisible)
+
+}
+
+func (l *LightVolume) convertToXYZIndices(wx, wy, wz float32) (x, y, z int) {
+
+	x = int((wx - l.dimensions.Min.X) / l.cellSizeX)
+	y = int((wy - l.dimensions.Min.Y) / l.cellSizeY)
+	z = int((wz - l.dimensions.Min.Z) / l.cellSizeZ)
+
+	return
+}
+
+func (l *LightVolume) convertToXYZIndicesVec(position Vector3) (x, y, z int) {
+	return l.convertToXYZIndices(position.X, position.Y, position.Z)
+}
+
+func (l *LightVolume) xyzIndicesInsideVolume(x, y, z int) bool {
+	return x >= 0 && y >= 0 && z >= 0 && x < l.cellCountX && y < l.cellCountY && z < l.cellCountZ
+}
+
+func (l *LightVolume) LightCellWriteToPosition(position Vector3, color Color) {
+
+	x, y, z := l.convertToXYZIndicesVec(position)
+
+	if l.xyzIndicesInsideVolume(x, y, z) {
+		l.setLightValue(x, y, z, color)
+	}
+
+}
+
+func (l *LightVolume) LightCellReadFromPosition(position Vector3, color Color) Color {
+
+	x, y, z := l.convertToXYZIndicesVec(position)
+
+	if l.xyzIndicesInsideVolume(x, y, z) {
+		return l.getLightValue(x, y, z)
+	}
+
+	return NewColor(0, 0, 0, 0)
+
+}
+
+func (l *LightVolume) LightCellReadWriteAll(forEach func(position Vector3, in Color) Color) {
+
+	if forEach == nil {
+		return
+	}
+
+	csx := l.cellSizeX / 2
+	csy := l.cellSizeY / 2
+	csz := l.cellSizeZ / 2
+
+	// Alreay transformed
+	for wz := l.dimensions.Min.Z + csz; wz <= l.dimensions.Max.Z; wz += l.cellSizeZ {
+		for wy := l.dimensions.Min.Y + csy; wy <= l.dimensions.Max.Y; wy += l.cellSizeY {
+			for wx := l.dimensions.Min.X + csx; wx <= l.dimensions.Max.X; wx += l.cellSizeX {
+
+				x, y, z := l.convertToXYZIndices(wx, wy, wz)
+
+				if l.xyzIndicesInsideVolume(x, y, z) {
+					out := forEach(NewVector3(wx, wy, wz), l.getLightValue(x, y, z))
+					l.setLightValue(x, y, z, out)
+				}
+
+			}
+		}
+	}
+
+}
+
+// func (l *LightVolume) handleSpecialColors() {
+
+// 	csx := l.cellSizeX / 2
+// 	csy := l.cellSizeY / 2
+// 	csz := l.cellSizeZ / 2
+
+// 	// Alreay transformed
+// 	for wz := l.dimensions.Min.Z + csz; wz <= l.dimensions.Max.Z; wz += l.cellSizeZ {
+// 		for wy := l.dimensions.Min.Y + csy; wy <= l.dimensions.Max.Y; wy += l.cellSizeY {
+// 			for wx := l.dimensions.Min.X + csx; wx <= l.dimensions.Max.X; wx += l.cellSizeX {
+
+// 				x, y, z := l.convertToXYZIndices(wx, wy, wz)
+
+// 				if l.xyzIndicesInsideVolume(x, y, z) {
+// 					color := l.getLightValue(x, y, z)
+// 					if color.R == lightVolumeSpecialCopy {
+// 						set := false
+// 						for nz := z - 1; nz <= z+1; nz++ {
+// 							for ny := y - 1; ny <= y+1; ny++ {
+// 								for nx := x - 1; nx <= x+1; nx++ {
+// 									if nx == 0 && ny == 0 && nz == 0 {
+// 										continue
+// 									}
+// 									if l.xyzIndicesInsideVolume(nx, ny, nz) {
+// 										newColor := l.getLightValue(nx, ny, nz)
+// 										if newColor.R != lightVolumeSpecialCopy {
+// 											l.setLightValue(x, y, z, newColor)
+// 											set = true
+// 										}
+// 									}
+// 									if set {
+// 										break
+// 									}
+// 								}
+// 								if set {
+// 									break
+// 								}
+// 							}
+// 							if set {
+// 								break
+// 							}
+// 						}
+// 					}
+// 				}
+
+// 			}
+// 		}
+// 	}
+// }
+
+// Blurs the cells in the LightVolume.
+// radius is the number of cells around each cell to blur each cell's value.
+// iterations is the number of times to run the blur.
+func (l *LightVolume) LightCellBlur(cellRadius int, iterations int) {
+
+	if cellRadius < 1 {
+		cellRadius = 1
+	}
+
+	if iterations < 1 {
+		iterations = 1
+	}
+
+	csx := l.cellSizeX / 2
+	csy := l.cellSizeY / 2
+	csz := l.cellSizeZ / 2
+
+	for range iterations {
+
+		ogLightValues := append(make([]Color, 0, len(l.lightValues)), l.lightValues...)
+
+		getLightValueSpread := func(indexX, indexY, indexZ int) Color {
+			if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= l.cellCountX || indexY >= l.cellCountY || indexZ >= l.cellCountZ {
+				return NewColor(0, 0, 0, 0)
+			}
+			return ogLightValues[indexX+(indexY*l.cellCountX)+(indexZ*l.cellCountX*l.cellCountY)]
+		}
+
+		for wz := l.dimensions.Min.Z + csz; wz <= l.dimensions.Max.Z; wz += l.cellSizeZ {
+			for wy := l.dimensions.Min.Y + csy; wy <= l.dimensions.Max.Y; wy += l.cellSizeY {
+				for wx := l.dimensions.Min.X + csx; wx <= l.dimensions.Max.X; wx += l.cellSizeX {
+
+					x, y, z := l.convertToXYZIndices(wx, wy, wz)
+
+					if l.xyzIndicesInsideVolume(x, y, z) {
+
+						count := 1
+						current := getLightValueSpread(x, y, z)
+
+						for i := 1; i <= cellRadius; i++ {
+
+							for rz := -cellRadius; rz <= cellRadius; rz++ {
+								for ry := -cellRadius; ry <= cellRadius; ry++ {
+									for rx := -cellRadius; rx <= cellRadius; rx++ {
+
+										if rx == 0 && ry == 0 && rz == 0 {
+											continue
+										}
+										if l.xyzIndicesInsideVolume(x+rx, y+ry, z+rz) {
+											c := getLightValueSpread(x+rx, y+ry, z+rz)
+											if c.A > 0 {
+												count++
+												current = current.Add(c)
+											}
+										}
+									}
+								}
+							}
+
+						}
+
+						l.setLightValue(x, y, z, current.MultiplyScalarRGB(1/float32(count)))
+
+					}
+
+				}
+			}
+		}
+
+	}
+}
+
+func (l *LightVolume) LightValuesSave() []Color {
+	return append(make([]Color, 0, len(l.lightValues)), l.lightValues...)
+}
+
+func (l *LightVolume) LightValuesLoad(colors []Color, forEach func(current, loading Color) Color) {
+	for i := 0; i < len(colors); i++ {
+		l.lightValues[i] = forEach(l.lightValues[i], colors[i])
+	}
+}
+
+func (l *LightVolume) getLightValue(indexX, indexY, indexZ int) Color {
+	if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= l.cellCountX || indexY >= l.cellCountY || indexZ >= l.cellCountZ {
+		return NewColor(0, 0, 0, 0)
+	}
+	return l.lightValues[indexX+(indexY*l.cellCountX)+(indexZ*l.cellCountX*l.cellCountY)]
+}
+
+func (l *LightVolume) setLightValue(indexX, indexY, indexZ int, color Color) {
+	if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= l.cellCountX || indexY >= l.cellCountY || indexZ >= l.cellCountZ {
+		return
+	}
+	l.lightValues[indexX+(indexY*l.cellCountX)+(indexZ*l.cellCountX*l.cellCountY)] = color
+}
+
+func (l *LightVolume) DebugDraw(screen *ebiten.Image, camera *Camera) {
+
+	l.LightCellReadWriteAll(func(position Vector3, in Color) Color {
+
+		// pos := camera.ClipToScreen(position)
+		pos := camera.WorldToScreenPixels(position)
+		if pos.Z < 0 {
+			return in
+		}
+		dist := 1 - (camera.WorldPosition().DistanceTo(position) / camera.far)
+		if dist < 0 {
+			return in
+		}
+
+		v := uint16(65535 * dist)
+		color := color.NRGBA64{0, v, 0, v}
+
+		// color = in.ToNRGBA64()
+
+		vector.StrokeLine(screen, pos.X-8, pos.Y, pos.X+8, pos.Y, 2, color, false)
+		vector.StrokeLine(screen, pos.X, pos.Y-8, pos.X, pos.Y+8, 2, color, false)
+		return in
+
+	})
+
+}
+
+// Returns the size of light volume cells on the X axis.
+func (l *LightVolume) CellSizeX() float32 {
+	return l.cellSizeX
+}
+
+// Returns the size of light volume cells on the Y axis.
+func (l *LightVolume) CellSizeY() float32 {
+	return l.cellSizeY
+}
+
+// Returns the size of light volume cells on the Z axis.
+func (l *LightVolume) CellSizeZ() float32 {
+	return l.cellSizeZ
+}
+
+// Returns the size of light volume cells on the axis determined by the dimension argument (0 = X, 1 = Y, otherwise = Z).
+func (l *LightVolume) CellSize(dimension int) float32 {
+	if dimension == 0 {
+		return l.cellSizeX
+	} else if dimension == 1 {
+		return l.cellSizeY
+	}
+	return l.cellSizeZ
+}
+
+// Returns the number of light volume cells on the X axis.
+func (l *LightVolume) CellCountX() int {
+	return l.cellCountX
+}
+
+// Returns the number of light volume cells on the Y axis.
+func (l *LightVolume) CellCountY() int {
+	return l.cellCountY
+}
+
+// Returns the number of light volume cells on the Z axis.
+func (l *LightVolume) CellCountZ() int {
+	return l.cellCountZ
+}
+
+// Returns the number of volume cells on the axis determined by the dimension argument (0 = X, 1 = Y, otherwise = Z).
+func (l *LightVolume) CellCount(dimension int) int {
+	if dimension == 0 {
+		return l.cellCountX
+	} else if dimension == 1 {
+		return l.cellCountY
+	}
+	return l.cellCountZ
+}
+
+// On returns if the lightmap is on or not.
+func (l *LightVolume) On() bool {
+	return l.on
+}
+
+// SetOn sets the lightmap to be on or off.
+func (l *LightVolume) SetOn(on bool) {
+	l.on = on
+}
+
+// Returns the global color associated with the LightVolume (which multiplies to color the cells of the LightVolume).
+func (l *LightVolume) Color() Color {
+	return l.color
+}
+
+// Sets the global color associated with the LightVolume (which multiplies to color the cells of the LightVolume).
+func (l *LightVolume) SetColor(color Color) {
+	l.color = color
+}
+
+// Returns the energy associated with the LightVolume (which multiplies to color the cells of the LightVolume).
+func (l *LightVolume) Energy() float32 {
+	return l.energy
+}
+
+// Sets the energy associated with the LightVolume (which multiplies to color the cells of the LightVolume).
+func (l *LightVolume) SetEnergy(energy float32) {
+	l.energy = energy
+}
+
+// Type returns the type of INode this is (NodeTypeLightVolume).
+func (l *LightVolume) Type() NodeType {
+	return NodeTypeLightVolume
+}
+
+/////
 
 // type polygonLightCell struct {
 // 	Color    *Color

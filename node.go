@@ -38,6 +38,7 @@ const (
 	NodeTypePointLight       NodeType = "NodeLightPoint"       // NodeTypePointLight represents specifically a point light
 	NodeTypeDirectionalLight NodeType = "NodeLightDirectional" // NodeTypeDirectionalLight represents specifically a directional (sun) light
 	NodeTypeCubeLight        NodeType = "NodeLightCube"        // NodeTypeCubeLight represents, specifically, a cube light
+	NodeTypeLightVolume      NodeType = "NodeLightLightVolume" // NodeTypeLightVolume represents, specifically, a light volume
 
 )
 

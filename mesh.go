@@ -56,6 +56,15 @@ func (dim Dimensions) Depth() float32 {
 	return dim.Max.Z - dim.Min.Z
 }
 
+func (dim Dimensions) Dimension(axis int) float32 {
+	if axis == 0 {
+		return dim.Width()
+	} else if axis == 1 {
+		return dim.Height()
+	}
+	return dim.Depth()
+}
+
 func (dim Dimensions) Size() Vector3 {
 	return Vector3{dim.Width(), dim.Height(), dim.Depth()}
 }
@@ -605,6 +614,10 @@ func (vs *VertexSelectionSet) Clone() *VertexSelectionSet {
 	return newVSS
 }
 
+func (vs *VertexSelectionSet) Contains(index int) bool {
+	return vs.Indices.Contains(index)
+}
+
 // VertexSelection represents a selection of vertices on one or more Meshes.
 type VertexSelection struct {
 	SelectionSet map[*Mesh]*VertexSelectionSet
@@ -734,6 +747,13 @@ func (vs VertexSelection) Clear() VertexSelection {
 
 func (vs VertexSelection) IsEmpty() bool {
 	return len(vs.SelectionSet) == 0
+}
+
+func (vs VertexSelection) Contains(mesh *Mesh, index int) bool {
+	if _, exists := vs.SelectionSet[mesh]; !exists {
+		return false
+	}
+	return vs.SelectionSet[mesh].Contains(index)
 }
 
 // SelectByMeshPart selects all vertices in the Mesh belonging to any of the specified MeshParts.

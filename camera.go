@@ -1000,7 +1000,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 	if scene.World != nil {
 
 		camera.DebugInfo.LightCount++
-		if scene.World.LightingOn && scene.World.AmbientLight.IsOn() {
+		if scene.World.LightingOn && scene.World.AmbientLight.On() {
 			scene.World.AmbientLight.beginRender()
 			sceneLights = append(sceneLights, scene.World.AmbientLight)
 		}
@@ -1009,7 +1009,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	for _, light := range lights {
 		camera.DebugInfo.LightCount++
-		if (scene.World == nil || scene.World.LightingOn) && light.IsOn() {
+		if (scene.World == nil || scene.World.LightingOn) && light.On() {
 			light.beginRender()
 			sceneLights = append(sceneLights, light)
 		}
@@ -1196,7 +1196,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 	}
 
 	for _, light := range sceneLights {
-		if scene.World != nil && scene.World.LightingOn && light.IsOn() {
+		if scene.World != nil && scene.World.LightingOn && light.On() {
 			camera.DebugInfo.ActiveLightCount++
 		}
 	}

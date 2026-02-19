@@ -1842,6 +1842,9 @@ def onModeChange():
     if inAutoUVUpdate:
         return
 
+    if bpy.context.mode != "OBJECT":
+        return
+
     obj = bpy.context.object
     if obj and obj.data and obj.type == 'MESH':
         for mat in obj.data.materials:

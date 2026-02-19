@@ -91,9 +91,9 @@ func (g *Game) Init() {
 	// Add the merged result model, and we're done, basically.
 	g.Scene.Root.AddChildren(merged)
 
-	// We can clone the merged result and move it to create 8 individual distinct
+	// We can clone the merged result and move it to create 24 individual distinct
 	// "sections" of cubes.
-	for x := 0; x < 8; x++ {
+	for x := 0; x < 24; x++ {
 		m2 := merged.Clone()
 		m2.Move(4*float32(x+1), 0, 0)
 		g.Scene.Root.AddChildren(m2)

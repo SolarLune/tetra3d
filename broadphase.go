@@ -30,6 +30,7 @@ func NewBroadphase(gridCellCount int, worldPosition Vector3, mesh *Mesh) *Broadp
 		mesh:        mesh,
 		center:      NewNode("broadphase center"),
 		workingAABB: NewBoundingAABB("bounding aabb", 1, 1, 1),
+		allTriSet:   newSet[int](),
 	}
 
 	b.center.AddChildren(b.workingAABB)
@@ -72,7 +73,7 @@ func (b *Broadphase) Resize(gridSize int) {
 	b.GridCellCount = gridSize
 
 	if gridSize <= 0 {
-		return
+		gridSize = 1
 	}
 
 	maxDim := b.mesh.Dimensions.MaxDimension()
@@ -85,7 +86,7 @@ func (b *Broadphase) Resize(gridSize int) {
 	b.workingAABB.updateSize()
 
 	b.TriSets = make([][][][]int, gridSize)
-	b.allTriSet = newSet[int]()
+	b.allTriSet.Clear()
 
 	hg := float32(b.GridCellCount) / 2
 

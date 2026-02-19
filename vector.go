@@ -406,10 +406,6 @@ func (vec Vector3) Equals(other Vector3) bool {
 		return false
 	}
 
-	// if !onlyXYZ && math32.Abs(vec.W-other.W) > eps {
-	// 	return false
-	// }
-
 	return true
 
 }

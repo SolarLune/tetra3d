@@ -813,6 +813,10 @@ var internalCollisionList = []*Collision{}
 
 func commonCollisionTest(node INode, settings CollisionTestSettings) *Collision {
 
+	if settings.TestAgainst == nil {
+		return nil
+	}
+
 	internalCollisionList = internalCollisionList[:0]
 
 	settings.TestAgainst.ForEach(func(checking INode) bool {

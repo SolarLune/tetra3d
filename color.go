@@ -149,6 +149,19 @@ func (color Color) ToFloat32Array() [4]float32 {
 	return [4]float32{float32(color.R), float32(color.G), float32(color.B), float32(color.A)}
 }
 
+// Equals returns true if the two Colors are close enough in all values.
+func (c Color) Equals(other Color) bool {
+
+	eps := float32(1e-4)
+
+	if math32.Abs(c.R-other.R) > eps || math32.Abs(c.G-other.G) > eps || math32.Abs(c.B-other.B) > eps || math32.Abs(c.A-other.A) > eps {
+		return false
+	}
+
+	return true
+
+}
+
 // ToRGBA64 converts a color to a color.RGBA64 instance.
 func (c Color) ToRGBA64() color.RGBA64 {
 	return color.RGBA64{

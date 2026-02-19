@@ -864,7 +864,7 @@ func (model *Model) Dimensions() Dimensions {
 
 type AOBakeOptions struct {
 	TargetMeshParts []*MeshPart // The target meshparts / materials to use for baking AO values to. If not set, then all meshparts will be used.
-	SourceVertices  VertexSelection
+	TargetVertices  VertexSelection
 	// The target vertex color channel to bake the ambient occlusion to.
 	// If the Model doesn't have enough vertex color channels to bake to this channel index, the BakeAO() function will
 	// create vertex color channels to fill in the values up to the target channel index.
@@ -880,9 +880,9 @@ type AOBakeOptions struct {
 }
 
 // NewDefaultAOBakeOptions creates a new AOBakeOptions struct with default settings.
-func NewDefaultAOBakeOptions() *AOBakeOptions {
+func NewDefaultAOBakeOptions() AOBakeOptions {
 
-	return &AOBakeOptions{
+	return AOBakeOptions{
 		TargetChannel:      0,
 		OcclusionAngle:     math32.ToRadians(60),
 		OcclusionColor:     NewColor(0.4, 0.4, 0.4, 1),
@@ -896,11 +896,7 @@ func NewDefaultAOBakeOptions() *AOBakeOptions {
 // If nil is passed instead of bake options, a default AOBakeOptions struct will be created and used.
 // The resulting vertex color will be mixed between whatever was originally there in that channel and the AO color where the color
 // takes effect.
-func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
-
-	if bakeOptions == nil {
-		bakeOptions = NewDefaultAOBakeOptions()
-	}
+func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 
 	if model.Mesh == nil || bakeOptions.TargetChannel < 0 {
 		return
@@ -968,6 +964,11 @@ func (model *Model) BakeAO(bakeOptions *AOBakeOptions) {
 
 		for i := 0; i < 3; i++ {
 			p := math32.Clamp(ao[i], 0, 1)
+
+			if !bakeOptions.TargetVertices.IsEmpty() && !bakeOptions.TargetVertices.Contains(model.Mesh, verts[i]) {
+				continue
+			}
+
 			model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].R += (bakeOptions.OcclusionColor.R - model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].R) * p
 			model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].G += (bakeOptions.OcclusionColor.G - model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].G) * p
 			model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].B += (bakeOptions.OcclusionColor.B - model.Mesh.VertexColors[bakeOptions.TargetChannel][verts[i]].B) * p
@@ -1075,7 +1076,7 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 
 	for _, light := range allLights {
 
-		if light.IsOn() {
+		if light.On() {
 
 			light.beginRender()
 			light.beginModel(model)
@@ -1104,7 +1105,7 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 
 			for _, light := range allLights {
 
-				if light.IsOn() {
+				if light.On() {
 					light.Light(mp, model, model.Mesh.VertexColors[targetChannel], false)
 				}
 
