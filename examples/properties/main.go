@@ -50,26 +50,27 @@ func (g *Game) Init() {
 
 	g.System = examples.NewBasicSystemHandler(g)
 
-	for _, o := range g.Scene.Root.Children() {
+	g.Scene.Root.ForEachChild(false, func(node tetra3d.INode, index, size int) bool {
 
 		// In this example, we use a property named "parented to" to dynamically parent an object to another at run-time.
-		if o.Properties().Has("parented to") {
+		if node.Properties().Has("parented to") {
 
 			// Object reference properties are composed of strings, formatted as: [Scene Name]:[Object Name].
 			// If the scene to search is not set in Blender, that portion will be blank.
-			link := strings.Split(o.Properties().Get("parented to").AsString(), ":")
+			link := strings.Split(node.Properties().Get("parented to").AsString(), ":")
 
 			// Store the object's original transform
-			transform := o.Transform()
+			transform := node.Transform()
 
 			// Reparent it to its new parent
-			g.Scene.Root.Get(link[1]).AddChildren(o)
+			g.Scene.Root.Get(link[1]).AddChildren(node)
 
 			// Re-apply the original transform, so it's in the same location as before
-			o.SetWorldTransform(transform)
+			node.SetWorldTransform(transform)
 		}
 
-	}
+		return true
+	})
 
 }
 
@@ -79,7 +80,8 @@ func (g *Game) Update() error {
 
 	// Here we loop through objects as usual, but notice from the blend file that collection instance
 	// objects are replaced in the scene tree by their children.
-	for _, o := range g.Scene.Root.Children() {
+
+	g.Scene.Root.ForEachChild(false, func(o tetra3d.INode, index, size int) bool {
 
 		props := o.Properties()
 
@@ -113,7 +115,8 @@ func (g *Game) Update() error {
 			// o.SetVisible()
 		}
 
-	}
+		return true
+	})
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyM) {
 		fmt.Println(g.Scene.Root.HierarchyAsString())
@@ -152,7 +155,7 @@ Collection instances can be used as prefabs,
 and properties set on a collection
 instance object get propagated to top-level objects
 in that collection.`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

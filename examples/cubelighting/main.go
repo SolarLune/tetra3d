@@ -46,13 +46,12 @@ func (g *Game) Init() {
 	g.Camera.Move(0, 10, 10)
 	g.System = examples.NewBasicSystemHandler(g)
 
-	for _, cubeLightModel := range g.Scene.Root.SearchTree().ByPropRegex("cubelight").Models() {
-
-		cubeLight := tetra3d.NewCubeLightFromModel("cube light", cubeLightModel)
+	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("cubelight")).ForEachModel(func(model *tetra3d.Model) bool {
+		cubeLight := tetra3d.NewCubeLightFromModel("cube light", model)
 		cubeLight.SetEnergy(3)
 		g.Scene.Root.AddChildren(cubeLight)
-
-	}
+		return true
+	})
 
 	g.Scene.Root.Get("SunLight").Unparent()
 
@@ -120,7 +119,7 @@ Up / Down Arrow Key: Increase / Decrease Bleed
 2 Key: Toggle all lighting
 `
 
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

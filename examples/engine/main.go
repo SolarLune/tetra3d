@@ -57,7 +57,7 @@ func (g *Game) Init() {
 	for _, scene := range library.Scenes {
 
 		// Set up callbacks for each relevant node that creates the necessary game object logic.
-		scene.Root.SearchTree().ByPropRegex("gameobject").ForEach(func(node tetra3d.INode) bool {
+		scene.Root.Search(tetra3d.SearchOptions{}.ByProps("gameobject")).ForEach(func(node tetra3d.INode) bool {
 
 			switch node.Properties().Get("gameobject").AsString() {
 
@@ -101,11 +101,11 @@ func (g *Game) Update() error {
 	}
 
 	// Loop through the scene tree and call Update on objects that can be updated.
-	g.Scene.Root.SearchTree().ForEach(func(node tetra3d.INode) bool {
+	// I could use g.Scene.Root.ForEachChild(), but if objects are removed, that can't work.
+	g.Scene.Root.Search(tetra3d.SearchOptions{}).ForEach(func(node tetra3d.INode) bool {
 		if gameObj, ok := node.Data().(GameObject); ok {
 			gameObj.Update()
 		}
-
 		return true
 	})
 
@@ -139,7 +139,7 @@ using a traditional 'class-based' approach with Tetra3D.
 Arrow keys: Move player(s)
 Touch spikes to destroy player(s)`
 
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

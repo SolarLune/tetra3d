@@ -396,6 +396,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] **Shaders**
 - [x] -- Custom fragment shaders
 - [x] -- Normal rendering (useful for, say, screen-space shaders)
+- [x] -- Vertex Modding CPU function
+    - [ ] -- Ability to transform normals in the function as well
 - [x] **Collision Testing**
 - [x] -- Normal reporting
 - [x] -- Slope reporting

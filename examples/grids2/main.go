@@ -105,13 +105,13 @@ func (p *PathAgent) Update() {
 
 		moveSpd := float32(0.05)
 
-		currentPos := p.PathStepper.CurrentWorldPosition()
+		currentPos := p.PathStepper.Current()
 		diff := currentPos.Sub(p.Model.WorldPosition()).ClampMagnitude(moveSpd)
 		p.Model.MoveVec(diff)
 
 		if currentPos.Equals(p.Model.WorldPosition()) {
 			if !p.PathStepper.AtEnd() {
-				p.PathStepper.Next()
+				p.PathStepper.GotoNext()
 			}
 
 		}
@@ -221,7 +221,7 @@ func (g *Game) Update() error {
 			return false // Don't continue stepping through ray hits beyond the first one
 
 		},
-		TestAgainst: g.Scene.Root.SearchTree().ByParentProps("gridPoint"),
+		TestAgainst: g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("gridPoint").WithReturnChildren(true).ByType(tetra3d.NodeTypeBoundingObject)),
 	})
 
 	g.Camera.Update()

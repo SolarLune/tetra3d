@@ -828,51 +828,53 @@ func (camera *Camera) RenderScene(scene *Scene) {
 	camera.RenderNodes(scene, scene.Root)
 }
 
-var meshes []*Model
-var lights []ILight
+var meshes = NewNodeCollection()
+var lights = NewNodeCollection()
 
 // RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example). Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple RenderScene() calls will be rendered on top of each other in the Camera's texture buffers.
 // Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
 func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
-	camera.DebugInfo.NodeCount = rootNode.SearchTree().Count() + 1
+	camera.DebugInfo.NodeCount = rootNode.ChildCount(true)
 
-	meshes = meshes[:0]
-	lights = lights[:0]
+	meshes.Clear()
+	lights.Clear()
 
 	if model, isModel := rootNode.(*Model); isModel {
-		meshes = append(meshes, model)
+		meshes.Add(model)
 	}
 
 	if camera.SectorRendering {
 
 		// Gather sectors
-		sectors := rootNode.SearchTree().bySectors()
-		sectorModels := sectors.Models()
+		sectorModels := []*Model{}
 
 		var insideSector *Sector
 
-		sectors.ForEach(func(node INode) bool {
+		rootNode.ForEachChild(true, func(child INode, index, size int) bool {
+			if model, ok := child.(*Model); ok && model.sector != nil {
 
-			sectorModel := node.(*Model)
-			sector := node.(*Model).sector
-			sector.rendering = false
+				sectorModels = append(sectorModels, model)
 
-			// Set them all to be invisible by default
-			if sectorModel.DynamicBatchOwner == nil {
+				sector := model.sector
 				sector.rendering = false
-			} else {
-				// Making a sector dynamically batched is just way too much to deal with, I'm sorry
-				panic("Can't make a sector " + sectorModel.Path() + " dynamically batched as well")
-			}
 
-			if sector.AABB.PointInside(camera.WorldPosition()) {
-				if insideSector == nil || sector.AABB.Dimensions.MaxSpan() < insideSector.AABB.Dimensions.MaxSpan() {
-					insideSector = sector
+				// Set them all to be invisible by default
+				if model.DynamicBatchOwner == nil {
+					sector.rendering = false
+				} else {
+					// Making a sector dynamically batched is just way too much to deal with, I'm sorry
+					panic("Can't make a sector " + model.Path() + " dynamically batched as well")
 				}
-			}
 
+				if sector.AABB.PointInside(camera.WorldPosition()) {
+					if insideSector == nil || sector.AABB.Dimensions.MaxSpan() < insideSector.AABB.Dimensions.MaxSpan() {
+						insideSector = sector
+					}
+				}
+
+			}
 			return true
 		})
 
@@ -885,36 +887,39 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 				r.rendering = true
 			}
 
-			rootNode.SearchTree().ByType(NodeTypeModel).ForEach(func(node INode) bool {
-				model := node.(*Model)
+			rootNode.ForEachChild(true, func(node INode, index, size int) bool {
 
-				if model.sector != nil && model.sector.rendering {
-					if model.sector.rendering {
-						meshes = append(meshes, model)
-					}
-				} else if model.DynamicBatchOwner == nil {
+				if model, ok := node.(*Model); ok {
 
-					// If something is dynamically batching, then we don't want to deal with sectors, because the batched objects belong to sectors.
-					if model.DynamicBatcher() {
-						meshes = append(meshes, model)
-					} else if model.SectorType() == SectorTypeStandalone || (model.SectorType() == SectorTypeObject && model.isInVisibleSector(sectorModels)) {
-						meshes = append(meshes, model)
-					} else if s := model.sectorHierarchy(); s != nil && s.rendering {
-						meshes = append(meshes, model)
+					if model.sector != nil && model.sector.rendering {
+						if model.sector.rendering {
+							meshes.Add(model)
+						}
+					} else if model.DynamicBatchOwner == nil {
+
+						// If something is dynamically batching, then we don't want to deal with sectors, because the batched objects belong to sectors.
+						if model.DynamicBatcher() {
+							meshes.Add(model)
+						} else if model.SectorType() == SectorTypeStandalone || (model.SectorType() == SectorTypeObject && model.isInVisibleSector(sectorModels)) {
+							meshes.Add(model)
+						} else if s := model.sectorHierarchy(); s != nil && s.rendering {
+							meshes.Add(model)
+						}
+
 					}
 
 				}
 
-				return true
-			})
+				if light, ok := node.(ILight); ok {
 
-			rootNode.SearchTree().ByType(NodeTypeLight).ForEach(func(node INode) bool {
-				light := node.(ILight)
-				if light.SectorType() == SectorTypeStandalone || (light.SectorType() == SectorTypeObject && light.isInVisibleSector(sectorModels)) {
-					lights = append(lights, light)
-				} else if s := light.sectorHierarchy(); s != nil && s.rendering {
-					lights = append(lights, light)
+					if light.SectorType() == SectorTypeStandalone || (light.SectorType() == SectorTypeObject && light.isInVisibleSector(sectorModels)) {
+						lights.Add(light)
+					} else if s := light.sectorHierarchy(); s != nil && s.rendering {
+						lights.Add(light)
+					}
+
 				}
+
 				return true
 			})
 
@@ -922,13 +927,13 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	} else {
 
-		rootNode.SearchTree().ForEach(func(node INode) bool {
+		rootNode.ForEachChild(true, func(node INode, index, size int) bool {
 
 			// Avoid allocating new model / lights slices
 			if m, ok := node.(*Model); ok && m.DynamicBatchOwner == nil {
-				meshes = append(meshes, m)
+				meshes.Add(m)
 			} else if l, ok := node.(ILight); ok {
-				lights = append(lights, l)
+				lights.Add(l)
 			}
 
 			return true
@@ -936,7 +941,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	}
 
-	camera.Render(scene, lights, meshes...)
+	camera.Render(scene, lights, meshes)
 
 }
 
@@ -989,7 +994,7 @@ var sceneLights []ILight
 // Render renders all of the models passed using the provided Scene's properties (fog, for example) and lights provided. Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 // Also, the function will automatically include the Scene's world ambient light, if there is a world.
-func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
+func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	scene.HandleAutobatch()
 
@@ -1007,13 +1012,16 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	}
 
-	for _, light := range lights {
+	lights.ForEachLight(func(light ILight) bool {
+
 		camera.DebugInfo.LightCount++
 		if (scene.World == nil || scene.World.LightingOn) && light.On() {
 			light.beginRender()
 			sceneLights = append(sceneLights, light)
 		}
-	}
+
+		return true
+	})
 
 	// if scene.World == nil || scene.World.LightingOn {
 
@@ -1055,7 +1063,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 	camSpread := camera.far - camera.near + (depthMarginPercentage * 2)
 
-	for _, model := range models {
+	models.ForEachModel(func(model *Model) bool {
 
 		if !model.DynamicBatcher() {
 
@@ -1068,7 +1076,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 		}
 
 		if !model.visible || model.DynamicBatchOwner != nil {
-			continue
+			return true
 		}
 
 		if !model.DynamicBatcher() {
@@ -1076,7 +1084,7 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 			if model.FrustumCulling {
 
 				if !camera.ModelInFrustum(model) {
-					continue
+					return true
 				}
 				model.refreshVertexVisibility()
 
@@ -1156,7 +1164,9 @@ func (camera *Camera) Render(scene *Scene, lights []ILight, models ...*Model) {
 
 		}
 
-	}
+		return true
+
+	})
 
 	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
 	if !camera.RenderDepth {
@@ -1947,8 +1957,7 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 
 		}
 
-		lights := scene.Root.SearchTree().ILights()
-		camera.Render(scene, lights, dynamicRenderOwner)
+		camera.Render(scene, scene.Root.Search(SearchOptions{NodeTypes: []NodeType{NodeTypeLight}}), NewNodeCollection(dynamicRenderOwner))
 
 	} else {
 		return errors.New("camera is not in a scene; cannot render elements")
@@ -2039,20 +2048,18 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
-
 	camWidth, camHeight := camera.Size()
 
 	halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
 
-	for _, m := range allModels {
+	NewNodeCollection(rootNode).ForEach(func(node INode) bool {
 
-		if model, isModel := m.(*Model); isModel {
+		if model, isModel := node.(*Model); isModel {
 
 			if model.FrustumCulling {
 				model.Transform()
 				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
-					continue
+					return true
 				}
 
 			}
@@ -2098,9 +2105,10 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			}
 
-		} else if path, isPath := m.(*Path); isPath {
+		} else if path, isPath := node.(*Path); isPath {
 
-			points := path.Children()
+			points := path.Children(false).ToNodes()
+
 			if path.Closed {
 				points = append(points, points[0])
 			}
@@ -2110,7 +2118,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 				vector.StrokeLine(screen, p1.X, p1.Y, p2.X, p2.Y, 1, color.ToNRGBA64(), false)
 			}
 
-		} else if grid, isGrid := m.(*Grid); isGrid {
+		} else if grid, isGrid := node.(*Grid); isGrid {
 
 			for _, point := range grid.Points() {
 
@@ -2125,7 +2133,8 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 		}
 
-	}
+		return true
+	})
 
 }
 
@@ -2135,43 +2144,39 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
+	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
 
-	for _, m := range allModels {
+		if model.FrustumCulling {
 
-		if model, isModel := m.(*Model); isModel {
-
-			if model.FrustumCulling {
-
-				model.Transform()
-				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
-					continue
-				}
-
-			}
-
-			for _, meshPart := range model.Mesh.MeshParts {
-
-				globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
-				if meshPart.Material != nil {
-					globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
-				}
-
-				model.ProcessVertices(vpMatrix, camera, meshPart, false)
-
-				globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
-
-					screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.Mesh.Triangles[triID].Center))
-
-					camera.DrawDebugText(screen, fmt.Sprintf("%d", triIndex), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
-
-				})
-
+			model.Transform()
+			if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+				return true
 			}
 
 		}
 
-	}
+		for _, meshPart := range model.Mesh.MeshParts {
+
+			globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
+			if meshPart.Material != nil {
+				globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
+			}
+
+			model.ProcessVertices(vpMatrix, camera, meshPart, false)
+
+			globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
+
+				screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.Mesh.Triangles[triID].Center))
+
+				camera.DrawDebugText(screen, fmt.Sprintf("%d", triIndex), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+
+			})
+
+		}
+
+		return true
+
+	})
 
 }
 
@@ -2181,43 +2186,38 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
+	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
 
-	for _, m := range allModels {
+		if model.FrustumCulling {
 
-		if model, isModel := m.(*Model); isModel {
-
-			if model.FrustumCulling {
-
-				model.Transform()
-				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
-					continue
-				}
-
-			}
-
-			for _, meshPart := range model.Mesh.MeshParts {
-
-				globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
-				if meshPart.Material != nil {
-					globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
-				}
-
-				model.ProcessVertices(vpMatrix, camera, meshPart, false)
-
-				globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
-
-					screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.Mesh.Triangles[triID].Center))
-
-					camera.DrawDebugText(screen, fmt.Sprintf("%d", model.Mesh.Triangles[triID].ID()), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
-
-				})
-
+			model.Transform()
+			if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+				return true
 			}
 
 		}
 
-	}
+		for _, meshPart := range model.Mesh.MeshParts {
+
+			globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
+			if meshPart.Material != nil {
+				globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
+			}
+
+			model.ProcessVertices(vpMatrix, camera, meshPart, false)
+
+			globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
+
+				screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.Mesh.Triangles[triID].Center))
+
+				camera.DrawDebugText(screen, fmt.Sprintf("%d", model.Mesh.Triangles[triID].ID()), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+
+			})
+
+		}
+
+		return true
+	})
 
 }
 
@@ -2225,75 +2225,63 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 // image provided.
 func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float32, color Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
+	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
 
-	for _, m := range allModels {
+		if model.FrustumCulling {
 
-		if model, isModel := m.(*Model); isModel {
-
-			if model.FrustumCulling {
-
-				model.Transform()
-				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
-					continue
-				}
-
+			model.Transform()
+			if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+				return true
 			}
-
-			screenPos := camera.WorldToScreenPixels(model.WorldPosition())
-
-			camera.DrawDebugText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 		}
 
-	}
+		screenPos := camera.WorldToScreenPixels(model.WorldPosition())
 
+		camera.DrawDebugText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+
+		return true
+	})
 }
 
 // DrawDebugNormals draws the normals of visible models underneath the rootNode given to the screen. NormalLength is the length of the normal lines
 // in units. Color is the color to draw the normals.
 func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float32, color Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
+	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
 
-	for _, m := range allModels {
+		if model.FrustumCulling {
 
-		if model, isModel := m.(*Model); isModel {
-
-			if model.FrustumCulling {
-
-				model.Transform()
-				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
-					continue
-				}
-
-			}
-
-			for _, tri := range model.Mesh.Triangles {
-
-				center := camera.WorldToScreenPixels(model.Transform().MultVecW(tri.Center).To3D())
-				transformedNormal := camera.WorldToScreenPixels(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(normalLength))).To3D())
-				vector.StrokeLine(screen, center.X, center.Y, transformedNormal.X, transformedNormal.Y, 1, color.ToNRGBA64(), false)
-
+			model.Transform()
+			if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+				return true
 			}
 
 		}
 
-	}
+		for _, tri := range model.Mesh.Triangles {
+
+			center := camera.WorldToScreenPixels(model.Transform().MultVecW(tri.Center).To3D())
+			transformedNormal := camera.WorldToScreenPixels(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(normalLength))).To3D())
+			vector.StrokeLine(screen, center.X, center.Y, transformedNormal.X, transformedNormal.Y, 1, color.ToNRGBA64(), false)
+
+		}
+
+		return true
+
+	})
 
 }
 
 // DrawDebugCenters draws the center positions of nodes under the rootNode using the color given to the screen image provided.
 func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
+	rootNode.Search(SearchOptions{}).ForEach(func(node INode) bool {
 
-	c := color.ToNRGBA64()
-
-	for _, node := range allModels {
+		c := color.ToNRGBA64()
 
 		if node == camera {
-			continue
+			return true
 		}
 
 		px := camera.WorldToScreenPixels(node.WorldPosition())
@@ -2306,7 +2294,9 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 			vector.StrokeLine(screen, pos.X, pos.Y, parentPos.X, parentPos.Y, 1, c, false)
 		}
 
-	}
+		return true
+
+	})
 
 }
 
@@ -2421,7 +2411,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 		return camera.clipToScreen(v.MultVecW(Vector3{}), 0, nil, float32(width), float32(height), float32(width)/2, float32(height)/2, true).To3D()
 	}
 
-	rootNode.SearchTree().ForEach(func(n INode) bool {
+	rootNode.Search(SearchOptions{}).ForEach(func(n INode) bool {
 
 		p, s, r := n.Transform().Inverted().Decompose()
 		invertedCamPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector3{1 / s.X, 1 / s.Y, 1 / s.Z}))
@@ -2637,18 +2627,13 @@ func DefaultDrawDebugBoundsSettings() DrawDebugBoundsColoredSettings {
 // The shapes will be drawn in the color provided to the screen image provided.
 func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, color Color) {
 
-	allModels := append([]INode{rootNode}, rootNode.SearchTree().INodes()...)
+	rootNode.Search(SearchOptions{}).ForEachModel(func(model *Model) bool {
 
-	for _, n := range allModels {
+		bounds := model.frustumCullingSphere
+		camera.drawSphere(screen, bounds, color)
+		return true
 
-		if model, ok := n.(*Model); ok {
-
-			bounds := model.frustumCullingSphere
-			camera.drawSphere(screen, bounds, color)
-
-		}
-
-	}
+	})
 
 }
 

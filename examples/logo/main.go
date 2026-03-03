@@ -67,9 +67,10 @@ func (g *Game) Update() error {
 	g.Camera.Update()
 
 	// Spin the tetrahedrons in the logos around their local orientation:
-	for _, g := range g.Scene.Root.SearchTree().ByPropRegex("spin").INodes() {
-		g.Rotate(0, 1, 0, 0.05)
-	}
+	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("spin")).ForEach(func(node tetra3d.INode) bool {
+		node.Rotate(0, 1, 0, 0.05)
+		return true
+	})
 
 	// Let the system handler handle quitting, fullscreening, restarting, etc.
 	return g.SystemHandler.Update()
@@ -92,7 +93,9 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.Offscreen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	// Render the screen objects individually after drawing the others; this way, we can ensure the TVs don't show up onscreen:
-	g.Camera.Render(g.Scene, g.Scene.Root.SearchTree().ILights(), g.Scene.FindNode("Screen").(*tetra3d.Model))
+	g.Camera.Render(g.Scene,
+		g.Scene.Root.Search(tetra3d.SearchOptions{NodeTypes: []tetra3d.NodeType{tetra3d.NodeTypeLight}}),
+		g.Scene.Root.Search(tetra3d.SearchOptions{}.ByNames("Screen")))
 
 	// And then just draw the color texture output:
 	screen.DrawImage(g.Camera.ColorTexture(), nil)

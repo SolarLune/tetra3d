@@ -24,6 +24,7 @@ bl_info = {
 objectTypes = [
     ("MESH", "Mesh", "A standard, visible mesh object.", 0, 0),
     ("GRID", "Grid", "A grid object; not visualized or 'physically present'. The vertices in Blender become grid points in Tetra3D; the edges become their connections.", 0, 1),
+    ("LIGHTVOLUME", "LightVolume", "An AABB light volume object; not 'physically present'.", 0, 2),
 ]
 
 sectorTypes = [
@@ -822,21 +823,30 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
 
         isCollection = context.object.instance_type == "COLLECTION" and context.object.instance_collection is not None
 
-        box = self.layout.box()
-        row = box.row()
-        row.label(text="Sector Type:")
-        
-        if isCollection:
-            row = box.row()
-            row.enabled = context.object.t3dObjectType__ == 'MESH'
-            row.prop(context.object, "t3dSectorTypeOverride__", expand=True)
+        if context.object.t3dObjectType__ == "LIGHTVOLUME":
 
-        row = box.row()
-        if isCollection:
-            row.enabled = context.object.t3dSectorTypeOverride__
-        else:
-            row.enabled = context.object.t3dObjectType__ == 'MESH'
-        row.prop(context.object, "t3dSectorType__", expand=True)
+            box = self.layout.box()
+            row = box.row()
+            row.label(text="Light Volume Cell Size:")
+
+            row = box.row()
+            row.prop(context.object, "t3dLightVolumeCellSize__", text="")
+        elif context.object.t3dObjectType__ == "MESH":
+            box = self.layout.box()
+            row = box.row()
+            row.label(text="Sector Type:")
+            
+            if isCollection:
+                row = box.row()
+                row.enabled = context.object.t3dObjectType__ == 'MESH'
+                row.prop(context.object, "t3dSectorTypeOverride__", expand=True)
+
+            row = box.row()
+            if isCollection:
+                row.enabled = context.object.t3dSectorTypeOverride__
+            else:
+                row.enabled = context.object.t3dObjectType__ == 'MESH'
+            row.prop(context.object, "t3dSectorType__", expand=True)
 
         row = self.layout.row()
         row.prop(context.object, "t3dBoundsType__")
@@ -1100,7 +1110,14 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.prop(context.material, "t3dMaterialFogless__")
         row = self.layout.row()
         row.prop(context.material, "use_backface_culling")
+        row = self.layout.row()
         row.prop(context.material, "t3dVisible__")
+        box = self.layout.box()
+        row = box.row()
+        row.label(text="Solidity")
+        row = box.row()
+        row.prop(context.material, "t3dSolidToCollisions__")
+        row.prop(context.material, "t3dSolidToRays__")
         row = self.layout.row()
         row.label(text="Transparency Mode:")
         row.prop(context.material, "t3dTransparencyMode__", text="")
@@ -1821,7 +1838,7 @@ class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
                             if p.index in selectedPolygons:
                                 p.select = True
 
-                        obj.active_material_index = prevActiveMaterialIndex
+                        # obj.active_material_index = prevActiveMaterialIndex
 
                         bpy.ops.object.mode_set(mode=ogMode)
 
@@ -2055,6 +2072,7 @@ objectProps = {
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
     "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
     "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
+    "t3dLightVolumeCellSize__" : bpy.props.FloatVectorProperty(name="Cell Size", description="Width (X), height (Y), and depth (Z) of the cells for the light volume object", min=0.0, default=[2,2,2], step=0.5),
     "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),    
     "t3dSectorType__" : bpy.props.EnumProperty(items=listSectorTypes,name="Sector Type", description="The type of sector capability this object has; only used if rendered with a camera with Sector Rendering on"),
     "t3dSectorTypeOverride__" : bpy.props.BoolProperty(name="Override Sector Type", description="If the collection object should override the sector type for ALL its objects"),
@@ -2201,6 +2219,8 @@ def register():
     bpy.types.Material.t3dDepthMode__ = bpy.props.EnumProperty(items=depthModes, name="Depth Rendering Modes", description="How depth should be rendered for meshes that use this materials", default="DEFAULT")
     bpy.types.Material.t3dMaterialLightingMode__ = bpy.props.EnumProperty(items=materialLightingModes, name="Lighting mode", description="How materials should be lit", default="DEFAULT")
     bpy.types.Material.t3dVisible__ = bpy.props.BoolProperty(name="Visible", description="Whether this material is visible", default=True)
+    bpy.types.Material.t3dSolidToCollisions__ = bpy.props.BoolProperty(name="Report Collisions", description="Whether this material contributes to collision checks for BoundingTriangles meshes", default=True)
+    bpy.types.Material.t3dSolidToRays__ = bpy.props.BoolProperty(name="Report Raycasts", description="Whether this material contributes to ray checks for BoundingTriangles meshes", default=True)
 
     bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode")
     bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5)
@@ -2441,6 +2461,8 @@ def unregister():
     del bpy.types.Material.t3dAutoUVUnitSize__
     del bpy.types.Material.t3dAutoUVRotation__
     del bpy.types.Material.t3dVisible__
+    del bpy.types.Material.t3dSolidToCollisions__
+    del bpy.types.Material.t3dSolidToRays__
 
     del bpy.types.World.t3dClearColor__
     del bpy.types.World.t3dFogColor__

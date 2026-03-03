@@ -60,7 +60,7 @@ func (g *Game) Update() error {
 
 	cube := g.Scene.Root.Get("Cube")
 	cubePos := cube.WorldPosition()
-	pathNodePos := g.PathStepper.CurrentWorldPosition()
+	pathNodePos := g.PathStepper.Current()
 
 	// Advance the stepper if you reach the target node...
 	if cubePos.Equals(pathNodePos) {
@@ -103,7 +103,7 @@ The cube will follow the path (which is invisible,
 as it is made up of Nodes).
 Left, Right keys: Step 1 unit forward or
 back through the path`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)

@@ -48,16 +48,16 @@ func (cube *CubeElement) Update() {
 
 	moveSpd := float32(0.05)
 
-	currentPos := cube.PathStepper.CurrentWorldPosition()
+	currentPos := cube.PathStepper.Current()
 	diff := currentPos.Sub(cube.Model.WorldPosition()).ClampMagnitude(moveSpd)
 	cube.Model.MoveVec(diff)
 
-	if currentPos.Equals(cube.Model.WorldPosition()) {
+	if currentPos.DistanceTo(cube.Model.WorldPosition()) <= moveSpd {
 
 		if cube.PathStepper.AtEnd() {
 			cube.ChooseNewTarget()
 		} else {
-			cube.PathStepper.Next()
+			cube.PathStepper.GotoNext()
 		}
 
 	}

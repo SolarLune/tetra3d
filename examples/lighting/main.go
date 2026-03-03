@@ -49,7 +49,7 @@ func (g *Game) Init() {
 	light := tetra3d.NewPointLight("camera light", 1, 1, 1, 2)
 	light.Range = 10
 	light.Move(0, 1, -2)
-	light.On = false
+	light.SetOn(false)
 	g.Camera.AddChildren(light)
 
 }
@@ -75,7 +75,7 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
 		pointLight := g.Camera.Get("camera light").(*tetra3d.PointLight)
-		pointLight.On = !pointLight.On
+		pointLight.SetOn(!pointLight.On())
 	}
 
 	g.Camera.Update()
@@ -101,7 +101,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := "This example simply shows dynamic\nvertex-based lighting.\nThere are six lights in this scene:\nan ambient light, three point lights, \na single directional (sun) light,\nand one more point light parented to the camera.\n1 Key: Toggle all lighting\n2 Key: Toggle camera light"
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)

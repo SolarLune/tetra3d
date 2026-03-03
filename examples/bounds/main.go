@@ -62,8 +62,8 @@ func (g *Game) Update() error {
 	accel := float32(0.05) + friction
 	gravity := float32(0.05)
 
-	bounds := g.Controlling.Children()[0].(tetra3d.IBoundingObject)
-	solids := g.Scene.Root.SearchTree().Not(bounds) // Either not the bounds or just the solid objects; either would work here
+	bounds := g.Controlling.Children(false).First().(tetra3d.IBoundingObject)
+	solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.Not(tetra3d.NewNodeCollection(bounds))) // Either not the bounds or just the solid objects; either would work here
 
 	movement := g.Movement.Modify() // Modification Vector
 
@@ -158,7 +158,7 @@ have BoundingAABB nodes, while the capsule and sphere are,
 naturally, capsule and sphere BoundingObjects.
 Arrow keys: Move %s
 F: switch between capsule and sphere`, g.Controlling.Name())
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

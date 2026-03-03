@@ -419,8 +419,6 @@ func (ap *AnimationPlayer) assignChannels() {
 			clear(ap.currentProperties)
 			clear(ap.ChannelsToNodes)
 
-			childrenRecursive := ap.RootNode.SearchTree().INodes()
-
 			for _, channel := range ap.Animation.Channels {
 
 				if ap.RootNode.Name() == channel.Name {
@@ -433,18 +431,20 @@ func (ap *AnimationPlayer) assignChannels() {
 
 				found := false
 
-				for _, n := range childrenRecursive {
+				ap.RootNode.ForEachChild(true, func(child INode, index, size int) bool {
 
-					if n.Name() == channel.Name {
-						ap.ChannelsToNodes[channel] = n
-						ap.AnimatedProperties[n] = AnimationValues{
+					if child.Name() == channel.Name {
+						ap.ChannelsToNodes[channel] = child
+						ap.AnimatedProperties[child] = AnimationValues{
 							channel: channel,
 						}
 						found = true
-						break
+						return false
 					}
 
-				}
+					return true
+
+				})
 
 				// If no channel matches, we'll just go with the root
 

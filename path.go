@@ -46,14 +46,28 @@ func (ps *PathStepper) SetIndexToEnd() {
 	ps.Index = len(ps.points) - 1
 }
 
-// CurrentWorldPosition returns the current node's world position for the PathStepper.
-func (ps *PathStepper) CurrentWorldPosition() Vector3 {
+// Current returns the current node's world position for the PathStepper.
+func (ps *PathStepper) Current() Vector3 {
 	return ps.points[ps.Index]
+}
+
+func (ps *PathStepper) Next() Vector3 {
+	if ps.Index >= len(ps.points)-1 {
+		return ps.points[0]
+	}
+	return ps.points[ps.Index+1]
+}
+
+func (ps *PathStepper) Prev() Vector3 {
+	if ps.Index < 0 {
+		return ps.points[len(ps.points)-1]
+	}
+	return ps.points[ps.Index-1]
 }
 
 // Next steps to the next point in the Path for the PathStepper.
 // If the PathStepper is at the end of the path, then it will loop through the path again.
-func (ps *PathStepper) Next() {
+func (ps *PathStepper) GotoNext() {
 
 	ps.Index++
 
@@ -65,7 +79,7 @@ func (ps *PathStepper) Next() {
 
 // Next steps to the previous point in the Path for the PathStepper.
 // If the PathStepper is at the beginning of the path, then it will loop through the path again.
-func (ps *PathStepper) Prev() {
+func (ps *PathStepper) GotoPrev() {
 
 	ps.Index--
 
@@ -127,6 +141,19 @@ func (ps *PathStepper) ProgressToWorldPosition(perc float32) Vector3 {
 
 }
 
+// func (ps *PathStepper) VectorToNext() Vector3 {
+
+// 	currentPos := ps.CurrentWorldPosition()
+// 	next := ps.points[ps.Index]
+// 	if ps.Index < len(ps.points)-1 {
+// 		next = ps.points[ps.Index+1]
+// 		diff := next.Sub(currentPos)
+// 		return diff.Unit()
+// 	}
+// 	return NewVector3(0, 0, 0)
+
+// }
+
 // IPath represents an object that implements a path, returning points of a given length across
 // a distance.
 type IPath interface {
@@ -179,21 +206,22 @@ func (path *Path) Clone() INode {
 // Length returns the total distance that a Path covers by stepping through all of the children under the Path.
 func (path *Path) Length() float32 {
 	dist := float32(0.0)
-	points := path.Children()
 
-	if len(points) <= 1 {
+	points := path.Children(false)
+
+	if points.Count() <= 1 {
 		return 0
 	}
 
-	start := points[0].WorldPosition()
-	for i := 1; i < len(points); i++ {
-		next := points[i].WorldPosition()
+	start := points.Get(0).WorldPosition()
+	for i := 1; i < points.Count(); i++ {
+		next := points.Get(i).WorldPosition()
 		dist += next.Sub(start).Magnitude()
 		start = next
 	}
 
 	if path.Closed {
-		dist += points[len(points)-1].WorldPosition().Sub(points[0].WorldPosition()).Magnitude()
+		dist += points.Last().WorldPosition().Sub(points.First().WorldPosition()).Magnitude()
 	}
 
 	return dist
@@ -201,7 +229,7 @@ func (path *Path) Length() float32 {
 
 // Points returns the Vector world positions of each point in the Path.
 func (path *Path) Points() []Vector3 {
-	points := make([]Vector3, 0, len(path.Children()))
+	points := make([]Vector3, 0, path.Children(false).Count())
 	for _, c := range path.children {
 		points = append(points, c.WorldPosition())
 	}
@@ -210,7 +238,7 @@ func (path *Path) Points() []Vector3 {
 
 // HopCount returns the number of hops in the path (i.e. number of nodes - 1).
 func (path *Path) HopCount() int {
-	return len(path.Children()) - 1
+	return path.Children(false).Count() - 1
 }
 
 func (path *Path) isClosed() bool {

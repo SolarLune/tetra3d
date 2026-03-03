@@ -47,6 +47,12 @@ const (
 	DepthModeUnbillboarded        // Unbillboarded depth mode; depth is written as though the mesh were not transformed
 )
 
+const (
+	LightVolumeShadingModePerVertexWithNormal    = iota // Shade vertices per vertex position; include normals so vertices outside of a light volume cell reflect it if facing that cell.
+	LightVolumeShadingModePerVertexWithoutNormal        // Shade vertices per vertex position; don't include the vertices' normals
+	LightVolumeShadingModePerObject                     // Shade vertices per the vertices' overall object's position
+)
+
 type Material struct {
 	id                uint32
 	library           *Library       // library is a reference to the Library that this Material came from.
@@ -69,13 +75,17 @@ type Material struct {
 	Fogless          bool         // If the material should be fogless or not
 	Blend            ebiten.Blend // Blend mode to use when rendering the material (i.e. additive, multiplicative, etc)
 
+	LightVolumeShadingMode int // Whether to shade materials per vertex or by object position when in LightVolumes
+
 	BillboardEnabled     bool // Billboard mode
 	BillboardLockX       bool
 	BillboardLockY       bool
 	BillboardLockZ       bool
 	BillboardUpDirection int
 
-	Visible bool // Whether the material is visible or not
+	Visible          bool // Whether the material is visible or not
+	ReportCollisions bool // Whether the material is collideable or not when performing collision checks against a BoundingTriangle with this Material
+	ReportRays       bool // Whether the material is collideable or not when performing ray checks against a BoundingTriangle with this Material
 
 	// fragmentShader represents a shader used to render the material with. This shader is activated after rendering
 	// to the depth texture, but before compositing the finished render to the screen after fog.
@@ -130,6 +140,8 @@ func NewMaterial(name string) *Material {
 		FragmentShaderOn:      true,
 		Blend:                 ebiten.BlendSourceOver,
 		Visible:               true,
+		ReportCollisions:      true,
+		ReportRays:            true,
 		TextureMapScreenSize:  1,
 	}
 
@@ -143,6 +155,7 @@ func (m *Material) Clone() *Material {
 	newMat := NewMaterial(m.name)
 	newMat.library = m.library
 	newMat.Color = m.Color
+	newMat.LightVolumeShadingMode = m.LightVolumeShadingMode
 
 	newMat.Texture = m.Texture
 	newMat.UseTexture = m.UseTexture
@@ -165,6 +178,8 @@ func (m *Material) Clone() *Material {
 	newMat.BillboardLockZ = m.BillboardLockZ
 	newMat.BillboardUpDirection = m.BillboardUpDirection
 	newMat.Visible = m.Visible
+	newMat.ReportCollisions = m.ReportCollisions
+	newMat.ReportRays = m.ReportRays
 
 	newMat.SetShaderText(m.fragmentSrc)
 	newMat.FragmentShaderOn = m.FragmentShaderOn

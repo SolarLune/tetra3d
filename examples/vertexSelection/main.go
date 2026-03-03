@@ -131,7 +131,7 @@ becomes channel 1 in Tetra3D as it's in the second slot).
 The vertices that have a non-black color
 in the "Flash" channel are then assigned
 a flashing color here in Tetra3D.`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

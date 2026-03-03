@@ -407,6 +407,14 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					newMat.Visible = s.(float64) > 0
 				}
 
+				if s, exists := dataMap["t3dSolidToCollisions__"]; exists {
+					newMat.ReportCollisions = s.(float64) > 0
+				}
+
+				if s, exists := dataMap["t3dSolidToRays__"]; exists {
+					newMat.ReportRays = s.(float64) > 0
+				}
+
 				// At this point, parenting should be set up.
 
 				if gameProps, exists := dataMap["t3dGameProperties__"]; exists {
@@ -888,9 +896,23 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			obj = NewModel(node.Name, mesh)
 
-			if node.Extras != nil && nodeHasProp(node, "t3dAutoBatch__") {
-				s := node.Extras.(map[string]any)["t3dAutoBatch__"].(float64)
-				obj.(*Model).AutoBatchMode = int(s)
+			if node.Extras != nil {
+
+				if nodeHasProp(node, "t3dAutoBatch__") {
+					s := node.Extras.(map[string]any)["t3dAutoBatch__"].(float64)
+					obj.(*Model).AutoBatchMode = int(s)
+				}
+
+				if nodeHasProp(node, "t3dObjectType__") && nodeGetProp(node, "t3dObjectType__").(float64) == 2 {
+					gridSize := [3]float32{2, 2, 2}
+					if value := nodeGetProp(node, "t3dLightVolumeCellSize"); value != nil {
+						gridSize[0] = float32(value.([]float64)[0])
+						gridSize[1] = float32(value.([]float64)[1])
+						gridSize[2] = float32(value.([]float64)[2])
+					}
+					obj = NewLightVolumeFromModel(obj.(*Model), gridSize[0], gridSize[1], gridSize[2])
+				}
+
 			}
 
 		} else if node.Camera != nil {
@@ -1411,8 +1433,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					}
 
 					if c, exists := dataMap["t3dSectorTypeOverride__"]; exists && c.(float64) > 0 {
-						n.SearchTree().ForEach(func(node INode) bool {
-							node.SetSectorType(obj.SectorType())
+						n.ForEachChild(true, func(child INode, index, size int) bool {
+							child.SetSectorType(obj.SectorType())
 							return true
 						})
 					}
@@ -1569,11 +1591,14 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		*/
 
-		for _, n := range scene.Root.SearchTree().INodes() {
+		models := scene.Root.Search(SearchOptions{NodeTypes: []NodeType{NodeTypeModel}})
 
-			n.setOriginalTransform()
+		// This has to make a copy of the children because the nodes are reparented
+		scene.Root.Children(true).ForEach(func(node INode) bool {
 
-			if node, ok := n.(*Node); ok && len(node.collectionObjects) > 0 {
+			node.setOriginalTransform()
+
+			if node, ok := node.(*Node); ok && len(node.collectionObjects) > 0 {
 
 				for _, child := range node.collectionObjects {
 					transform := child.Transform()
@@ -1594,12 +1619,12 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			}
 
-			models := scene.Root.SearchTree().Models()
-			if model, ok := n.(*Model); ok && model.sector != nil {
-				model.sector.UpdateNeighbors(models...)
+			if model, ok := node.(*Model); ok && model.sector != nil {
+				model.sector.UpdateNeighbors(models)
 			}
 
-		}
+			return true
+		})
 
 		for _, cam := range exportedCameras {
 			scene.View3DCameras = append(scene.View3DCameras, cam.Clone().(*Camera))

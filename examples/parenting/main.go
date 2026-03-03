@@ -78,7 +78,7 @@ func (g *Game) Update() error {
 	parent := g.Scene.Root.Get("parent")
 	parent.SetLocalRotation(parent.LocalRotation().Rotated(0, 1, 0, 0.05))
 
-	child := g.Scene.Root.SearchTree().ByName("child").First()
+	child := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByNames("child")).First()
 	position := parent.LocalPosition()
 
 	moveSpd := float32(0.1)
@@ -144,7 +144,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := "Arrow Keys:Move parent\nO: Toggle parenting\nG:Reset child position\nI:Toggle visibility on parent recursively"
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)

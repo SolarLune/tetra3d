@@ -406,11 +406,11 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 		panic(`Error: Cannot reassign skinned Model [` + model.Path() + `] to armature bone [` + armatureRoot.Path() + `]. ReassignBones() should be called with the desired armature's root node.`)
 	}
 
-	bones := armatureRoot.SearchTree().INodes()
+	bones := armatureRoot.Search(SearchOptions{})
 
 	boneMap := map[string]*Node{}
 
-	for _, b := range bones {
+	for _, b := range bones.OrderedSet {
 		if b.IsBone() {
 			boneMap[b.Name()] = b.(*Node)
 		}
@@ -875,7 +875,7 @@ type AOBakeOptions struct {
 	// A filter indicating other models that influence ambient occlusion when baking. If this is not set, the AO will
 	// just take effect for triangles within the Model, rather than also taking effect for objects that
 	// are close to the baking Model.
-	OtherModels        NodeFilter
+	OtherModels        []*Model
 	InterModelDistance float32 // How far the other models in OtherModels must be to influence the baking AO.
 }
 
@@ -979,22 +979,20 @@ func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 
 	// Inter-object AO next; this is kinda slow and janky, but it does work OK, I think
 
-	if !bakeOptions.OtherModels.IsZero() {
+	if bakeOptions.OtherModels != nil {
 
 		transform := model.Transform()
 
 		distanceSquared := bakeOptions.InterModelDistance * bakeOptions.InterModelDistance
 
-		bakeOptions.OtherModels.ForEach(func(node INode) bool {
-
-			other := node.(*Model)
+		for _, other := range bakeOptions.OtherModels {
 
 			rad := model.frustumCullingSphere.WorldRadius()
 			if or := other.frustumCullingSphere.WorldRadius(); or > rad {
 				rad = or
 			}
 			if model == other || model.WorldPosition().DistanceSquaredTo(other.WorldPosition()) > rad*rad {
-				return true
+				continue
 			}
 
 			otherTransform := other.Transform()
@@ -1050,9 +1048,7 @@ func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 
 			}
 
-			return true
-
-		})
+		}
 
 	}
 
@@ -1060,7 +1056,8 @@ func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 
 // BakeLighting bakes the colors for the provided lights into a Model's Mesh's vertex colors. Note that the baked lighting overwrites whatever vertex colors
 // previously existed in the target channel (as otherwise, the colors could only get brighter with additive mixing, or only get darker with multiplicative mixing).
-func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
+// It will add the Model's scene's ambient lighting in, if it's not there already.
+func (model *Model) BakeLighting(targetChannel int, lights *NodeCollectionSet) {
 
 	if model.Mesh == nil || targetChannel < 0 {
 		return
@@ -1068,13 +1065,11 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 
 	model.Mesh.ensureEnoughVertexColorChannels(targetChannel)
 
-	allLights := append([]ILight{}, lights...)
-
 	if model.Scene() != nil {
-		allLights = append(allLights, model.Scene().World.AmbientLight)
+		lights.Add(model.Scene().World.AmbientLight)
 	}
 
-	for _, light := range allLights {
+	lights.ForEachLight(func(light ILight) bool {
 
 		if light.On() {
 
@@ -1083,7 +1078,8 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 
 		}
 
-	}
+		return true
+	})
 
 	for _, mp := range model.Mesh.MeshParts {
 
@@ -1103,13 +1099,12 @@ func (model *Model) BakeLighting(targetChannel int, lights ...ILight) {
 				model.Mesh.VertexColors[targetChannel][vertIndex].B = 0
 			}, false)
 
-			for _, light := range allLights {
-
+			lights.ForEachLight(func(light ILight) bool {
 				if light.On() {
 					light.Light(mp, model, model.Mesh.VertexColors[targetChannel], false)
 				}
-
-			}
+				return true
+			})
 
 		}
 
@@ -1143,16 +1138,17 @@ func (model *Model) setParent(parent INode) {
 
 	if !batched {
 
-		for _, child := range model.SearchTree().INodes() {
+		model.ForEachChild(true, func(child INode, index, size int) bool {
 
 			if child, ok := child.(*Model); ok && child.AutoBatchMode != AutoBatchNone {
 
 				batched = true
-				break
+				return false
 
 			}
 
-		}
+			return true
+		})
 
 	} else {
 

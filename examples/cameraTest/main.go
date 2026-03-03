@@ -50,7 +50,7 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	cameras := g.Scene.Root.SearchTree().ByType(tetra3d.NodeTypeCamera).INodes()
+	cameras := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeCamera)).ToCameras()
 
 	n := 0
 
@@ -75,7 +75,7 @@ func (g *Game) Update() error {
 			n = len(cameras) - 1
 		}
 
-		g.Camera = cameras[n].(*tetra3d.Camera)
+		g.Camera = cameras[n]
 
 	}
 

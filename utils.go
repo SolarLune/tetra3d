@@ -128,11 +128,6 @@ func (s Set[E]) Clone() Set[E] {
 	return newSet
 }
 
-func (s Set[E]) Set(other Set[E]) {
-	s.Clear()
-	s.Combine(other)
-}
-
 // Add adds the given elements to a set.
 func (s Set[E]) Add(element E) {
 	s[element] = struct{}{}
@@ -168,6 +163,68 @@ func (s Set[E]) ForEach(f func(element E)) {
 	for element := range s {
 		f(element)
 	}
+
+}
+
+type OrderedSet[E comparable] []E
+
+// newOrderedSet creates a new OrderedSet.
+func newOrderedSet[E comparable]() OrderedSet[E] {
+	return OrderedSet[E]{}
+}
+
+func (s OrderedSet[E]) Clone() OrderedSet[E] {
+	newOrderedSet := newOrderedSet[E]()
+	newOrderedSet.Combine(s)
+	return newOrderedSet
+}
+
+// Add adds the given elements to a OrderedSet.
+func (s *OrderedSet[E]) Add(elements ...E) {
+	for _, element := range elements {
+		if !s.Contains(element) {
+			(*s) = append((*s), element)
+		}
+	}
+}
+
+// Combine combines the given other elements to the OrderedSet.
+func (s *OrderedSet[E]) Combine(otherOrderedSet OrderedSet[E]) {
+	for _, element := range otherOrderedSet {
+		s.Add(element)
+	}
+}
+
+// Contains returns if the OrderedSet contains the given element.
+func (s *OrderedSet[E]) Contains(element E) bool {
+	for _, e := range *s {
+		if e == element {
+			return true
+		}
+	}
+	return false
+}
+
+// Remove removes the given element from the OrderedSet.
+func (s *OrderedSet[E]) Remove(element E) {
+	for i, e := range *s {
+		if e == element {
+			(*s) = append((*s)[:i], (*s)[i+1:]...)
+		}
+	}
+}
+
+// Clear clears the OrderedSet.
+func (s *OrderedSet[E]) Clear() {
+	(*s) = (*s)[:0]
+}
+
+// ForEach runs the provided function for each element in the OrderedSet.
+func (s OrderedSet[E]) ForEach(f func(element E)) {
+	for _, element := range s {
+		f(element)
+	}
+
 }
 
 func BlendModeDefault() ebiten.Blend {

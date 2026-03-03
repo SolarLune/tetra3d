@@ -61,10 +61,7 @@ func (g *Game) Init() {
 	// easily preview the differences, as well.
 
 	// We start by collecting all the lights we'll be baking. NodeFilter.Lights() will automatically give us just the lights out of our selection and discard any other INodes.
-	lights := g.Scene.Root.SearchTree().ILights()
-
-	// // Don't forget the world's ambient light!
-	lights = append(lights, g.Scene.World.AmbientLight)
+	lights := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeLight))
 
 	// Let's get all the solid, occluding models here.
 	// The idea is that we'll bake the lighting and AO of each ao-applicable Model.
@@ -75,7 +72,7 @@ func (g *Game) Init() {
 	model := g.Scene.Get("GameMap").(*tetra3d.Model)
 
 	// First, we'll bake the lighting into the lighting vertex color channel.
-	model.BakeLighting(ChannelLight, lights...)
+	model.BakeLighting(ChannelLight, lights)
 
 	// Next, we'll bake the AO into the AO vertex color channel.
 
@@ -165,7 +162,7 @@ ambient occlusion can be baked into vertex colors.
 3 key: Switch to only lighting
 4 Key: Switch to VC + AO + Lighting
 5 Key: Enable / disable texture channel`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

@@ -76,15 +76,23 @@ func (scene *Scene) Clone() *Scene {
 	newScene.updateAutobatch = true
 
 	// Update sectors after cloning the scene
-	models := newScene.Root.SearchTree().bySectors().Models()
+	models := newScene.Root.Search(SearchOptions{
+		NodeTypes: []NodeType{NodeTypeModel},
+	})
 
-	for _, n := range models {
-		n.sector.Neighbors.Clear()
-	}
+	models.ForEachModel(func(model *Model) bool {
+		if model.Sector() != nil {
+			model.Sector().Neighbors.Clear()
+		}
+		return true
+	})
 
-	for _, n := range models {
-		n.sector.UpdateNeighbors(models...)
-	}
+	models.ForEachModel(func(model *Model) bool {
+		if model.Sector() != nil {
+			model.Sector().AABB.updateSize()
+		}
+		return true
+	})
 
 	for _, cam := range scene.View3DCameras {
 		newScene.View3DCameras = append(newScene.View3DCameras, cam.Clone().(*Camera))
@@ -105,9 +113,10 @@ func (scene *Scene) Clone() *Scene {
 		}
 
 		// Loop through and call OnClone for each Node that has it set in the tree.
-		newScene.Root.SearchTree().ForEach(func(node INode) bool {
-			if node.Callbacks().OnClone != nil {
-				node.Callbacks().OnClone(node)
+		// This is done through a copy of the children slice because they could
+		newScene.Root.Children(true).ForEach(func(child INode) bool {
+			if child.Callbacks().OnClone != nil {
+				child.Callbacks().OnClone(child)
 			}
 			return true
 		})
@@ -168,7 +177,7 @@ func (scene *Scene) HandleAutobatch() {
 
 	if scene.updateAutobatch {
 
-		for _, node := range scene.Root.SearchTree().INodes() {
+		scene.Root.ForEachChild(true, func(node INode, index, size int) bool {
 
 			if model, ok := node.(*Model); ok {
 
@@ -214,7 +223,9 @@ func (scene *Scene) HandleAutobatch() {
 
 			}
 
-		}
+			return true
+
+		})
 
 		for _, dyn := range scene.autobatchDynamicMap {
 
@@ -249,12 +260,6 @@ func (scene *Scene) HandleAutobatch() {
 // Syntactic sugar for Scene.Root.Get().
 func (scene *Scene) Get(nodePath string) INode {
 	return scene.Root.Get(nodePath)
-}
-
-// FindNode searches through a Node's tree for the node by name exactly. This is mostly syntactic sugar for
-// Node.SearchTree().ByName(nodeName).First().
-func (scene *Scene) FindNode(nodeName string) INode {
-	return scene.Root.SearchTree().ByName(nodeName).First()
 }
 
 func (scene *Scene) Callbacks() *SceneCallbacks {

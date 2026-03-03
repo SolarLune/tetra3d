@@ -69,6 +69,10 @@ func (dim Dimensions) Size() Vector3 {
 	return Vector3{dim.Width(), dim.Height(), dim.Depth()}
 }
 
+func (dim Dimensions) Contains(point Vector3) bool {
+	return point.X >= dim.Min.X && point.Y >= dim.Min.Y && point.Z >= dim.Min.Z && point.X <= dim.Max.X && point.Y <= dim.Max.Y && point.Z <= dim.Max.Z
+}
+
 // func (dim Dimensions) reform() {
 
 // 	if dim.Min.X > dim.Max.X {

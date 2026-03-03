@@ -21,15 +21,17 @@ type Player struct {
 	Model   *tetra3d.Model
 	Bounds  *tetra3d.BoundingCapsule
 	Fallspd float32
+	Facing  tetra3d.Vector3
 }
 
 func NewPlayer(model *tetra3d.Model) *Player {
+	// model.Get("PlayerModelHead").(*tetra3d.Model).Mesh.MeshParts[0].Material.LightVolumeShadingMode = tetra3d.LightVolumeShadingModePerVertexWithoutNormal
 	return &Player{Model: model, Bounds: model.Get("BoundingCapsule").(*tetra3d.BoundingCapsule)}
 }
 
 func (p *Player) Update() {
 
-	cam := p.Model.Scene().Root.SearchTree().ByType(tetra3d.NodeTypeCamera).First().(*tetra3d.Camera)
+	cam := p.Model.Scene().Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeCamera)).First().(*tetra3d.Camera)
 	// cam := p.Model.Scene().Get("Camera").(*tetra3d.Camera)
 
 	camRight := cam.Transform().Right()
@@ -40,6 +42,8 @@ func (p *Player) Update() {
 
 	camRight = camRight.Unit()
 	camForward = camForward.Unit()
+
+	p.Model.Get("PlayerModelBody").Rotate(0, 1, 0, 0.01)
 
 	// p.Model.Rotate(0, 1, 0, 0.01)
 
@@ -58,6 +62,11 @@ func (p *Player) Update() {
 		mv = mv.Add(camRight.Invert())
 	}
 
+	if mv.MagnitudeSquared() > 0.1 {
+		p.Facing = mv.Unit()
+		p.Model.Get("PlayerModelHead").SetWorldRotation(tetra3d.NewMatrix4LookAt(tetra3d.NewVector3(0, 0, 0), p.Facing, tetra3d.WorldUp))
+	}
+
 	movespd := float32(0.1)
 
 	if ebiten.IsKeyPressed(ebiten.KeyShift) {
@@ -66,7 +75,8 @@ func (p *Player) Update() {
 
 	p.Model.MoveVec(mv.Unit().Scale(movespd))
 
-	sceneTree := p.Bounds.Scene().Root.SearchTree()
+	sceneTree := p.Bounds.Scene().Root.Children(true)
+	solids := p.Bounds.Scene().Root.Search(tetra3d.SearchOptions{}.ByProps("solid").WithReturnChildren(true))
 
 	p.Bounds.CollisionTest(tetra3d.CollisionTestSettings{
 		TestAgainst: sceneTree,
@@ -83,7 +93,7 @@ func (p *Player) Update() {
 	tetra3d.RayTest(tetra3d.RayTestOptions{
 		From:        p.Model.WorldPosition(),
 		To:          p.Model.WorldPosition().SubY(2),
-		TestAgainst: sceneTree.ByParentProps("solid"),
+		TestAgainst: solids,
 		OnHit: func(hit tetra3d.RayHit, index, count int) bool {
 			onGround = true
 			p.Fallspd = 0
@@ -100,14 +110,70 @@ func (p *Player) Update() {
 
 }
 
+type Guy struct {
+	Model       *tetra3d.Model
+	Bounds      *tetra3d.BoundingCapsule
+	PathStepper *tetra3d.PathStepper
+}
+
+func NewGuy(node *tetra3d.Model) *Guy {
+	return &Guy{
+		Model:       node,
+		PathStepper: tetra3d.NewPathStepper(nil),
+		Bounds:      node.Get("BoundingCapsule").(*tetra3d.BoundingCapsule),
+	}
+}
+
+func (g *Guy) Update() {
+
+	grid := g.Model.Scene().Get("Grid").(*tetra3d.Grid)
+
+	if g.PathStepper.Path() == nil {
+
+		point := grid.ClosestGridPoint(g.Model.WorldPosition())
+		g.PathStepper.SetPath(point.PathTo(grid.RandomPoint()))
+
+	} else {
+
+		if g.PathStepper.Current().DistanceTo(g.Model.WorldPosition()) < 0.1 {
+			g.PathStepper.GotoNext()
+			if g.PathStepper.AtEnd() {
+				g.PathStepper.SetPath(nil)
+			}
+		} else {
+			g.Model.MoveTowardsVec(g.PathStepper.Current(), 0.05)
+		}
+
+	}
+
+	// sceneTree := g.Model.Scene().Root.SearchTree()
+
+	// g.Bounds.CollisionTest(tetra3d.CollisionTestSettings{
+	// 	TestAgainst: sceneTree,
+	// 	OnCollision: func(col *tetra3d.Collision, index, count int) bool {
+	// 		mtv := col.AverageMTV()
+	// 		mtv.Y = 0
+	// 		g.Model.MoveVec(mtv)
+	// 		return true
+	// 	},
+	// })
+
+	// grid := g.Model.Scene().Get("Grid").(*tetra3d.Grid)
+
+}
+
 type Game struct {
 	Scene *tetra3d.Scene
 
 	Player *Player
+	Guys   []*Guy
 
-	Camera      examples.BasicTargetedCam
-	System      examples.BasicSystemHandler
-	LightVolume *tetra3d.LightVolume
+	Time float32
+
+	Camera                  examples.BasicTargetedCam
+	System                  examples.BasicSystemHandler
+	LightVolume             *tetra3d.LightVolume
+	DebugDrawingLightVolume bool
 }
 
 func NewGame() *Game {
@@ -133,7 +199,12 @@ func (g *Game) Init() {
 
 	g.Scene = library.SceneByName("Scene")
 
-	g.Player = NewPlayer(g.Scene.Root.SearchTree().ByNamePartial("Player").First().(*tetra3d.Model))
+	g.Player = NewPlayer(g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("player")).First().(*tetra3d.Model))
+
+	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("guy")).ForEach(func(node tetra3d.INode) bool {
+		g.Guys = append(g.Guys, NewGuy(node.(*tetra3d.Model)))
+		return true
+	})
 
 	g.Camera = examples.NewBasicTargetedCam(g.Player.Model)
 
@@ -143,33 +214,28 @@ func (g *Game) Init() {
 	opt.TargetVertices = tetra3d.NewVertexSelection().SelectByMeshPartName(m.Mesh, "Walls", "Grass")
 	m.BakeAO(opt)
 
-	lightVolumeCube := g.Scene.Get("LightVolume").(*tetra3d.Model)
-	// Create a light volume from the LightVolume model. It will use its current name and dimensions.
-	// A light volume is essentially a grid of cells - in this case, the cell size is 2x2x2.
-	lightvolume := tetra3d.NewLightVolumeFromModel(lightVolumeCube, 2, 2, 2)
-	g.LightVolume = lightvolume
-	g.Scene.Root.AddChildren(lightvolume)
+	t := time.Now()
 
-	// Once we've added the LightVolume to the scene, we don't need the original cube anymore.
-	lightVolumeCube.Unparent()
-
-	// This gets the objects to perform the ray test against.
-	testAgainst := g.Scene.Root.SearchTree()
+	// So we get the LightVolume, which is a blank slate at this point.
+	// Now to populate it with light data!
+	lightvolume := g.Scene.Root.Get("LightVolume").(*tetra3d.LightVolume)
 
 	// For each grid cell in the LightVolume, we take in the position of the grid cell and the current color,
 	// and then we shade that cell - anything that passes through the cell is lightened, darkened, or otherwise colored
 	// depending on the color we put in the cell.
 
-	t := time.Now()
-	lightvolume.LightCellReadWriteAll(func(position tetra3d.Vector3, in tetra3d.Color) tetra3d.Color {
+	solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByParentProps("solid"))
+	lightvolume.LightVolumeForEachCell(func(position tetra3d.Vector3, cell *tetra3d.LightVolumeCell) {
 
 		// Start off assuming darkness, with a light value of -1 (negative light / darkness).
-		v := float32(-1)
+		cell.Color.R = -1
+		cell.Color.G = -1
+		cell.Color.B = -1
 
 		up := tetra3d.RayTest(tetra3d.RayTestOptions{
 			From:        position,
 			To:          position.AddY(1000),
-			TestAgainst: testAgainst,
+			TestAgainst: solids,
 			Doublesided: true,
 		})
 
@@ -179,28 +245,35 @@ func (g *Game) Init() {
 
 			if up.Triangle.MeshPart.Material.Name() == "Sky" {
 				// Set the light value to 0 (no change).
-				v = 0
+				cell.Color.R = 0
+				cell.Color.G = 0
+				cell.Color.B = 0
 			} else if up.Triangle.MeshPart.Material.Name() == "LightCube" {
-				v = 2
+				vertexColor, _ := up.VertexColor(0)
+				cell.Color = vertexColor.MultiplyScalarRGB(1)
 			}
+		} else if up == nil {
+			cell.Blocked = true
 		}
 
-		in.R = v
-		in.G = v
-		in.B = v
-
-		return in
 	})
-	fmt.Println(time.Since(t))
 
-	// It's a little ugly, so let's blur the result.
-	lightvolume.LightCellBlur(1, 1)
+	fmt.Println("time to check light cells:", time.Since(t))
+
+	lightvolume.LightVolumeBlur(2, 1, 1)
+
+	g.LightVolume = lightvolume
 
 }
 
 func (g *Game) Update() error {
 
 	g.Player.Update()
+	for _, guy := range g.Guys {
+		guy.Update()
+	}
+
+	g.Time += 1.0 / 60.0
 
 	g.Camera.Update()
 
@@ -208,12 +281,16 @@ func (g *Game) Update() error {
 		g.LightVolume.SetOn(!g.LightVolume.On())
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+		g.DebugDrawingLightVolume = !g.DebugDrawingLightVolume
+	}
+
 	return g.System.Update()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
-	g.Camera.ClearWithColor(g.Scene.World.FogColor)
+	g.Camera.Clear()
 	// g.Camera.Clear()
 
 	g.Camera.RenderScene(g.Scene)
@@ -228,8 +305,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := `This example showcases light volumes.
 As you walk around the map, the character
 gets darker or lighter depending on his
-environment.`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+environment.
+Press 1 to toggle the light volume.`
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+	}
+
+	if g.DebugDrawingLightVolume {
+		g.LightVolume.LightVolumeDebugDraw(screen, g.Camera.Camera)
 	}
 
 }

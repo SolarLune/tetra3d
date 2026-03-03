@@ -56,14 +56,14 @@ func (sector *Sector) Clone() *Sector {
 
 // UpdateNeighbors updates the Sector's neighbors to refresh it, in case it moves. The Neighbors set is updated, not replaced,
 // by this process (so clear the Sector's NeighborSet first if you need to do so).
-func (sector *Sector) UpdateNeighbors(otherModels ...*Model) {
+func (sector *Sector) UpdateNeighbors(otherModels *NodeCollectionSet) {
 
 	sector.AABB.updateSize()
 
-	for _, otherModel := range otherModels {
+	otherModels.ForEachModel(func(otherModel *Model) bool {
 
 		if otherModel == sector.Model || otherModel.sector == nil || sector.Neighbors.Contains(otherModel.sector) {
-			continue
+			return true
 		}
 
 		otherModel.sector.AABB.updateSize()
@@ -105,7 +105,8 @@ func (sector *Sector) UpdateNeighbors(otherModels ...*Model) {
 
 		}
 
-	}
+		return true
+	})
 
 }
 

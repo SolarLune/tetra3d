@@ -147,7 +147,7 @@ func (result *Collision) AverageContactPoint() Vector3 {
 type CollisionTestSettings struct {
 
 	// TestAgainst controls what objects to test against.
-	TestAgainst NodeIterator
+	TestAgainst *NodeCollectionSet
 
 	// OnCollision is a callback function that is called when a valid collision test happens between the
 	// calling object and one of the valid INodes contained within the Others slice. The callback should return a boolean
@@ -262,6 +262,10 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 	triangles.Broadphase.ForEachTriangleFromBoundingObject(sphere, func(triID int) bool {
 
 		tri := triangles.Mesh.Triangles[triID]
+
+		if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportCollisions {
+			return true
+		}
 
 		// MaxSpan / 0.66 because if you have a triangle where the two vertices are very close to each other, they'll pull the triangle center
 		// towards them by twice as much as the third vertex (i.e. the center won't be in the center)
@@ -405,6 +409,10 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 		tri := triangles.Mesh.Triangles[triID]
 
+		if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportCollisions {
+			return true
+		}
+
 		v0 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[0]])
 		v1 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[1]])
 		v2 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[2]])
@@ -539,6 +547,10 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 
 	for _, meshPart := range trianglesA.Mesh.MeshParts {
 
+		if meshPart.Material != nil && !meshPart.Material.ReportCollisions {
+			continue
+		}
+
 		mesh := meshPart.Mesh
 
 		meshPart.ForEachTri(func(tri *Triangle) {
@@ -564,6 +576,10 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 	bTris := []*Triangle{}
 
 	for _, meshPart := range trianglesB.Mesh.MeshParts {
+
+		if meshPart.Material != nil && !meshPart.Material.ReportCollisions {
+			continue
+		}
 
 		mesh := meshPart.Mesh
 
@@ -745,6 +761,10 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 		tri := triangles.Mesh.Triangles[triID]
 
+		if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportCollisions {
+			return true
+		}
+
 		if capsulePosition.DistanceSquaredTo(tri.Center) > math32.Pow((tri.MaxSpan*0.66)+capSpread, 2) {
 			return true
 		}
@@ -819,11 +839,9 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) *Collision 
 
 	internalCollisionList = internalCollisionList[:0]
 
-	settings.TestAgainst.ForEach(func(checking INode) bool {
+	settings.TestAgainst.ForEachBoundingObject(func(bounds IBoundingObject) bool {
 
-		bounds, ok := checking.(IBoundingObject)
-
-		if !ok || node == checking || (settings.OnCollision == nil && len(internalCollisionList) > 0) {
+		if node == bounds || (settings.OnCollision == nil && len(internalCollisionList) > 0) {
 			return true
 		}
 
@@ -832,14 +850,18 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) *Collision 
 		}
 
 		return true
-
 	})
+
+	var result *Collision
 
 	// Sort the collisions by distance to the intersection start point (so closer collisions come up sooner).
-	sort.Slice(internalCollisionList, func(i, j int) bool {
-		return internalCollisionList[i].AverageContactPoint().DistanceSquaredTo(internalCollisionList[i].Intersections[0].StartingPoint) >
-			internalCollisionList[j].AverageContactPoint().DistanceSquaredTo(internalCollisionList[j].Intersections[0].StartingPoint)
-	})
+	if len(internalCollisionList) > 0 {
+		sort.Slice(internalCollisionList, func(i, j int) bool {
+			return internalCollisionList[i].AverageContactPoint().DistanceSquaredTo(internalCollisionList[i].Intersections[0].StartingPoint) >
+				internalCollisionList[j].AverageContactPoint().DistanceSquaredTo(internalCollisionList[j].Intersections[0].StartingPoint)
+		})
+		result = internalCollisionList[0]
+	}
 
 	if settings.OnCollision != nil {
 
@@ -851,11 +873,7 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) *Collision 
 
 	}
 
-	if len(internalCollisionList) > 0 {
-		return internalCollisionList[0]
-	}
-
-	return nil
+	return result
 
 }
 

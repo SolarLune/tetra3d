@@ -86,9 +86,17 @@ func (lib *Library) AddScene(sceneName string) *Scene {
 }
 
 func (lib *Library) NodeByID(id uint32) INode {
+	var idNode INode
 	for _, scene := range lib.Scenes {
-		if n := scene.Root.SearchTree().ByID(id).First(); n != nil {
-			return n
+		scene.Root.ForEachChild(true, func(child INode, index, size int) bool {
+			if child.ID() == id {
+				idNode = child
+				return false
+			}
+			return true
+		})
+		if idNode != nil {
+			return idNode
 		}
 	}
 	return nil
@@ -97,9 +105,17 @@ func (lib *Library) NodeByID(id uint32) INode {
 // NodeByName allows you to find a node by name by searching through each of a Library's scenes. If the Node with the given name isn't found,
 // NodeByName will return nil.
 func (lib *Library) NodeByName(objectName string) INode {
+	var object INode
 	for _, scene := range lib.Scenes {
-		if n := scene.Root.SearchTree().ByName(objectName).First(); n != nil {
-			return n
+		scene.Root.ForEachChild(true, func(child INode, index, size int) bool {
+			if child.Name() == objectName {
+				object = child
+				return false
+			}
+			return true
+		})
+		if object != nil {
+			return object
 		}
 	}
 	return nil

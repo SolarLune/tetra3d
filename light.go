@@ -1,8 +1,6 @@
 package tetra3d
 
 import (
-	"image/color"
-
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/tetra3d/math32"
@@ -697,16 +695,6 @@ func (cube *CubeLight) Type() NodeType {
 	return NodeTypeCubeLight
 }
 
-/////
-
-// func LightVolumeSpecialCopy() Color {
-// 	return NewColor(lightVolumeSpecialCopy, 0, 0, 0)
-// }
-
-// const lightVolumeSpecialCopy = -99899
-
-// var LightVolumeSpecialCopy = NewColor(-9999, -8888, -7777, 0)
-
 // LightVolume represents a grid of colors representing light to color models that enter the space with.
 type LightVolume struct {
 	*Node
@@ -721,7 +709,7 @@ type LightVolume struct {
 
 	dimensions Dimensions
 
-	lightValues []Color
+	lightValues []*LightVolumeCell
 
 	energy float32
 	color  Color
@@ -739,7 +727,7 @@ func NewLightVolume(name string, volumeDim Dimensions, cellSizeX, cellSizeY, cel
 
 	lv.owner = lv
 
-	lv.Resize(volumeDim, cellSizeX, cellSizeY, cellSizeZ)
+	lv.LightVolumeResize(volumeDim, cellSizeX, cellSizeY, cellSizeZ)
 
 	return lv
 }
@@ -762,8 +750,33 @@ func (l *LightVolume) Clone() INode {
 	return newLightmap
 }
 
+func (l *LightVolume) Dimensions() Dimensions {
+	return l.dimensions
+}
+
 // Resizes the LightVolume to be of the given transformed dimensions and cellular size.
-func (l *LightVolume) Resize(dimensions Dimensions, cellsizeX, cellsizeY, cellsizeZ float32) {
+// Calling this after initial creation will move the Cell properties over to the newly resized LightVolume,
+// meaning you can create a low resolution LightVolume, populate its cells, then resize it and blur or spread the light
+// for a finer looking result with the original data.
+// If the LightVolume already has the given dimensions and cellular size, then nothing is done.
+func (l *LightVolume) LightVolumeResize(dimensions Dimensions, cellsizeX, cellsizeY, cellsizeZ float32) {
+
+	oldLightValues := make([]*LightVolumeCell, 0, len(l.lightValues))
+
+	for _, lv := range l.lightValues {
+		oldLightValues = append(oldLightValues, lv.clone())
+	}
+
+	oldDimensions := l.dimensions
+	oldCellSizeX := l.cellSizeX
+	oldCellSizeY := l.cellSizeY
+	oldCellSizeZ := l.cellSizeZ
+
+	oldCellCountX := l.cellCountX
+	oldCellCountY := l.cellCountY
+	oldCellCountZ := l.cellCountZ
+
+	l.lightValues = l.lightValues[:0]
 
 	l.dimensions = dimensions
 	l.cellSizeX = cellsizeX
@@ -775,25 +788,71 @@ func (l *LightVolume) Resize(dimensions Dimensions, cellsizeX, cellsizeY, cellsi
 	cellCountZ := 0
 
 	for z := dimensions.Min.Z; z < dimensions.Max.Z; z += cellsizeZ {
-		cellCountZ++
 		cellCountY = 0
 
 		for y := dimensions.Min.Y; y < dimensions.Max.Y; y += cellsizeY {
-			cellCountY++
 			cellCountX = 0
 
 			for x := dimensions.Min.X; x < dimensions.Max.X; x += cellsizeX {
+				l.lightValues = append(l.lightValues, &LightVolumeCell{
+					Color:  NewColor(0, 0, 0, 1),
+					indexX: l.cellCountX,
+					indexY: l.cellCountY,
+					indexZ: l.cellCountZ,
+				})
 				cellCountX++
-				l.lightValues = append(l.lightValues, NewColor(0, 0, 0, 1))
 			}
 
+			cellCountY++
+
 		}
+
+		cellCountZ++
 
 	}
 
 	l.cellCountX = cellCountX
 	l.cellCountY = cellCountY
 	l.cellCountZ = cellCountZ
+
+	if oldLightValues != nil {
+
+		oldConvertToXYZIndices := func(wx, wy, wz float32) (x, y, z int) {
+
+			x = int((wx - oldDimensions.Min.X) / oldCellSizeX)
+			y = int((wy - oldDimensions.Min.Y) / oldCellSizeY)
+			z = int((wz - oldDimensions.Min.Z) / oldCellSizeZ)
+
+			return
+		}
+
+		getOgLightCell := func(indexX, indexY, indexZ int) *LightVolumeCell {
+			if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= oldCellCountX || indexY >= oldCellCountY || indexZ >= oldCellCountZ {
+				return nil
+			}
+			return oldLightValues[indexX+(indexY*oldCellCountX)+(indexZ*oldCellCountX*oldCellCountY)]
+		}
+
+		for z := dimensions.Min.Z; z < dimensions.Max.Z; z += cellsizeZ {
+
+			for y := dimensions.Min.Y; y < dimensions.Max.Y; y += cellsizeY {
+
+				for x := dimensions.Min.X; x < dimensions.Max.X; x += cellsizeX {
+
+					if cell := l.getLightCell(l.convertToXYZIndices(x, y, z)); cell != nil {
+						if oldCell := getOgLightCell(oldConvertToXYZIndices(x, y, z)); oldCell != nil {
+							cell.Color = oldCell.Color
+							cell.Blocked = oldCell.Blocked
+						}
+					}
+
+				}
+
+			}
+
+		}
+
+	}
 
 }
 
@@ -811,40 +870,79 @@ func (l *LightVolume) Light(meshPart *MeshPart, model *Model, targetColors Verte
 
 	transform := model.Transform()
 
-	center := l.dimensions.Center()
+	objectShadingMode := 0
 
-	// Half the max span so that each vertex is, at maximum, as far from the center
-	// as the distance from min corner to max corner / 2
-	d := l.dimensions.MaxSpan() / 2
-	maxDist := d * d
+	if meshPart.Material != nil {
+		objectShadingMode = meshPart.Material.LightVolumeShadingMode
+
+		if meshPart.Material.LightVolumeShadingMode == LightVolumeShadingModePerObject {
+
+			x, y, z := l.convertToXYZIndicesVec(model.WorldPosition())
+
+			cell := l.getLightCell(x, y, z)
+			if cell != nil {
+				cellColor.R = cell.Color.R
+				cellColor.G = cell.Color.G
+				cellColor.B = cell.Color.B
+			}
+
+		}
+
+	}
+
+	cellSize := NewVector3(l.cellSizeX, l.cellSizeY, l.cellSizeZ)
 
 	meshPart.ForEachVertexIndex(func(vertIndex int) {
 
-		var vertPos Vector3
+		if objectShadingMode != LightVolumeShadingModePerObject {
 
-		if model.skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[vertIndex]
-		} else {
-			vertPos = transform.MultVec(model.Mesh.VertexPositions[vertIndex])
-		}
+			var vertPos Vector3
+			var vertPosWithNormal Vector3
 
-		if vertPos.DistanceSquaredTo(center) > maxDist {
-			return
-		}
+			if model.skinned {
+				vertPos = model.Mesh.vertexSkinnedPositions[vertIndex]
+				if !l.dimensions.Contains(vertPos) {
+					return
+				}
 
-		cellColor.R = 0
-		cellColor.G = 0
-		cellColor.B = 0
+				if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
+					vertPosWithNormal = vertPos.Add(model.Mesh.vertexSkinnedNormals[vertIndex])
+				}
+			} else {
+				vertPos = transform.MultVec(model.Mesh.VertexPositions[vertIndex])
 
-		x, y, z := l.convertToXYZIndicesVec(vertPos)
+				if !l.dimensions.Contains(vertPos) {
+					return
+				}
 
-		if l.xyzIndicesInsideVolume(x, y, z) {
+				if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
+					vertPosWithNormal = transform.MultVec(model.Mesh.VertexPositions[vertIndex].Add(model.Mesh.VertexNormals[vertIndex].Mult(cellSize)))
+				}
+			}
 
-			lvColor := l.getLightValue(x, y, z)
+			cellColor.R = 0
+			cellColor.G = 0
+			cellColor.B = 0
 
-			cellColor.R = lvColor.R
-			cellColor.G = lvColor.G
-			cellColor.B = lvColor.B
+			x, y, z := l.convertToXYZIndicesVec(vertPos)
+
+			if cell := l.getLightCell(x, y, z); cell != nil {
+				cellColor = cell.Color
+			}
+
+			// If we're taking into account the vertex's normal as well,
+			// then check if that's lighter than what we currently have; if so, use it.
+			if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
+
+				x, y, z := l.convertToXYZIndicesVec(vertPosWithNormal)
+
+				cell := l.getLightCell(x, y, z)
+				if cell != nil && cellColor.Value() < cell.Color.Value() {
+					cellColor = cell.Color
+					// cellColor = cellColor.Lerp(cell.Color, 0.5)
+				}
+
+			}
 
 		}
 
@@ -869,33 +967,27 @@ func (l *LightVolume) convertToXYZIndicesVec(position Vector3) (x, y, z int) {
 	return l.convertToXYZIndices(position.X, position.Y, position.Z)
 }
 
+func (l *LightVolume) convertToWorldPosition(x, y, z int) Vector3 {
+
+	return NewVector3(
+		(float32(x)*l.cellSizeX)+l.dimensions.Min.X,
+		(float32(y)*l.cellSizeY)+l.dimensions.Min.Y,
+		(float32(z)*l.cellSizeZ)+l.dimensions.Min.Z,
+	)
+}
+
 func (l *LightVolume) xyzIndicesInsideVolume(x, y, z int) bool {
 	return x >= 0 && y >= 0 && z >= 0 && x < l.cellCountX && y < l.cellCountY && z < l.cellCountZ
 }
 
-func (l *LightVolume) LightCellWriteToPosition(position Vector3, color Color) {
+func (l *LightVolume) LightVolumeCellAt(position Vector3) *LightVolumeCell {
 
 	x, y, z := l.convertToXYZIndicesVec(position)
-
-	if l.xyzIndicesInsideVolume(x, y, z) {
-		l.setLightValue(x, y, z, color)
-	}
+	return l.getLightCell(x, y, z)
 
 }
 
-func (l *LightVolume) LightCellReadFromPosition(position Vector3, color Color) Color {
-
-	x, y, z := l.convertToXYZIndicesVec(position)
-
-	if l.xyzIndicesInsideVolume(x, y, z) {
-		return l.getLightValue(x, y, z)
-	}
-
-	return NewColor(0, 0, 0, 0)
-
-}
-
-func (l *LightVolume) LightCellReadWriteAll(forEach func(position Vector3, in Color) Color) {
+func (l *LightVolume) LightVolumeForEachCell(forEach func(position Vector3, cell *LightVolumeCell)) {
 
 	if forEach == nil {
 		return
@@ -912,9 +1004,8 @@ func (l *LightVolume) LightCellReadWriteAll(forEach func(position Vector3, in Co
 
 				x, y, z := l.convertToXYZIndices(wx, wy, wz)
 
-				if l.xyzIndicesInsideVolume(x, y, z) {
-					out := forEach(NewVector3(wx, wy, wz), l.getLightValue(x, y, z))
-					l.setLightValue(x, y, z, out)
+				if cell := l.getLightCell(x, y, z); cell != nil {
+					forEach(NewVector3(wx, wy, wz), cell)
 				}
 
 			}
@@ -923,64 +1014,12 @@ func (l *LightVolume) LightCellReadWriteAll(forEach func(position Vector3, in Co
 
 }
 
-// func (l *LightVolume) handleSpecialColors() {
-
-// 	csx := l.cellSizeX / 2
-// 	csy := l.cellSizeY / 2
-// 	csz := l.cellSizeZ / 2
-
-// 	// Alreay transformed
-// 	for wz := l.dimensions.Min.Z + csz; wz <= l.dimensions.Max.Z; wz += l.cellSizeZ {
-// 		for wy := l.dimensions.Min.Y + csy; wy <= l.dimensions.Max.Y; wy += l.cellSizeY {
-// 			for wx := l.dimensions.Min.X + csx; wx <= l.dimensions.Max.X; wx += l.cellSizeX {
-
-// 				x, y, z := l.convertToXYZIndices(wx, wy, wz)
-
-// 				if l.xyzIndicesInsideVolume(x, y, z) {
-// 					color := l.getLightValue(x, y, z)
-// 					if color.R == lightVolumeSpecialCopy {
-// 						set := false
-// 						for nz := z - 1; nz <= z+1; nz++ {
-// 							for ny := y - 1; ny <= y+1; ny++ {
-// 								for nx := x - 1; nx <= x+1; nx++ {
-// 									if nx == 0 && ny == 0 && nz == 0 {
-// 										continue
-// 									}
-// 									if l.xyzIndicesInsideVolume(nx, ny, nz) {
-// 										newColor := l.getLightValue(nx, ny, nz)
-// 										if newColor.R != lightVolumeSpecialCopy {
-// 											l.setLightValue(x, y, z, newColor)
-// 											set = true
-// 										}
-// 									}
-// 									if set {
-// 										break
-// 									}
-// 								}
-// 								if set {
-// 									break
-// 								}
-// 							}
-// 							if set {
-// 								break
-// 							}
-// 						}
-// 					}
-// 				}
-
-// 			}
-// 		}
-// 	}
-// }
-
-// Blurs the cells in the LightVolume.
+// Blurs all of the cells in the LightVolume.
 // radius is the number of cells around each cell to blur each cell's value.
 // iterations is the number of times to run the blur.
-func (l *LightVolume) LightCellBlur(cellRadius int, iterations int) {
-
-	if cellRadius < 1 {
-		cellRadius = 1
-	}
+// blurStrength is the strength of the blur, ranging from 0 to 1.
+// Each application of the blur happens at the end of the iterations, not all at once.
+func (l *LightVolume) LightVolumeBlur(cellRadius int, iterations int, blurStrength float32) {
 
 	if iterations < 1 {
 		iterations = 1
@@ -990,13 +1029,20 @@ func (l *LightVolume) LightCellBlur(cellRadius int, iterations int) {
 	csy := l.cellSizeY / 2
 	csz := l.cellSizeZ / 2
 
+	ogLightValues := make([]*LightVolumeCell, 0, len(l.lightValues))
+
 	for range iterations {
 
-		ogLightValues := append(make([]Color, 0, len(l.lightValues)), l.lightValues...)
+		ogLightValues = ogLightValues[:0]
 
-		getLightValueSpread := func(indexX, indexY, indexZ int) Color {
+		for _, l := range l.lightValues {
+			newL := *l
+			ogLightValues = append(ogLightValues, &newL)
+		}
+
+		getOgLightCell := func(indexX, indexY, indexZ int) *LightVolumeCell {
 			if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= l.cellCountX || indexY >= l.cellCountY || indexZ >= l.cellCountZ {
-				return NewColor(0, 0, 0, 0)
+				return nil
 			}
 			return ogLightValues[indexX+(indexY*l.cellCountX)+(indexZ*l.cellCountX*l.cellCountY)]
 		}
@@ -1007,112 +1053,161 @@ func (l *LightVolume) LightCellBlur(cellRadius int, iterations int) {
 
 					x, y, z := l.convertToXYZIndices(wx, wy, wz)
 
-					if l.xyzIndicesInsideVolume(x, y, z) {
+					count := 1
+					current := l.getLightCell(x, y, z)
+					baseColor := current.Color
 
-						count := 1
-						current := getLightValueSpread(x, y, z)
+					for rz := -cellRadius; rz <= cellRadius; rz++ {
+						for ry := -cellRadius; ry <= cellRadius; ry++ {
+							for rx := -cellRadius; rx <= cellRadius; rx++ {
+								if cell := getOgLightCell(x+int(rx), y+int(ry), z+int(rz)); cell != nil && !cell.Blocked {
+									count++
+									baseColor = baseColor.Add(cell.Color)
+								}
+							}
+						}
+					}
 
-						for i := 1; i <= cellRadius; i++ {
+					current.Color = current.Color.Lerp(baseColor.MultiplyScalarRGB(1.0/float32(count)), blurStrength)
 
-							for rz := -cellRadius; rz <= cellRadius; rz++ {
-								for ry := -cellRadius; ry <= cellRadius; ry++ {
-									for rx := -cellRadius; rx <= cellRadius; rx++ {
+				}
+			}
+		}
+	}
+}
 
-										if rx == 0 && ry == 0 && rz == 0 {
-											continue
-										}
-										if l.xyzIndicesInsideVolume(x+rx, y+ry, z+rz) {
-											c := getLightValueSpread(x+rx, y+ry, z+rz)
-											if c.A > 0 {
-												count++
-												current = current.Add(c)
-											}
-										}
+// Propagates light through all of the cells in the LightVolume.
+// iterations is the number of times to run the blur.
+// propagationStrength is how strong the light propagates (so how the light darkens over
+// each successive cell) and ranges from 0 to 1.
+func (l *LightVolume) LightVolumePropagate(iterations int, propagationStrength float32) {
+
+	if iterations < 1 {
+		iterations = 1
+	}
+
+	csx := l.cellSizeX / 2
+	csy := l.cellSizeY / 2
+	csz := l.cellSizeZ / 2
+
+	ogLightValues := make([]*LightVolumeCell, 0, len(l.lightValues))
+
+	for range iterations {
+
+		ogLightValues = ogLightValues[:0]
+
+		for _, l := range l.lightValues {
+			newL := *l
+			ogLightValues = append(ogLightValues, &newL)
+		}
+
+		getOgLightCell := func(indexX, indexY, indexZ int) *LightVolumeCell {
+			if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= l.cellCountX || indexY >= l.cellCountY || indexZ >= l.cellCountZ {
+				return nil
+			}
+			return ogLightValues[indexX+(indexY*l.cellCountX)+(indexZ*l.cellCountX*l.cellCountY)]
+		}
+
+		for wz := l.dimensions.Min.Z + csz; wz <= l.dimensions.Max.Z; wz += l.cellSizeZ {
+			for wy := l.dimensions.Min.Y + csy; wy <= l.dimensions.Max.Y; wy += l.cellSizeY {
+				for wx := l.dimensions.Min.X + csx; wx <= l.dimensions.Max.X; wx += l.cellSizeX {
+
+					x, y, z := l.convertToXYZIndices(wx, wy, wz)
+
+					current := l.getLightCell(x, y, z)
+					ogCurrent := getOgLightCell(x, y, z)
+
+					for rz := -1; rz <= 1; rz++ {
+						for ry := -1; ry <= 1; ry++ {
+							for rx := -1; rx <= 1; rx++ {
+
+								if cell := getOgLightCell(x+int(rx), y+int(ry), z+int(rz)); cell != nil && !cell.Blocked {
+									target := cell.Color
+									if target.Value() > ogCurrent.Color.Value() {
+										current.Color = ogCurrent.Color.Lerp(target, propagationStrength)
 									}
 								}
 							}
-
 						}
-
-						l.setLightValue(x, y, z, current.MultiplyScalarRGB(1/float32(count)))
-
 					}
 
 				}
 			}
 		}
-
 	}
 }
 
-func (l *LightVolume) LightValuesSave() []Color {
-	return append(make([]Color, 0, len(l.lightValues)), l.lightValues...)
-}
+// func (l *LightVolume) LightValuesSave() []Color {
+// 	return append(make([]Color, 0, len(l.lightValues)), l.lightValues...)
+// }
 
-func (l *LightVolume) LightValuesLoad(colors []Color, forEach func(current, loading Color) Color) {
-	for i := 0; i < len(colors); i++ {
-		l.lightValues[i] = forEach(l.lightValues[i], colors[i])
-	}
-}
+// func (l *LightVolume) LightValuesLoad(colors []Color, forEach func(current, loading Color) Color) {
+// 	for i := 0; i < len(colors); i++ {
+// 		l.lightValues[i] = forEach(l.lightValues[i], colors[i])
+// 	}
+// }
 
-func (l *LightVolume) getLightValue(indexX, indexY, indexZ int) Color {
+func (l *LightVolume) getLightCell(indexX, indexY, indexZ int) *LightVolumeCell {
 	if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= l.cellCountX || indexY >= l.cellCountY || indexZ >= l.cellCountZ {
-		return NewColor(0, 0, 0, 0)
+		return nil
 	}
 	return l.lightValues[indexX+(indexY*l.cellCountX)+(indexZ*l.cellCountX*l.cellCountY)]
 }
 
-func (l *LightVolume) setLightValue(indexX, indexY, indexZ int, color Color) {
-	if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= l.cellCountX || indexY >= l.cellCountY || indexZ >= l.cellCountZ {
-		return
-	}
-	l.lightValues[indexX+(indexY*l.cellCountX)+(indexZ*l.cellCountX*l.cellCountY)] = color
-}
+func (l *LightVolume) LightVolumeDebugDraw(screen *ebiten.Image, camera *Camera) {
 
-func (l *LightVolume) DebugDraw(screen *ebiten.Image, camera *Camera) {
+	l.LightVolumeForEachCell(func(position Vector3, cell *LightVolumeCell) {
 
-	l.LightCellReadWriteAll(func(position Vector3, in Color) Color {
+		if cell.Blocked {
+			return
+		}
 
 		// pos := camera.ClipToScreen(position)
 		pos := camera.WorldToScreenPixels(position)
 		if pos.Z < 0 {
-			return in
+			return
 		}
 		dist := 1 - (camera.WorldPosition().DistanceTo(position) / camera.far)
 		if dist < 0 {
-			return in
+			return
 		}
 
-		v := uint16(65535 * dist)
-		color := color.NRGBA64{0, v, 0, v}
+		strokeColor := cell.Color.MultiplyScalarRGB(0.5).AddRGBA(0.5, 0.5, 0.5, 0)
+
+		// v := uint16(65535 * dist)
+		// color := color.NRGBA64{0, v, 0, v}
 
 		// color = in.ToNRGBA64()
 
-		vector.StrokeLine(screen, pos.X-8, pos.Y, pos.X+8, pos.Y, 2, color, false)
-		vector.StrokeLine(screen, pos.X, pos.Y-8, pos.X, pos.Y+8, 2, color, false)
-		return in
+		vector.StrokeLine(screen, pos.X-8, pos.Y, pos.X+8, pos.Y, 2, strokeColor.ToNRGBA64(), false)
+		vector.StrokeLine(screen, pos.X, pos.Y-8, pos.X, pos.Y+8, 2, strokeColor.ToNRGBA64(), false)
+		return
 
 	})
 
 }
 
+func (l *LightVolume) distance(rx, ry, rz float32) float32 {
+	return math32.Sqrt(rx*rx + ry*ry + rz*rz)
+}
+
 // Returns the size of light volume cells on the X axis.
-func (l *LightVolume) CellSizeX() float32 {
+func (l *LightVolume) LightVolumeCellSizeX() float32 {
 	return l.cellSizeX
 }
 
 // Returns the size of light volume cells on the Y axis.
-func (l *LightVolume) CellSizeY() float32 {
+func (l *LightVolume) LightVolumeCellSizeY() float32 {
 	return l.cellSizeY
 }
 
 // Returns the size of light volume cells on the Z axis.
-func (l *LightVolume) CellSizeZ() float32 {
+func (l *LightVolume) LightVolumeCellSizeZ() float32 {
 	return l.cellSizeZ
 }
 
 // Returns the size of light volume cells on the axis determined by the dimension argument (0 = X, 1 = Y, otherwise = Z).
-func (l *LightVolume) CellSize(dimension int) float32 {
+func (l *LightVolume) LightVolumeCellSize(dimension int) float32 {
 	if dimension == 0 {
 		return l.cellSizeX
 	} else if dimension == 1 {
@@ -1122,22 +1217,22 @@ func (l *LightVolume) CellSize(dimension int) float32 {
 }
 
 // Returns the number of light volume cells on the X axis.
-func (l *LightVolume) CellCountX() int {
+func (l *LightVolume) LightVolumeCellCountX() int {
 	return l.cellCountX
 }
 
 // Returns the number of light volume cells on the Y axis.
-func (l *LightVolume) CellCountY() int {
+func (l *LightVolume) LightVolumeCellCountY() int {
 	return l.cellCountY
 }
 
 // Returns the number of light volume cells on the Z axis.
-func (l *LightVolume) CellCountZ() int {
+func (l *LightVolume) LightVolumeCellCountZ() int {
 	return l.cellCountZ
 }
 
 // Returns the number of volume cells on the axis determined by the dimension argument (0 = X, 1 = Y, otherwise = Z).
-func (l *LightVolume) CellCount(dimension int) int {
+func (l *LightVolume) LightVolumeCellCount(dimension int) int {
 	if dimension == 0 {
 		return l.cellCountX
 	} else if dimension == 1 {
@@ -1179,6 +1274,33 @@ func (l *LightVolume) SetEnergy(energy float32) {
 // Type returns the type of INode this is (NodeTypeLightVolume).
 func (l *LightVolume) Type() NodeType {
 	return NodeTypeLightVolume
+}
+
+// LightVolumeCell represents a cell in the LightVolume.
+type LightVolumeCell struct {
+	Color   Color
+	Blocked bool
+	indexX  int
+	indexY  int
+	indexZ  int
+	Data    any
+}
+
+func (c *LightVolumeCell) clone() *LightVolumeCell {
+	newCell := *c
+	return &newCell
+}
+
+func (c LightVolumeCell) IndexX() int {
+	return c.indexX
+}
+
+func (c LightVolumeCell) IndexY() int {
+	return c.indexY
+}
+
+func (c LightVolumeCell) IndexZ() int {
+	return c.indexZ
 }
 
 /////

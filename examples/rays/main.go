@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
@@ -50,9 +51,11 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
+	fmt.Println(g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject)))
+
 	g.Camera.MouseRayTest(tetra3d.MouseRayTestOptions{
 		// Depth: g.Camera.Far(),
-		TestAgainst: g.Scene.Root.SearchTree().IBoundingObjects(),
+		TestAgainst: g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject)),
 
 		OnHit: func(hit tetra3d.RayHit, hitIndex int, hitCount int) bool {
 

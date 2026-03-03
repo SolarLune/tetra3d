@@ -196,7 +196,7 @@ they now share textures, blend modes, filtering, etc.
 They also can no longer intersect, now just drawing in front of or behind each other.
 
 1 Key: Toggle batching cubes together`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

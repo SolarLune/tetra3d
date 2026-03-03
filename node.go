@@ -17,28 +17,28 @@ const (
 // NodeType represents a Node's type. Node types are categorized, and can be said to extend or "be of" more general types.
 // For example, a BoundingSphere has a type of NodeTypeBoundingSphere. That type can also be said to be NodeTypeBoundingObject
 // (because it is a bounding object). However, it is not of type NodeTypeBoundingTriangles, as that is a different category.
-type NodeType string
+type NodeType uint32
 
 const (
-	NodeTypeNode      NodeType = "NodeNode"       // NodeTypeNode represents specifically a node
-	NodeTypeModel     NodeType = "NodeModel"      // NodeTypeModel represents specifically a Model
-	NodeTypeCamera    NodeType = "NodeCamera"     // NodeTypeCamera represents specifically a Camera
-	NodeTypePath      NodeType = "NodePath"       // NodeTypePath represents specifically a Path
-	NodeTypeGrid      NodeType = "NodeGrid"       // NodeTypeGrid represents specifically a Grid
-	NodeTypeGridPoint NodeType = "Node_GridPoint" // NodeTypeGrid represents specifically a GridPoint (note the extra underscore to ensure !NodeTypeGridPoint.Is(NodeTypeGrid))
+	NodeTypeNode      NodeType = 1 << iota              // NodeTypeNode represents specifically a node
+	NodeTypeModel              = 1<<iota + NodeTypeNode // NodeTypeModel represents specifically a Model
+	NodeTypeCamera                                      // NodeTypeCamera represents specifically a Camera
+	NodeTypePath                                        // NodeTypePath represents specifically a Path
+	NodeTypeGrid                                        // NodeTypeGrid represents specifically a Grid
+	NodeTypeGridPoint                                   // NodeTypeGrid represents specifically a GridPoint (note the extra underscore to ensure !NodeTypeGridPoint.Is(NodeTypeGrid))
 
-	NodeTypeBoundingObject    NodeType = "NodeBounding"          // NodeTypeBoundingObject represents any generic bounding object
-	NodeTypeBoundingAABB      NodeType = "NodeBoundingAABB"      // NodeTypeBoundingAABB represents specifically a BoundingAABB
-	NodeTypeBoundingCapsule   NodeType = "NodeBoundingCapsule"   // NodeTypeBoundingCapsule represents specifically a BoundingCapsule
-	NodeTypeBoundingTriangles NodeType = "NodeBoundingTriangles" // NodeTypeBoundingTriangles represents specifically a BoundingTriangles object
-	NodeTypeBoundingSphere    NodeType = "NodeBoundingSphere"    // NodeTypeBoundingSphere represents specifically a BoundingSphere BoundingObject
+	NodeTypeBoundingObject    = 1<<iota + NodeTypeNode           // NodeTypeBoundingObject represents any generic bounding object
+	NodeTypeBoundingAABB      = 1<<iota + NodeTypeBoundingObject // NodeTypeBoundingAABB represents specifically a BoundingAABB
+	NodeTypeBoundingCapsule                                      // NodeTypeBoundingCapsule represents specifically a BoundingCapsule
+	NodeTypeBoundingTriangles                                    // NodeTypeBoundingTriangles represents specifically a BoundingTriangles object
+	NodeTypeBoundingSphere                                       // NodeTypeBoundingSphere represents specifically a BoundingSphere BoundingObject
 
-	NodeTypeLight            NodeType = "NodeLight"            // NodeTypeLight represents any generic light
-	NodeTypeAmbientLight     NodeType = "NodeLightAmbient"     // NodeTypeAmbientLight represents specifically an ambient light
-	NodeTypePointLight       NodeType = "NodeLightPoint"       // NodeTypePointLight represents specifically a point light
-	NodeTypeDirectionalLight NodeType = "NodeLightDirectional" // NodeTypeDirectionalLight represents specifically a directional (sun) light
-	NodeTypeCubeLight        NodeType = "NodeLightCube"        // NodeTypeCubeLight represents, specifically, a cube light
-	NodeTypeLightVolume      NodeType = "NodeLightLightVolume" // NodeTypeLightVolume represents, specifically, a light volume
+	NodeTypeLight            = 1<<iota + NodeTypeNode  // NodeTypeLight represents any generic light
+	NodeTypeAmbientLight     = 1<<iota + NodeTypeLight // NodeTypeAmbientLight represents specifically an ambient light
+	NodeTypePointLight                                 // NodeTypePointLight represents specifically a point light
+	NodeTypeDirectionalLight                           // NodeTypeDirectionalLight represents specifically a directional (sun) light
+	NodeTypeCubeLight                                  // NodeTypeCubeLight represents, specifically, a cube light
+	NodeTypeLightVolume                                // NodeTypeLightVolume represents, specifically, a light volume
 
 )
 
@@ -49,7 +49,47 @@ func (nt NodeType) Is(other NodeType) bool {
 	if nt == other {
 		return true
 	}
-	return strings.Contains(string(nt), string(other))
+	return nt&other == other
+}
+
+func (nt NodeType) String() string {
+	switch nt {
+	case NodeTypeNode:
+		return "Node"
+	case NodeTypeModel:
+		return "Model"
+	case NodeTypeCamera:
+		return "Camera"
+	case NodeTypePath:
+		return "Path"
+	case NodeTypeGrid:
+		return "Grid"
+	case NodeTypeGridPoint:
+		return "GridPoint"
+	case NodeTypeBoundingObject:
+		return "BoundingObject"
+	case NodeTypeBoundingAABB:
+		return "BoundingAABB"
+	case NodeTypeBoundingCapsule:
+		return "BoundingCapsule"
+	case NodeTypeBoundingTriangles:
+		return "BoundingTriangles"
+	case NodeTypeBoundingSphere:
+		return "BoundingSphere"
+	// case NodeTypeLight: // No object has "light" as a type, because it's a generic type
+	// 	return "Light"
+	case NodeTypeAmbientLight:
+		return "AmbientLight"
+	case NodeTypePointLight:
+		return "PointLight"
+	case NodeTypeDirectionalLight:
+		return "DirectionalLight"
+	case NodeTypeCubeLight:
+		return "CubeLight"
+	case NodeTypeLightVolume:
+		return "LightVolume"
+	}
+	panic("This should never happen")
 }
 
 // INode represents an object that exists in 3D space and can be positioned relative to an origin point.
@@ -107,14 +147,16 @@ type INode interface {
 	Index() int
 
 	// Children() returns the Node's children as an INode.
-	Children() []INode
+	Children(recursive bool) *NodeCollectionSet
+
+	// Returns the number of children under the Node.
+	// When recursive, it traverses the entire tree underneath the Node;
+	// otherwise, it just returns the number of children directly beneath the Node.
+	ChildCount(recursive bool) int
 
 	// ForEachChild() runs a callback for each child in the Node's children set.
 	// If the callback returns false, then the execution stops with the current child.
-	ForEachChild(func(child INode, index, size int) bool)
-
-	// SearchTree() returns a NodeFilter to search the given Node's hierarchical tree.
-	SearchTree() NodeFilter
+	ForEachChild(recursive bool, forEach func(node INode, index, size int) bool)
 
 	// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 	// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
@@ -239,8 +281,8 @@ type INode interface {
 	// trims the extra spaces from the beginning and end of Node Names, so avoid using spaces at the beginning or end of your Nodes' names.
 	Get(path string) INode
 
-	// FindNode searches a node's hierarchy using a string to find the specified Node.
-	FindNode(nodeName string) INode
+	// Search searches a node's hierarchy using a string to find the specified Node.
+	Search(options SearchOptions) *NodeCollectionSet
 
 	// HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.
 	// This is a useful function to debug the layout of a node tree, for example.
@@ -502,7 +544,7 @@ func (node *Node) SetWorldTransform(transform Matrix4) {
 // rebuilt. This should be called when modifying the transformation properties (position, scale, rotation) of the Node.
 func (node *Node) dirtyTransform() {
 
-	for _, child := range node.SearchTree().INodes() {
+	for _, child := range node.children {
 		child.dirtyTransform()
 	}
 
@@ -953,7 +995,13 @@ func (node *Node) setParent(parent INode) {
 		node.parent = nil
 		node.cachedSceneRootNode = nil
 	}
-	node.SearchTree().ForEach(func(child INode) bool { child.setCachedSceneRoot(node.cachedSceneRootNode); return true })
+	for _, child := range node.children {
+		child.setParent(node)
+	}
+	node.ForEachChild(true, func(child INode, index, size int) bool {
+		child.setCachedSceneRoot(node.cachedSceneRootNode)
+		return true
+	})
 }
 
 func (node *Node) setCachedSceneRoot(root *Node) {
@@ -1096,7 +1144,7 @@ func (node *Node) ReindexChild(child INode, newIndex int) int {
 func (node *Node) Index() int {
 	var index = -1
 	if node.parent != nil {
-		node.parent.ForEachChild(func(child INode, i, size int) bool {
+		node.parent.ForEachChild(false, func(child INode, i, size int) bool {
 			if child == node {
 				index = i
 				return false
@@ -1108,31 +1156,40 @@ func (node *Node) Index() int {
 }
 
 // Children returns the Node's children as a slice of INodes.
-func (node *Node) Children() []INode {
-	return append(make([]INode, 0, len(node.children)), node.children...)
+// recursive controls whether it returns all nodes recursive moving down the Node's hierarchy or not.
+// If recursive is true, it's syntactic sugar for Node.FindNodes(FindNodeOptions{}).
+func (node *Node) Children(recursive bool) *NodeCollectionSet {
+	if recursive {
+		return node.Search(SearchOptions{})
+	}
+	return NewNodeCollection(node.children...)
 }
 
 // ForEachChild runs the provided callback function for each child in the node's children slice.
 // If the callback returns false, then it stops execution with the current child.
 // The function loops through the children list in reverse so removing children is non-problematic.
-func (node *Node) ForEachChild(forEach func(child INode, index, size int) bool) {
+func (node *Node) ForEachChild(recursive bool, forEach func(node INode, index, size int) bool) {
 	size := len(node.children)
 	for i := len(node.children) - 1; i >= 0; i-- {
 		if !forEach(node.children[i], i, size) {
 			return
 		}
+		if recursive {
+			node.children[i].ForEachChild(recursive, forEach)
+		}
 	}
 }
 
-// SearchTree returns a NodeFilter to search through and filter a Node's hierarchy.
-func (node *Node) SearchTree() NodeFilter {
-	return newNodeFilter(node)
-}
-
-// FindNode searches through a Node's tree for the node by name. This is mostly syntactic sugar for
-// Node.SearchTree().ByName(nodeName).First().
-func (node *Node) FindNode(nodeName string) INode {
-	return node.SearchTree().ByName(nodeName).First()
+// Returns the number of children under the Node.
+// When recursive, it traverses the entire tree underneath the Node;
+// otherwise, it just returns the number of children directly beneath the Node.
+func (node *Node) ChildCount(recursive bool) int {
+	count := 0
+	node.ForEachChild(recursive, func(child INode, index, size int) bool {
+		count++
+		return true
+	})
+	return count
 }
 
 // IsVisible returns whether the Object is visible.
@@ -1143,8 +1200,8 @@ func (node *Node) IsVisible() bool {
 // SetVisible sets the object's visibility. If recursive is true, all recursive children of this Node will have their visibility set the same way.
 func (node *Node) SetVisible(visible bool, recursive bool) {
 	if recursive {
-		for _, child := range node.SearchTree().INodes() {
-			child.SetVisible(visible, true)
+		for _, child := range node.children {
+			child.SetVisible(visible, recursive)
 		}
 	}
 	node.visible = visible
@@ -1204,6 +1261,8 @@ func (node *Node) HierarchyAsString() string {
 				prefix = "TRI"
 			} else if nodeType.Is(NodeTypeModel) {
 				prefix = "MODEL"
+			} else if nodeType.Is(NodeTypeLightVolume) {
+				prefix = "LIGHTVOLUME"
 			} else {
 				prefix = "NODE"
 			}
@@ -1232,9 +1291,10 @@ func (node *Node) HierarchyAsString() string {
 		}
 		str += " [" + prefix + "] " + node.Name() + fmt.Sprintf(" : %d : ", node.ID()) + wpStr + "\n"
 
-		for _, child := range node.Children() {
-			str += printNode(child, level+1)
-		}
+		node.ForEachChild(false, func(node INode, index, size int) bool {
+			str += printNode(node, level+1)
+			return true
+		})
 
 		return str
 	}
@@ -1289,22 +1349,27 @@ func (node *Node) Get(path string) INode {
 			return search(node.Parent())
 		}
 
-		for _, child := range node.Children() {
+		var foundNode INode
+
+		node.ForEachChild(false, func(child INode, index, size int) bool {
 
 			if child.Name() == split[0] {
 
 				if len(split) <= 1 {
-					return child
+					foundNode = child
+					return false
 				} else {
 					split = split[1:]
-					return search(child)
+					foundNode = search(child)
+					return false
 				}
 
 			}
 
-		}
+			return true
+		})
 
-		return nil
+		return foundNode
 
 	}
 
@@ -1430,11 +1495,11 @@ func (node *Node) Sector() *Sector {
 
 			pos := node.WorldPosition()
 
-			root.SearchTree().bySectors().ForEach(func(child INode) bool {
-				sectorModel := child.(*Model)
-				if sectorModel.sector.AABB.PointInside(pos) {
-					node.cachedSector = sectorModel.sector
-					return false
+			root.ForEachChild(true, func(child INode, index, size int) bool {
+				if model, ok := child.(*Model); ok && model.sector != nil {
+					if model.sector.AABB.PointInside(pos) {
+						node.cachedSector = model.sector
+					}
 				}
 				return true
 			})

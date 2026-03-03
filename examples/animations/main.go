@@ -50,7 +50,7 @@ func (g *Game) Update() error {
 
 	scene := g.Camera.Scene
 
-	armature := scene.Root.SearchTree().ByName("Armature").First()
+	armature := scene.Root.Search(tetra3d.SearchOptions{}.ByNames("Armature")).First()
 	armature.Rotate(0, 1, 0, 0.01)
 
 	ap := armature.AnimationPlayer()
@@ -111,7 +111,7 @@ animations (as shown on the table).
 F Key: Play Animation on Skinned Mesh
 Note that the nodes move as well (as can be
 seen in the debug mode).`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }
