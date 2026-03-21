@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"image"
 	"io"
 	"io/fs"
@@ -676,6 +677,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			newIndices := make([]int, len(indices))
 
 			for i, j := range indices {
+				if int(j) >= len(vertexData) {
+					return nil, fmt.Errorf("invalid gltf: index %d out of bounds for vertex data length %d", j, len(vertexData))
+				}
 				newIndices[i] = int(j)
 			}
 
