@@ -17,27 +17,66 @@ type ILight interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model)
 
-	Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) // Light lights the triangles in the MeshPart, storing the result in the targetColors
+	VertexLight(vertexIndex int, triangle *Triangle, model *Model, targetColors VertexColorChannel)
+	Light(triangle *Triangle, model *Model, targetColors VertexColorChannel) // Light lights the triangles in the MeshPart, storing the result in the targetColors
 	// color buffer. If onlyVisible is true, only the visible vertices will be lit; if it's false, they will all be lit.
-	On() bool      // On is simply used to tell if a "generic" Light is on or not.
-	SetOn(on bool) // SetOn sets whether the light is on or not
 
-	Color() Color
-	SetColor(c Color)
+	Color() Color4
+	SetColor(c Color4)
 	Energy() float32
 	SetEnergy(energy float32)
+}
+
+type LightBase struct {
+	*Node
+	color Color4 // Color is the color of the PointLight.
+	// energy is the overall energy of the Light. Internally, technically there's no difference between a brighter color and a
+	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
+	energy float32
+	on     bool // If the light is on and contributing to the scene.
+}
+
+func newLightBase(name string, r, g, b, energy float32) *LightBase {
+	lightBase := &LightBase{
+		Node:   NewNode(name),
+		color:  NewColor4(r, g, b, 1),
+		energy: energy,
+		on:     true,
+	}
+	return lightBase
+}
+
+func (l *LightBase) clone() *LightBase {
+	newLB := newLightBase(l.name, l.color.R, l.color.G, l.color.B, l.energy)
+	newLB.Node = l.Node.clone(l.owner).(*Node)
+	return newLB
+}
+
+func (l *LightBase) Energy() float32 {
+	return l.energy
+}
+
+func (l *LightBase) SetEnergy(energy float32) {
+	if l.energy != energy {
+		l.energy = energy
+	}
+}
+
+func (l *LightBase) Color() Color4 {
+	return l.color
+}
+
+func (l *LightBase) SetColor(color Color4) {
+	if l.color != color {
+		l.color = color
+	}
 }
 
 //---------------//
 
 // AmbientLight represents an ambient light that colors the entire Scene.
 type AmbientLight struct {
-	*Node
-	color Color // Color is the color of the PointLight.
-	// energy is the overall energy of the Light. Internally, technically there's no difference between a brighter color and a
-	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
-	energy float32
-	on     bool // If the light is on and contributing to the scene.
+	*LightBase
 
 	result [3]float32
 }
@@ -45,10 +84,7 @@ type AmbientLight struct {
 // NewAmbientLight returns a new AmbientLight.
 func NewAmbientLight(name string, r, g, b, energy float32) *AmbientLight {
 	amb := &AmbientLight{
-		Node:   NewNode(name),
-		color:  NewColor(r, g, b, 1),
-		energy: energy,
-		on:     true,
+		LightBase: newLightBase(name, r, g, b, energy),
 	}
 	amb.owner = amb
 	return amb
@@ -59,7 +95,7 @@ func (amb *AmbientLight) Clone() INode {
 	clone := NewAmbientLight(amb.name, amb.color.R, amb.color.G, amb.color.B, amb.energy)
 	clone.on = amb.on
 
-	clone.Node = amb.Node.clone(clone).(*Node)
+	clone.LightBase = amb.LightBase.clone()
 
 	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
@@ -75,37 +111,17 @@ func (amb *AmbientLight) beginRender() {
 
 func (amb *AmbientLight) beginModel(model *Model) {}
 
+func (amb *AmbientLight) VertexLight(vertexIndex int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
+	targetColors[vertexIndex].R += amb.result[0]
+	targetColors[vertexIndex].G += amb.result[1]
+	targetColors[vertexIndex].B += amb.result[2]
+}
+
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
-	meshPart.ForEachVertexIndex(func(vertIndex int) {
-		targetColors[vertIndex].R += amb.result[0]
-		targetColors[vertIndex].G += amb.result[1]
-		targetColors[vertIndex].B += amb.result[2]
-	}, onlyVisible)
-}
-
-func (amb *AmbientLight) On() bool {
-	return amb.on && amb.energy > 0
-}
-
-func (amb *AmbientLight) SetOn(on bool) {
-	amb.on = on
-}
-
-func (amb *AmbientLight) Color() Color {
-	return amb.color
-}
-
-func (amb *AmbientLight) SetColor(color Color) {
-	amb.color = color
-}
-
-func (amb *AmbientLight) Energy() float32 {
-	return amb.energy
-}
-
-func (amb *AmbientLight) SetEnergy(energy float32) {
-	amb.energy = energy
+func (amb *AmbientLight) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
+	tri.ForEachVertexIndex(func(vertIndex int) {
+		amb.VertexLight(vertIndex, tri, model, targetColors)
+	})
 }
 
 // Type returns the NodeType for this object.
@@ -117,30 +133,18 @@ func (amb *AmbientLight) Type() NodeType {
 
 // PointLight represents a point light (naturally).
 type PointLight struct {
-	*Node
+	*LightBase
 	// Range represents the distance after which the light fully attenuates. If this is 0 (the default),
 	// it falls off using something akin to the inverse square law.
-	Range float32
-	// color is the color of the PointLight.
-	color Color
-	// energy is the overall energy of the Light, with 1.0 being full brightness. Internally, technically there's no
-	// difference between a brighter color and a higher energy, but this is here for convenience / adherance to the
-	// GLTF spec and 3D modelers.
-	energy float32
-	// If the light is on and contributing to the scene.
-	on bool
-
-	rangeSquared    float32
-	workingPosition Vector3
+	lightRange        float32
+	lightRangeSquared float32
+	workingPosition   Vector3
 }
 
 // NewPointLight creates a new Point light.
 func NewPointLight(name string, r, g, b, energy float32) *PointLight {
 	point := &PointLight{
-		Node:   NewNode(name),
-		energy: energy,
-		color:  NewColor(r, g, b, 1),
-		on:     true,
+		LightBase: newLightBase(name, r, g, b, energy),
 	}
 	point.owner = point
 	return point
@@ -151,9 +155,10 @@ func (p *PointLight) Clone() INode {
 
 	clone := NewPointLight(p.name, p.color.R, p.color.G, p.color.B, p.energy)
 	clone.on = p.on
-	clone.Range = p.Range
+	clone.lightRange = p.lightRange
+	clone.lightRangeSquared = p.lightRangeSquared
 
-	clone.Node = p.Node.clone(clone).(*Node)
+	clone.LightBase = p.LightBase.clone()
 
 	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
@@ -163,9 +168,7 @@ func (p *PointLight) Clone() INode {
 
 }
 
-func (p *PointLight) beginRender() {
-	p.rangeSquared = p.Range * p.Range
-}
+func (p *PointLight) beginRender() {}
 
 func (p *PointLight) beginModel(model *Model) {
 
@@ -183,114 +186,104 @@ func (p *PointLight) beginModel(model *Model) {
 
 }
 
+func (p *PointLight) VertexLight(index int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
+	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
+
+	var vertPos, vertNormal Vector3
+
+	if model.skinned {
+		vertPos = model.mesh.vertexSkinnedPositions[index]
+		vertNormal = model.mesh.vertexSkinnedNormals[index]
+	} else {
+		vertPos = model.mesh.VertexPositions[index]
+		vertNormal = model.mesh.VertexNormals[index]
+	}
+
+	distance := p.workingPosition.DistanceSquaredTo(vertPos)
+
+	if p.lightRange > 0 {
+
+		if distance > p.lightRangeSquared {
+			return
+		}
+
+		// var triCenter Vector
+
+		// if model.skinned {
+		// 	v0 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
+		// 	v1 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
+		// 	v2 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
+		// 	triCenter = Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
+		// } else {
+		// 	triCenter = tri.Center
+		// }
+
+		// dist := fastVectorDistanceSquared(point.workingPosition, triCenter)
+		// if dist > (point.distanceSquared + (tri.MaxSpan * tri.MaxSpan)) {
+		// 	return
+		// }
+
+	} else {
+		if 1/distance*float32(p.energy) < 0.001 {
+			return
+		}
+	}
+
+	// If you're on the other side of the plane, just assume it's not visible.
+	// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
+	// 	return light
+	// }
+
+	lightVec := p.workingPosition.Sub(vertPos).Unit()
+	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
+		vertNormal = lightVec
+	}
+
+	diffuse := vertNormal.Dot(lightVec)
+
+	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
+		diffuse = math32.Abs(diffuse)
+	}
+
+	if diffuse > 0 {
+
+		diffuseFactor := diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
+
+		if p.lightRangeSquared > 0 {
+			distClamp := math32.Clamp((p.lightRangeSquared-distance)/distance, 0, 1)
+			diffuseFactor *= distClamp
+		}
+
+		targetColors[index].R += p.color.R * float32(diffuseFactor) * p.energy
+		targetColors[index].G += p.color.G * float32(diffuseFactor) * p.energy
+		targetColors[index].B += p.color.B * float32(diffuseFactor) * p.energy
+
+	}
+
+}
+
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (p *PointLight) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
+func (p *PointLight) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
 	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-	meshPart.ForEachVertexIndex(func(index int) {
+	tri.ForEachVertexIndex(func(index int) {
 
-		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
+		p.VertexLight(index, tri, model, targetColors)
 
-		var vertPos, vertNormal Vector3
-
-		if model.skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[index]
-			vertNormal = model.Mesh.vertexSkinnedNormals[index]
-		} else {
-			vertPos = model.Mesh.VertexPositions[index]
-			vertNormal = model.Mesh.VertexNormals[index]
-		}
-
-		distance := p.workingPosition.DistanceSquaredTo(vertPos)
-
-		if p.Range > 0 {
-
-			if distance > p.rangeSquared {
-				return
-			}
-
-			// var triCenter Vector
-
-			// if model.skinned {
-			// 	v0 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[0]].Clone()
-			// 	v1 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[1]]
-			// 	v2 := model.Mesh.vertexSkinnedPositions[tri.VertexIndices[2]]
-			// 	triCenter = Vector(vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0))
-			// } else {
-			// 	triCenter = tri.Center
-			// }
-
-			// dist := fastVectorDistanceSquared(point.workingPosition, triCenter)
-			// if dist > (point.distanceSquared + (tri.MaxSpan * tri.MaxSpan)) {
-			// 	return
-			// }
-
-		} else {
-			if 1/distance*float32(p.energy) < 0.001 {
-				return
-			}
-		}
-
-		// If you're on the other side of the plane, just assume it's not visible.
-		// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
-		// 	return light
-		// }
-
-		lightVec := p.workingPosition.Sub(vertPos).Unit()
-		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
-			vertNormal = lightVec
-		}
-
-		diffuse := vertNormal.Dot(lightVec)
-
-		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
-			diffuse = math32.Abs(diffuse)
-		}
-
-		if diffuse > 0 {
-
-			diffuseFactor := diffuse * (1.0 / (1.0 + (0.1 * distance))) * 2
-
-			if p.Range > 0 {
-				distClamp := math32.Clamp((p.rangeSquared-distance)/distance, 0, 1)
-				diffuseFactor *= distClamp
-			}
-
-			targetColors[index].R += p.color.R * float32(diffuseFactor) * p.energy
-			targetColors[index].G += p.color.G * float32(diffuseFactor) * p.energy
-			targetColors[index].B += p.color.B * float32(diffuseFactor) * p.energy
-
-		}
-
-	}, onlyVisible)
+	})
 
 }
 
-func (p *PointLight) On() bool {
-	return p.on && p.energy > 0
+func (p *PointLight) Range() float32 {
+	return p.lightRange
 }
 
-func (p *PointLight) SetOn(on bool) {
-	p.on = on
-}
-
-func (p *PointLight) Color() Color {
-	return p.color
-}
-
-func (p *PointLight) SetColor(color Color) {
-	p.color = color
-}
-
-func (p *PointLight) Energy() float32 {
-	return p.energy
-}
-
-func (p *PointLight) SetEnergy(energy float32) {
-	p.energy = energy
+func (p *PointLight) SetRange(lightRange float32) {
+	p.lightRange = lightRange
+	p.lightRangeSquared = lightRange * lightRange
 }
 
 // Type returns the NodeType for this object.
@@ -302,13 +295,7 @@ func (p *PointLight) Type() NodeType {
 
 // DirectionalLight represents a directional light of infinite distance.
 type DirectionalLight struct {
-	*Node
-	color Color // Color is the color of the light.
-	// energy is the overall energy of the light. Internally, technically there's no difference between a brighter color and a
-	// higher energy, but this is here for convenience / adherance to GLTF / 3D modelers.
-	energy float32
-	on     bool // If the light is on and contributing to the scene.
-
+	*LightBase
 	workingForward       Vector3 // Internal forward vector so we don't have to calculate it for every triangle for every model using this light.
 	workingModelRotation Matrix4 // Similarly, this is an internal rotational transform (without the transformation row) for the Model being lit.
 }
@@ -316,10 +303,7 @@ type DirectionalLight struct {
 // NewDirectionalLight creates a new Directional Light with the specified RGB color and energy (assuming 1.0 energy is standard / "100%" lighting).
 func NewDirectionalLight(name string, r, g, b, energy float32) *DirectionalLight {
 	sun := &DirectionalLight{
-		Node:   NewNode(name),
-		color:  NewColor(r, g, b, 1),
-		energy: energy,
-		on:     true,
+		LightBase: newLightBase(name, r, g, b, energy),
 	}
 	sun.owner = sun
 	return sun
@@ -332,7 +316,8 @@ func (sun *DirectionalLight) Clone() INode {
 
 	clone.on = sun.on
 
-	clone.Node = sun.Node.clone(clone).(*Node)
+	clone.LightBase = sun.LightBase.clone()
+
 	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
 	}
@@ -351,63 +336,43 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 	}
 }
 
+func (sun *DirectionalLight) VertexLight(index int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
+
+	var normal Vector3
+	if model.skinned {
+		// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
+		normal = model.mesh.vertexSkinnedNormals[index]
+	} else {
+		normal = sun.workingModelRotation.MultVec(model.mesh.VertexNormals[index])
+	}
+
+	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
+		normal = sun.workingForward
+	}
+
+	diffuseFactor := normal.Dot(sun.workingForward)
+
+	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
+		diffuseFactor = math32.Abs(diffuseFactor)
+	}
+
+	if diffuseFactor <= 0 {
+		return
+	}
+
+	targetColors[index].R += sun.color.R * float32(diffuseFactor) * sun.energy
+	targetColors[index].G += sun.color.G * float32(diffuseFactor) * sun.energy
+	targetColors[index].B += sun.color.B * float32(diffuseFactor) * sun.energy
+
+}
+
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
+func (sun *DirectionalLight) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
 
-	meshPart.ForEachVertexIndex(func(index int) {
+	tri.ForEachVertexIndex(func(index int) {
+		sun.VertexLight(index, tri, model, targetColors)
+	})
 
-		var normal Vector3
-		if model.skinned {
-			// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
-			normal = model.Mesh.vertexSkinnedNormals[index]
-		} else {
-			normal = sun.workingModelRotation.MultVec(model.Mesh.VertexNormals[index])
-		}
-
-		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
-			normal = sun.workingForward
-		}
-
-		diffuseFactor := normal.Dot(sun.workingForward)
-
-		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
-			diffuseFactor = math32.Abs(diffuseFactor)
-		}
-
-		if diffuseFactor <= 0 {
-			return
-		}
-
-		targetColors[index].R += sun.color.R * float32(diffuseFactor) * sun.energy
-		targetColors[index].G += sun.color.G * float32(diffuseFactor) * sun.energy
-		targetColors[index].B += sun.color.B * float32(diffuseFactor) * sun.energy
-
-	}, onlyVisible)
-
-}
-
-func (sun *DirectionalLight) On() bool {
-	return sun.on && sun.energy > 0
-}
-
-func (sun *DirectionalLight) SetOn(on bool) {
-	sun.on = on
-}
-
-func (d *DirectionalLight) Color() Color {
-	return d.color
-}
-
-func (d *DirectionalLight) SetColor(color Color) {
-	d.color = color
-}
-
-func (d *DirectionalLight) Energy() float32 {
-	return d.energy
-}
-
-func (d *DirectionalLight) SetEnergy(energy float32) {
-	d.energy = energy
 }
 
 // Type returns the NodeType for this object.
@@ -417,15 +382,12 @@ func (sun *DirectionalLight) Type() NodeType {
 
 // CubeLight represents an AABB volume that lights triangles.
 type CubeLight struct {
-	*Node
+	*LightBase
 	Dimensions Dimensions // The overall dimensions of the CubeLight.
-	energy     float32    // The overall energy of the CubeLight
-	color      Color      // The color of the CubeLight
-	on         bool       // If the CubeLight is on or not
 	// A value between 0 and 1 indicating how much opposite faces are still lit within the volume (i.e. at LightBleed = 0.0,
 	// faces away from the light are dark; at 1.0, faces away from the light are fully illuminated)
-	Bleed             float32
-	LightingAngle     Vector3 // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
+	bleed             float32
+	lightingAngle     Vector3 // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
 	workingDimensions Dimensions
 	workingPosition   Vector3
 	workingAngle      Vector3
@@ -434,13 +396,9 @@ type CubeLight struct {
 // NewCubeLight creates a new CubeLight with the given dimensions.
 func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 	cube := &CubeLight{
-		Node: NewNode(name),
-		// Dimensions:    Dimensions{{-w / 2, -h / 2, -d / 2}, {w / 2, h / 2, d / 2}},
+		LightBase:     newLightBase(name, 1, 1, 1, 1),
 		Dimensions:    dimensions,
-		energy:        1,
-		color:         NewColor(1, 1, 1, 1),
-		on:            true,
-		LightingAngle: Vector3{0, -1, 0},
+		lightingAngle: Vector3{0, -1, 0},
 	}
 	cube.owner = cube
 	return cube
@@ -450,9 +408,9 @@ func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
 // Note that this does not add it to the Model's hierarchy in any way - the newly created CubeLight
 // is still its own Node.
 func NewCubeLightFromModel(name string, model *Model) *CubeLight {
-	cube := NewCubeLight(name, model.Mesh.Dimensions)
+	cube := NewCubeLight(name, model.mesh.Dimensions)
 	cube.SetWorldTransform(model.Transform())
-	cube.LightingAngle = model.WorldRotation().Up().Invert()
+	cube.lightingAngle = model.WorldRotation().Up().Invert()
 	return cube
 }
 
@@ -462,8 +420,8 @@ func (cube *CubeLight) Clone() INode {
 	newCube.energy = cube.energy
 	newCube.color = cube.color
 	newCube.on = cube.on
-	newCube.Bleed = cube.Bleed
-	newCube.LightingAngle = cube.LightingAngle
+	newCube.bleed = cube.bleed
+	newCube.lightingAngle = cube.lightingAngle
 	newCube.SetWorldTransform(cube.Transform())
 	newCube.Node = cube.Node.clone(newCube).(*Node)
 	if runCallbacks && newCube.Callbacks().OnClone != nil {
@@ -533,7 +491,7 @@ func (cube *CubeLight) TransformedDimensions() Dimensions {
 }
 
 func (cube *CubeLight) beginRender() {
-	cube.workingAngle = cube.WorldRotation().MultVec(cube.LightingAngle.Invert())
+	cube.workingAngle = cube.WorldRotation().MultVec(cube.lightingAngle.Invert())
 }
 
 func (cube *CubeLight) beginModel(model *Model) {
@@ -545,7 +503,7 @@ func (cube *CubeLight) beginModel(model *Model) {
 	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
 	// The same technique is used for Sphere - Triangle collision in bounds.go.
 
-	lightStartPos := cube.WorldPosition().Add(cube.LightingAngle.Invert().Scale(cube.Dimensions.Height() / 2))
+	lightStartPos := cube.WorldPosition().Add(cube.lightingAngle.Invert().Scale(cube.Dimensions.Height() / 2))
 
 	cube.workingDimensions = cube.TransformedDimensions()
 
@@ -565,129 +523,109 @@ func (cube *CubeLight) beginModel(model *Model) {
 		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(p)
 		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(p)
 
+		cube.workingDimensions = cube.workingDimensions.Canon()
+
 	}
 
 }
 
-// Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (cube *CubeLight) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
+func (cube *CubeLight) VertexLight(index int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
 
-	meshPart.ForEachVertexIndex(func(index int) {
+	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
-		// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
+	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
+	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
+	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
-		// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
-		// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
-		// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
+	// var triCenter Vector
 
-		// var triCenter Vector
+	// if model.skinned {
+	// 	v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
+	// 	v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
+	// 	v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
+	// 	vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0)
+	// 	triCenter = v0
+	// } else {
+	// 	triCenter = model.Mesh.Triangles[triIndex].Center
+	// }
 
-		// if model.skinned {
-		// 	v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
-		// 	v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
-		// 	v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
-		// 	vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0)
-		// 	triCenter = v0
-		// } else {
-		// 	triCenter = model.Mesh.Triangles[triIndex].Center
-		// }
+	// dist := fastVectorDistanceSquared(cube.workingPosition, triCenter)
 
-		// dist := fastVectorDistanceSquared(cube.workingPosition, triCenter)
+	// if cube.Distance > 0 && dist > distanceSquared {
+	// 	return light
+	// }
 
-		// if cube.Distance > 0 && dist > distanceSquared {
-		// 	return light
-		// }
+	// If you're on the other side of the plane, just assume it's not visible.
+	// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
+	// 	return light
+	// }
 
-		// If you're on the other side of the plane, just assume it's not visible.
-		// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
-		// 	return light
-		// }
+	var vertPos, vertNormal Vector3
 
-		var vertPos, vertNormal Vector3
+	if model.skinned {
+		vertPos = model.mesh.vertexSkinnedPositions[index]
+		vertNormal = model.mesh.vertexSkinnedNormals[index]
+	} else {
+		vertPos = model.mesh.VertexPositions[index]
+		vertNormal = model.mesh.VertexNormals[index]
+	}
 
-		if model.skinned {
-			vertPos = model.Mesh.vertexSkinnedPositions[index]
-			vertNormal = model.Mesh.vertexSkinnedNormals[index]
-		} else {
-			vertPos = model.Mesh.VertexPositions[index]
-			vertNormal = model.Mesh.VertexNormals[index]
-		}
+	var diffuse, diffuseFactor float32
 
-		var diffuse, diffuseFactor float32
+	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
+		vertNormal = cube.workingAngle
+	}
 
-		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
-			vertNormal = cube.workingAngle
-		}
+	diffuse = vertNormal.Dot(cube.workingAngle)
 
-		diffuse = vertNormal.Dot(cube.workingAngle)
+	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
+		diffuse = math32.Abs(diffuse)
+	}
 
-		if mat := meshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
-			diffuse = math32.Abs(diffuse)
-		}
-
-		if cube.Bleed > 0 {
-
-			if diffuse < 0 {
-				diffuse = 0
-			}
-
-			// diffuse += cube.Bleed
-			diffuse = cube.Bleed + ((1 - cube.Bleed) * diffuse)
-
-			if diffuse > 1 {
-				diffuse = 1
-			}
-
-		}
+	if cube.bleed > 0 {
 
 		if diffuse < 0 {
-			return
+			diffuse = 0
+		}
+
+		// diffuse += cube.Bleed
+		diffuse = cube.bleed + ((1 - cube.bleed) * diffuse)
+
+		if diffuse > 1 {
+			diffuse = 1
+		}
+
+	}
+
+	if diffuse < 0 {
+		return
+	} else {
+
+		if !vertPos.IsInsideDimensions(cube.workingDimensions) {
+			diffuseFactor = 0
 		} else {
-
-			if !vertPos.IsInsideDimensions(cube.workingDimensions) {
-				diffuseFactor = 0
-			} else {
-				diffuseFactor = diffuse
-			}
-
+			diffuseFactor = diffuse
 		}
 
-		if diffuseFactor <= 0 {
-			return
-		}
+	}
 
-		targetColors[index].R += cube.color.R * float32(diffuseFactor) * cube.energy
-		targetColors[index].G += cube.color.G * float32(diffuseFactor) * cube.energy
-		targetColors[index].B += cube.color.B * float32(diffuseFactor) * cube.energy
+	if diffuseFactor <= 0 {
+		return
+	}
 
-	}, onlyVisible)
+	targetColors[index].R += cube.color.R * float32(diffuseFactor) * cube.energy
+	targetColors[index].G += cube.color.G * float32(diffuseFactor) * cube.energy
+	targetColors[index].B += cube.color.B * float32(diffuseFactor) * cube.energy
 
 }
 
-// On returns if the CubeLight is on or not.
-func (cube *CubeLight) On() bool {
-	return cube.on
-}
+// Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
+func (cube *CubeLight) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
 
-// SetOn sets the CubeLight to be on or off.
-func (cube *CubeLight) SetOn(on bool) {
-	cube.on = on
-}
+	tri.ForEachVertexIndex(func(index int) {
+		cube.VertexLight(index, tri, model, targetColors)
+	})
 
-func (cube *CubeLight) Color() Color {
-	return cube.color
-}
-
-func (cube *CubeLight) SetColor(color Color) {
-	cube.color = color
-}
-
-func (cube *CubeLight) Energy() float32 {
-	return cube.energy
-}
-
-func (cube *CubeLight) SetEnergy(energy float32) {
-	cube.energy = energy
 }
 
 // Type returns the type of INode this is (NodeTypeCubeLight).
@@ -695,9 +633,27 @@ func (cube *CubeLight) Type() NodeType {
 	return NodeTypeCubeLight
 }
 
+func (cube *CubeLight) LightingAngle() Vector3 {
+	return cube.lightingAngle
+}
+
+func (cube *CubeLight) SetLightingAngle(angle Vector3) {
+	cube.lightingAngle = angle
+}
+
+func (cube *CubeLight) Bleed() float32 {
+	return cube.bleed
+}
+
+func (cube *CubeLight) SetBleed(bleed float32) {
+	cube.bleed = bleed
+}
+
 // LightVolume represents a grid of colors representing light to color models that enter the space with.
 type LightVolume struct {
-	*Node
+	*LightBase
+
+	useLightsRenderSet Set[ILight]
 
 	cellSizeX float32
 	cellSizeY float32
@@ -710,19 +666,13 @@ type LightVolume struct {
 	dimensions Dimensions
 
 	lightValues []*LightVolumeCell
-
-	energy float32
-	color  Color
-	on     bool
 }
 
 // Creates a new light volume node of the given name, transformed dimensions, and light grid cellular size.
 func NewLightVolume(name string, volumeDim Dimensions, cellSizeX, cellSizeY, cellSizeZ float32) *LightVolume {
 	lv := &LightVolume{
-		Node:   NewNode(name),
-		energy: 1,
-		on:     true,
-		color:  NewColor(1, 1, 1, 1),
+		LightBase:          newLightBase(name, 1, 1, 1, 1),
+		useLightsRenderSet: newSet[ILight](),
 	}
 
 	lv.owner = lv
@@ -737,12 +687,15 @@ func NewLightVolume(name string, volumeDim Dimensions, cellSizeX, cellSizeY, cel
 func NewLightVolumeFromModel(model *Model, cellSizeX, cellSizeY, cellSizeZ float32) *LightVolume {
 	vol := NewLightVolume(model.Name(), model.Dimensions(), cellSizeX, cellSizeY, cellSizeZ)
 	vol.Node.SetWorldTransform(model.Transform())
+	vol.scene = model.scene
 	return vol
 }
 
 // Clones the LightVolume and returns another.
 func (l *LightVolume) Clone() INode {
 	newLightmap := NewLightVolume(l.Name(), l.dimensions, l.cellSizeX, l.cellSizeY, l.cellSizeZ)
+	newLightmap.LightBase = l.LightBase.clone()
+	newLightmap.dimensions = l.dimensions
 	newLightmap.lightValues = append(newLightmap.lightValues, l.lightValues...)
 	newLightmap.energy = l.energy
 	newLightmap.color = l.color
@@ -760,6 +713,11 @@ func (l *LightVolume) Dimensions() Dimensions {
 // for a finer looking result with the original data.
 // If the LightVolume already has the given dimensions and cellular size, then nothing is done.
 func (l *LightVolume) LightVolumeResize(dimensions Dimensions, cellsizeX, cellsizeY, cellsizeZ float32) {
+
+	// Don't resize if the sizes are 0 (light volume is being created)
+	if cellsizeX == 0 || cellsizeY == 0 || cellsizeZ == 0 {
+		return
+	}
 
 	oldLightValues := make([]*LightVolumeCell, 0, len(l.lightValues))
 
@@ -795,10 +753,11 @@ func (l *LightVolume) LightVolumeResize(dimensions Dimensions, cellsizeX, cellsi
 
 			for x := dimensions.Min.X; x < dimensions.Max.X; x += cellsizeX {
 				l.lightValues = append(l.lightValues, &LightVolumeCell{
-					Color:  NewColor(0, 0, 0, 1),
-					indexX: l.cellCountX,
-					indexY: l.cellCountY,
-					indexZ: l.cellCountZ,
+					lightVolume: l,
+					color:       NewColor4(0, 0, 0, 1),
+					indexX:      cellCountX,
+					indexY:      cellCountY,
+					indexZ:      cellCountZ,
 				})
 				cellCountX++
 			}
@@ -841,8 +800,11 @@ func (l *LightVolume) LightVolumeResize(dimensions Dimensions, cellsizeX, cellsi
 
 					if cell := l.getLightCell(l.convertToXYZIndices(x, y, z)); cell != nil {
 						if oldCell := getOgLightCell(oldConvertToXYZIndices(x, y, z)); oldCell != nil {
-							cell.Color = oldCell.Color
-							cell.Blocked = oldCell.Blocked
+							cell.color = oldCell.color
+							cell.useLights = append(make([]ILight, 0, len(oldCell.useLights)), oldCell.useLights...)
+							cell.blocked = oldCell.blocked
+							cell.diffuseness = oldCell.diffuseness
+							cell.lightDirection = oldCell.lightDirection
 						}
 					}
 
@@ -856,101 +818,113 @@ func (l *LightVolume) LightVolumeResize(dimensions Dimensions, cellsizeX, cellsi
 
 }
 
-func (l *LightVolume) beginRender() {}
+func (l *LightVolume) beginRender() {
+	l.useLightsRenderSet.ForEach(func(light ILight) bool {
+		light.beginRender()
+		return true
+	})
+}
 
-func (l *LightVolume) beginModel(model *Model) {}
+func (l *LightVolume) beginModel(model *Model) {
 
-// Lights the mesh part of the model being rendered, placing the results into the targeted VertexColorChannel, only doing so
-// for the visible parts of the mesh if onlyVisible is set to true.
-func (l *LightVolume) Light(meshPart *MeshPart, model *Model, targetColors VertexColorChannel, onlyVisible bool) {
+	l.useLightsRenderSet.ForEach(func(light ILight) bool {
+		light.beginModel(model)
+		return true
+	})
 
-	cellColor := NewColor(0, 0, 0, 1)
+}
 
-	// TODO: If distance from the mesh mesh part is too big, then we can just forget about it?
-
-	transform := model.Transform()
+func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
 
 	objectShadingMode := 0
 
-	if meshPart.Material != nil {
-		objectShadingMode = meshPart.Material.LightVolumeShadingMode
+	cellColor := NewColor4(0, 0, 0, 1)
 
-		if meshPart.Material.LightVolumeShadingMode == LightVolumeShadingModePerObject {
+	transform := model.Transform()
+
+	cellSize := NewVector3(l.cellSizeX, l.cellSizeY, l.cellSizeZ)
+
+	if tri.MeshPart.Material != nil {
+		objectShadingMode = tri.MeshPart.Material.LightVolumeShadingMode
+
+		if tri.MeshPart.Material.LightVolumeShadingMode == LightVolumeShadingModePerObject {
 
 			x, y, z := l.convertToXYZIndicesVec(model.WorldPosition())
 
 			cell := l.getLightCell(x, y, z)
 			if cell != nil {
-				cellColor.R = cell.Color.R
-				cellColor.G = cell.Color.G
-				cellColor.B = cell.Color.B
+				cellColor.R = cell.color.R
+				cellColor.G = cell.color.G
+				cellColor.B = cell.color.B
 			}
 
 		}
 
 	}
 
-	cellSize := NewVector3(l.cellSizeX, l.cellSizeY, l.cellSizeZ)
+	if objectShadingMode != LightVolumeShadingModePerObject {
 
-	meshPart.ForEachVertexIndex(func(vertIndex int) {
+		var vertPos Vector3
+		var normal Vector3
 
-		if objectShadingMode != LightVolumeShadingModePerObject {
+		if model.skinned {
+			vertPos = model.mesh.vertexSkinnedPositions[vertIndex]
+			normal = model.mesh.vertexSkinnedNormals[vertIndex]
 
-			var vertPos Vector3
-			var vertPosWithNormal Vector3
-
-			if model.skinned {
-				vertPos = model.Mesh.vertexSkinnedPositions[vertIndex]
-				if !l.dimensions.Contains(vertPos) {
-					return
-				}
-
-				if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
-					vertPosWithNormal = vertPos.Add(model.Mesh.vertexSkinnedNormals[vertIndex])
-				}
-			} else {
-				vertPos = transform.MultVec(model.Mesh.VertexPositions[vertIndex])
-
-				if !l.dimensions.Contains(vertPos) {
-					return
-				}
-
-				if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
-					vertPosWithNormal = transform.MultVec(model.Mesh.VertexPositions[vertIndex].Add(model.Mesh.VertexNormals[vertIndex].Mult(cellSize)))
-				}
-			}
-
-			cellColor.R = 0
-			cellColor.G = 0
-			cellColor.B = 0
-
-			x, y, z := l.convertToXYZIndicesVec(vertPos)
-
-			if cell := l.getLightCell(x, y, z); cell != nil {
-				cellColor = cell.Color
-			}
-
-			// If we're taking into account the vertex's normal as well,
-			// then check if that's lighter than what we currently have; if so, use it.
 			if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
+				vertPos = vertPos.Add(model.mesh.vertexSkinnedNormals[vertIndex])
+			}
 
-				x, y, z := l.convertToXYZIndicesVec(vertPosWithNormal)
+		} else {
+			normal = model.mesh.VertexNormals[vertIndex]
 
-				cell := l.getLightCell(x, y, z)
-				if cell != nil && cellColor.Value() < cell.Color.Value() {
-					cellColor = cell.Color
-					// cellColor = cellColor.Lerp(cell.Color, 0.5)
-				}
-
+			if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
+				vertPos = transform.MultVec(model.mesh.VertexPositions[vertIndex].Add(normal.Mult(cellSize)))
+			} else {
+				vertPos = transform.MultVec(model.mesh.VertexPositions[vertIndex])
 			}
 
 		}
 
-		targetColors[vertIndex].R += l.color.R * cellColor.R * l.energy
-		targetColors[vertIndex].G += l.color.G * cellColor.G * l.energy
-		targetColors[vertIndex].B += l.color.B * cellColor.B * l.energy
+		if !l.dimensions.Contains(vertPos) {
+			return
+		}
 
-	}, onlyVisible)
+		cellColor.R = 0
+		cellColor.G = 0
+		cellColor.B = 0
+
+		x, y, z := l.convertToXYZIndicesVec(vertPos)
+
+		cell := l.getLightCell(x, y, z)
+		if cell != nil {
+
+			if cellColor.Value() < cell.color.Value() {
+				cellColor = cell.color
+			}
+
+			for _, light := range cell.useLights {
+				light.VertexLight(vertIndex, tri, model, targetColors)
+			}
+		}
+
+	}
+
+	targetColors[vertIndex].R += l.color.R * cellColor.R * l.energy
+	targetColors[vertIndex].G += l.color.G * cellColor.G * l.energy
+	targetColors[vertIndex].B += l.color.B * cellColor.B * l.energy
+
+}
+
+// Lights the mesh part of the model being rendered, placing the results into the targeted VertexColorChannel, only doing so
+// for the visible parts of the mesh if onlyVisible is set to true.
+func (l *LightVolume) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
+
+	// TODO: If distance from the mesh mesh part is too big, then we can just forget about it?
+
+	tri.ForEachVertexIndex(func(vertIndex int) {
+		l.VertexLight(vertIndex, tri, model, targetColors)
+	})
 
 }
 
@@ -1055,32 +1029,44 @@ func (l *LightVolume) LightVolumeBlur(cellRadius int, iterations int, blurStreng
 
 					count := 1
 					current := l.getLightCell(x, y, z)
-					baseColor := current.Color
+					baseColor := current.color
 
 					for rz := -cellRadius; rz <= cellRadius; rz++ {
 						for ry := -cellRadius; ry <= cellRadius; ry++ {
 							for rx := -cellRadius; rx <= cellRadius; rx++ {
-								if cell := getOgLightCell(x+int(rx), y+int(ry), z+int(rz)); cell != nil && !cell.Blocked {
+								if cell := getOgLightCell(x+rx, y+ry, z+rz); cell != nil && !cell.blocked {
 									count++
-									baseColor = baseColor.Add(cell.Color)
+									baseColor = baseColor.Add(cell.color)
 								}
 							}
 						}
 					}
 
-					current.Color = current.Color.Lerp(baseColor.MultiplyScalarRGB(1.0/float32(count)), blurStrength)
+					current.color = current.color.Lerp(baseColor.MultiplyScalarRGB(1.0/float32(count)), blurStrength)
 
 				}
 			}
 		}
 	}
+
 }
+
+type LightVolumePropagationDirection int
+
+const (
+	PropagationDirectionWorldDown LightVolumePropagationDirection = iota
+	PropagationDirectionWorldUp
+	PropagationDirectionWorldRight
+	PropagationDirectionWorldLeft
+	PropagationDirectionWorldForward
+	PropagationDirectionWorldBack
+)
 
 // Propagates light through all of the cells in the LightVolume.
 // iterations is the number of times to run the blur.
 // propagationStrength is how strong the light propagates (so how the light darkens over
 // each successive cell) and ranges from 0 to 1.
-func (l *LightVolume) LightVolumePropagate(iterations int, propagationStrength float32) {
+func (l *LightVolume) LightVolumePropagate(iterations int, propagationFalloff float32, propagationDirection LightVolumePropagationDirection) {
 
 	if iterations < 1 {
 		iterations = 1
@@ -1117,17 +1103,26 @@ func (l *LightVolume) LightVolumePropagate(iterations int, propagationStrength f
 					current := l.getLightCell(x, y, z)
 					ogCurrent := getOgLightCell(x, y, z)
 
-					for rz := -1; rz <= 1; rz++ {
-						for ry := -1; ry <= 1; ry++ {
-							for rx := -1; rx <= 1; rx++ {
+					switch propagationDirection {
+					case PropagationDirectionWorldUp:
+						y--
+					case PropagationDirectionWorldDown:
+						y++
+					case PropagationDirectionWorldRight:
+						x--
+					case PropagationDirectionWorldLeft:
+						x++
+					case PropagationDirectionWorldBack:
+						z++
+					case PropagationDirectionWorldForward:
+						z--
+					}
 
-								if cell := getOgLightCell(x+int(rx), y+int(ry), z+int(rz)); cell != nil && !cell.Blocked {
-									target := cell.Color
-									if target.Value() > ogCurrent.Color.Value() {
-										current.Color = ogCurrent.Color.Lerp(target, propagationStrength)
-									}
-								}
-							}
+					if cell := getOgLightCell(x, y, z); cell != nil && !cell.blocked {
+						target := cell.color
+
+						if target.Value() > ogCurrent.color.Value() {
+							current.color = ogCurrent.color.Lerp(target, propagationFalloff)
 						}
 					}
 
@@ -1135,16 +1130,178 @@ func (l *LightVolume) LightVolumePropagate(iterations int, propagationStrength f
 			}
 		}
 	}
+
 }
 
-// func (l *LightVolume) LightValuesSave() []Color {
-// 	return append(make([]Color, 0, len(l.lightValues)), l.lightValues...)
+// // Propagates light through all of the cells in the LightVolume.
+// // iterations is the number of times to run the blur.
+// // propagationStrength is how strong the light propagates (so how the light darkens over
+// // each successive cell) and ranges from 0 to 1.
+// func (l *LightVolume) LightVolumePropagate(iterations int, propagationFalloff float32, propagationDirection Vector3, propagationBleed float32) {
+
+// 	propagationDirection = propagationDirection.Invert()
+
+// 	if iterations < 1 {
+// 		iterations = 1
+// 	}
+
+// 	csx := l.cellSizeX / 2
+// 	csy := l.cellSizeY / 2
+// 	csz := l.cellSizeZ / 2
+
+// 	ogLightValues := make([]*LightVolumeCell, 0, len(l.lightValues))
+
+// 	for range iterations {
+
+// 		ogLightValues = ogLightValues[:0]
+
+// 		for _, l := range l.lightValues {
+// 			newL := *l
+// 			ogLightValues = append(ogLightValues, &newL)
+// 		}
+
+// 		getOgLightCell := func(indexX, indexY, indexZ int) *LightVolumeCell {
+// 			if indexX < 0 || indexY < 0 || indexZ < 0 || indexX >= l.cellCountX || indexY >= l.cellCountY || indexZ >= l.cellCountZ {
+// 				return nil
+// 			}
+// 			return ogLightValues[indexX+(indexY*l.cellCountX)+(indexZ*l.cellCountX*l.cellCountY)]
+// 		}
+
+// 		for wz := l.dimensions.Min.Z + csz; wz <= l.dimensions.Max.Z; wz += l.cellSizeZ {
+// 			for wy := l.dimensions.Min.Y + csy; wy <= l.dimensions.Max.Y; wy += l.cellSizeY {
+// 				for wx := l.dimensions.Min.X + csx; wx <= l.dimensions.Max.X; wx += l.cellSizeX {
+
+// 					x, y, z := l.convertToXYZIndices(wx, wy, wz)
+
+// 					current := l.getLightCell(x, y, z)
+// 					ogCurrent := getOgLightCell(x, y, z)
+
+// 					for rz := -1; rz <= 1; rz++ {
+// 						for ry := -1; ry <= 1; ry++ {
+// 							for rx := -1; rx <= 1; rx++ {
+
+// 								if rx == 0 && ry == 0 && rz == 0 {
+// 									continue
+// 								}
+
+// 								if cell := getOgLightCell(x+rx, y+ry, z+rz); cell != nil && !cell.blocked {
+// 									target := cell.color
+
+// 									if !propagationDirection.IsZero() {
+// 										vec := NewVector3(float32(rx), float32(ry), float32(rz)).Unit()
+// 										dot := vec.Dot(propagationDirection)
+// 										if dot < 0 {
+// 											dot = 0
+// 										}
+// 										if dot > 1 {
+// 											dot = 1
+// 										}
+
+// 										target = Color4{0, 0, 0, 1}.Lerp(target, dot+propagationBleed)
+// 									}
+
+// 									if target.Value() > ogCurrent.color.Value() {
+// 										current.color = ogCurrent.color.Lerp(target, propagationFalloff)
+// 									}
+// 								}
+// 							}
+// 						}
+// 					}
+
+// 				}
+// 			}
+// 		}
+// 	}
+
 // }
 
-// func (l *LightVolume) LightValuesLoad(colors []Color, forEach func(current, loading Color) Color) {
-// 	for i := 0; i < len(colors); i++ {
-// 		l.lightValues[i] = forEach(l.lightValues[i], colors[i])
+// func (l *LightVolume) LightVolumeProjectTextureOntoCells(cells []*LightVolumeCell, projectionDirection LightVolumePropagationDirection, lightEnergy float32, textureWidth, textureHeight int, texturePixels []byte) {
+
+// 	startX := math.MaxInt
+// 	startY := math.MaxInt
+// 	startZ := math.MaxInt
+
+// 	endX := math.MinInt
+// 	endY := math.MinInt
+// 	endZ := math.MinInt
+
+// 	if cells == nil {
+// 		cells = l.lightValues
 // 	}
+
+// 	for _, cell := range cells {
+// 		if cell.indexX < startX {
+// 			startX = cell.indexX
+// 		}
+
+// 		if cell.indexY < startY {
+// 			startY = cell.indexY
+// 		}
+
+// 		if cell.indexZ < startZ {
+// 			startZ = cell.indexZ
+// 		}
+
+// 		if cell.indexX > endX {
+// 			endX = cell.indexX
+// 		}
+
+// 		if cell.indexY > endY {
+// 			endY = cell.indexY
+// 		}
+
+// 		if cell.indexZ > endZ {
+// 			endZ = cell.indexZ
+// 		}
+// 	}
+
+// 	for _, cell := range cells {
+
+// 		switch projectionDirection {
+// 		case PropagationDirectionWorldRight:
+// 			tx := float32(cell.indexZ-startZ) / float32(endZ-startZ)
+// 			ty := float32(cell.indexY-startY) / float32(endY-startY)
+
+// 			ty = 1 - ty
+
+// 			ttx := int(tx * float32(textureWidth))
+// 			tty := int(ty * float32(textureHeight))
+
+// 			if ttx < 0 {
+// 				ttx = 0
+// 			}
+
+// 			if tty < 0 {
+// 				tty = 0
+// 			}
+
+// 			if ttx >= textureWidth {
+// 				ttx = textureWidth - 1
+// 			}
+
+// 			if tty >= textureHeight {
+// 				tty = textureHeight - 1
+// 			}
+
+// 			// fmt.Println(cell.indexZ, cell.indexY, ttx, tty)
+// 			// fmt.Println((ttx + tty*textureWidth) * 4)
+
+// 			cR := texturePixels[((tty*textureWidth)+ttx)*4]
+// 			cG := texturePixels[((tty*textureWidth)+ttx)*4+1]
+// 			cB := texturePixels[((tty*textureWidth)+ttx)*4+2]
+// 			cA := texturePixels[((tty*textureWidth)+ttx)*4+3]
+
+// 			colorA := float32(cA) / 255
+// 			colorR := float32(cR) / 255 * colorA
+// 			colorG := float32(cG) / 255 * colorA
+// 			colorB := float32(cB) / 255 * colorA
+
+// 			cell.SetColorRGB(colorR*lightEnergy, colorG*lightEnergy, colorB*lightEnergy)
+
+// 		}
+
+// 	}
+
 // }
 
 func (l *LightVolume) getLightCell(indexX, indexY, indexZ int) *LightVolumeCell {
@@ -1158,7 +1315,7 @@ func (l *LightVolume) LightVolumeDebugDraw(screen *ebiten.Image, camera *Camera)
 
 	l.LightVolumeForEachCell(func(position Vector3, cell *LightVolumeCell) {
 
-		if cell.Blocked {
+		if cell.blocked {
 			return
 		}
 
@@ -1172,7 +1329,7 @@ func (l *LightVolume) LightVolumeDebugDraw(screen *ebiten.Image, camera *Camera)
 			return
 		}
 
-		strokeColor := cell.Color.MultiplyScalarRGB(0.5).AddRGBA(0.5, 0.5, 0.5, 0)
+		strokeColor := cell.color.MultiplyScalarRGB(0.5).AddRGBA(0.5, 0.5, 0.5, 0)
 
 		// v := uint16(65535 * dist)
 		// color := color.NRGBA64{0, v, 0, v}
@@ -1241,36 +1398,6 @@ func (l *LightVolume) LightVolumeCellCount(dimension int) int {
 	return l.cellCountZ
 }
 
-// On returns if the lightmap is on or not.
-func (l *LightVolume) On() bool {
-	return l.on
-}
-
-// SetOn sets the lightmap to be on or off.
-func (l *LightVolume) SetOn(on bool) {
-	l.on = on
-}
-
-// Returns the global color associated with the LightVolume (which multiplies to color the cells of the LightVolume).
-func (l *LightVolume) Color() Color {
-	return l.color
-}
-
-// Sets the global color associated with the LightVolume (which multiplies to color the cells of the LightVolume).
-func (l *LightVolume) SetColor(color Color) {
-	l.color = color
-}
-
-// Returns the energy associated with the LightVolume (which multiplies to color the cells of the LightVolume).
-func (l *LightVolume) Energy() float32 {
-	return l.energy
-}
-
-// Sets the energy associated with the LightVolume (which multiplies to color the cells of the LightVolume).
-func (l *LightVolume) SetEnergy(energy float32) {
-	l.energy = energy
-}
-
 // Type returns the type of INode this is (NodeTypeLightVolume).
 func (l *LightVolume) Type() NodeType {
 	return NodeTypeLightVolume
@@ -1278,12 +1405,16 @@ func (l *LightVolume) Type() NodeType {
 
 // LightVolumeCell represents a cell in the LightVolume.
 type LightVolumeCell struct {
-	Color   Color
-	Blocked bool
-	indexX  int
-	indexY  int
-	indexZ  int
-	Data    any
+	lightVolume    *LightVolume
+	lightDirection Vector3
+	diffuseness    float32
+	color          Color4
+	blocked        bool
+	indexX         int
+	indexY         int
+	indexZ         int
+	data           any
+	useLights      []ILight
 }
 
 func (c *LightVolumeCell) clone() *LightVolumeCell {
@@ -1301,6 +1432,45 @@ func (c LightVolumeCell) IndexY() int {
 
 func (c LightVolumeCell) IndexZ() int {
 	return c.indexZ
+}
+
+func (c LightVolumeCell) Color() Color4 {
+	return c.color
+}
+
+func (c *LightVolumeCell) SetColor(color Color4) {
+	c.color = color
+}
+
+func (c *LightVolumeCell) SetColorRGB(r, g, b float32) {
+	c.color.R = r
+	c.color.G = g
+	c.color.B = b
+}
+
+func (c *LightVolumeCell) SetColorMonochrome(value float32) {
+	c.color.R = value
+	c.color.G = value
+	c.color.B = value
+}
+
+func (c LightVolumeCell) Blocked() bool {
+	return c.blocked
+}
+
+func (c *LightVolumeCell) SetBlocked(blocked bool) {
+	c.blocked = blocked
+}
+
+func (c *LightVolumeCell) UseLights(lights ...ILight) {
+	for _, l := range lights {
+		c.lightVolume.useLightsRenderSet.Add(l)
+	}
+	c.useLights = append(c.useLights, lights...)
+}
+
+func (c *LightVolumeCell) LightsInUse() []ILight {
+	return append(make([]ILight, 0, len(c.useLights)), c.useLights...)
 }
 
 /////

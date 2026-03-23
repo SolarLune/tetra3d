@@ -7,10 +7,8 @@ import (
 // sortingTriangle is used specifically for sorting triangles when rendering. Less data means more data fits in cache,
 // which means sorting is faster.
 type sortingTriangle struct {
-	// Triangle *Triangle
-	depth         float32
-	TriangleID    int
-	vertexIndices []int
+	Triangle *Triangle
+	depth    float32
 }
 
 type sortingTriangleBin struct {
@@ -31,10 +29,9 @@ func newSortingTriangleBucket() *sortingTriangleBucket {
 	return bucket
 }
 
-func (s *sortingTriangleBucket) AddTriangle(triID int, depth float32, vertexIndices []int) {
-	s.unsetTris[s.unsetTriIndex].TriangleID = triID
+func (s *sortingTriangleBucket) AddTriangle(tri *Triangle, depth float32) {
+	s.unsetTris[s.unsetTriIndex].Triangle = tri
 	s.unsetTris[s.unsetTriIndex].depth = depth
-	s.unsetTris[s.unsetTriIndex].vertexIndices = vertexIndices
 	s.unsetTriIndex++
 }
 
@@ -59,8 +56,7 @@ func (s *sortingTriangleBucket) Sort(minRange, maxRange float32) {
 		}
 
 		s.bins[targetBin].triangles[s.bins[targetBin].triangleIndex].depth = s.unsetTris[i].depth
-		s.bins[targetBin].triangles[s.bins[targetBin].triangleIndex].TriangleID = s.unsetTris[i].TriangleID
-		s.bins[targetBin].triangles[s.bins[targetBin].triangleIndex].vertexIndices = s.unsetTris[i].vertexIndices
+		s.bins[targetBin].triangles[s.bins[targetBin].triangleIndex].Triangle = s.unsetTris[i].Triangle
 		s.bins[targetBin].triangleIndex++
 
 	}
@@ -82,7 +78,7 @@ func (s *sortingTriangleBucket) Clear() {
 	s.unsetTriIndex = 0
 }
 
-func (s *sortingTriangleBucket) ForEach(forEach func(triIndex, triID int, vertexIndices []int)) {
+func (s *sortingTriangleBucket) ForEach(forEach func(triIndex int, triangle *Triangle)) {
 
 	if s.IsEmpty() {
 		return
@@ -97,7 +93,7 @@ func (s *sortingTriangleBucket) ForEach(forEach func(triIndex, triID int, vertex
 				if ti >= bin.triangleIndex {
 					break
 				}
-				forEach(triIndex, bin.triangles[ti].TriangleID, bin.triangles[ti].vertexIndices)
+				forEach(triIndex, bin.triangles[ti].Triangle)
 				triIndex++
 			}
 		}
@@ -108,7 +104,7 @@ func (s *sortingTriangleBucket) ForEach(forEach func(triIndex, triID int, vertex
 				if ti >= bin.triangleIndex {
 					break
 				}
-				forEach(triIndex, bin.triangles[ti].TriangleID, bin.triangles[ti].vertexIndices)
+				forEach(triIndex, bin.triangles[ti].Triangle)
 				triIndex++
 			}
 		}

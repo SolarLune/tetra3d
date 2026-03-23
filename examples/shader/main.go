@@ -33,7 +33,7 @@ func (g *Game) Init() {
 
 	g.Scene = tetra3d.NewScene("shader test scene")
 
-	mesh := tetra3d.NewCubeMesh()
+	mesh := tetra3d.NewCubeMesh(2, 2, 2)
 
 	// Here we specify a fragment shader...
 	_, err := mesh.MeshParts[0].Material.SetShaderText([]byte(`

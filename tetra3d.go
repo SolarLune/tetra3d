@@ -18,8 +18,9 @@ var colorVertexList = make([]ebiten.Vertex, MaxTriangleCount*3)
 var normalVertexList = make([]ebiten.Vertex, MaxTriangleCount*3)
 var depthVertexList = make([]ebiten.Vertex, MaxTriangleCount*3)
 var indexList = make([]uint16, MaxTriangleCount*3)
+
 var vertexListIndex = 0
-var indexListIndex = 0
+
 var indexListStart = 0
 
 var globalVertexTransforms = make([]Vector4, MaxTriangleCount*3)

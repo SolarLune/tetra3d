@@ -47,9 +47,9 @@ func (g *Game) Init() {
 	g.System = examples.NewBasicSystemHandler(g)
 
 	light := tetra3d.NewPointLight("camera light", 1, 1, 1, 2)
-	light.Range = 10
+	light.SetRange(10)
 	light.Move(0, 1, -2)
-	light.SetOn(false)
+	light.SetVisible(false, false)
 	g.Camera.AddChildren(light)
 
 }
@@ -75,7 +75,7 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
 		pointLight := g.Camera.Get("camera light").(*tetra3d.PointLight)
-		pointLight.SetOn(!pointLight.On())
+		pointLight.SetVisible(!pointLight.IsVisible(), false)
 	}
 
 	g.Camera.Update()

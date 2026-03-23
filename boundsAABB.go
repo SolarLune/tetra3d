@@ -1,6 +1,8 @@
 package tetra3d
 
-import "github.com/solarlune/tetra3d/math32"
+import (
+	"github.com/solarlune/tetra3d/math32"
+)
 
 // BoundingAABB represents a 3D AABB (Axis-Aligned Bounding Box), a 3D cube of varying width, height, and depth that cannot rotate.
 // The primary purpose of a BoundingAABB is, like the other Bounding* Nodes, to perform intersection testing between itself and other
@@ -8,7 +10,7 @@ import "github.com/solarlune/tetra3d/math32"
 type BoundingAABB struct {
 	*Node
 	internalSize Vector3
-	Dimensions   Dimensions // Dimensions represents the size of the AABB after transformation.
+	dimensions   Dimensions // Dimensions represents the size of the AABB after transformation.
 }
 
 // NewBoundingAABB returns a new BoundingAABB Node.
@@ -27,6 +29,18 @@ func NewBoundingAABB(name string, width, height, depth float32) *BoundingAABB {
 		Node:         NewNode(name),
 		internalSize: Vector3{width, height, depth},
 	}
+	bounds.Node.onTransformUpdate = bounds.updateSize
+	bounds.updateSize()
+	bounds.owner = bounds
+	return bounds
+}
+
+func NewBoundingAABBFromDimensions(name string, dim Dimensions) *BoundingAABB {
+	bounds := &BoundingAABB{
+		Node:         NewNode(name),
+		internalSize: dim.Size(),
+	}
+	bounds.SetWorldPositionVec(dim.Center())
 	bounds.Node.onTransformUpdate = bounds.updateSize
 	bounds.updateSize()
 	bounds.owner = bounds
@@ -86,7 +100,7 @@ func (box *BoundingAABB) updateSize() {
 
 	}
 
-	box.Dimensions = dimensions
+	box.dimensions = dimensions
 
 }
 
@@ -113,6 +127,13 @@ func (box *BoundingAABB) SetDimensions(newWidth, newHeight, newDepth float32) {
 
 }
 
+func (box *BoundingAABB) Dimensions() Dimensions {
+	dim := box.dimensions
+	dim.Max = box.Transform().MultVec(dim.Max)
+	dim.Min = box.Transform().MultVec(dim.Min)
+	return dim.Canon()
+}
+
 // Clone returns a new BoundingAABB.
 func (box *BoundingAABB) Clone() INode {
 	clone := NewBoundingAABB(box.name, box.internalSize.X, box.internalSize.Y, box.internalSize.Z)
@@ -130,7 +151,7 @@ func (box *BoundingAABB) ClosestPoint(point Vector3) Vector3 {
 	out := point
 	pos := box.WorldPosition()
 
-	half := box.Dimensions.Size().Scale(0.5)
+	half := box.dimensions.Size().Scale(0.5)
 
 	if out.X > pos.X+half.X {
 		out.X = pos.X + half.X
@@ -163,9 +184,9 @@ func (box *BoundingAABB) normalFromContactPoint(contactPoint Vector3) Vector3 {
 
 	p := contactPoint.Sub(box.WorldPosition())
 	d := Vector3{
-		box.Dimensions.Width() / 2,
-		box.Dimensions.Height() / 2,
-		box.Dimensions.Depth() / 2,
+		box.dimensions.Width() / 2,
+		box.dimensions.Height() / 2,
+		box.dimensions.Depth() / 2,
 	}
 
 	nx := p.X / d.X
@@ -190,12 +211,12 @@ func (box *BoundingAABB) Colliding(other IBoundingObject) bool {
 func (box *BoundingAABB) ContainsAABB(other *BoundingAABB) bool {
 
 	mePos := box.WorldPosition()
-	meMin := mePos.Sub(box.Dimensions.Center())
-	meMax := mePos.Add(box.Dimensions.Center())
+	meMin := mePos.Sub(box.dimensions.Center())
+	meMax := mePos.Add(box.dimensions.Center())
 
 	otherPos := other.WorldPosition()
-	otherMin := otherPos.Sub(other.Dimensions.Center())
-	otherMax := otherPos.Add(other.Dimensions.Center())
+	otherMin := otherPos.Sub(other.dimensions.Center())
+	otherMax := otherPos.Add(other.dimensions.Center())
 
 	return otherMin.X > meMin.X && otherMin.Y > meMin.Y && otherMin.Z > meMin.Z && otherMax.X < meMax.X && otherMax.Y < meMax.Y && otherMax.Z < meMax.Z
 }
@@ -255,8 +276,8 @@ func (box *BoundingAABB) CollisionTest(settings CollisionTestSettings) *Collisio
 func (box *BoundingAABB) PointInside(point Vector3) bool {
 
 	position := box.WorldPosition()
-	min := box.Dimensions.Min.Add(position)
-	max := box.Dimensions.Max.Add(position)
+	min := box.dimensions.Min.Add(position)
+	max := box.dimensions.Max.Add(position)
 	margin := float32(0.01)
 
 	if point.X >= min.X-margin && point.X <= max.X+margin &&

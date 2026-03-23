@@ -57,7 +57,7 @@ type Material struct {
 	id                uint32
 	library           *Library       // library is a reference to the Library that this Material came from.
 	name              string         // Name is the name of the Material.
-	Color             Color          // The overall color of the Material.
+	Color             Color4         // The overall color of the Material.
 	Texture           *ebiten.Image  // The texture applied to the Material.
 	UseTexture        bool           // Whether to use the texture while rendering or not.
 	TexturePath       string         // The path to the texture, if it was not packed into the exporter.
@@ -128,7 +128,7 @@ func NewMaterial(name string) *Material {
 	mat := &Material{
 		id:                    materialID,
 		name:                  name,
-		Color:                 NewColor(1, 1, 1, 1),
+		Color:                 NewColor4(1, 1, 1, 1),
 		properties:            NewProperties(),
 		TextureFilterMode:     ebiten.FilterNearest,
 		textureWrapMode:       ebiten.AddressRepeat,

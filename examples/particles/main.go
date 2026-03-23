@@ -112,7 +112,7 @@ func (g *Game) Init() {
 		particle.Model.MoveVec(diff.Unit().Scale(0.01))
 	}
 
-	particleColor := tetra3d.NewColor(0.25, 0.75, 1, 1)
+	particleColor := tetra3d.NewColor4(0.25, 0.75, 1, 1)
 	settings.ColorCurve.Add(particleColor.SetAlpha(0), 0)
 	settings.ColorCurve.Add(particleColor, 0.1)
 	settings.ColorCurve.Add(colors.White(), 0.9)

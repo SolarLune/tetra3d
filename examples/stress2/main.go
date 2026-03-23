@@ -81,7 +81,7 @@ func (g *Game) Init() {
 	}
 
 	// We can reuse the same mesh for all of the models.
-	cubeMesh := tetra3d.NewCubeMesh()
+	cubeMesh := tetra3d.NewCubeMesh(2, 2, 2)
 
 	// Set up how the cube should appear.
 	mat := cubeMesh.MeshParts[0].Material
@@ -159,7 +159,7 @@ func (g *Game) Update() error {
 		dyn := g.Scene.Root.Get("DynamicBatching").(*tetra3d.Model)
 
 		if len(dyn.DynamicBatchModels) == 0 {
-			dyn.DynamicBatchAdd(dyn.Mesh.MeshParts[0], g.Cubes...) // Note that Model.DynamicBatchAdd() can return an error if batching the specified objects would push it over the vertex limit.
+			dyn.DynamicBatchAdd(dyn.Mesh().MeshParts[0], g.Cubes...) // Note that Model.DynamicBatchAdd() can return an error if batching the specified objects would push it over the vertex limit.
 		} else {
 			dyn.DynamicBatchRemove(g.Cubes...)
 		}

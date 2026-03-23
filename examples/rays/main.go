@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	_ "embed"
-	"fmt"
 
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
@@ -51,8 +50,6 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	fmt.Println(g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject)))
-
 	g.Camera.MouseRayTest(tetra3d.MouseRayTestOptions{
 		// Depth: g.Camera.Far(),
 		TestAgainst: g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject)),
@@ -69,10 +66,10 @@ func (g *Game) Update() error {
 
 			// If that's the case, we can just go with the material color instead.
 			if err != nil && err.Error() == tetra3d.ErrorObjectHitNotBoundingTriangles {
-				vc = hit.Object.Parent().(*tetra3d.Model).Mesh.MeshParts[0].Material.Color
+				vc = hit.Object.Parent().(*tetra3d.Model).Mesh().MeshParts[0].Material.Color
 			}
 
-			tetra3d.NewVertexSelection().SelectByMeshPartIndex(marker.(*tetra3d.Model).Mesh, 1).SetColor(0, vc)
+			tetra3d.NewVertexSelection().SelectByMeshPartIndex(marker.(*tetra3d.Model).Mesh(), 1).SetColor(0, vc)
 
 			marker.SetWorldPositionVec(hit.Position.Add(hit.Normal.Scale(0.5)))
 

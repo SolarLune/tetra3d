@@ -32,13 +32,13 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float32) *
 	// If the object is too small (less than 5 units large), it may not be worth doing
 	maxDim := bt.Mesh.Dimensions.MaxDimension()
 
-	gridSize := 0
+	gridSize := float32(0)
 
 	if broadphaseGridSize > 0 {
-		gridSize = int(math32.Ceil(maxDim / broadphaseGridSize))
+		gridSize = math32.Ceil(maxDim / broadphaseGridSize)
 	}
 
-	bt.Broadphase = NewBroadphase(gridSize, bt.WorldPosition(), mesh)
+	bt.Broadphase = NewBroadphase(gridSize, gridSize, gridSize, bt)
 
 	bt.owner = bt
 
@@ -47,8 +47,9 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float32) *
 
 // DisableBroadphase turns off the broadphase system for collision detection by settings its grid and cell size to 0.
 // To turn broadphase collision back on, simply call Broadphase.Resize(gridSize) with a gridSize value above 0.
-func (bt *BoundingTriangles) DisableBroadphase() {
-	bt.Broadphase.Resize(0)
+func (bt *BoundingTriangles) EnableBroadphase(enabled bool) {
+	// bt.Broadphase.Resize(0)
+	bt.Broadphase.enabled = enabled
 }
 
 // Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
@@ -63,18 +64,21 @@ func (bt *BoundingTriangles) UpdateTransform() {
 	bt.BoundingAABB.MoveVec(rot)
 	bt.BoundingAABB.Transform()
 
-	if bt.Broadphase != nil {
-		bt.Broadphase.center.SetWorldTransform(transform)
-		bt.Broadphase.center.MoveVec(rot)
-		bt.Broadphase.center.Transform() // Update the transform
-	}
+}
 
+// Dimensions returns the transformed dimensions of the Model's mesh.
+func (bt *BoundingTriangles) Dimensions() Dimensions {
+	dim := bt.Mesh.Dimensions
+	transform := bt.Transform()
+	dim.Min = transform.MultVec(dim.Min)
+	dim.Max = transform.MultVec(dim.Max)
+	return dim.Canon()
 }
 
 // Clone returns a new BoundingTriangles Node with the same values set as the original.
 func (bt *BoundingTriangles) Clone() INode {
 	clone := NewBoundingTriangles(bt.name, bt.Mesh, 0) // Broadphase size is set to 0 so cloning doesn't create the broadphase triangle sets
-	clone.Broadphase = bt.Broadphase.Clone()
+	clone.Broadphase = bt.Broadphase.Clone(clone)
 	clone.Node = bt.Node.clone(clone).(*Node)
 	clone.Node.onTransformUpdate = clone.UpdateTransform
 	if runCallbacks && clone.Callbacks().OnClone != nil {

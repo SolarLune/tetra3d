@@ -489,6 +489,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if dataMap, isMap := mesh.Extras.(map[string]any); isMap {
 
+				if autoSubdivide, exists := dataMap["t3dAutoSubdivide__"]; exists {
+					newMesh.AutoSubdivide = autoSubdivide.(float64) > 0
+				}
+
 				if vcNames, exists := dataMap["t3dVertexColorNames__"]; exists {
 					for index, name := range vcNames.([]any) {
 						newMesh.VertexColorChannelNames[name.(string)] = index
@@ -508,6 +512,31 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					} else {
 						newMesh.Unique = MeshUniqueMesh
 					}
+				}
+
+				if value, exists := dataMap["t3dAutoSubdivisionLevels__"]; exists {
+
+					levels := value.([]any)
+					for _, level := range levels {
+
+						data := level.(map[string]any)
+
+						getOrDefaultFloat := func(propMap map[string]any, key string, defaultValue float32) float32 {
+							if value, keyExists := propMap[key]; keyExists {
+								return float32(value.(float64))
+							}
+							return defaultValue
+						}
+
+						d := getOrDefaultFloat(data, "distance", 40)
+						newMesh.autoSubdivisionLevels = append(newMesh.autoSubdivisionLevels, AutoSubdivisionLevel{
+							DistanceSquared:     d * d,
+							SubdivisionLevel:    int(getOrDefaultFloat(data, "subdivisionLevel", 1)),
+							MinimumTriangleSize: getOrDefaultFloat(data, "minimumTriangleSize", 0),
+						})
+
+					}
+
 				}
 
 				// Non-Tetra3D custom data
@@ -609,7 +638,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 						for i, colorData := range colors {
 
 							// colors are exported from Blender as linear, but display as sRGB so we'll convert them here
-							color := NewColor(
+							color := NewColor4(
 								float32(colorData[0])/math.MaxUint16,
 								float32(colorData[1])/math.MaxUint16,
 								float32(colorData[2])/math.MaxUint16,
@@ -655,6 +684,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 
 			}
+
+			newMesh.allocateVertexBuffers(len(vertexData))
 
 			newMesh.AddVertices(vertexData...)
 
@@ -903,16 +934,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					obj.(*Model).AutoBatchMode = int(s)
 				}
 
-				if nodeHasProp(node, "t3dObjectType__") && nodeGetProp(node, "t3dObjectType__").(float64) == 2 {
-					gridSize := [3]float32{2, 2, 2}
-					if value := nodeGetProp(node, "t3dLightVolumeCellSize"); value != nil {
-						gridSize[0] = float32(value.([]float64)[0])
-						gridSize[1] = float32(value.([]float64)[1])
-						gridSize[2] = float32(value.([]float64)[2])
-					}
-					obj = NewLightVolumeFromModel(obj.(*Model), gridSize[0], gridSize[1], gridSize[2])
-				}
-
 			}
 
 		} else if node.Camera != nil {
@@ -972,19 +993,19 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if lightData.Type == lightspunctual.TypeDirectional {
 				directionalLight := NewDirectionalLight(node.Name, 1, 1, 1, float32(*lightData.Intensity)) // Sun is in "energy"
-				directionalLight.color = NewColor(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
+				directionalLight.color = NewColor4(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
 				obj = directionalLight
 			} else if lightData.Type == lightspunctual.TypePoint {
 				pointLight := NewPointLight(node.Name, 1, 1, 1, float32(*lightData.Intensity)/80) // Point lights have wattage energy
-				pointLight.color = NewColor(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
+				pointLight.color = NewColor4(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
 				if !math.IsInf(*lightData.Range, 0) {
-					pointLight.Range = float32(*lightData.Range)
+					pointLight.SetRange(float32(*lightData.Range))
 				}
 				obj = pointLight
 			} else {
 				// Any other unsupported light type just gets turned into an ambient light (along with ambient lights)
 				light := NewAmbientLight(node.Name, 1, 1, 1, float32(*lightData.Intensity)/80)
-				light.color = NewColor(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
+				light.color = NewColor4(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
 				obj = light
 			}
 
@@ -1109,16 +1130,16 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							boundsSize := getOrDefaultFloatSlice("t3dAABBCustomSize__", []float32{2, 2, 2})
 							aabb = NewBoundingAABB("BoundingAABB", boundsSize[0], boundsSize[1], boundsSize[2])
 
-						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-							mesh := obj.(*Model).Mesh
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+							mesh := obj.(*Model).mesh
 							dim := mesh.Dimensions
 							aabb = NewBoundingAABB("BoundingAABB", dim.Width(), dim.Height(), dim.Depth())
 						}
 
 						if aabb != nil {
 
-							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								aabb.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+								aabb.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(aabb)
@@ -1135,16 +1156,16 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							height := getOrDefaultFloat("t3dCapsuleCustomHeight__", 2)
 							radius := getOrDefaultFloat("t3dCapsuleCustomRadius__", 0.5)
 							capsule = NewBoundingCapsule("BoundingCapsule", height, radius)
-						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-							mesh := obj.(*Model).Mesh
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+							mesh := obj.(*Model).mesh
 							dim := mesh.Dimensions
 							capsule = NewBoundingCapsule("BoundingCapsule", dim.Height(), math32.Max(dim.Width(), dim.Depth())/2)
 						}
 
 						if capsule != nil {
 
-							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								capsule.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+								capsule.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(capsule)
@@ -1160,10 +1181,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 						if sphereCustomEnabled := getOrDefaultBool("t3dSphereCustomEnabled__", false); sphereCustomEnabled {
 							radius := getOrDefaultFloat("t3dSphereCustomRadius__", 1)
 							sphere = NewBoundingSphere("BoundingSphere", radius)
-						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 
 							model := obj.(*Model)
-							dim := model.Mesh.Dimensions
+							dim := model.mesh.Dimensions
 							scale := model.WorldScale()
 
 							dim.Min = dim.Min.Mult(scale)
@@ -1174,8 +1195,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 						if sphere != nil {
 
-							if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
-								sphere.SetLocalPositionVec(obj.(*Model).Mesh.Dimensions.Center())
+							if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
+								sphere.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
 
 							obj.AddChildren(sphere)
@@ -1186,7 +1207,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					case 4: // Triangles
 
-						if obj.Type().Is(NodeTypeModel) && obj.(*Model).Mesh != nil {
+						if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 
 							gridSize := float32(20)
 
@@ -1194,7 +1215,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 								gridSize = getOrDefaultFloat("t3dTrianglesCustomBroadphaseGridSize__", 20)
 							}
 
-							triangles := NewBoundingTriangles("BoundingTriangles", obj.(*Model).Mesh, gridSize)
+							triangles := NewBoundingTriangles("BoundingTriangles", obj.(*Model).mesh, gridSize)
 
 							obj.AddChildren(triangles)
 						}
@@ -1240,6 +1261,16 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		// 	sec.SectorDetectionType = SectorDetectionType(sectorDetection)
 		// 	obj.(*Model).sector = sec
 		// }
+
+		if nodeHasProp(node, "t3dObjectType__") && nodeGetProp(node, "t3dObjectType__").(float64) == 2 {
+			gridSize := [3]float32{4, 4, 4}
+			if value := nodeGetProp(node, "t3dLightVolumeCellSize__"); value != nil {
+				gridSize[0] = float32(value.([]any)[0].(float64))
+				gridSize[1] = float32(value.([]any)[1].(float64))
+				gridSize[2] = float32(value.([]any)[2].(float64))
+			}
+			obj = NewLightVolumeFromModel(obj.(*Model), gridSize[0], gridSize[1], gridSize[2])
+		}
 
 		if value := nodeGetProp(node, "t3dSectorType__"); value != nil {
 			obj.SetSectorType(SectorType(value.(float64)))
@@ -1306,7 +1337,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			}
 
-			for vertIndex, boneIndices := range model.Mesh.VertexBones {
+			for vertIndex, boneIndices := range model.mesh.VertexBones {
 				model.bones = append(model.bones, []*Node{})
 
 				for _, boneID := range boneIndices {
@@ -1463,7 +1494,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				if wc, exists := props["ambient color"]; exists {
 					wcc := wc.([]any)
-					worldColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1).ConvertTosRGB()
+					worldColor := NewColor4(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), 1).ConvertTosRGB()
 					world.AmbientLight.color = worldColor
 				}
 
@@ -1473,7 +1504,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				if cc, exists := props["clear color"]; exists {
 					wcc := cc.([]any)
-					clearColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64))).ConvertTosRGB()
+					clearColor := NewColor4(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64))).ConvertTosRGB()
 					world.ClearColor = clearColor
 				}
 
@@ -1512,7 +1543,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				if v, exists := props["fog color"]; exists {
 					wcc := v.([]any)
-					fogColor := NewColor(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64))).ConvertTosRGB()
+					fogColor := NewColor4(float32(wcc[0].(float64)), float32(wcc[1].(float64)), float32(wcc[2].(float64)), float32(wcc[3].(float64))).ConvertTosRGB()
 					world.FogColor = fogColor
 				}
 
@@ -1547,6 +1578,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		if s.Extras != nil {
 			extras := s.Extras.(map[string]any)
+
 			if wn, exists := extras["t3dCurrentWorld__"]; exists {
 				scene.World = library.WorldByName(wn.(string))
 			}
@@ -1744,7 +1776,7 @@ func handleGameProperties(p any) (string, any) {
 		}
 	} else if propType == 5 {
 		colorValues := getOrDefaultFloatArray(property, "valueColor", []float32{1, 1, 1, 1})
-		color := NewColor(float32(colorValues[0]), float32(colorValues[1]), float32(colorValues[2]), float32(colorValues[3])).ConvertTosRGB()
+		color := NewColor4(float32(colorValues[0]), float32(colorValues[1]), float32(colorValues[2]), float32(colorValues[3])).ConvertTosRGB()
 		value = color
 	} else if propType == 6 {
 		vecValues := getOrDefaultFloatArray(property, "valueVector3D", []float32{0, 0, 0})

@@ -9,13 +9,19 @@ package tetra3d
 // If so, it proceeds to the broadphase check, where it sees which set(s) of triangles the colliding
 // object could be colliding with, and then returns that set for finer examination.
 type Broadphase struct {
-	GridCellCount int           // The number of cells in the broadphase grid
-	cellSize      float32       // The size of each cell in the grid
-	center        *Node         // The center node of the broadphase
-	workingAABB   *BoundingAABB // The working-process AABB used to determine which triangles belong in which cells
-	TriSets       [][][][]int   // The sets of triangles
-	allTriSet     Set[int]      // A set containing all triangles
-	mesh          *Mesh         // The mesh used for the Broadphase object
+	TriSets [][]int // The sets of triangles
+
+	boundingTriangles *BoundingTriangles
+	dimensions        Dimensions
+	enabled           bool
+
+	cellSizeX float32
+	cellSizeY float32
+	cellSizeZ float32
+
+	cellCountX int
+	cellCountY int
+	cellCountZ int
 }
 
 // NewBroadphase returns a new Broadphase object.
@@ -24,239 +30,325 @@ type Broadphase struct {
 // it's being used for a mesh, and should be the position of the BoundingTriangles if it's being used for
 // collision testing.
 // mesh is the Mesh to be used for broadphase testing.
-func NewBroadphase(gridCellCount int, worldPosition Vector3, mesh *Mesh) *Broadphase {
+func NewBroadphase(gridSizeX, gridSizeY, gridSizeZ float32, boundingTris *BoundingTriangles) *Broadphase {
 
 	b := &Broadphase{
-		mesh:        mesh,
-		center:      NewNode("broadphase center"),
-		workingAABB: NewBoundingAABB("bounding aabb", 1, 1, 1),
-		allTriSet:   newSet[int](),
+
+		boundingTriangles: boundingTris,
+		dimensions:        boundingTris.Mesh.Dimensions, // Specifically the untransformed dimensions
+
+		cellSizeX: gridSizeX,
+		cellSizeY: gridSizeY,
+		cellSizeZ: gridSizeZ,
+
+		enabled: true,
 	}
 
-	b.center.AddChildren(b.workingAABB)
-	b.center.SetWorldPositionVec(worldPosition.Add(mesh.Dimensions.Center()))
-	b.center.Transform() // Update the transform so that when resizing, the aabb can properly check all triangles
-	b.Resize(gridCellCount)
+	b.Resize(gridSizeX, gridSizeY, gridSizeZ)
 
 	return b
 }
 
 // Clone clones the Broadphase.
-func (b *Broadphase) Clone() *Broadphase {
-	newBroadphase := NewBroadphase(0, b.center.WorldPosition(), b.mesh)
-	newBroadphase.center = b.center.Clone().(*Node)
-	newBroadphase.workingAABB = newBroadphase.center.children[0].(*BoundingAABB)
-	newBroadphase.GridCellCount = b.GridCellCount
-	newBroadphase.cellSize = b.cellSize
+func (b *Broadphase) Clone(newBoundingTriangles *BoundingTriangles) *Broadphase {
+	newBroadphase := NewBroadphase(b.cellSizeX, b.cellSizeY, b.cellSizeZ, newBoundingTriangles)
 
-	ts := make([][][][]int, len(b.TriSets))
+	ts := make([][]int, 0, len(b.TriSets))
 
-	for i := range b.TriSets {
-		ts[i] = make([][][]int, len(b.TriSets[i]))
-		for j := range b.TriSets[i] {
-			ts[i][j] = make([][]int, len(b.TriSets[i][j]))
-			for k := range b.TriSets[i][j] {
-				ts[i][j][k] = make([]int, len(b.TriSets[i][j][k]))
-				copy(ts[i][j][k], b.TriSets[i][j][k])
-			}
-		}
+	for _, set := range b.TriSets {
+		ts = append(ts, append([]int{}, set...))
 	}
 
 	newBroadphase.TriSets = ts
-	newBroadphase.allTriSet = b.allTriSet.Clone()
+
+	newBroadphase.enabled = b.enabled
+
+	newBroadphase.cellSizeX = b.cellSizeX
+	newBroadphase.cellSizeY = b.cellSizeY
+	newBroadphase.cellSizeZ = b.cellSizeZ
+
+	newBroadphase.cellCountX = b.cellCountX
+	newBroadphase.cellCountY = b.cellCountY
+	newBroadphase.cellCountZ = b.cellCountZ
 
 	return newBroadphase
 }
 
 // Resize resizes the Broadphase struct, using the new gridSize for how big in units each cell in the grid should be.
-func (b *Broadphase) Resize(gridSize int) {
-	b.GridCellCount = gridSize
+func (b *Broadphase) Resize(cellSizeX, cellSizeY, cellSizeZ float32) {
 
-	if gridSize <= 0 {
-		gridSize = 1
+	if cellSizeX <= 0 {
+		cellSizeX = 1
 	}
 
-	maxDim := b.mesh.Dimensions.MaxDimension()
-	cellSize := (maxDim / float32(gridSize)) + 1 // The +1 adds a little extra room
-	b.cellSize = cellSize
+	if cellSizeY <= 0 {
+		cellSizeY = 1
+	}
 
-	b.workingAABB.internalSize.X = cellSize
-	b.workingAABB.internalSize.Y = cellSize
-	b.workingAABB.internalSize.Z = cellSize
-	b.workingAABB.updateSize()
+	if cellSizeZ <= 0 {
+		cellSizeZ = 1
+	}
 
-	b.TriSets = make([][][][]int, gridSize)
-	b.allTriSet.Clear()
+	// maxDim := b.mesh.Dimensions.MaxDimension()
 
-	hg := float32(b.GridCellCount) / 2
+	b.TriSets = [][]int{}
 
-	for i := 0; i < gridSize; i++ {
-		b.TriSets[i] = make([][][]int, gridSize)
-		for j := 0; j < gridSize; j++ {
-			b.TriSets[i][j] = make([][]int, gridSize)
-			for k := 0; k < gridSize; k++ {
+	cellCountX := 0
+	cellCountY := 0
+	cellCountZ := 0
 
-				b.TriSets[i][j][k] = []int{}
+	mesh := b.boundingTriangles.Mesh
 
-				b.workingAABB.SetLocalPositionVec(Vector3{
-					(float32(i) - hg + 0.5) * b.cellSize,
-					(float32(j) - hg + 0.5) * b.cellSize,
-					(float32(k) - hg + 0.5) * b.cellSize,
-				})
+	cellCountZ = 0
 
-				for triID, tri := range b.mesh.Triangles {
+	dimMin := b.dimensions.Min
+	dimMax := b.dimensions.Max
 
-					// Triangles should not be able to be in multiple bins. This allows us
-					// to ensure checking triangles only if they could conceivably be struck by a ray,
-					// for example, without needing to use sets to ensure we check each triangle once.
-					if b.workingAABB.PointInside(tri.Center) {
-						b.TriSets[i][j][k] = append(b.TriSets[i][j][k], triID)
+	if dimMax.X-dimMin.X < cellSizeX {
+		dimMax.X = dimMin.X + cellSizeX
+	}
+
+	if dimMax.Y-dimMin.Y < cellSizeY {
+		dimMax.Y = dimMin.Y + cellSizeY
+	}
+
+	if dimMax.Z-dimMin.Z < cellSizeZ {
+		dimMax.Z = dimMin.Z + cellSizeZ
+	}
+	margin := max(cellSizeX, cellSizeY, cellSizeZ)
+
+	for z := dimMin.Z; z < dimMax.Z; z += cellSizeZ {
+		cellCountY = 0
+
+		for y := dimMin.Y; y < dimMax.Y; y += cellSizeY {
+			cellCountX = 0
+
+			for x := dimMin.X; x < dimMax.X; x += cellSizeX {
+				nd := Dimensions{
+					Min: NewVector3(x-margin, y-margin, z-margin),
+					Max: NewVector3(x+cellSizeX+margin, y+cellSizeY+margin, z+cellSizeZ+margin),
+				}
+
+				set := []int{}
+
+				for triIndex, tri := range b.boundingTriangles.Mesh.Triangles {
+
+					point := closestPointOnTri(
+						NewVector3(x, y, z),
+						mesh.VertexPositions[tri.VertexIndexA],
+						mesh.VertexPositions[tri.VertexIndexB],
+						mesh.VertexPositions[tri.VertexIndexC],
+					)
+
+					if nd.Contains(point) {
+						set = append(set, triIndex)
 					}
-					b.allTriSet.Add(triID)
 
 				}
 
+				b.TriSets = append(b.TriSets, set)
+				cellCountX++
 			}
+
+			cellCountY++
 
 		}
 
+		cellCountZ++
+
 	}
+
+	b.cellCountX = cellCountX
+	b.cellCountY = cellCountY
+	b.cellCountZ = cellCountZ
+
+}
+
+func (b *Broadphase) convertToXYZIndices(wx, wy, wz float32) (x, y, z int) {
+
+	x = int((wx - b.dimensions.Min.X) / b.cellSizeX)
+	y = int((wy - b.dimensions.Min.Y) / b.cellSizeY)
+	z = int((wz - b.dimensions.Min.Z) / b.cellSizeZ)
+
+	return
+}
+
+func (b *Broadphase) convertToXYZIndicesVec(position Vector3) (x, y, z int) {
+	return b.convertToXYZIndices(position.X, position.Y, position.Z)
+}
+
+func (b *Broadphase) xyzIndicesInsideVolume(x, y, z int) bool {
+	return x >= 0 && y >= 0 && z >= 0 && x < b.cellCountX && y < b.cellCountY && z < b.cellCountZ
+}
+
+func (b *Broadphase) convertToWorldPosition(x, y, z int) Vector3 {
+
+	return NewVector3(
+		(float32(x)*b.cellSizeX)+b.dimensions.Min.X,
+		(float32(y)*b.cellSizeY)+b.dimensions.Min.Y,
+		(float32(z)*b.cellSizeZ)+b.dimensions.Min.Z,
+	)
 
 }
 
 // Mesh returns the mesh that is associated with the Broadphase object.
 func (b *Broadphase) Mesh() *Mesh {
-	return b.mesh
+	return b.boundingTriangles.Mesh
 }
+
+var broadphaseTestingTriIndices = Set[int]{}
 
 // TrianglesFromBoundingObject returns a set of triangle IDs, based on where the BoundingObject is
 // in relation to the Broadphase owning BoundingTriangles instance. The returned set contains each triangle only
 // once, of course.
 func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingObject, forEach func(triID int) bool) {
 
-	// Previously, this used sets; this no longer does for optimization's sake.
-	// This works because triangles used to be able to be in multiple sets; this should no longer be the case.
-	if b.GridCellCount <= 1 {
-		for t := range b.allTriSet {
+	if !b.enabled {
+		for t := range b.boundingTriangles.Mesh.Triangles {
 			if !forEach(t) {
 				return
 			}
 		}
 	}
 
-	margin := float32(1.2)
-	b.workingAABB.internalSize.X = b.cellSize * margin
-	b.workingAABB.internalSize.Y = b.cellSize * margin
-	b.workingAABB.internalSize.Z = b.cellSize * margin
-	b.workingAABB.updateSize()
+	broadphaseTestingTriIndices.Clear()
 
-	hg := float32(b.GridCellCount) / 2
+	margin := float32(max(b.cellSizeX, b.cellSizeY, b.cellSizeZ))
 
-	// We're brute forcing it here; this isn't ideal, but it works alright for now
-	for i := 0; i < b.GridCellCount; i++ {
-		for j := 0; j < b.GridCellCount; j++ {
-			for k := 0; k < b.GridCellCount; k++ {
+	invertedTransform := b.boundingTriangles.Transform().Inverted()
 
-				// We can skip empty sets
-				if len(b.TriSets[i][j][k]) == 0 {
+	dim := boundingObject.Dimensions()
+
+	center := dim.Center()
+
+	// Expand the dimensions to add in some margin
+	dim.Max = dim.Max.Sub(center).Expand(margin, 0).Add(center)
+	dim.Min = dim.Min.Sub(center).Expand(margin, 0).Add(center)
+
+	// Inverted transform the dimensions so we don't have to transform the cellular dimensions
+	dim.Max = invertedTransform.MultVec(dim.Max)
+	dim.Min = invertedTransform.MultVec(dim.Min)
+
+	dim = dim.Canon()
+
+	for z := 0; z < b.cellCountZ; z++ {
+		for y := 0; y < b.cellCountY; y++ {
+			for x := 0; x < b.cellCountX; x++ {
+
+				pos := b.convertToWorldPosition(x, y, z)
+
+				nd := Dimensions{
+					Min: NewVector3(
+						pos.X-margin,
+						pos.Y-margin,
+						pos.Z-margin,
+					),
+					Max: NewVector3(
+						pos.X+b.cellSizeX+margin,
+						pos.Y+b.cellSizeY+margin,
+						pos.Z+b.cellSizeZ+margin,
+					),
+				}
+
+				if !nd.Intersects(dim) {
 					continue
 				}
 
-				b.workingAABB.SetLocalPositionVec(Vector3{
-					(float32(i) - hg + 0.5) * b.cellSize,
-					(float32(j) - hg + 0.5) * b.cellSize,
-					(float32(k) - hg + 0.5) * b.cellSize,
-				})
+				triSetIndex := x + (y * b.cellCountX) + (z * b.cellCountY * b.cellCountX)
 
-				if b.workingAABB.Colliding(boundingObject) {
-					for _, triID := range b.TriSets[i][j][k] {
-						if !forEach(triID) {
-							break
-						}
+				if triSetIndex >= 0 && triSetIndex < len(b.TriSets) {
+					for _, t := range b.TriSets[triSetIndex] {
+						broadphaseTestingTriIndices.Add(t)
 					}
 				}
+
 			}
+
 		}
+
 	}
+
+	broadphaseTestingTriIndices.ForEach(func(element int) bool {
+		return forEach(element)
+	})
 
 }
 
-func (b *Broadphase) ForEachTriangleInRange(pos Vector3, radius float32, forEach func(triID int) bool) {
+// func (b *Broadphase) ForEachTriangleInRange(pos Vector3, checkRadius float32, forEach func(triID int) bool) {
 
-	if b.GridCellCount <= 1 {
-		for t := range b.allTriSet {
-			if !forEach(t) {
-				return
-			}
-		}
-	}
+// 	// Previously, this used sets; this no longer does for optimization's sake.
+// 	// This works because triangles used to be able to be in multiple sets; this should no longer be the case.
+// 	if !b.enabled {
+// 		for t := range b.boundingTriangles.Mesh.Triangles {
+// 			if !forEach(t) {
+// 				return
+// 			}
+// 		}
+// 	}
 
-	hg := float32(b.GridCellCount) / 2
+// 	checkRadius *= checkRadius
 
-	transform := b.center.Transform()
+// 	// We're brute forcing it here; this isn't ideal, but it works alright for now
+// 	for z := 0; z < b.cellCountZ; z++ {
+// 		for y := 0; y < b.cellCountY; y++ {
+// 			for x := 0; x < b.cellCountX; x++ {
 
-	rr2 := (radius + b.cellSize) * (radius + b.cellSize)
+// 				// We can skip empty sets
+// 				// if len(b.TriSets[z][y][x]) == 0 {
+// 				// 	continue
+// 				// }
 
-	for i := 0; i < b.GridCellCount; i++ {
-		for j := 0; j < b.GridCellCount; j++ {
-			for k := 0; k < b.GridCellCount; k++ {
+// 				// cellPos := b.boundingTriangles.Transform().MultVec(b.convertToWorldPosition(x, y, z))
 
-				// We can skip empty sets
-				if len(b.TriSets[i][j][k]) == 0 {
-					continue
-				}
+// 				// if cellPos.DistanceSquaredTo(pos) > checkRadius {
+// 				// 	continue
+// 				// }
 
-				vp := transform.MultVec(Vector3{
-					(float32(i) - hg + 0.5) * b.cellSize,
-					(float32(j) - hg + 0.5) * b.cellSize,
-					(float32(k) - hg + 0.5) * b.cellSize,
-				})
+// 				// for _, triID := range b.TriSets[z][y][x] {
+// 				// 	if !forEach(triID) {
+// 				// 		break
+// 				// 	}
+// 				// }
 
-				if vp.DistanceSquaredTo(pos) <= rr2 {
-					for _, triID := range b.TriSets[i][j][k] {
-						if !forEach(triID) {
-							return
-						}
-					}
-				}
-			}
-		}
-	}
+// 			}
 
-}
+// 		}
+
+// 	}
+
+// }
 
 func (b *Broadphase) allAABBPositions() []*BoundingAABB {
 
 	aabbs := []*BoundingAABB{}
 
-	if b.GridCellCount <= 0 || b.cellSize <= 0 {
-		return aabbs
+	dimMin := b.dimensions.Min
+	dimMax := b.dimensions.Max
+
+	if dimMax.X-dimMin.X < b.cellSizeX {
+		dimMax.X = dimMin.X + b.cellSizeX
 	}
 
-	hg := float32(b.GridCellCount) / 2
+	if dimMax.Y-dimMin.Y < b.cellSizeY {
+		dimMax.Y = dimMin.Y + b.cellSizeY
+	}
 
-	b.workingAABB.SetLocalPositionVec(Vector3{})
+	if dimMax.Z-dimMin.Z < b.cellSizeZ {
+		dimMax.Z = dimMin.Z + b.cellSizeZ
+	}
 
-	for i := 0; i < b.GridCellCount; i++ {
-		for j := 0; j < b.GridCellCount; j++ {
-			for k := 0; k < b.GridCellCount; k++ {
+	for z := dimMin.Z; z < dimMax.Z; z += b.cellSizeZ {
 
-				clone := b.workingAABB.Clone().(*BoundingAABB)
+		for y := dimMin.Y; y < dimMax.Y; y += b.cellSizeY {
 
-				clone.SetLocalPositionVec(Vector3{
-					(float32(i) - hg + 0.5) * b.cellSize,
-					(float32(j) - hg + 0.5) * b.cellSize,
-					(float32(k) - hg + 0.5) * b.cellSize,
-				})
-
-				clone.SetWorldTransform(b.workingAABB.Transform().Mult(clone.Transform()))
-
-				clone.Transform()
-
-				aabbs = append(aabbs, clone)
-
+			for x := dimMin.X; x < dimMax.X; x += b.cellSizeX {
+				aabb := NewBoundingAABB("", b.cellSizeX, b.cellSizeY, b.cellSizeZ)
+				aabb.SetWorldPosition(x, y, z)
+				aabbs = append(aabbs, aabb)
 			}
+
 		}
+
 	}
 
 	return aabbs

@@ -51,7 +51,7 @@ func (g *Game) Init() {
 	// In this example, we'll construct the scene ourselves by hand.
 	g.Scene = tetra3d.NewScene("Test Scene")
 
-	cubeMesh := tetra3d.NewCubeMesh()
+	cubeMesh := tetra3d.NewCubeMesh(2, 2, 2)
 	mat := cubeMesh.MeshParts[0].Material
 	mat.Shadeless = true
 	mat.Texture = loadImage(testImageData)

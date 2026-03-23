@@ -15,7 +15,7 @@ import (
 )
 
 //go:embed *.glb
-var shapes embed.FS
+var assets embed.FS
 
 type Player struct {
 	Model   *tetra3d.Model
@@ -192,7 +192,7 @@ func (g *Game) Init() {
 
 	g.System = examples.NewBasicSystemHandler(g)
 
-	library, err := tetra3d.LoadGLTFFileSystem(shapes, "lightvolume.glb", nil)
+	library, err := tetra3d.LoadGLTFFileSystem(assets, "lightvolume.glb", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -208,12 +208,6 @@ func (g *Game) Init() {
 
 	g.Camera = examples.NewBasicTargetedCam(g.Player.Model)
 
-	// Bake the AO on the map to make it look a little nicer.
-	m := g.Scene.Get("Map").(*tetra3d.Model)
-	opt := tetra3d.NewDefaultAOBakeOptions()
-	opt.TargetVertices = tetra3d.NewVertexSelection().SelectByMeshPartName(m.Mesh, "Walls", "Grass")
-	m.BakeAO(opt)
-
 	t := time.Now()
 
 	// So we get the LightVolume, which is a blank slate at this point.
@@ -225,15 +219,32 @@ func (g *Game) Init() {
 	// depending on the color we put in the cell.
 
 	solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByParentProps("solid"))
+
+	selectedCellsForAnimation := []*tetra3d.LightVolumeCell{}
+
 	lightvolume.LightVolumeForEachCell(func(position tetra3d.Vector3, cell *tetra3d.LightVolumeCell) {
 
-		// Start off assuming darkness, with a light value of -1 (negative light / darkness).
-		cell.Color.R = -1
-		cell.Color.G = -1
-		cell.Color.B = -1
+		tetra3d.RayTest(tetra3d.RayTestOptions{
+			From:        position,
+			To:          position.SubY(8),
+			TestAgainst: g.Scene.Root.Children(true),
+			OnHit: func(hit tetra3d.RayHit, index, count int) bool {
+
+				if hit.Triangle != nil {
+					mat := hit.Triangle.MeshPart.Material
+					if mat.Name() == "LightCube" {
+						cell.UseLights(g.Scene.Root.Get("Underlight").(*tetra3d.DirectionalLight))
+
+						selectedCellsForAnimation = append(selectedCellsForAnimation, cell)
+					}
+				}
+
+				return true
+			},
+		})
 
 		up := tetra3d.RayTest(tetra3d.RayTestOptions{
-			From:        position,
+			From:        position.AddY(0.5),
 			To:          position.AddY(1000),
 			TestAgainst: solids,
 			Doublesided: true,
@@ -241,26 +252,30 @@ func (g *Game) Init() {
 
 		// Perform a ray test - if we hit a triangle that has the "Sky" material, then we'll say that this point
 		// is exposed to the sky / sun, and so is bright.
-		if up != nil && up.Triangle != nil {
+		if up != nil {
 
-			if up.Triangle.MeshPart.Material.Name() == "Sky" {
-				// Set the light value to 0 (no change).
-				cell.Color.R = 0
-				cell.Color.G = 0
-				cell.Color.B = 0
-			} else if up.Triangle.MeshPart.Material.Name() == "LightCube" {
+			mat := up.Triangle.MeshPart.Material
+
+			if mat.Name() == "Sky" {
+				cell.SetColorMonochrome(1.25)
+			} else if mat.Name() == "LightCube" {
 				vertexColor, _ := up.VertexColor(0)
-				cell.Color = vertexColor.MultiplyScalarRGB(1)
+				cell.SetColor(vertexColor.MultiplyScalarRGB(1.5))
+			} else {
+				cell.SetColorMonochrome(-1)
 			}
-		} else if up == nil {
-			cell.Blocked = true
+
+		} else {
+			cell.SetBlocked(true)
 		}
 
 	})
 
 	fmt.Println("time to check light cells:", time.Since(t))
 
-	lightvolume.LightVolumeBlur(2, 1, 1)
+	lightvolume.LightVolumeResize(lightvolume.Dimensions(), 2, 2, 2)
+
+	lightvolume.LightVolumeBlur(1, 2, 1)
 
 	g.LightVolume = lightvolume
 
@@ -278,11 +293,16 @@ func (g *Game) Update() error {
 	g.Camera.Update()
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.LightVolume.SetOn(!g.LightVolume.On())
+		g.LightVolume.SetVisible(!g.LightVolume.IsVisible(), false)
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
 		g.DebugDrawingLightVolume = !g.DebugDrawingLightVolume
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.Key3) {
+		m := g.Scene.Get("Map").(*tetra3d.Model)
+		m.Mesh().AutoSubdivide = !m.Mesh().AutoSubdivide
 	}
 
 	return g.System.Update()

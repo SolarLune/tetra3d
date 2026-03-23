@@ -15,15 +15,38 @@ import (
 	"golang.org/x/image/font/basicfont"
 )
 
+type DebugInfoDuration struct {
+	debugInfo *DebugInfo
+	duration  time.Duration
+	startTime time.Time
+}
+
+func (d *DebugInfoDuration) reset() {
+	d.duration = 0
+}
+
+func (d *DebugInfoDuration) StartTimer() {
+	if d.debugInfo.On {
+		d.startTime = time.Now()
+	}
+}
+
+func (d *DebugInfoDuration) EndTimer() {
+	if d.debugInfo.On {
+		d.duration += time.Since(d.startTime)
+	}
+}
+
 // DebugInfo is a struct that holds debugging information for a Camera's render pass. These values are reset when Camera.Clear() is called.
 type DebugInfo struct {
+	On                   bool          // If not on, debug info is not filled out
 	FrameTime            time.Duration // Amount of CPU frame time spent transforming vertices and calling Image.DrawTriangles. Doesn't include time ebitengine spends flushing the command queue.
 	AnimationTime        time.Duration // Amount of CPU frame time spent animating vertices.
 	LightTime            time.Duration // Amount of CPU frame time spent lighting vertices.
-	currentAnimationTime time.Duration
-	currentLightTime     time.Duration
-	currentFrameTime     time.Duration
-	tickTime             time.Time
+	currentAnimationTime DebugInfoDuration
+	currentLightTime     DebugInfoDuration
+	currentFrameTime     DebugInfoDuration
+	frameCount           int
 	NodeCount            int
 	DrawnParts           int // Number of draw calls, excluding those invisible or culled based on distance
 	TotalParts           int // Total number of draw calls
@@ -32,6 +55,8 @@ type DebugInfo struct {
 	TotalTris            int // Total number of triangles
 	LightCount           int // Total number of lights
 	ActiveLightCount     int // Total active number of lights
+
+	tickTime time.Time
 }
 
 type AccumulationColorMode int
@@ -84,9 +109,9 @@ type Camera struct {
 	// Defaults to 0 (off).
 	VertexSnapping float32
 
-	DebugInfo        DebugInfo
-	PrevFrametimes   []float32
-	PrevDebugInfoCap int
+	DebugInfo                 *DebugInfo
+	prevFrametimes            []float32
+	prevDebugInfoFrametimeCap int
 
 	depthShader     *ebiten.Shader
 	clipAlphaShader *ebiten.Shader
@@ -129,8 +154,15 @@ func NewCamera(w, h int) *Camera {
 		SectorRendering:   false,
 		SectorRenderDepth: 1,
 
-		PrevDebugInfoCap: 20,
+		DebugInfo: &DebugInfo{
+			On: true,
+		},
+		prevDebugInfoFrametimeCap: 20,
 	}
+
+	cam.DebugInfo.currentAnimationTime.debugInfo = cam.DebugInfo
+	cam.DebugInfo.currentFrameTime.debugInfo = cam.DebugInfo
+	cam.DebugInfo.currentLightTime.debugInfo = cam.DebugInfo
 
 	cam.owner = cam
 
@@ -498,7 +530,7 @@ func (camera *Camera) SetFar(far float32) {
 
 // We do this for each vertex for each triangle for each model, so we want to avoid allocating vectors if possible. clipToScreen
 // does this by taking outVec, a vertex (Vector) that it stores the values in and returns, which avoids reallocation.
-func (camera *Camera) clipToScreen(vert Vector4, vertID int, model *Model, width, height, halfWidth, halfHeight float32, limitW bool) Vector4 {
+func (camera *Camera) clipToScreen(vert Vector4, model *Model, width, height, halfWidth, halfHeight float32, limitW bool) Vector4 {
 
 	w := vert.W
 
@@ -536,7 +568,7 @@ func (camera *Camera) clipToScreen(vert Vector4, vertID int, model *Model, width
 // ClipToScreen projects the pre-transformed vertex in View space and remaps it to screen coordinates.
 func (camera *Camera) ClipToScreen(vert Vector3) Vector3 {
 	width, height := camera.Size()
-	return camera.clipToScreen(vert.To4D(), 0, nil, float32(width), float32(height), float32(width)/2, float32(height)/2, false).To3D()
+	return camera.clipToScreen(vert.To4D(), nil, float32(width), float32(height), float32(width)/2, float32(height)/2, false).To3D()
 }
 
 // WorldToScreenPixels transforms a 3D position in the world to a position onscreen, with X and Y representing the pixels.
@@ -544,7 +576,7 @@ func (camera *Camera) ClipToScreen(vert Vector3) Vector3 {
 func (camera *Camera) WorldToScreenPixels(vert Vector3) Vector3 {
 	v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 	width, height := camera.Size()
-	return camera.clipToScreen(v.MultVecW(Vector3{}), 0, nil, float32(width), float32(height), float32(width)/2, float32(height)/2, false).To3D()
+	return camera.clipToScreen(v.MultVecW(Vector3{}), nil, float32(width), float32(height), float32(width)/2, float32(height)/2, false).To3D()
 }
 
 // WorldToScreen transforms a 3D position in the world to a 2D vector, with X and Y ranging from -1 to 1.
@@ -751,14 +783,14 @@ func (camera *Camera) Clear() {
 		}
 	}
 
-	camera.ClearWithColor(NewColor(0, 0, 0, 0))
+	camera.ClearWithColor(NewColor4(0, 0, 0, 0))
 
 }
 
 // ClearWithColor should be called at the beginning of a single rendered frame and clears the Camera's backing textures
 // to the desired color before rendering.
 // It also resets the debug values.
-func (camera *Camera) ClearWithColor(clear Color) {
+func (camera *Camera) ClearWithColor(clear Color4) {
 
 	rgba := clear.ToNRGBA64()
 
@@ -788,31 +820,42 @@ func (camera *Camera) ClearWithColor(clear Color) {
 		camera.resultNormalTexture.Clear()
 	}
 
-	if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
+	if camera.DebugInfo != nil && camera.DebugInfo.On {
 
-		camera.PrevFrametimes = append(camera.PrevFrametimes, float32(camera.DebugInfo.FrameTime.Seconds()))
+		if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 
-		for len(camera.PrevFrametimes) > camera.PrevDebugInfoCap {
-			camera.PrevFrametimes = camera.PrevFrametimes[1:]
+			camera.prevFrametimes = append(camera.prevFrametimes, float32(camera.DebugInfo.FrameTime.Seconds()))
+
+			for len(camera.prevFrametimes) > camera.prevDebugInfoFrametimeCap {
+				camera.prevFrametimes = camera.prevFrametimes[1:]
+			}
+
+			frameCount := 1
+			if camera.DebugInfo.frameCount > 0 {
+				frameCount = camera.DebugInfo.frameCount
+			}
+
+			camera.DebugInfo.FrameTime = camera.DebugInfo.currentFrameTime.duration / time.Duration(frameCount)
+			camera.DebugInfo.AnimationTime = camera.DebugInfo.currentAnimationTime.duration / time.Duration(frameCount)
+			camera.DebugInfo.LightTime = camera.DebugInfo.currentLightTime.duration / time.Duration(frameCount)
+			camera.DebugInfo.tickTime = time.Now()
+
+			camera.DebugInfo.currentFrameTime.reset()
+			camera.DebugInfo.currentAnimationTime.reset()
+			camera.DebugInfo.currentLightTime.reset()
+			camera.DebugInfo.frameCount = 0
 		}
 
-		camera.DebugInfo.FrameTime = camera.DebugInfo.currentFrameTime
-		camera.DebugInfo.AnimationTime = camera.DebugInfo.currentAnimationTime
-		camera.DebugInfo.LightTime = camera.DebugInfo.currentLightTime
-		camera.DebugInfo.tickTime = time.Now()
-	}
+		camera.DebugInfo.NodeCount = 0
+		camera.DebugInfo.DrawnParts = 0
+		camera.DebugInfo.BatchedParts = 0
+		camera.DebugInfo.TotalParts = 0
+		camera.DebugInfo.TotalTris = 0
+		camera.DebugInfo.DrawnTris = 0
+		camera.DebugInfo.LightCount = 0
+		camera.DebugInfo.ActiveLightCount = 0
 
-	camera.DebugInfo.currentFrameTime = 0
-	camera.DebugInfo.currentAnimationTime = 0
-	camera.DebugInfo.currentLightTime = 0
-	camera.DebugInfo.NodeCount = 0
-	camera.DebugInfo.DrawnParts = 0
-	camera.DebugInfo.BatchedParts = 0
-	camera.DebugInfo.TotalParts = 0
-	camera.DebugInfo.TotalTris = 0
-	camera.DebugInfo.DrawnTris = 0
-	camera.DebugInfo.LightCount = 0
-	camera.DebugInfo.ActiveLightCount = 0
+	}
 
 	cameraRot := camera.WorldRotation()
 	camera.cameraForward = cameraRot.Forward()
@@ -836,7 +879,9 @@ var lights = NewNodeCollection()
 // Note that each MeshPart of a Model has a maximum renderable triangle count of 21845.
 func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
-	camera.DebugInfo.NodeCount = rootNode.ChildCount(true)
+	if camera.DebugInfo.On {
+		camera.DebugInfo.NodeCount = rootNode.ChildCount(true)
+	}
 
 	meshes.Clear()
 	lights.Clear()
@@ -869,7 +914,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 				}
 
 				if sector.AABB.PointInside(camera.WorldPosition()) {
-					if insideSector == nil || sector.AABB.Dimensions.MaxSpan() < insideSector.AABB.Dimensions.MaxSpan() {
+					if insideSector == nil || sector.AABB.dimensions.MaxSpan() < insideSector.AABB.dimensions.MaxSpan() {
 						insideSector = sector
 					}
 				}
@@ -998,14 +1043,15 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	scene.HandleAutobatch()
 
-	frametimeStart := time.Now()
+	camera.DebugInfo.currentFrameTime.StartTimer()
 
 	sceneLights = sceneLights[:0]
 
 	if scene.World != nil {
 
 		camera.DebugInfo.LightCount++
-		if scene.World.LightingOn && scene.World.AmbientLight.On() {
+
+		if scene.World.LightingOn && scene.World.AmbientLight.IsVisible() {
 			scene.World.AmbientLight.beginRender()
 			sceneLights = append(sceneLights, scene.World.AmbientLight)
 		}
@@ -1015,7 +1061,8 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 	lights.ForEachLight(func(light ILight) bool {
 
 		camera.DebugInfo.LightCount++
-		if (scene.World == nil || scene.World.LightingOn) && light.On() {
+
+		if (scene.World == nil || scene.World.LightingOn) && light.IsVisible() {
 			light.beginRender()
 			sceneLights = append(sceneLights, light)
 		}
@@ -1065,10 +1112,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	models.ForEachModel(func(model *Model) bool {
 
-		if !model.DynamicBatcher() {
+		if camera.DebugInfo.On && !model.DynamicBatcher() {
 
 			if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
-				for range model.Mesh.MeshParts {
+				for range model.mesh.MeshParts {
 					camera.DebugInfo.TotalParts++
 				}
 			}
@@ -1086,15 +1133,14 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				if !camera.ModelInFrustum(model) {
 					return true
 				}
-				model.refreshVertexVisibility()
 
 			}
 
-			if model.Mesh != nil {
+			if model.mesh != nil {
 
 				modelIsTransparent := false
 
-				for _, mp := range model.Mesh.MeshParts {
+				for _, mp := range model.mesh.MeshParts {
 
 					if !mp.isVisible() {
 						continue
@@ -1135,7 +1181,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 					if !transparent {
 
-						for _, mp := range child.Mesh.MeshParts {
+						for _, mp := range child.mesh.MeshParts {
 
 							if mp.isVisible() && child.isTransparent(mp) {
 								transparent = true
@@ -1158,7 +1204,9 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 					}
 				}
 
-				camera.DebugInfo.TotalParts += len(modelSlice)
+				if camera.DebugInfo.On {
+					camera.DebugInfo.TotalParts += len(modelSlice)
+				}
 
 			}
 
@@ -1205,9 +1253,11 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 		sceneLights = sceneLights[:math32.Min(camera.MaxLightCount, len(sceneLights))]
 	}
 
-	for _, light := range sceneLights {
-		if scene.World != nil && scene.World.LightingOn && light.On() {
-			camera.DebugInfo.ActiveLightCount++
+	if camera.DebugInfo.On {
+		for _, light := range sceneLights {
+			if scene.World != nil && scene.World.LightingOn && light.IsVisible() {
+				camera.DebugInfo.ActiveLightCount++
+			}
 		}
 	}
 
@@ -1218,7 +1268,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 		model := rp.Model
 
 		// Models without Meshes are essentially just "nodes" that just have a position. They aren't counted for rendering.
-		if model.Mesh == nil {
+		if model.mesh == nil {
 			return
 		}
 
@@ -1234,10 +1284,14 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 			}
 		}
 
-		camera.DebugInfo.TotalTris += meshPart.TriangleCount()
+		if camera.DebugInfo.On {
 
-		if model.DynamicBatchOwner != nil {
-			camera.DebugInfo.BatchedParts++
+			camera.DebugInfo.TotalTris += meshPart.TriangleCount()
+
+			if model.DynamicBatchOwner != nil {
+				camera.DebugInfo.BatchedParts++
+			}
+
 		}
 
 		globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
@@ -1245,7 +1299,13 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 			globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
 		}
 
+		startingVertexListIndex := vertexListIndex
 		model.ProcessVertices(vpMatrix, camera, meshPart, true)
+		// lastVertexListIndex := vertexListIndex
+
+		if vertexListIndex == 0 {
+			return
+		}
 
 		srcW := float32(0.0)
 		srcH := float32(0.0)
@@ -1255,9 +1315,9 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 			srcH = float32(mat.Texture.Bounds().Dy())
 		}
 
-		if lighting {
+		camera.DebugInfo.currentLightTime.StartTimer()
 
-			t := time.Now()
+		if lighting {
 
 			if model.LightGroup != nil && model.LightGroup.Active {
 				sceneLights = model.LightGroup.Lights
@@ -1270,13 +1330,13 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				light.beginModel(model)
 			}
 
-			camera.DebugInfo.currentLightTime += time.Since(t)
-
 		}
 
-		mesh := model.Mesh
+		camera.DebugInfo.currentLightTime.EndTimer()
 
-		maxSpan := model.Mesh.Dimensions.MaxSpan()
+		mesh := model.mesh
+
+		maxSpan := model.mesh.Dimensions.MaxSpan()
 		modelPos := model.WorldPosition()
 
 		// Here we do all vertex transforms first because of data locality (it's faster to access all vertex transformations, then go back and do all UV values, etc)
@@ -1287,19 +1347,29 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 			mpColor = mpColor.MultiplyRGBA(meshPart.Material.Color.ToFloat32s())
 		}
 
-		if lighting && !globalSortingTriangleBucket.IsEmpty() {
+		halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
 
-			t := time.Now()
+		customDepthFunctionSet := mat != nil && mat.CustomDepthFunction != nil
+		vertexClipFunctionOn := model != nil && model.VertexClipFunction != nil
 
-			meshPart.ForEachVertexIndex(func(vertIndex int) {
-				mesh.vertexLights[vertIndex] = Color{0, 0, 0, 1}
-			}, true)
+		vertexListIndex = startingVertexListIndex
+
+		globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
+
+			camera.DebugInfo.currentLightTime.StartTimer()
+
+			triangle.ForEachVertexIndex(func(vertexIndex int) {
+				mesh.vertexLights[vertexIndex].R = 0
+				mesh.vertexLights[vertexIndex].G = 0
+				mesh.vertexLights[vertexIndex].B = 0
+				mesh.vertexLights[vertexIndex].A = 1
+			})
 
 			for _, light := range sceneLights {
 
 				// Skip calculating lighting for objects that are too far away from light sources.
-				if point, ok := light.(*PointLight); ok && point.Range > 0 {
-					dist := maxSpan + point.Range
+				if point, ok := light.(*PointLight); ok && point.Range() > 0 {
+					dist := maxSpan + point.Range()
 					if modelPos.DistanceSquaredTo(point.WorldPosition()) > dist*dist {
 						continue
 					}
@@ -1310,213 +1380,190 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 					// 	}
 				}
 
-				light.Light(meshPart, model, mesh.vertexLights, true)
+				light.Light(triangle, model, mesh.vertexLights)
 
 			}
 
-			camera.DebugInfo.currentLightTime += time.Since(t)
+			camera.DebugInfo.currentLightTime.EndTimer()
 
-		}
+			for vi := range 3 {
 
-		halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
+				vertexIndex := triangle.VertexIndex(vi)
 
-		// TODO: Implement PS1-style automatic tesselation
+				// We clip the vertices to the screen here manually because it wasn't being inlined previously.
 
-		meshPartVertexIndexStart := meshPart.VertexIndexStart
+				// CLIP SCREEN START
+				w := globalVertexTransforms[vertexIndex].W
 
-		customDepthFunctionSet := mat != nil && mat.CustomDepthFunction != nil
-		vertexClipFunctionOn := model != nil && model.VertexClipFunction != nil
+				if !camera.perspective {
+					w = 1.0
+				}
 
-		for vertIndex := meshPart.VertexIndexStart; vertIndex < meshPart.VertexIndexEnd; vertIndex++ {
+				// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
+				// If it's too small, there will be visual artifacts when the camera is right up against surfaces
+				// If it's too large, then textures and vertices will appear to warp and bend "around" the screen, towards the "back" of the camera
+				if w < 0 {
+					w = 0.001
+				}
 
-			// We clip the vertices to the screen here manually because it wasn't being inlined previously.
+				target := globalVertexTransforms[vertexIndex]
 
-			// CLIP SCREEN START
+				if vertexClipFunctionOn {
+					model.VertexClipFunction(&target, vertexIndex)
+				}
 
-			w := globalVertexTransforms[vertIndex].W
+				dx := float32((target.X/w)*float32(camWidth) + halfCamWidth)
+				dy := float32((target.Y/-w)*float32(camHeight) + halfCamHeight)
 
-			if !camera.perspective {
-				w = 1.0
-			}
+				// CLIP SCREEN END
 
-			// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
-			// If it's too small, there will be visual artifacts when the camera is right up against surfaces
-			// If it's too large, then textures and vertices will appear to warp and bend "around" the screen, towards the "back" of the camera
-			if w < 0 {
-				w = 0.001
-			}
+				colorVertexList[vertexListIndex].DstX = dx
+				colorVertexList[vertexListIndex].DstY = dy
+				depthVertexList[vertexListIndex].DstX = dx
+				depthVertexList[vertexListIndex].DstY = dy
 
-			// It's 1 frame faster on the stress test not to have to calculate the half screen width and height here.
-			globalVertexTransforms[vertIndex].X = (globalVertexTransforms[vertIndex].X/w)*float32(camWidth) + halfCamWidth
-			globalVertexTransforms[vertIndex].Y = (globalVertexTransforms[vertIndex].Y/-w)*float32(camHeight) + halfCamHeight
-			// vertexTransforms[vertIndex].Z /= w
+				var uvU, uvV float32
 
-			if vertexClipFunctionOn {
-				model.VertexClipFunction(&globalVertexTransforms[vertIndex], vertIndex)
-			}
-
-			// CLIP SCREEN END
-
-			colorVertexList[vertexListIndex].DstX = float32(globalVertexTransforms[vertIndex].X)
-			colorVertexList[vertexListIndex].DstY = float32(globalVertexTransforms[vertIndex].Y)
-			depthVertexList[vertexListIndex].DstX = float32(globalVertexTransforms[vertIndex].X)
-			depthVertexList[vertexListIndex].DstY = float32(globalVertexTransforms[vertIndex].Y)
-
-			var uvU, uvV float32
-
-			// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
-			// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
-			// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
-			if camera.PerspectiveCorrectedTextureMapping {
-				uvU = float32((mesh.VertexUVs[vertIndex].X / w) * srcW)
-				uvV = float32(((1 - mesh.VertexUVs[vertIndex].Y) / w) * srcH)
-			} else {
-				uvU = float32(mesh.VertexUVs[vertIndex].X * srcW)
-				uvV = float32((1 - mesh.VertexUVs[vertIndex].Y) * srcH)
-			}
-
-			if mat != nil && mat.TextureMapMode == TextureMapModeScreen {
-				uvU = mat.TextureMapScreenOffset.X
-				uvV = mat.TextureMapScreenOffset.Y
-			}
-
-			colorVertexList[vertexListIndex].SrcX = uvU
-			colorVertexList[vertexListIndex].SrcY = uvV
-
-			if camera.PerspectiveCorrectedTextureMapping {
-				d := 1.0 / float32(w)
-				colorVertexList[vertexListIndex].Custom0 = d // Set the perspective divide here
-				depthVertexList[vertexListIndex].Custom0 = d
-				// normalVertexList[vertexListIndex].Custom0 = d
-			}
-
-			depthVertexList[vertexListIndex].SrcX = uvU
-			depthVertexList[vertexListIndex].SrcY = uvV
-
-			if camera.RenderNormals {
-
-				normalVertexList[vertexListIndex].DstX = float32(globalVertexTransforms[vertIndex].X)
-				normalVertexList[vertexListIndex].DstY = float32(globalVertexTransforms[vertIndex].Y)
-
-				normalVertexList[vertexListIndex].SrcX = uvU
-				normalVertexList[vertexListIndex].SrcY = uvV
-
-				normalVertexList[vertexListIndex].ColorR = float32(globalVertexTransformedNormals[vertIndex].X*0.5 + 0.5)
-				normalVertexList[vertexListIndex].ColorG = float32(globalVertexTransformedNormals[vertIndex].Y*0.5 + 0.5)
-				normalVertexList[vertexListIndex].ColorB = float32(globalVertexTransformedNormals[vertIndex].Z*0.5 + 0.5)
-
-			}
-
-			// Vertex colors
-
-			if activeChannel := mesh.VertexActiveColorChannel; activeChannel >= 0 {
-				colorVertexList[vertexListIndex].ColorR = mesh.VertexColors[activeChannel][vertIndex].R * mpColor.R
-				colorVertexList[vertexListIndex].ColorG = mesh.VertexColors[activeChannel][vertIndex].G * mpColor.G
-				colorVertexList[vertexListIndex].ColorB = mesh.VertexColors[activeChannel][vertIndex].B * mpColor.B
-				colorVertexList[vertexListIndex].ColorA = mesh.VertexColors[activeChannel][vertIndex].A * mpColor.A
-			} else {
-				colorVertexList[vertexListIndex].ColorR = mpColor.R
-				colorVertexList[vertexListIndex].ColorG = mpColor.G
-				colorVertexList[vertexListIndex].ColorB = mpColor.B
-				colorVertexList[vertexListIndex].ColorA = mpColor.A
-			}
-
-			if lighting {
-				colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights[vertIndex].R
-				colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights[vertIndex].G
-				colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights[vertIndex].B
-			}
-
-			if camera.RenderDepth {
-
-				// 3/28/23, TODO: We used to use the transformed vertex positions for rendering the depth texture. Note
-				// that this makes fog shift aggressively as you turn the camera, more noticeably in first-person games
-				// (as points closer to the corners of the screen are mathematically closer to the camera because of projection).
-				// In an attempt to fix this, I used the below, now commented-out depth function. This attempt did fix the fog,
-				// but it also made depth sorting buggier, which is unacceptable. For now, I've reverted this change to have
-				// better depth sorting. This is currently fine, though the fog issue should be resolved at some point in the future.
-
-				// See this Discord conversation for the visualization of the issue:
-				// https://discord.com/channels/842049801528016967/844522898126536725/1090223569247674488
-
-				// p, s, r := model.Transform().Inverted().Decompose()
-				// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
-				// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertIndex]) - camera.near) / (camera.far - camera.near)
-
-				var vertexDepth float32
-				if rp.MeshPart.Material != nil && rp.MeshPart.Material.DepthMode == DepthModeUnbillboarded {
-					vertexDepth = globalVertexDepthUnbillboarded[vertIndex]
+				// We set the UVs back here because we might need to use them if the material has clip alpha enabled.
+				// We do 1 - v here (aka Y in texture coordinates) because 1.0 is the top of the texture while 0 is the bottom in UV coordinates,
+				// but when drawing textures 0 is the top, and the sourceHeight is the bottom.
+				if camera.PerspectiveCorrectedTextureMapping {
+					uvU = float32((mesh.VertexUVs[vertexIndex].X / w) * srcW)
+					uvV = float32(((1 - mesh.VertexUVs[vertexIndex].Y) / w) * srcH)
 				} else {
-					vertexDepth = globalVertexTransforms[vertIndex].Z
+					uvU = float32(mesh.VertexUVs[vertexIndex].X * srcW)
+					uvV = float32((1 - mesh.VertexUVs[vertexIndex].Y) * srcH)
 				}
 
-				if customDepthFunctionSet {
-					vertexDepth = mat.CustomDepthFunction(model, camera, meshPart, vertIndex, vertexDepth)
+				if mat != nil && mat.TextureMapMode == TextureMapModeScreen {
+					uvU = mat.TextureMapScreenOffset.X
+					uvV = mat.TextureMapScreenOffset.Y
 				}
 
-				depth := (vertexDepth + depthMarginPercentage) / camSpread
+				colorVertexList[vertexListIndex].SrcX = uvU
+				colorVertexList[vertexListIndex].SrcY = uvV
 
-				if depth < 0 {
-					depth = 0
-				} else if depth > 1 {
-					depth = 1
+				if camera.PerspectiveCorrectedTextureMapping {
+					d := 1.0 / float32(w)
+					colorVertexList[vertexListIndex].Custom0 = d // Set the perspective divide here
+					depthVertexList[vertexListIndex].Custom0 = d
+					// normalVertexList[vertexListIndex].Custom0 = d
 				}
 
-				depthVertexList[vertexListIndex].ColorR = float32(depth)
-				depthVertexList[vertexListIndex].ColorG = float32(depth)
-				depthVertexList[vertexListIndex].ColorB = float32(depth)
-				depthVertexList[vertexListIndex].ColorA = 1
+				depthVertexList[vertexListIndex].SrcX = uvU
+				depthVertexList[vertexListIndex].SrcY = uvV
 
-			} else if scene.World != nil && scene.World.FogOn {
+				if camera.RenderNormals {
 
-				vertexDepth := globalVertexTransforms[vertIndex].Z
+					normalVertexList[vertexListIndex].DstX = dx
+					normalVertexList[vertexListIndex].DstY = dy
 
-				if customDepthFunctionSet {
-					vertexDepth = mat.CustomDepthFunction(model, camera, meshPart, vertIndex, vertexDepth)
+					normalVertexList[vertexListIndex].SrcX = uvU
+					normalVertexList[vertexListIndex].SrcY = uvV
+
+					normalVertexList[vertexListIndex].ColorR = float32(globalVertexTransformedNormals[vertexIndex].X*0.5 + 0.5)
+					normalVertexList[vertexListIndex].ColorG = float32(globalVertexTransformedNormals[vertexIndex].Y*0.5 + 0.5)
+					normalVertexList[vertexListIndex].ColorB = float32(globalVertexTransformedNormals[vertexIndex].Z*0.5 + 0.5)
+
 				}
 
-				depth := (vertexDepth + depthMarginPercentage) / camSpread
+				// Vertex colors
 
-				if depth < 0 {
-					depth = 0
-				} else if depth > 1 {
-					depth = 1
+				if activeChannel := mesh.VertexActiveColorChannel; activeChannel >= 0 {
+					colorVertexList[vertexListIndex].ColorR = mesh.VertexColors[activeChannel][vertexIndex].R * mpColor.R
+					colorVertexList[vertexListIndex].ColorG = mesh.VertexColors[activeChannel][vertexIndex].G * mpColor.G
+					colorVertexList[vertexListIndex].ColorB = mesh.VertexColors[activeChannel][vertexIndex].B * mpColor.B
+					colorVertexList[vertexListIndex].ColorA = mesh.VertexColors[activeChannel][vertexIndex].A * mpColor.A
+				} else {
+					colorVertexList[vertexListIndex].ColorR = mpColor.R
+					colorVertexList[vertexListIndex].ColorG = mpColor.G
+					colorVertexList[vertexListIndex].ColorB = mpColor.B
+					colorVertexList[vertexListIndex].ColorA = mpColor.A
 				}
 
-				// depth = 1 - depth
-
-				depth = float32(scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - float32(depth)))
-
-				if scene.World.FogMode == FogAdd {
-					colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * float32(depth)
-					colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * float32(depth)
-					colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * float32(depth)
-				} else if scene.World.FogMode == FogSub {
-					colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * float32(depth)
-					colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * float32(depth)
-					colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * float32(depth)
+				if lighting {
+					colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights[vertexIndex].R
+					colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights[vertexIndex].G
+					colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights[vertexIndex].B
 				}
 
-			}
+				if camera.RenderDepth {
 
-			vertexListIndex++
+					// 3/28/23, TODO: We used to use the transformed vertex positions for rendering the depth texture. Note
+					// that this makes fog shift aggressively as you turn the camera, more noticeably in first-person games
+					// (as points closer to the corners of the screen are mathematically closer to the camera because of projection).
+					// In an attempt to fix this, I used the below, now commented-out depth function. This attempt did fix the fog,
+					// but it also made depth sorting buggier, which is unacceptable. For now, I've reverted this change to have
+					// better depth sorting. This is currently fine, though the fog issue should be resolved at some point in the future.
 
-		}
+					// See this Discord conversation for the visualization of the issue:
+					// https://discord.com/channels/842049801528016967/844522898126536725/1090223569247674488
 
-		if vertexListIndex == 0 {
-			return
-		}
+					// p, s, r := model.Transform().Inverted().Decompose()
+					// invertedCameraPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
+					// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertexListIndex]) - camera.near) / (camera.far - camera.near)
 
-		globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
+					var vertexDepth float32
+					if rp.MeshPart.Material != nil && rp.MeshPart.Material.DepthMode == DepthModeUnbillboarded {
+						vertexDepth = globalVertexDepthUnbillboarded[vertexIndex]
+					} else {
+						vertexDepth = globalVertexTransforms[vertexIndex].Z
+					}
 
-			for _, index := range vertexIndices {
-				indexList[indexListIndex] = uint16(index - meshPartVertexIndexStart + indexListStart)
-				indexListIndex++
+					if customDepthFunctionSet {
+						vertexDepth = mat.CustomDepthFunction(model, camera, meshPart, vertexIndex, vertexDepth)
+					}
+
+					depth := (vertexDepth + depthMarginPercentage) / camSpread
+
+					if depth < 0 {
+						depth = 0
+					} else if depth > 1 {
+						depth = 1
+					}
+
+					depthVertexList[vertexListIndex].ColorR = float32(depth)
+					depthVertexList[vertexListIndex].ColorG = float32(depth)
+					depthVertexList[vertexListIndex].ColorB = float32(depth)
+					depthVertexList[vertexListIndex].ColorA = 1
+
+				} else if scene.World != nil && scene.World.FogOn {
+
+					vertexDepth := globalVertexTransforms[vertexIndex].Z
+
+					if customDepthFunctionSet {
+						vertexDepth = mat.CustomDepthFunction(model, camera, meshPart, vertexIndex, vertexDepth)
+					}
+
+					depth := (vertexDepth + depthMarginPercentage) / camSpread
+
+					if depth < 0 {
+						depth = 0
+					} else if depth > 1 {
+						depth = 1
+					}
+
+					// depth = 1 - depth
+
+					depth = float32(scene.World.FogRange[0] + ((scene.World.FogRange[1]-scene.World.FogRange[0])*1 - float32(depth)))
+
+					if scene.World.FogMode == FogAdd {
+						colorVertexList[vertexListIndex].ColorR += scene.World.FogColor.R * float32(depth)
+						colorVertexList[vertexListIndex].ColorG += scene.World.FogColor.G * float32(depth)
+						colorVertexList[vertexListIndex].ColorB += scene.World.FogColor.B * float32(depth)
+					} else if scene.World.FogMode == FogSub {
+						colorVertexList[vertexListIndex].ColorR *= scene.World.FogColor.R * float32(depth)
+						colorVertexList[vertexListIndex].ColorG *= scene.World.FogColor.G * float32(depth)
+						colorVertexList[vertexListIndex].ColorB *= scene.World.FogColor.B * float32(depth)
+					}
+
+				}
+
+				indexList[vertexListIndex] = uint16(vertexListIndex)
+				vertexListIndex++
 			}
 
 		})
-
-		indexListStart = vertexListIndex
 
 		// for i := 0; i < vertexListIndex; i++ {
 		// 	indexList[i] = uint16(i)
@@ -1526,10 +1573,8 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	flush := func(rp renderPair) {
 
-		if vertexListIndex == 0 || indexListIndex == 0 {
+		if vertexListIndex == 0 {
 			vertexListIndex = 0
-			indexListIndex = 0
-			indexListStart = 0
 			return
 		}
 
@@ -1613,14 +1658,14 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 						"TextureMapScreenSize":  textureMapScreenSize,
 					},
 				}
-				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:indexListIndex], camera.clipAlphaShader, shaderOpt)
+				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.clipAlphaShader, shaderOpt)
 
 			} else {
 				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
 					Images: [4]*ebiten.Image{camera.resultDepthTexture},
 				}
 
-				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:indexListIndex], camera.depthShader, shaderOpt)
+				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.depthShader, shaderOpt)
 			}
 
 			if !model.isTransparent(meshPart) {
@@ -1684,7 +1729,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 		if camera.RenderNormals {
 			colorPassShaderOptions.Images[0] = defaultImg
 			colorPassShaderOptions.Uniforms["Fogless"] = 1 // No fog in a normal render
-			camera.resultNormalTexture.DrawTrianglesShader(normalVertexList[:vertexListIndex], indexList[:indexListIndex], camera.colorShader, colorPassShaderOptions)
+			camera.resultNormalTexture.DrawTrianglesShader(normalVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.colorShader, colorPassShaderOptions)
 			// camera.resultNormalTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], camera.colorShader, colorPassShaderOptions)
 		} else {
 			colorPassShaderOptions.Uniforms["Fogless"] = fogless
@@ -1715,9 +1760,9 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 						colorPassShaderOptions.Images[3] = mat.FragmentShaderOptions.Images[3]
 					}
 				}
-				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], mat.fragmentShader, colorPassShaderOptions)
+				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:vertexListIndex], mat.fragmentShader, colorPassShaderOptions)
 			} else {
-				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], camera.colorShader, colorPassShaderOptions)
+				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.colorShader, colorPassShaderOptions)
 			}
 
 			// camera.resultColorTexture.DrawRectShader(w, h, camera.colorShader, rectShaderOptions)
@@ -1726,19 +1771,19 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 			if hasFragShader {
 				// TODO: Review usage of FragmentShaderOptions here.
-				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], mat.fragmentShader, mat.FragmentShaderOptions)
+				camera.resultColorTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:vertexListIndex], mat.fragmentShader, mat.FragmentShaderOptions)
 			} else {
-				camera.resultColorTexture.DrawTriangles(colorVertexList[:vertexListIndex], indexList[:indexListIndex], img, colorPassOptions)
+				camera.resultColorTexture.DrawTriangles(colorVertexList[:vertexListIndex], indexList[:vertexListIndex], img, colorPassOptions)
 			}
 
 		}
 
-		camera.DebugInfo.DrawnTris += indexListIndex / 3
-		camera.DebugInfo.DrawnParts++
+		if camera.DebugInfo.On {
+			camera.DebugInfo.DrawnTris += vertexListIndex / 3
+			camera.DebugInfo.DrawnParts++
+		}
 
 		vertexListIndex = 0
-		indexListIndex = 0
-		indexListStart = 0
 
 	}
 
@@ -1785,7 +1830,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 						}
 					}
 
-					for _, part := range merged.Mesh.MeshParts {
+					for _, part := range merged.mesh.MeshParts {
 						render(renderPair{Model: merged, MeshPart: part})
 					}
 				}
@@ -1801,7 +1846,8 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	}
 
-	camera.DebugInfo.currentFrameTime += time.Since(frametimeStart)
+	camera.DebugInfo.currentFrameTime.EndTimer()
+	camera.DebugInfo.frameCount++
 
 }
 
@@ -1908,10 +1954,10 @@ type DynamicRenderSettings struct {
 
 	Transform Matrix4 // A transform to use for rendering; this is used if it is non-zero.
 
-	Color Color // The color to render the Model.
+	Color Color4 // The color to render the Model.
 }
 
-var dynamicRenderMesh = NewCubeMesh()
+var dynamicRenderMesh = NewCubeMesh(2, 2, 2)
 var dynamicRenderOwner = NewModel("dynamic batch render cubes", dynamicRenderMesh)
 
 // DynamicRender quickly and easily renders an object with the desired setup.
@@ -1927,7 +1973,7 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 			return errors.New("no render settings to render")
 		}
 
-		dynamicRenderOwner.Mesh.MeshParts[0].Material = settings[0].Model.Mesh.MeshParts[0].Material
+		dynamicRenderOwner.mesh.MeshParts[0].Material = settings[0].Model.mesh.MeshParts[0].Material
 
 		dynamicRenderOwner.FrustumCulling = false
 
@@ -1953,7 +1999,7 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 				}
 			}
 			model.Color = setting.Color
-			dynamicRenderOwner.DynamicBatchAdd(dynamicRenderOwner.Mesh.MeshParts[0], model)
+			dynamicRenderOwner.DynamicBatchAdd(dynamicRenderOwner.mesh.MeshParts[0], model)
 
 		}
 
@@ -1972,7 +2018,7 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 // Note that the frame-time mentioned here is purely the time that Tetra3D spends sending render commands to the command queue.
 // Any additional time that Ebitengine takes to flush that queue is not included in this average frame-time value, and is not
 // visible outside of debugging and profiling, like with pprof.
-func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float32, col Color) {
+func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float32, col Color4) {
 
 	m := camera.DebugInfo.FrameTime.Round(time.Microsecond).Microseconds()
 	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
@@ -2019,12 +2065,12 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float3
 
 	vector.StrokeRect(screen, 128, 16, barWidth, barHeight, 1, color.White, false)
 
-	for i := 0; i < len(camera.PrevFrametimes)-1; i++ {
+	for i := 0; i < len(camera.prevFrametimes)-1; i++ {
 
-		ip := 1.0 / float32(camera.PrevDebugInfoCap)
+		ip := 1.0 / float32(camera.prevDebugInfoFrametimeCap)
 
-		db := camera.PrevFrametimes[i]
-		nextdb := camera.PrevFrametimes[i+1]
+		db := camera.prevFrametimes[i]
+		nextdb := camera.prevFrametimes[i+1]
 
 		maxFt := 1.0 / float32(ebiten.TPS())
 
@@ -2044,7 +2090,7 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float3
 
 // DrawDebugWireframe draws the wireframe triangles of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
-func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, color Color) {
+func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, color Color4) {
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
@@ -2052,7 +2098,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 	halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
 
-	NewNodeCollection(rootNode).ForEach(func(node INode) bool {
+	rootNode.ForEachChild(true, func(node INode, index, size int) bool {
 
 		if model, isModel := node.(*Model); isModel {
 
@@ -2074,7 +2120,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 			// 	}
 			// }
 
-			for _, meshPart := range model.Mesh.MeshParts {
+			for _, meshPart := range model.mesh.MeshParts {
 
 				globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
 				if meshPart.Material != nil {
@@ -2083,11 +2129,11 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 				model.ProcessVertices(vpMatrix, camera, meshPart, false)
 
-				globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
+				globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
-					v0 := camera.clipToScreen(globalVertexTransforms[vertexIndices[0]], vertexIndices[0], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
-					v1 := camera.clipToScreen(globalVertexTransforms[vertexIndices[1]], vertexIndices[1], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
-					v2 := camera.clipToScreen(globalVertexTransforms[vertexIndices[2]], vertexIndices[2], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
+					v0 := camera.clipToScreen(globalVertexTransforms[triangle.VertexIndexA], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
+					v1 := camera.clipToScreen(globalVertexTransforms[triangle.VertexIndexB], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
+					v2 := camera.clipToScreen(globalVertexTransforms[triangle.VertexIndexC], model, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true)
 
 					if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 						(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
@@ -2136,11 +2182,13 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 		return true
 	})
 
+	vertexListIndex = 0
+
 }
 
 // DrawDebugDrawOrder draws the drawing order of all triangles of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
-func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, textScale float32, color Color) {
+func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, textScale float32, color Color4) {
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
@@ -2155,7 +2203,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 		}
 
-		for _, meshPart := range model.Mesh.MeshParts {
+		for _, meshPart := range model.mesh.MeshParts {
 
 			globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
 			if meshPart.Material != nil {
@@ -2164,9 +2212,9 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 			model.ProcessVertices(vpMatrix, camera, meshPart, false)
 
-			globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
+			globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
-				screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.Mesh.Triangles[triID].Center))
+				screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.mesh.Triangles[triangle.ID()].Center))
 
 				camera.DrawDebugText(screen, fmt.Sprintf("%d", triIndex), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
@@ -2182,7 +2230,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 // Draws the IDs of all triangles of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
-func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode, textScale float32, color Color) {
+func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode, textScale float32, color Color4) {
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
@@ -2197,7 +2245,7 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 
 		}
 
-		for _, meshPart := range model.Mesh.MeshParts {
+		for _, meshPart := range model.mesh.MeshParts {
 
 			globalSortingTriangleBucket.sortMode = TriangleSortModeBackToFront
 			if meshPart.Material != nil {
@@ -2206,11 +2254,11 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 
 			model.ProcessVertices(vpMatrix, camera, meshPart, false)
 
-			globalSortingTriangleBucket.ForEach(func(triIndex, triID int, vertexIndices []int) {
+			globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
-				screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.Mesh.Triangles[triID].Center))
+				screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(triangle.Center))
 
-				camera.DrawDebugText(screen, fmt.Sprintf("%d", model.Mesh.Triangles[triID].ID()), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+				camera.DrawDebugText(screen, fmt.Sprintf("%d", triangle.ID()), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 			})
 
@@ -2223,7 +2271,7 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 
 // DrawDebugDrawCallCount draws the draw call count of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
-func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float32, color Color) {
+func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float32, color Color4) {
 
 	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
 
@@ -2238,7 +2286,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 		screenPos := camera.WorldToScreenPixels(model.WorldPosition())
 
-		camera.DrawDebugText(screen, fmt.Sprintf("%d", len(model.Mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+		camera.DrawDebugText(screen, fmt.Sprintf("%d", len(model.mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 		return true
 	})
@@ -2246,7 +2294,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 // DrawDebugNormals draws the normals of visible models underneath the rootNode given to the screen. NormalLength is the length of the normal lines
 // in units. Color is the color to draw the normals.
-func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float32, color Color) {
+func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float32, color Color4) {
 
 	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
 
@@ -2259,7 +2307,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 
 		}
 
-		for _, tri := range model.Mesh.Triangles {
+		for _, tri := range model.mesh.Triangles {
 
 			center := camera.WorldToScreenPixels(model.Transform().MultVecW(tri.Center).To3D())
 			transformedNormal := camera.WorldToScreenPixels(model.Transform().MultVecW(tri.Center.Add(tri.Normal.Scale(normalLength))).To3D())
@@ -2274,7 +2322,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 }
 
 // DrawDebugCenters draws the center positions of nodes under the rootNode using the color given to the screen image provided.
-func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color Color) {
+func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color Color4) {
 
 	rootNode.Search(SearchOptions{}).ForEach(func(node INode) bool {
 
@@ -2300,7 +2348,7 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 }
 
-func (camera *Camera) DrawDebugText(screen *ebiten.Image, txtStr string, posX, posY, textScale float32, color Color) {
+func (camera *Camera) DrawDebugText(screen *ebiten.Image, txtStr string, posX, posY, textScale float32, color Color4) {
 
 	size := text.BoundString(basicfont.Face7x13, txtStr).Size()
 
@@ -2380,24 +2428,24 @@ func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
 // DrawDebugBoundsColoredSettings is a struct used to define how to draw debug information showing the positions of IBoundingObjects
 // in a node tree.
 type DrawDebugBoundsColoredSettings struct {
-	RenderAABBs bool  // Whether BoundingAABBs should be rendered or not
-	AABBColor   Color // The color used to render BoundingAABBs
+	RenderAABBs bool   // Whether BoundingAABBs should be rendered or not
+	AABBColor   Color4 // The color used to render BoundingAABBs
 
-	RenderSpheres bool  // Whether BoundingSpheres should be rendered or not
-	SphereColor   Color // The color used to render BoundingSpheres
+	RenderSpheres bool   // Whether BoundingSpheres should be rendered or not
+	SphereColor   Color4 // The color used to render BoundingSpheres
 
-	RenderCapsules bool  // Whether BoundingCapsules should be rendered or not
-	CapsuleColor   Color // The color used to render BoundingSpheres
+	RenderCapsules bool   // Whether BoundingCapsules should be rendered or not
+	CapsuleColor   Color4 // The color used to render BoundingSpheres
 
-	RenderTriangles               bool  // Whether BoundingTriangles should be rendered or not
-	TrianglesColor                Color // The color used to render BoundingTriangles
+	RenderTriangles               bool   // Whether BoundingTriangles should be rendered or not
+	TrianglesColor                Color4 // The color used to render BoundingTriangles
 	RenderTrianglesBackfaceCulled bool
 
-	RenderTrianglesAABB bool  // Whether the AABB surrounding BoundingTriangles should be rendered not
-	TrianglesAABBColor  Color // The color used to render the AABB surrounding BoundingTriangles
+	RenderTrianglesAABB bool   // Whether the AABB surrounding BoundingTriangles should be rendered not
+	TrianglesAABBColor  Color4 // The color used to render the AABB surrounding BoundingTriangles
 
-	RenderBroadphases bool  // Whether the broadphase cells surrounding BoundingTriangles should be rendered or not
-	BroadphaseColor   Color // The color used to render broadphase cells
+	RenderBroadphases bool   // Whether the broadphase cells surrounding BoundingTriangles should be rendered or not
+	BroadphaseColor   Color4 // The color used to render broadphase cells
 }
 
 // DrawDebugBoundsColored will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
@@ -2408,7 +2456,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 	worldToScreenPixels := func(vert Vector3) Vector3 {
 		v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
 		width, height := camera.Size()
-		return camera.clipToScreen(v.MultVecW(Vector3{}), 0, nil, float32(width), float32(height), float32(width)/2, float32(height)/2, true).To3D()
+		return camera.clipToScreen(v.MultVecW(Vector3{}), nil, float32(width), float32(height), float32(width)/2, float32(height)/2, true).To3D()
 	}
 
 	rootNode.Search(SearchOptions{}).ForEach(func(n INode) bool {
@@ -2480,7 +2528,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 				if options.RenderAABBs {
 
 					pos := bounds.WorldPosition()
-					size := bounds.Dimensions.Size().Scale(0.5)
+					size := bounds.dimensions.Size().Scale(0.5)
 
 					ufr := worldToScreenPixels(pos.Add(Vector3{size.X, size.Y, size.Z}))
 					ufl := worldToScreenPixels(pos.Add(Vector3{-size.X, size.Y, size.Z}))
@@ -2548,9 +2596,9 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 							continue
 						}
 
-						v0 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[0]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
-						v1 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[1]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
-						v2 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndices[2]]), 0, nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
+						v0 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndexA]), nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
+						v1 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndexB]), nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
+						v2 := camera.clipToScreen(mvpMatrix.MultVecW(mesh.VertexPositions[tri.VertexIndexC]), nil, float32(camWidth), float32(camHeight), halfCamWidth, halfCamHeight, true).To3D()
 
 						if (v0.X < 0 && v1.X < 0 && v2.X < 0) ||
 							(v0.Y < 0 && v1.Y < 0 && v2.Y < 0) ||
@@ -2614,18 +2662,18 @@ func DefaultDrawDebugBoundsSettings() DrawDebugBoundsColoredSettings {
 		RenderTrianglesAABB: true,
 		RenderBroadphases:   false,
 
-		AABBColor:          NewColor(0, 0.25, 1, 0.5),
-		SphereColor:        NewColor(0.5, 0.25, 1.0, 0.5),
-		CapsuleColor:       NewColor(0.25, 1, 0, 0.5),
-		TrianglesColor:     NewColor(1, 1, 1, 0.5),
-		TrianglesAABBColor: NewColor(1, 0.5, 0, 0.5),
-		BroadphaseColor:    NewColor(1, 0, 0, 0.1),
+		AABBColor:          NewColor4(0, 0.25, 1, 0.5),
+		SphereColor:        NewColor4(0.5, 0.25, 1.0, 0.5),
+		CapsuleColor:       NewColor4(0.25, 1, 0, 0.5),
+		TrianglesColor:     NewColor4(1, 1, 1, 0.5),
+		TrianglesAABBColor: NewColor4(1, 0.5, 0, 0.5),
+		BroadphaseColor:    NewColor4(1, 0, 0, 0.1),
 	}
 }
 
 // DrawDebugFrustums will draw shapes approximating the frustum spheres for objects underneath the rootNode.
 // The shapes will be drawn in the color provided to the screen image provided.
-func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, color Color) {
+func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, color Color4) {
 
 	rootNode.Search(SearchOptions{}).ForEachModel(func(model *Model) bool {
 
@@ -2640,7 +2688,7 @@ func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, co
 var debugIcosphereMesh = NewIcosphereMesh(1)
 var debugIcosphere = NewModel("debug icosphere", debugIcosphereMesh)
 
-func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color Color) {
+func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color Color4) {
 
 	debugIcosphere.SetLocalPositionVec(sphere.WorldPosition())
 	s := sphere.WorldRadius()

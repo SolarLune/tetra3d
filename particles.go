@@ -229,9 +229,9 @@ type ParticleSystem struct {
 func NewParticleSystem(baseModel *Model, particles ...*Model) *ParticleSystem {
 
 	for _, part := range particles {
-		mat := part.Mesh.MeshParts[0].Material
-		if baseModel.Mesh.MeshPartByMaterialName(mat.name) == nil {
-			baseModel.Mesh.AddMeshPart(part.Mesh.MeshParts[0].Material)
+		mat := part.mesh.MeshParts[0].Material
+		if baseModel.mesh.MeshPartByMaterialName(mat.name) == nil {
+			baseModel.mesh.AddMeshPart(part.mesh.MeshParts[0].Material)
 		}
 	}
 
@@ -282,7 +282,7 @@ func (ps *ParticleSystem) Update(dt float32) {
 	for _, part := range ps.LivingParticles {
 		part.Update(dt)
 		furthestDist = math32.Max(furthestDist, ps.Root.DistanceSquaredTo(part.Model))
-		largestParticle = math32.Max(largestParticle, part.Model.Mesh.Dimensions.MaxSpan()*part.Model.scale.Magnitude())
+		largestParticle = math32.Max(largestParticle, part.Model.mesh.Dimensions.MaxSpan()*part.Model.scale.Magnitude())
 	}
 
 	ps.Root.frustumCullingSphere.position = ps.Root.WorldPosition()
@@ -339,7 +339,7 @@ func (ps *ParticleSystem) Spawn() {
 	} else {
 		part = NewParticle(ps, ps.ParticleFactories)
 		for _, model := range part.ModelBank {
-			ps.Root.DynamicBatchAdd(model.Mesh.MeshParts[0], model)
+			ps.Root.DynamicBatchAdd(model.mesh.MeshParts[0], model)
 		}
 		// for _, newModel := range part.ModelBank {
 		// 	ps.Root.DynamicBatchAdd(ps.Root.Mesh.FindMeshPart(part.Model.Mesh.MeshParts[0].Material.Name), newModel)
@@ -371,12 +371,12 @@ func (ps *ParticleSystem) Spawn() {
 
 		model := ps.Settings.VertexSpawnModel
 
-		vertCount := len(model.Mesh.VertexPositions)
+		vertCount := len(model.mesh.VertexPositions)
 
 		if model.skinned {
-			pos = model.Mesh.vertexSkinnedPositions[ps.vertexSpawnIndex]
+			pos = model.mesh.vertexSkinnedPositions[ps.vertexSpawnIndex]
 		} else {
-			pos = model.Transform().MultVec(model.Mesh.VertexPositions[ps.vertexSpawnIndex])
+			pos = model.Transform().MultVec(model.mesh.VertexPositions[ps.vertexSpawnIndex])
 		}
 
 		switch ps.Settings.VertexSpawnMode {

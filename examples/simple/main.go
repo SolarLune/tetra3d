@@ -43,8 +43,8 @@ func (g *Game) Init() {
 	g.SystemHandler = examples.NewBasicSystemHandler(g)
 
 	// Create a cube, set the color, add it to the scene.
-	cube := tetra3d.NewModel("Cube", tetra3d.NewCubeMesh())
-	cube.Color = tetra3d.NewColor(0, 0.5, 1, 1)
+	cube := tetra3d.NewModel("Cube", tetra3d.NewCubeMesh(2, 2, 2))
+	cube.Color = tetra3d.NewColor4(0, 0.5, 1, 1)
 	g.Scene.Root.AddChildren(cube)
 
 	// Create a camera, move it back on the Z axis (depth). The camera automatically looks forward.
@@ -60,7 +60,7 @@ func (g *Game) Update() error {
 
 	// Spinning the cube.
 	cube := g.Scene.Root.Get("Cube")
-	cube.SetLocalRotation(cube.LocalRotation().Rotated(0, 1, 0, 0.05))
+	cube.Rotate(0, 1, 0, 0.01)
 
 	// Debug views
 

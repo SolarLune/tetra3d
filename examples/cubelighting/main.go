@@ -61,27 +61,33 @@ func (g *Game) Update() error {
 
 	cubeLight := g.Scene.Root.Get("cube light").(*tetra3d.CubeLight)
 
-	angle := cubeLight.LightingAngle.Modify()
+	angle := cubeLight.LightingAngle()
 
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
-		angle.RotateVec(tetra3d.WorldRight.Modify(), 0.1)
+		angle.RotateVec(tetra3d.WorldRight, 0.1)
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
-		angle.RotateVec(tetra3d.WorldRight.Modify(), -0.1)
+		angle.RotateVec(tetra3d.WorldRight, -0.1)
 	}
 
+	cubeLight.SetLightingAngle(angle)
+
+	bleed := cubeLight.Bleed()
+
 	if ebiten.IsKeyPressed(ebiten.KeyUp) {
-		cubeLight.Bleed += 0.05
-		if cubeLight.Bleed > 1 {
-			cubeLight.Bleed = 1
+		bleed += 0.05
+		if bleed > 1 {
+			bleed = 1
 		}
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyDown) {
-		cubeLight.Bleed -= 0.05
-		if cubeLight.Bleed < 0 {
-			cubeLight.Bleed = 0
+		bleed -= 0.05
+		if bleed < 0 {
+			bleed = 0
 		}
 	}
+
+	cubeLight.SetBleed(bleed)
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
 		g.Scene.World.LightingOn = !g.Scene.World.LightingOn

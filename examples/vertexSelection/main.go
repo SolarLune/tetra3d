@@ -71,7 +71,7 @@ func (g *Game) Init() {
 	// (As an aside, by default, when we export a mesh with vertex colors, the first vertex color channel is active.)
 
 	// Here, we'll select our vertices and store it in the Game struct.
-	mesh := g.Cube.Mesh
+	mesh := g.Cube.Mesh()
 
 	// Select vertices that have non-black vertex color in the specified vertex color channel.
 	vertices, err := tetra3d.NewVertexSelection().SelectByVertexColorChannelNames(mesh, "Flash")
@@ -93,13 +93,13 @@ func (g *Game) Update() error {
 	g.Time += 1.0 / 60.0
 
 	// Here we'll create a new glowing color.
-	glow := tetra3d.NewColorFromHSV(g.Time/10, 1, 1)
+	glow := tetra3d.NewColor4FromHSV(g.Time/10, 1, 1)
 
 	// Once we've gotten our indices, we can use the helper SetColor() function to set the color of all vertices at the same time.
 	// There are other functions to, for example, move or set the normal of the vertices, but if we wanted to do something else a
 	// bit more special, we could do so manually by looping through the indices in the *VertexSelection instance and modifying the
 	// mesh's vertex properties.
-	g.FlashingVertices.SetColor(g.Cube.Mesh.VertexColorChannelNames["Color"], glow)
+	g.FlashingVertices.SetColor(g.Cube.Mesh().VertexColorChannelNames["Color"], glow)
 
 	g.Camera.Update()
 

@@ -216,6 +216,24 @@ func (capsule *BoundingCapsule) closestPointCapsules(other *BoundingCapsule) Vec
 
 }
 
+func (capsule *BoundingCapsule) Dimensions() Dimensions {
+	r := capsule.Radius / 2
+	h := capsule.Height / 2
+	pos := capsule.WorldPosition()
+	return Dimensions{
+		Min: NewVector3(
+			pos.X-r,
+			pos.Y-h,
+			pos.Z-r,
+		),
+		Max: NewVector3(
+			pos.X+r,
+			pos.Y+h,
+			pos.Z+r,
+		),
+	}
+}
+
 // Returns the closest point on the capsule and the closest point on the given line.
 func (capsule *BoundingCapsule) nearestPointsToLine(lineStart, lineEnd Vector3) (Vector3, Vector3) {
 

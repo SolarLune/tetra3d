@@ -159,9 +159,11 @@ func (s Set[E]) Clear() {
 }
 
 // ForEach runs the provided function for each element in the set.
-func (s Set[E]) ForEach(f func(element E)) {
+func (s Set[E]) ForEach(f func(element E) bool) {
 	for element := range s {
-		f(element)
+		if !f(element) {
+			break
+		}
 	}
 
 }

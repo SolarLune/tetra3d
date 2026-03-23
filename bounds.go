@@ -143,6 +143,46 @@ func (result *Collision) AverageContactPoint() Vector3 {
 	return contactPoint
 }
 
+func (result *Collision) CollidedWithMaterialByName(matName string) bool {
+	for _, inter := range result.Intersections {
+		if inter.Triangle != nil && inter.Triangle.MeshPart.Material != nil && inter.Triangle.MeshPart.Material.name == matName {
+			return true
+		}
+	}
+	if parent := result.Object.Parent(); parent != nil {
+		if model, ok := parent.Parent().(*Model); ok {
+			for _, meshPart := range model.Mesh().MeshParts {
+				if meshPart.Material != nil && meshPart.Material.name == matName {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (result *Collision) CollidedWithMaterialByPropName(propName string) bool {
+	for _, inter := range result.Intersections {
+		if inter.Triangle != nil && inter.Triangle.MeshPart.Material != nil {
+			if inter.Triangle.MeshPart.Material.properties.Has(propName) {
+				return true
+			}
+		}
+	}
+	if parent := result.Object.Parent(); parent != nil {
+		if model, ok := parent.Parent().(*Model); ok {
+			for _, meshPart := range model.Mesh().MeshParts {
+				if meshPart.Material != nil {
+					if meshPart.Material.properties.Has(propName) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
 // CollisionTestSettings controls how a CollisionTest() call evaluates.
 type CollisionTestSettings struct {
 
@@ -179,6 +219,9 @@ type IBoundingObject interface {
 	// and returns the first collision found (if none are found, then it returns nil). To perform a function against
 	// multiple objects, use the OnCollision function in the CollisionTestSettings object.
 	CollisionTest(settings CollisionTestSettings) *Collision
+
+	// Returns the transformed dimensions of the bounding object.
+	Dimensions() Dimensions
 }
 
 // The below set of bt functions are used to test for intersection between BoundingObject pairs.
@@ -273,9 +316,9 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 			return true // Skip
 		}
 
-		v0 := triangles.Mesh.VertexPositions[tri.VertexIndices[0]]
-		v1 := triangles.Mesh.VertexPositions[tri.VertexIndices[1]]
-		v2 := triangles.Mesh.VertexPositions[tri.VertexIndices[2]]
+		v0 := triangles.Mesh.VertexPositions[tri.VertexIndexA]
+		v1 := triangles.Mesh.VertexPositions[tri.VertexIndexB]
+		v2 := triangles.Mesh.VertexPositions[tri.VertexIndexC]
 
 		closest := closestPointOnTri(spherePos, v0, v1, v2)
 		delta := spherePos.Sub(closest)
@@ -310,8 +353,8 @@ func btAABBAABB(aabbA, aabbB *BoundingAABB) *Collision {
 
 	aPos := aabbA.WorldPosition()
 	bPos := aabbB.WorldPosition()
-	aSize := aabbA.Dimensions.Size().Scale(0.5)
-	bSize := aabbB.Dimensions.Size().Scale(0.5)
+	aSize := aabbA.dimensions.Size().Scale(0.5)
+	bSize := aabbB.dimensions.Size().Scale(0.5)
 
 	dx := bPos.X - aPos.X
 	px := (bSize.X + aSize.X) - math32.Abs(dx)
@@ -391,7 +434,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 	}
 
 	boxPos := box.WorldPosition()
-	boxSize := box.Dimensions.Size().Scale(0.5)
+	boxSize := box.dimensions.Size().Scale(0.5)
 
 	transform := triangles.Transform()
 	transformNoLoc := transform.Clone()
@@ -405,7 +448,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 	// Pretty sure I can avoid transforming the vertices (and normal) by transforming the AABB axes by an inverse
 
-	triangles.Broadphase.ForEachTriangleInRange(boxPos, box.Dimensions.MaxSpan()/2, func(triID int) bool {
+	triangles.Broadphase.ForEachTriangleFromBoundingObject(box, func(triID int) bool {
 
 		tri := triangles.Mesh.Triangles[triID]
 
@@ -413,9 +456,9 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 			return true
 		}
 
-		v0 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[0]])
-		v1 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[1]])
-		v2 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndices[2]])
+		v0 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndexA])
+		v1 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndexB])
+		v2 := transform.MultVec(triangles.Mesh.VertexPositions[tri.VertexIndexC])
 
 		axes := []Vector3{
 
@@ -555,9 +598,9 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 
 		meshPart.ForEachTri(func(tri *Triangle) {
 
-			v0 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndices[0]])
-			v1 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndices[1]])
-			v2 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndices[2]])
+			v0 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndexA])
+			v1 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndexB])
+			v2 := transformA.MultVec(mesh.VertexPositions[tri.VertexIndexC])
 
 			transformedA = append(transformedA,
 				[]Vector3{
@@ -585,9 +628,9 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 
 		meshPart.ForEachTri(func(tri *Triangle) {
 
-			v0 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndices[0]])
-			v1 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndices[1]])
-			v2 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndices[2]])
+			v0 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndexA])
+			v1 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndexB])
+			v2 := transformB.MultVec(mesh.VertexPositions[tri.VertexIndexC])
 
 			bTris = append(bTris, tri)
 
@@ -757,9 +800,9 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	closestSub := Vector3{}
 
-	triangles.Broadphase.ForEachTriangleFromBoundingObject(capsule, func(triID int) bool {
+	triangles.Broadphase.ForEachTriangleFromBoundingObject(capsule, func(triIndex int) bool {
 
-		tri := triangles.Mesh.Triangles[triID]
+		tri := triangles.Mesh.Triangles[triIndex]
 
 		if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportCollisions {
 			return true
@@ -775,9 +818,9 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 			closestCapsulePoint = capsuleBottom
 		}
 
-		v0 := triangles.Mesh.VertexPositions[tri.VertexIndices[0]]
-		v1 := triangles.Mesh.VertexPositions[tri.VertexIndices[1]]
-		v2 := triangles.Mesh.VertexPositions[tri.VertexIndices[2]]
+		v0 := triangles.Mesh.VertexPositions[tri.VertexIndexA]
+		v1 := triangles.Mesh.VertexPositions[tri.VertexIndexB]
+		v2 := triangles.Mesh.VertexPositions[tri.VertexIndexC]
 
 		closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
 		closestSub.X = closest.X - capsuleBottom.X
@@ -877,13 +920,13 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) *Collision 
 
 }
 
-type projection struct {
+type Projection struct {
 	Min, Max float32
 }
 
-func project(axis Vector3, points ...Vector3) projection {
+func project(axis Vector3, points ...Vector3) Projection {
 
-	projection := projection{}
+	projection := Projection{}
 	projection.Min = axis.Dot(points[0])
 	projection.Max = projection.Min
 
@@ -905,7 +948,7 @@ func project(axis Vector3, points ...Vector3) projection {
 
 }
 
-func (projection projection) Overlap(other projection) float32 {
+func (projection Projection) Overlap(other Projection) float32 {
 
 	if projection.Min > other.Max {
 		return 0
@@ -921,11 +964,11 @@ func (projection projection) Overlap(other projection) float32 {
 	// return projection.Min - other.Max
 }
 
-func (projection projection) IsOverlapping(other projection) bool {
+func (projection Projection) IsOverlapping(other Projection) bool {
 	return !(projection.Min > other.Max || other.Min > projection.Max)
 }
 
-func (p projection) Distance() float32 {
+func (p Projection) Distance() float32 {
 	return p.Max - p.Min
 }
 

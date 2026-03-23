@@ -125,7 +125,7 @@ type INode interface {
 	// Unparent unparents the Node from its parent, removing it from the scenegraph.
 	Unparent()
 	getOwner() INode
-	// IsDescendantOf returns if a Node is a descendant child of a parent Node.
+	// DescendantOf returns if a Node is a descendant child of a parent Node.
 	DescendantOf(parent INode) bool
 	// Scene looks for the Node's parents recursively to return what scene it exists in.
 	// If the node is not within a tree (i.e. unparented), this will return nil.

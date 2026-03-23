@@ -293,7 +293,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- Additional effects? (Wavy text, shaky text, etc.)
 - [x] -- Multitexturing / Per-triangle Materials
 - [x] -- Perspective-corrected texturing (currently it's affine, see [Wikipedia](https://en.wikipedia.org/wiki/Texture_mapping#Affine_texture_mapping))
-- [ ] -- Automatic triangle / mesh subdivision depending on distance
+- [x] -- Automatic triangle / mesh subdivision depending on distance
 - [ ] -- Automatic level of detail
 - [ ] -- Manual level of detail (ability to render a model using various meshes in stages); note that these stages should be accessible at runtime to allow cloning meshes, for example
 - [ ] -- Possibly some UI utilities?
@@ -314,7 +314,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Bounding object debug rendering
 - [x] **Materials**
 - [x] -- Basic Texturing
-- [ ] -- Ability to use screen coordinates instead of just UV texturing (useful for repeating patterns)
+- [x] -- Ability to use screen coordinates instead of just UV texturing (useful for repeating patterns)
 - [ ] -- Replace opaque transparency mode with just automatic transparency mode? I feel like there might be a reason to have opaque separate, but I can't imagine a normal situation where you'd want it when you could just go with auto + setting alpha to 1
 - [x] **Animations**
 - [x] -- Armature-based animations
@@ -342,13 +342,11 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
 - [x] **Blender Add-on**
 - [x] -- Export 3D view camera to Scenes for quick iteration
-- [x] -- Auto mesh subdivision based on edge length
--                       [ ] -- Looks weird currently after a new update (since Blender ~4.4)
 - [ ] -- Object-level color option
 - [ ] -- Object-level shadeless checkbox
 - [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices (SolarLune 3/3/24: Doesn't seem to be possible outside of vertex colors)
 - [x] -- Exporting animations and auto-subdivided mesh data doesn't work properly when the scene is not focused in Blender
-- [ ] -- Sharing materials and textures doesn't work properly
+- [x] -- Sharing materials and textures doesn't work properly (3/23/26 SolarLune: Not sure what I meant by this?)
 - [x] -- Export GLTF on save / on command via button
 - [x] -- Bounds node creation
 - [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
@@ -362,7 +360,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Path / 3D Curve support
 - [x] -- Grid support (for pathfinding / linking 3D points together)
 - [ ] -- -- Adding costs to pathfinding (should be as simple as adding a cost and currentcost to each GridPoint, then sorting the points to check by cost when pathfinding, then reduce all costs greater than 1 by 1 ) (7/5/23, SolarLune: This works currently, but the pathfinding is still a bit wonky, so it should be looked at again)
-- [ ] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
+- [x] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
 - [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values. (5/22/23, SolarLune: should it be?)
 - [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose? It would be great if the models looked the way you'd expect)
 - [ ] -- Components (This would also require meta-programming; it'd be nice if components could have elements that were adjustable in Blender. Maybe a "game object" can have a dynamically-written "Components" struct, with space for one of each kind of component, for simplicity (i.e. one physics controller, one gameplay controller, one animation component, etc). There doesn't need to be ways to add or remove components from an object, and components can have any of OnInit, OnAdd, OnRemove, or Update functions to be considered components).
@@ -376,7 +374,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Ambient lights
 - [x] -- Light Volumes
     - [ ] -- Ability to project images to Light Volumes?
-    - [ ] -- Layers? That way you can, say, toggle a shadow cast by a single specifically
+    - [ ] -- Layers? That way you can, say, toggle a shadow cast by a layer specifically
 - [x] -- Point lights
 - [x] -- Directional lights
 - [x] -- Cube lights
@@ -384,7 +382,6 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Ability to bake lighting to vertex colors
 - [x] -- Ability to bake ambient occlusion to vertex colors
 - [ ] -- Specular lighting (shininess)
-- [ ] -- Lighting Probes - general idea is to be able to specify a space that has basic (optionally continuously updated) AO and lighting information, so standing a character in this spot makes him greener, that spot redder, that spot darker because he's in the shadows, etc.
 - [ ] -- Lightmaps - might be possible with being able to use multiple textures at the same time now?
 - [ ] -- Baking AO and lighting into vertex colors? from Blender? It's possible to do already using Cycles, but not very easy or simple.
 - [ ] -- Take into account view normal (seems most useful for seeing a dark side if looking at a non-backface-culled triangle that is lit) - This is now done for point lights, but not sun lights
@@ -396,7 +393,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] **Shaders**
 - [x] -- Custom fragment shaders
 - [x] -- Normal rendering (useful for, say, screen-space shaders)
-- [x] -- Vertex Modding CPU function
+- [x] -- Vertex Transformation CPU function
     - [ ] -- Ability to transform normals in the function as well
 - [x] **Collision Testing**
 - [x] -- Normal reporting

@@ -1,6 +1,8 @@
 package tetra3d
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // There is no zero ID; this is to make it so that systems that reference scenes by id can use 0 as an invalid reference.
 var sceneID uint32 = 1
@@ -185,7 +187,7 @@ func (scene *Scene) HandleAutobatch() {
 
 					mat := autobatchBlankMat
 
-					if mats := model.Mesh.Materials(); len(mats) > 0 {
+					if mats := model.mesh.Materials(); len(mats) > 0 {
 						mat = mats[0]
 					}
 
@@ -200,7 +202,7 @@ func (scene *Scene) HandleAutobatch() {
 							scene.autobatchDynamicMap[mat] = m
 							scene.Root.AddChildren(m)
 						}
-						scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].Mesh.MeshParts[0], model)
+						scene.autobatchDynamicMap[mat].DynamicBatchAdd(scene.autobatchDynamicMap[mat].mesh.MeshParts[0], model)
 
 					} else if model.AutoBatchMode == AutoBatchStatic {
 
@@ -211,8 +213,8 @@ func (scene *Scene) HandleAutobatch() {
 							scene.Root.AddChildren(scene.autobatchStaticMap[mat])
 						}
 						scene.autobatchStaticMap[mat].StaticMerge(model)
-						if len(scene.autobatchStaticMap[mat].Mesh.VertexColors) > 0 {
-							scene.autobatchStaticMap[mat].Mesh.VertexActiveColorChannel = 0
+						if len(scene.autobatchStaticMap[mat].mesh.VertexColors) > 0 {
+							scene.autobatchStaticMap[mat].mesh.VertexActiveColorChannel = 0
 						}
 
 					}

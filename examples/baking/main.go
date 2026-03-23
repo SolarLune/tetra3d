@@ -81,26 +81,26 @@ func (g *Game) Init() {
 	// for each Model.
 	bakeOptions := tetra3d.NewDefaultAOBakeOptions()
 	bakeOptions.TargetMeshParts = []*tetra3d.MeshPart{ // Bake AO only to meshparts with the following materials
-		model.Mesh.MeshPartByMaterialName("BrickTile"),
-		model.Mesh.MeshPartByMaterialName("GroundTile"),
-		model.Mesh.MeshPartByMaterialName("Cube"),
+		model.Mesh().MeshPartByMaterialName("BrickTile"),
+		model.Mesh().MeshPartByMaterialName("GroundTile"),
+		model.Mesh().MeshPartByMaterialName("Cube"),
 	}
 	bakeOptions.OcclusionAngle = math32.ToRadians(60)
 	bakeOptions.TargetChannel = ChannelAO // Set the target baking channel (as it's not 0)
 	// bakeOptions.OtherModels = models      // Specify what other objects should influence the AO (note that this is optional)
-	model.Mesh.SetVertexColor(ChannelAO, colors.White())
+	model.Mesh().SetVertexColor(ChannelAO, colors.White())
 	model.BakeAO(bakeOptions) // And bake the AO.
 
 	// We'll combine the channels together multiplicatively here.
-	model.Mesh.CombineVertexColors(ChannelCombined, true, ChannelColor, ChannelLight, ChannelAO)
+	model.Mesh().CombineVertexColors(ChannelCombined, true, ChannelColor, ChannelLight, ChannelAO)
 
-	for _, mat := range model.Mesh.Materials() {
+	for _, mat := range model.Mesh().Materials() {
 		mat.Shadeless = true // We don't need lighting anymore.
 	}
 
 	// Finally, we'll set the models' active color channel here. By default, it's -1, indicating no vertex colors are active (unless
 	// the mesh was exported from Blender with an active vertex color channel).
-	model.Mesh.SetActiveColorChannel(ChannelCombined)
+	model.Mesh().SetActiveColorChannel(ChannelCombined)
 
 }
 
@@ -110,23 +110,23 @@ func (g *Game) Update() error {
 	gameMap := g.Scene.Root.Get("GameMap").(*tetra3d.Model)
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		gameMap.Mesh.Select().SetActiveColorChannel(ChannelColor)
+		gameMap.Mesh().Select().SetActiveColorChannel(ChannelColor)
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		gameMap.Mesh.Select().SetActiveColorChannel(ChannelAO)
+		gameMap.Mesh().Select().SetActiveColorChannel(ChannelAO)
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key3) {
-		gameMap.Mesh.Select().SetActiveColorChannel(ChannelLight)
+		gameMap.Mesh().Select().SetActiveColorChannel(ChannelLight)
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key4) {
-		gameMap.Mesh.Select().SetActiveColorChannel(ChannelCombined)
+		gameMap.Mesh().Select().SetActiveColorChannel(ChannelCombined)
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key5) {
-		for _, mp := range gameMap.Mesh.MeshParts {
+		for _, mp := range gameMap.Mesh().MeshParts {
 			mp.Material.UseTexture = !mp.Material.UseTexture
 		}
 	}

@@ -13,22 +13,22 @@ import (
 	"github.com/tanema/gween/ease"
 )
 
-// Color represents a color, containing R, G, B, and A components, each expected to range from 0 to 1.
-type Color struct {
+// Color4 represents a color, containing R, G, B, and A components, each expected to range from 0 to 1.
+type Color4 struct {
 	R, G, B, A float32
 }
 
-// NewColor returns a new Color, with the provided R, G, B, and A components expected to range from 0 to 1.
-func NewColor(r, g, b, a float32) Color {
-	return Color{r, g, b, a}
+// NewColor4 returns a new Color, with the provided R, G, B, and A components expected to range from 0 to 1.
+func NewColor4(r, g, b, a float32) Color4 {
+	return Color4{r, g, b, a}
 }
 
-// NewColorFromColor returns a new Color based on a provided color.Color.
-func NewColorFromColor(color color.Color) Color {
+// NewColor4FromColor returns a new Color based on a provided color.Color.
+func NewColor4FromColor(color color.Color) Color4 {
 
 	r, g, b, a := color.RGBA()
 
-	return NewColor(
+	return NewColor4(
 		float32(r)/65535,
 		float32(g)/65535,
 		float32(b)/65535,
@@ -37,9 +37,9 @@ func NewColorFromColor(color color.Color) Color {
 
 }
 
-// NewColorRandom creates a randomized color, with each component lying between the minimum and maximum values.
-func NewColorRandom(min, max float32, grayscale bool) Color {
-	color := NewColor(1, 1, 1, 1)
+// NewColor4Random creates a randomized color, with each component lying between the minimum and maximum values.
+func NewColor4Random(min, max float32, grayscale bool) Color4 {
+	color := NewColor4(1, 1, 1, 1)
 	diff := max - min
 	if grayscale {
 		r := min + (diff * rand.Float32())
@@ -55,7 +55,7 @@ func NewColorRandom(min, max float32, grayscale bool) Color {
 }
 
 // AddRGBA adds the provided R, G, B, and A values to the color as provided. The components are expected to range from 0 to 1.
-func (color Color) AddRGBA(r, g, b, a float32) Color {
+func (color Color4) AddRGBA(r, g, b, a float32) Color4 {
 	color.R += r
 	color.G += g
 	color.B += b
@@ -64,12 +64,12 @@ func (color Color) AddRGBA(r, g, b, a float32) Color {
 }
 
 // Add adds the provided Color to the existing Color.
-func (color Color) Add(other Color) Color {
+func (color Color4) Add(other Color4) Color4 {
 	return color.AddRGBA(other.ToFloat32s())
 }
 
 // MultiplyRGBA multiplies the color's RGBA channels by the provided R, G, B, and A scalar values.
-func (color Color) MultiplyRGBA(scalarR, scalarG, scalarB, scalarA float32) Color {
+func (color Color4) MultiplyRGBA(scalarR, scalarG, scalarB, scalarA float32) Color4 {
 	color.R *= scalarR
 	color.G *= scalarG
 	color.B *= scalarB
@@ -77,21 +77,21 @@ func (color Color) MultiplyRGBA(scalarR, scalarG, scalarB, scalarA float32) Colo
 	return color
 }
 
-func (color Color) MultiplyScalarRGB(scalar float32) Color {
+func (color Color4) MultiplyScalarRGB(scalar float32) Color4 {
 	return color.MultiplyRGBA(scalar, scalar, scalar, 1)
 }
 
-func (color Color) MultiplyScalarRGBA(scalar float32) Color {
+func (color Color4) MultiplyScalarRGBA(scalar float32) Color4 {
 	return color.MultiplyRGBA(scalar, scalar, scalar, scalar)
 }
 
 // Multiply multiplies the existing Color by the provided Color.
-func (color Color) Multiply(other Color) Color {
+func (color Color4) Multiply(other Color4) Color4 {
 	return color.MultiplyRGBA(other.ToFloat32s())
 }
 
 // Sub subtracts the other Color from the calling Color instance.
-func (color Color) SubRGBA(r, g, b, a float32) Color {
+func (color Color4) SubRGBA(r, g, b, a float32) Color4 {
 	color.R -= r
 	color.G -= g
 	color.B -= b
@@ -100,12 +100,12 @@ func (color Color) SubRGBA(r, g, b, a float32) Color {
 }
 
 // Sub subtracts the other Color from the calling Color instance.
-func (color Color) Sub(other Color) Color {
+func (color Color4) Sub(other Color4) Color4 {
 	return color.SubRGBA(other.ToFloat32s())
 }
 
 // Mix mixes the calling Color with the other Color, mixed to the percentage given (ranging from 0 - 1).
-func (color Color) Mix(other Color, percentage float32) Color {
+func (color Color4) Mix(other Color4, percentage float32) Color4 {
 
 	// percentage = math32.Clamp(percentage, 0, 1)
 	color.R += (other.R - color.R) * percentage
@@ -117,40 +117,40 @@ func (color Color) Mix(other Color, percentage float32) Color {
 }
 
 // AddAlpha adds the provided alpha amount to the Color
-func (c Color) AddAlpha(alpha float32) Color {
+func (c Color4) AddAlpha(alpha float32) Color4 {
 	c.A += alpha
 	return c
 }
 
 // SubAlpha adds the provided alpha amount to the Color
-func (c Color) SubAlpha(alpha float32) Color {
+func (c Color4) SubAlpha(alpha float32) Color4 {
 	c.A -= alpha
 	return c
 }
 
 // SetAlpha returns a copy of the the Color with the alpha set to the provided alpha value.
-func (color Color) SetAlpha(alpha float32) Color {
+func (color Color4) SetAlpha(alpha float32) Color4 {
 	color.A = alpha
 	return color
 }
 
 // ToFloat32s returns the Color as four float32 in the order R, G, B, and A.
-func (color Color) ToFloat32s() (float32, float32, float32, float32) {
+func (color Color4) ToFloat32s() (float32, float32, float32, float32) {
 	return color.R, color.G, color.B, color.A
 }
 
 // Tofloat32s returns four float32 values for each channel in the Color in the order R, G, B, and A.
-func (color Color) Tofloat32s() (float32, float32, float32, float32) {
+func (color Color4) Tofloat32s() (float32, float32, float32, float32) {
 	return float32(color.R), float32(color.G), float32(color.B), float32(color.A)
 }
 
 // ToFloat32Array returns a [4]float32 array for each channel in the Color in the order of R, G, B, and A.
-func (color Color) ToFloat32Array() [4]float32 {
+func (color Color4) ToFloat32Array() [4]float32 {
 	return [4]float32{float32(color.R), float32(color.G), float32(color.B), float32(color.A)}
 }
 
 // Equals returns true if the two Colors are close enough in all values.
-func (c Color) Equals(other Color) bool {
+func (c Color4) Equals(other Color4) bool {
 
 	eps := float32(1e-4)
 
@@ -163,7 +163,7 @@ func (c Color) Equals(other Color) bool {
 }
 
 // ToRGBA64 converts a color to a color.RGBA64 instance.
-func (c Color) ToRGBA64() color.RGBA64 {
+func (c Color4) ToRGBA64() color.RGBA64 {
 	return color.RGBA64{
 		c.capRGBA64(c.R),
 		c.capRGBA64(c.G),
@@ -173,7 +173,7 @@ func (c Color) ToRGBA64() color.RGBA64 {
 }
 
 // ToNRGBA64 converts a color to a color.NRGBA64 (non-alpha color multiplied) color instance.
-func (c Color) ToNRGBA64() color.NRGBA64 {
+func (c Color4) ToNRGBA64() color.NRGBA64 {
 	return color.NRGBA64{
 		c.capRGBA64(c.R),
 		c.capRGBA64(c.G),
@@ -182,7 +182,7 @@ func (c Color) ToNRGBA64() color.NRGBA64 {
 	}
 }
 
-func (color Color) capRGBA64(value float32) uint16 {
+func (color Color4) capRGBA64(value float32) uint16 {
 	if value > 1 {
 		value = 1
 	} else if value < 0 {
@@ -193,7 +193,7 @@ func (color Color) capRGBA64(value float32) uint16 {
 
 // ConvertTosRGB() converts the color's R, G, and B components to the sRGB color space. This is used to convert
 // colors from their values in GLTF to how they should appear on the screen. See: https://en.wikipedia.org/wiki/SRGB
-func (color Color) ConvertTosRGB() Color {
+func (color Color4) ConvertTosRGB() Color4 {
 
 	if color.R <= 0.0031308 {
 		color.R *= 12.92
@@ -218,7 +218,7 @@ func (color Color) ConvertTosRGB() Color {
 }
 
 // Lerp linearly interpolates the color from the starting color to the target by the percentage given.
-func (c Color) Lerp(other Color, percentage float32) Color {
+func (c Color4) Lerp(other Color4, percentage float32) Color4 {
 
 	percentage = math32.Clamp(percentage, 0, 1)
 	c.R += (other.R - c.R) * float32(percentage)
@@ -230,7 +230,7 @@ func (c Color) Lerp(other Color, percentage float32) Color {
 }
 
 // Lerp linearly interpolates the color from the starting color to the target by the percentage given.
-func (c Color) LerpRGBA(r, g, b, a, percentage float32) Color {
+func (c Color4) LerpRGBA(r, g, b, a, percentage float32) Color4 {
 
 	percentage = math32.Clamp(percentage, 0, 1)
 	c.R += (float32(r) - c.R) * float32(percentage)
@@ -241,14 +241,14 @@ func (c Color) LerpRGBA(r, g, b, a, percentage float32) Color {
 	return c
 }
 
-func (color Color) String() string {
+func (color Color4) String() string {
 	return fmt.Sprintf("<%0.2f, %0.2f, %0.2f, %0.2f>", color.R, color.G, color.B, color.A)
 }
 
-// NewColorFromHSV returns a new color, using hue, saturation, and value numbers, each ranging from 0 to 1. A hue of
+// NewColor4FromHSV returns a new color, using hue, saturation, and value numbers, each ranging from 0 to 1. A hue of
 // 0 is red, while 1 is also red, but on the other end of the spectrum.
 // Cribbed from: https://github.com/lucasb-eyer/go-colorful/blob/master/colors.go
-func NewColorFromHSV(h, s, v float32) Color {
+func NewColor4FromHSV(h, s, v float32) Color4 {
 
 	for h >= 1 {
 		h--
@@ -299,12 +299,12 @@ func NewColorFromHSV(h, s, v float32) Color {
 		b = X
 	}
 
-	return Color{float32(m + r), float32(m + g), float32(m + b), 1}
+	return Color4{float32(m + r), float32(m + g), float32(m + b), 1}
 }
 
-func NewColorFromHexString(hex string) Color {
+func NewColor4FromHexString(hex string) Color4 {
 
-	c := NewColor(0, 0, 0, 1)
+	c := NewColor4(0, 0, 0, 1)
 
 	hex = strings.TrimPrefix(hex, "#")
 
@@ -340,7 +340,7 @@ func NewColorFromHexString(hex string) Color {
 }
 
 // Hue returns the hue of the color as a value ranging from 0 to 1.
-func (color Color) Hue() float32 {
+func (color Color4) Hue() float32 {
 	// Function cribbed from: https://github.com/lucasb-eyer/go-colorful/blob/master/colors.go
 
 	r := float32(color.R)
@@ -371,7 +371,7 @@ func (color Color) Hue() float32 {
 }
 
 // Saturation returns the saturation of the color as a value ranging from 0 to 1.
-func (color Color) Saturation() float32 {
+func (color Color4) Saturation() float32 {
 
 	r := float32(color.R)
 	g := float32(color.G)
@@ -390,7 +390,7 @@ func (color Color) Saturation() float32 {
 }
 
 // Value returns the value of the color as a value, ranging from 0 to 1.
-func (color Color) Value() float32 {
+func (color Color4) Value() float32 {
 
 	r := float32(color.R)
 	g := float32(color.G)
@@ -399,65 +399,417 @@ func (color Color) Value() float32 {
 	return math32.Max(math32.Max(r, g), b)
 }
 
-// func (color Color) HSV() (float32, float32, float32) {
-
-// 	r := float32(color.R)
-// 	g := float32(color.G)
-// 	b := float32(color.B)
-
-// 	min := math32.Min(math32.Min(r, g), b)
-// 	v := math32.Max(math32.Max(r, g), b)
-// 	C := v - min
-
-// 	s := 0.0
-// 	if v != 0.0 {
-// 		s = C / v
-// 	}
-
-// 	h := 0.0
-// 	if min != v {
-// 		if v == r {
-// 			h = math32.Mod((g-b)/C, 6.0)
-// 		}
-// 		if v == g {
-// 			h = (b-r)/C + 2.0
-// 		}
-// 		if v == b {
-// 			h = (r-g)/C + 4.0
-// 		}
-// 		h *= 60.0
-// 		if h < 0.0 {
-// 			h += 360.0
-// 		}
-// 	}
-// 	return h / 360, s, v
-// }
-
 // SetHue returns a copy of the color with the hue set to the specified value.
 // Hue goes through the rainbow, starting with red, and ranges from 0 to 1.
-func (color Color) SetHue(h float32) Color {
-	return NewColorFromHSV(h, color.Saturation(), color.Value())
+func (color Color4) SetHue(h float32) Color4 {
+	return NewColor4FromHSV(h, color.Saturation(), color.Value())
 }
 
 // SetSaturation returns a copy of the color with the saturation of the color set to the specified value.
 // Saturation ranges from 0 to 1.
-func (color Color) SetSaturation(s float32) Color {
-	return NewColorFromHSV(color.Hue(), s, color.Value())
+func (color Color4) SetSaturation(s float32) Color4 {
+	return NewColor4FromHSV(color.Hue(), s, color.Value())
 }
 
 // SetValue returns a copy of the color with the value of the color set to the specified value.
 // Value ranges from 0 to 1.
-func (color Color) SetValue(v float32) Color {
-	return NewColorFromHSV(color.Hue(), color.Saturation(), v)
+func (color Color4) SetValue(v float32) Color4 {
+	return NewColor4FromHSV(color.Hue(), color.Saturation(), v)
 }
 
-func (c Color) IsZero() bool {
+func (c Color4) IsZero() bool {
 	return c.R == 0 && c.G == 0 && c.B == 0 && c.A == 0
+}
+
+func (c Color4) ToColor3() Color3 {
+	return Color3{c.R, c.G, c.B}
+}
+
+type Color3 struct {
+	R, G, B float32
+}
+
+func NewColor3(r, g, b float32) Color3 {
+	return Color3{r, g, b}
+}
+
+func (c Color3) ToColor4() Color4 {
+	return Color4{c.R, c.G, c.B, 1}
+}
+
+// NewColorFromColor returns a new Color based on a provided color.Color.
+func NewColor3FromColor(color color.Color) Color3 {
+
+	r, g, b, _ := color.RGBA()
+
+	return NewColor3(
+		float32(r)/65535,
+		float32(g)/65535,
+		float32(b)/65535,
+	)
+
+}
+
+// NewColorRandom creates a randomized color, with each component lying between the minimum and maximum values.
+func NewColor3Random(min, max float32, grayscale bool) Color3 {
+	color := NewColor3(1, 1, 1)
+	diff := max - min
+	if grayscale {
+		r := min + (diff * rand.Float32())
+		color.R = r
+		color.G = r
+		color.B = r
+	} else {
+		color.R = min + (diff * rand.Float32())
+		color.G = min + (diff * rand.Float32())
+		color.B = min + (diff * rand.Float32())
+	}
+	return color
+}
+
+// AddRGBA adds the provided R, G, and B values to the color as provided.
+func (color Color3) AddRGB(r, g, b float32) Color3 {
+	color.R += r
+	color.G += g
+	color.B += b
+	return color
+}
+
+// Adds the given Scalar value to all components of the Color3.
+func (color Color3) AddScalar(scalar float32) Color3 {
+	color.R += scalar
+	color.G += scalar
+	color.B += scalar
+	return color
+}
+
+// Add adds the provided Color to the existing Color.
+func (color Color3) Add(other Color3) Color3 {
+	return color.AddRGB(other.ToFloat32s())
+}
+
+// MultiplyRGBA multiplies the color's RGBA channels by the provided R, G, B, and A scalar values.
+func (color Color3) MultiplyRGB(scalarR, scalarG, scalarB float32) Color3 {
+	color.R *= scalarR
+	color.G *= scalarG
+	color.B *= scalarB
+	return color
+}
+
+func (color Color3) MultiplyScalar(scalar float32) Color3 {
+	return color.MultiplyRGB(scalar, scalar, scalar)
+}
+
+// Multiply multiplies the existing Color by the provided Color.
+func (color Color3) Multiply(other Color3) Color3 {
+	return color.MultiplyRGB(other.ToFloat32s())
+}
+
+// Sub subtracts the other Color from the calling Color instance.
+func (color Color3) SubRGB(r, g, b float32) Color3 {
+	color.R -= r
+	color.G -= g
+	color.B -= b
+	return color
+}
+
+// Sub subtracts the other Color from the calling Color instance.
+func (color Color3) Sub(other Color3) Color3 {
+	return color.SubRGB(other.ToFloat32s())
+}
+
+// Mix mixes the calling Color with the other Color, mixed to the percentage given (ranging from 0 - 1).
+func (color Color3) Mix(other Color3, percentage float32) Color3 {
+
+	// percentage = math32.Clamp(percentage, 0, 1)
+	color.R += (other.R - color.R) * percentage
+	color.G += (other.G - color.G) * percentage
+	color.B += (other.B - color.B) * percentage
+	return color
+
+}
+
+// ToFloat32s returns the Color as four float32 in the order R, G, B, and A.
+func (color Color3) ToFloat32s() (float32, float32, float32) {
+	return color.R, color.G, color.B
+}
+
+// Tofloat32s returns four float32 values for each channel in the Color in the order R, G, B, and A.
+func (color Color3) Tofloat32s() (float32, float32, float32) {
+	return float32(color.R), float32(color.G), float32(color.B)
+}
+
+// ToFloat32Array returns a [4]float32 array for each channel in the Color in the order of R, G, B, and A.
+func (color Color3) ToFloat32Array() [3]float32 {
+	return [3]float32{float32(color.R), float32(color.G), float32(color.B)}
+}
+
+// Equals returns true if the two Colors are close enough in all values.
+func (c Color3) Equals(other Color3) bool {
+
+	eps := float32(1e-4)
+
+	if math32.Abs(c.R-other.R) > eps || math32.Abs(c.G-other.G) > eps || math32.Abs(c.B-other.B) > eps {
+		return false
+	}
+
+	return true
+
+}
+
+// ToRGBA64 converts a color to a color.RGBA64 instance.
+func (c Color3) ToRGBA64() color.RGBA64 {
+	return color.RGBA64{
+		c.capRGBA64(c.R),
+		c.capRGBA64(c.G),
+		c.capRGBA64(c.B),
+		65535,
+	}
+}
+
+// ToNRGBA64 converts a color to a color.NRGBA64 (non-alpha color multiplied) color instance.
+func (c Color3) ToNRGBA64() color.NRGBA64 {
+	return color.NRGBA64{
+		c.capRGBA64(c.R),
+		c.capRGBA64(c.G),
+		c.capRGBA64(c.B),
+		65535,
+	}
+}
+
+func (color Color3) capRGBA64(value float32) uint16 {
+	if value > 1 {
+		value = 1
+	} else if value < 0 {
+		value = 0
+	}
+	return uint16(value * math.MaxUint16)
+}
+
+// ConvertTosRGB() converts the color's R, G, and B components to the sRGB color space. This is used to convert
+// colors from their values in GLTF to how they should appear on the screen. See: https://en.wikipedia.org/wiki/SRGB
+func (color Color3) ConvertTosRGB() Color3 {
+
+	if color.R <= 0.0031308 {
+		color.R *= 12.92
+	} else {
+		color.R = float32(1.055*math32.Pow(float32(color.R), 1/2.4) - 0.055)
+	}
+
+	if color.G <= 0.0031308 {
+		color.G *= 12.92
+	} else {
+		color.G = float32(1.055*math32.Pow(float32(color.G), 1/2.4) - 0.055)
+	}
+
+	if color.B <= 0.0031308 {
+		color.B *= 12.92
+	} else {
+		color.B = float32(1.055*math32.Pow(float32(color.B), 1/2.4) - 0.055)
+	}
+
+	return color
+
+}
+
+// Lerp linearly interpolates the color from the starting color to the target by the percentage given.
+func (c Color3) Lerp(other Color3, percentage float32) Color3 {
+
+	percentage = math32.Clamp(percentage, 0, 1)
+	c.R += (other.R - c.R) * float32(percentage)
+	c.G += (other.G - c.G) * float32(percentage)
+	c.B += (other.B - c.B) * float32(percentage)
+
+	return c
+}
+
+// Lerp linearly interpolates the color from the starting color to the target by the percentage given.
+func (c Color3) LerpRGB(r, g, b, percentage float32) Color3 {
+
+	percentage = math32.Clamp(percentage, 0, 1)
+	c.R += (float32(r) - c.R) * float32(percentage)
+	c.G += (float32(g) - c.G) * float32(percentage)
+	c.B += (float32(b) - c.B) * float32(percentage)
+
+	return c
+}
+
+func (color Color3) String() string {
+	return fmt.Sprintf("<%0.2f, %0.2f, %0.2f>", color.R, color.G, color.B)
+}
+
+// NewColorFromHSV returns a new color, using hue, saturation, and value numbers, each ranging from 0 to 1. A hue of
+// 0 is red, while 1 is also red, but on the other end of the spectrum.
+// Cribbed from: https://github.com/lucasb-eyer/go-colorful/blob/master/colors.go
+func NewColor3FromHSV(h, s, v float32) Color3 {
+
+	for h >= 1 {
+		h--
+	}
+	for h < 0 {
+		h++
+	}
+
+	h *= 360
+
+	if s > 1 {
+		s = 1
+	} else if s < 0 {
+		s = 0
+	}
+
+	if v > 1 {
+		v = 1
+	} else if v < 0 {
+		v = 0
+	}
+
+	Hp := float32(h / 60.0)
+	C := v * s
+	X := C * (1.0 - math32.Abs(math32.Mod(Hp, 2.0)-1.0))
+
+	m := v - C
+	r, g, b := float32(0), float32(0), float32(0)
+
+	switch {
+	case 0.0 <= Hp && Hp < 1.0:
+		r = C
+		g = X
+	case 1.0 <= Hp && Hp < 2.0:
+		r = X
+		g = C
+	case 2.0 <= Hp && Hp < 3.0:
+		g = C
+		b = X
+	case 3.0 <= Hp && Hp < 4.0:
+		g = X
+		b = C
+	case 4.0 <= Hp && Hp < 5.0:
+		r = X
+		b = C
+	case 5.0 <= Hp && Hp < 6.0:
+		r = C
+		b = X
+	}
+
+	return Color3{float32(m + r), float32(m + g), float32(m + b)}
+}
+
+func NewColor3FromHexString(hex string) Color3 {
+
+	c := NewColor3(0, 0, 0)
+
+	hex = strings.TrimPrefix(hex, "#")
+
+	if len(hex) >= 2 {
+		v, _ := strconv.ParseInt(hex[:2], 16, 32)
+		c.R = float32(v) / 256.0
+
+		if len(hex) >= 4 {
+			v, _ := strconv.ParseInt(hex[2:4], 16, 32)
+			c.G = float32(v) / 256.0
+		} else {
+			c.G = 1
+		}
+
+		if len(hex) >= 6 {
+			v, _ := strconv.ParseInt(hex[4:6], 16, 32)
+			c.B = float32(v) / 256.0
+		} else {
+			c.B = 1
+		}
+
+	}
+
+	return c
+
+}
+
+// Hue returns the hue of the color as a value ranging from 0 to 1.
+func (color Color3) Hue() float32 {
+	// Function cribbed from: https://github.com/lucasb-eyer/go-colorful/blob/master/colors.go
+
+	r := float32(color.R)
+	g := float32(color.G)
+	b := float32(color.B)
+
+	min := math32.Min(math32.Min(r, g), b)
+	v := math32.Max(math32.Max(r, g), b)
+	C := v - min
+
+	h := float32(0)
+	if min != v {
+		if v == r {
+			h = math32.Mod((g-b)/C, 6.0)
+		}
+		if v == g {
+			h = (b-r)/C + 2.0
+		}
+		if v == b {
+			h = (r-g)/C + 4.0
+		}
+		h *= 60.0
+		if h < 0.0 {
+			h += 360.0
+		}
+	}
+	return h / 360
+}
+
+// Saturation returns the saturation of the color as a value ranging from 0 to 1.
+func (color Color3) Saturation() float32 {
+
+	r := float32(color.R)
+	g := float32(color.G)
+	b := float32(color.B)
+
+	min := math32.Min(math32.Min(r, g), b)
+	v := math32.Max(math32.Max(r, g), b)
+	C := v - min
+
+	s := float32(0)
+	if v != 0.0 {
+		s = C / v
+	}
+
+	return s
+}
+
+// Value returns the value of the color as a value, ranging from 0 to 1.
+func (color Color3) Value() float32 {
+
+	r := float32(color.R)
+	g := float32(color.G)
+	b := float32(color.B)
+
+	return math32.Max(math32.Max(r, g), b)
+}
+
+// SetHue returns a copy of the color with the hue set to the specified value.
+// Hue goes through the rainbow, starting with red, and ranges from 0 to 1.
+func (color Color3) SetHue(h float32) Color3 {
+	return NewColor3FromHSV(h, color.Saturation(), color.Value())
+}
+
+// SetSaturation returns a copy of the color with the saturation of the color set to the specified value.
+// Saturation ranges from 0 to 1.
+func (color Color3) SetSaturation(s float32) Color3 {
+	return NewColor3FromHSV(color.Hue(), s, color.Value())
+}
+
+// SetValue returns a copy of the color with the value of the color set to the specified value.
+// Value ranges from 0 to 1.
+func (color Color3) SetValue(v float32) Color3 {
+	return NewColor3FromHSV(color.Hue(), color.Saturation(), v)
+}
+
+func (c Color3) IsZero() bool {
+	return c.R == 0 && c.G == 0 && c.B == 0
 }
 
 // ColorCurvePoint indicates an individual color point in a color curve.
 type ColorCurvePoint struct {
-	Color      Color
+	Color      Color4
 	Percentage float32
 }
 
@@ -469,7 +821,7 @@ type ColorCurve struct {
 
 // NewColorCurve creats a new ColorCurve composed of the colors given, evenly spaced throughout the curve.
 // If no colors are given, the ColorCurve is still valid - it's just empty.
-func NewColorCurve(colors ...Color) ColorCurve {
+func NewColorCurve(colors ...Color4) ColorCurve {
 	cc := ColorCurve{
 		Points:         []ColorCurvePoint{},
 		EasingFunction: ease.Linear,
@@ -494,7 +846,7 @@ func (cc ColorCurve) Clone() ColorCurve {
 }
 
 // Add adds a color point to the ColorCurve with the color and percentage provided (from 0-1).
-func (cc *ColorCurve) Add(color Color, percentage float32) {
+func (cc *ColorCurve) Add(color Color4, percentage float32) {
 	cc.AddRGBA(color.R, color.G, color.B, color.A, percentage)
 }
 
@@ -508,7 +860,7 @@ func (cc *ColorCurve) AddRGBA(r, g, b, a float32, percentage float32) {
 	}
 
 	cc.Points = append(cc.Points, ColorCurvePoint{
-		Color:      NewColor(r, g, b, a),
+		Color:      NewColor4(r, g, b, a),
 		Percentage: percentage,
 	})
 
@@ -518,9 +870,9 @@ func (cc *ColorCurve) AddRGBA(r, g, b, a float32, percentage float32) {
 // Color returns the Color for the given percentage in the color curve. For example, if you have a curve composed of
 // the colors {0, 0, 0, 0} at 0 and {1, 1, 1, 1} at 1, then calling Curve.Color(0.5) would return {0.5, 0.5, 0.5, 0.5}.
 // If the curve doesn't have any color curve points, Color will return transparent.
-func (cc ColorCurve) Color(perc float32) Color {
+func (cc ColorCurve) Color(perc float32) Color4 {
 
-	var c Color
+	var c Color4
 
 	for i := 0; i < len(cc.Points); i++ {
 
@@ -597,7 +949,7 @@ func (c *ColorTween) Reset() {
 }
 
 // Color returns the current color from the internal ColorCurve.
-func (c *ColorTween) Color() Color {
+func (c *ColorTween) Color() Color4 {
 	return c.ColorCurve.Color(c.Percent)
 }
 

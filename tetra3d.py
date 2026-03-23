@@ -128,7 +128,8 @@ t3dDrawObjectPropertiesModes = [
 
 def filepathSet(self, value):
 
-    value = bpy.path.relpath(value)
+    if value != "":
+        value = bpy.path.relpath(value)
 
     global currentlyPlayingAudioHandle, currentlyPlayingAudioName, audioPaused
     if "valueFilepath" in self and self["valueFilepath"] == currentlyPlayingAudioName and value != self["valueFilepath"]:
@@ -136,6 +137,7 @@ def filepathSet(self, value):
         currentlyPlayingAudioHandle = None
         currentlyPlayingAudioName = ""
         audioPaused = False
+
     self["valueFilepath"] = value
 
 def filepathGet(self):
@@ -705,6 +707,115 @@ class RENDER_OT_tetra3dQuickSetRenderResolution(bpy.types.Operator):
         context.scene.t3dRenderResolutionH__ = int(self.resolutionHeight)
         return {'FINISHED'}
 
+class t3dAutoSubdivisionLevel__(bpy.types.PropertyGroup):
+
+    distance: bpy.props.FloatProperty(name="Max Distance", default=40, min=0, description="How far away from the camera a triangle can be before being subdivided at this level")
+    subdivisionLevel: bpy.props.IntProperty(name="Subdivision Level", default=1, min=1, description="How many subdivision iterations to perform on triangles")
+    minimumTriangleSize: bpy.props.FloatProperty(name="Minimum Triangle Size", default=0, min=0, description="The minimum span (distance across its maximum dimensions) a triangle has to be in order to be subdivided")
+
+class MESH_OT_tetra3dAddAutoSubdivisionLevel(bpy.types.Operator):
+    bl_idname = "mesh.tetra3daddautosubdivisionlevel"
+    bl_label = "Add Level"
+    bl_description= "Adds a level of auto subdivision"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        
+        context.object.data.t3dAutoSubdivisionLevels__.add()
+
+        return {'FINISHED'}
+
+class MESH_OT_tetra3dDeleteAutoSubdivisionLevel(bpy.types.Operator):
+    bl_idname = "mesh.tetra3ddeleteautosubdivisionlevel"
+    bl_label = "Delete Level"
+    bl_description= "Deletes a level of auto subdivision"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+
+    def execute(self, context):
+
+        context.object.data.t3dAutoSubdivisionLevels__.remove(self.index)
+        return {'FINISHED'}
+
+class MESH_OT_tetra3dReorderAutoSubdivisionLevel(bpy.types.Operator):
+    bl_idname = "mesh.tetra3dreorderautosubdivisionlevel"
+    bl_label = "Re-order Level"
+    bl_description= "Moves a subdivision level up or down in the list"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index : bpy.props.IntProperty()
+    moveUp : bpy.props.BoolProperty()
+
+    def execute(self, context):
+
+        if self.moveUp:
+            context.object.data.t3dAutoSubdivisionLevels__.move(self.index, self.index-1)
+        else:
+            context.object.data.t3dAutoSubdivisionLevels__.move(self.index, self.index+1)
+
+        return {'FINISHED'}
+
+class MESH_OT_tetra3dClearAutoSubdivisionLevels(bpy.types.Operator):
+    bl_idname = "mesh.tetra3dclearautosubdivisionlevels"
+    bl_label = "Clear Levels"
+    bl_description= "Clears auto subdivision levels"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+
+        context.object.data.t3dAutoSubdivisionLevels__.clear()
+
+        return {'FINISHED'}
+
+class MESH_OT_tetra3dCopyAutoSubdivisionLevels(bpy.types.Operator):
+    bl_idname = "mesh.tetra3dcopyautosubdivisionlevels"
+    bl_label = "Overwrite Levels"
+    bl_description= "Overwrites auto-subdivision levels from the mesh of the last selected object to all meshees for the rest of the currently selected objects"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+
+        selected = context.object
+
+        if selected.type == "MESH":
+
+            for o in context.selected_objects:
+                if o == selected:
+                    continue
+                if o.type == "MESH":
+                    o.data.t3dAutoSubdivide__ = selected.data.t3dAutoSubdivide__
+                    o.data.t3dAutoSubdivisionLevels__.clear()
+                    for prop in selected.data.t3dAutoSubdivisionLevels__:
+                        newProp = o.data.t3dAutoSubdivisionLevels__.add()
+                        newProp.distance = prop.distance
+                        newProp.subdivisionLevel = prop.subdivisionLevel
+                        newProp.minimumTriangleSize = prop.minimumTriangleSize
+
+        return {'FINISHED'}
+
+class MESH_OT_tetra3dClearAllAutoSubdivisionLevels(bpy.types.Operator):
+    bl_idname = "mesh.tetra3dclearallautosubdivisionlevels"
+    bl_label = "Clear All Levels"
+    bl_description= "Clears all auto subdivision levels from all selected mesh objects"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+
+        selected = context.object
+
+        for o in context.selected_objects:
+            if o == selected:
+                continue
+            o.t3dAutoSubdivisionLevels__.clear()
+            for prop in selected.t3dAutoSubdivisionLevels__:
+                newProp = o.t3dAutoSubdivisionLevels__.add()
+                newProp.distance = prop.distance
+                newProp.subdivisionLevel = prop.subdivisionLevel
+                newProp.minimumTriangleSize = prop.minimumTriangleSize
+
+        return {'FINISHED'}
+
 def objectNodePath(object):
 
     p = object.name
@@ -742,13 +853,64 @@ class MESH_PT_tetra3d(bpy.types.Panel):
         meshData = context.object.data
         if meshData and context.object.type == "MESH":
             
-            row.prop(context.object.data, "t3dAutoSubdivide__")
-            row.prop(meshData, "t3dAutoSubdivideSize__") 
+            box = self.layout.box()
 
-            row = self.layout.row()
+            row = box.row()
+            row.label(text="Auto Subdivision Options")
+
+            row.prop(context.window_manager, "t3dExpandAutoSubdivisionSettings__", icon="TRIA_DOWN" if context.window_manager.t3dExpandAutoSubdivisionSettings__ else "TRIA_RIGHT", icon_only=True, emboss=False)
+
+            if context.window_manager.t3dExpandAutoSubdivisionSettings__:
+
+                row = box.row()
+                row.prop(context.object.data, "t3dAutoSubdivide__")
+
+                row = box.row()
+                row.enabled = context.object.data.t3dAutoSubdivide__
+                row.operator(MESH_OT_tetra3dAddAutoSubdivisionLevel.bl_idname, icon="PLUS")
+
+                row.operator(MESH_OT_tetra3dCopyAutoSubdivisionLevels.bl_idname, icon="COPYDOWN")
+
+                row = box.row()
+                row.enabled = context.object.data.t3dAutoSubdivide__
+                row.operator(MESH_OT_tetra3dClearAutoSubdivisionLevels.bl_idname, icon="CANCEL")
+
+
+                for index, prop in enumerate(context.object.data.t3dAutoSubdivisionLevels__):
+
+                    box2 = box.box()
+
+                    row = box2.row()
+                    row.label(text="Subdivision Level #" + str(index))
+                    row.enabled = context.object.data.t3dAutoSubdivide__
+
+                    moveUpOptions = row.operator(MESH_OT_tetra3dReorderAutoSubdivisionLevel.bl_idname, text="", icon="TRIA_UP")
+                    moveUpOptions.index = index
+                    moveUpOptions.moveUp = True
+
+                    moveDownOptions = row.operator(MESH_OT_tetra3dReorderAutoSubdivisionLevel.bl_idname, text="", icon="TRIA_DOWN")
+                    moveDownOptions.index = index
+                    moveDownOptions.moveUp = False
+
+                    deleteOptions = row.operator(MESH_OT_tetra3dDeleteAutoSubdivisionLevel.bl_idname, text="", icon="TRASH")
+                    deleteOptions.index = index
+
+                    row = box2.row()
+                    row.enabled = context.object.data.t3dAutoSubdivide__
+                    row.prop(prop, "distance")
+                    row = box2.row()
+                    row.enabled = context.object.data.t3dAutoSubdivide__
+                    row.prop(prop, "subdivisionLevel")
+                    row = box2.row()
+                    row.enabled = context.object.data.t3dAutoSubdivide__
+                    row.prop(prop, "minimumTriangleSize")
+
+            box = self.layout.box()
+
+            row = box.row()
             row.prop(meshData, "t3dUniqueMesh__")
             
-            row = self.layout.row()
+            row = box.row()
             row.prop(meshData, "t3dUniqueMaterials__")
             if "t3dUniqueMesh__" in meshData:
                 row.enabled = meshData["t3dUniqueMesh__"]
@@ -770,23 +932,27 @@ class ACTION_PT_tetra3d(bpy.types.Panel):
 
     def draw(self, context):
 
-        row = self.layout.row()
+        box = self.layout.box()
+
+        row = box.row()
+        row.label(text="Action Properties")
+
+        row = box.row()
         row.prop(context.active_action, "t3dRelativeMotion__")
         
-        row = self.layout.row()
+        row = box.row()
 
         add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
         add.mode = "action"
 
         # row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
 
-        handleT3DProperties(self, context.active_action.t3dGameProperties__, "action")
-
-        row = self.layout.row()
-
-        # No scene equivalent for this, so there is no mode property for this class
+        row = box.row()
         clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
         clear.mode = "action"
+
+        handleT3DProperties(self, box, context.active_action.t3dGameProperties__, "action")
+
 
 class OBJECT_PT_tetra3d(bpy.types.Panel):
     bl_idname = "OBJECT_PT_tetra3d"
@@ -801,89 +967,97 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
 
     def draw(self, context):
 
-        row = self.layout.row()
-        np = objectNodePath(context.object)
-        np = " / ".join(np.split("/"))
-        row.label(text="Node Path : " + np)
-        row = self.layout.row()
-        row.operator("object.tetra3dcopynodepath", text="Copy Node Path to Clipboard", icon="COPYDOWN")
-        
-        row = self.layout.row()
-        row.enabled = context.object.t3dObjectType__ == 'MESH'
-        row.prop(context.object, "t3dVisible__")
+        baseBox = self.layout.box()
+        row = baseBox.row()
+        row.label(text="Object Properties")
 
-        if context.object.type == "MESH":
-            box = self.layout.box()
-            row = box.row()
-            row.enabled = context.object.t3dObjectType__ == 'MESH'
-            row.prop(context.object, "t3dAutoBatch__")
-            row = box.row()
-            row.label(text="Object Type: ")
-            row.prop(context.object, "t3dObjectType__", expand=True)
+        row.prop(context.window_manager, "t3dExpandObjectProps__", icon="TRIA_DOWN" if context.window_manager.t3dExpandObjectProps__ else "TRIA_RIGHT", icon_only=True, emboss=False)
 
         isCollection = context.object.instance_type == "COLLECTION" and context.object.instance_collection is not None
 
-        if context.object.t3dObjectType__ == "LIGHTVOLUME":
+        if context.window_manager.t3dExpandObjectProps__:
 
-            box = self.layout.box()
-            row = box.row()
-            row.label(text="Light Volume Cell Size:")
-
-            row = box.row()
-            row.prop(context.object, "t3dLightVolumeCellSize__", text="")
-        elif context.object.t3dObjectType__ == "MESH":
-            box = self.layout.box()
-            row = box.row()
-            row.label(text="Sector Type:")
+            row = baseBox.row()
+            np = objectNodePath(context.object)
+            np = " / ".join(np.split("/"))
+            row.label(text="Node Path : " + np)
+            row = baseBox.row()
+            row.operator("object.tetra3dcopynodepath", text="Copy Node Path to Clipboard", icon="COPYDOWN")
             
-            if isCollection:
-                row = box.row()
+            row = baseBox.row()
+            row.enabled = context.object.t3dObjectType__ == 'MESH' or context.object.t3dObjectType__ == 'LIGHTVOLUME' or context.object.type == "LIGHT"
+            row.prop(context.object, "t3dVisible__")
+
+            if context.object.type == "MESH":
+                autobatchBox = baseBox.box()
+                row = autobatchBox.row()
                 row.enabled = context.object.t3dObjectType__ == 'MESH'
-                row.prop(context.object, "t3dSectorTypeOverride__", expand=True)
+                row.prop(context.object, "t3dAutoBatch__")
+                row = autobatchBox.row()
+                row.label(text="Object Type: ")
+                row.prop(context.object, "t3dObjectType__", expand=True)
 
-            row = box.row()
-            if isCollection:
-                row.enabled = context.object.t3dSectorTypeOverride__
-            else:
-                row.enabled = context.object.t3dObjectType__ == 'MESH'
-            row.prop(context.object, "t3dSectorType__", expand=True)
+            if context.object.t3dObjectType__ == "LIGHTVOLUME":
 
-        row = self.layout.row()
-        row.prop(context.object, "t3dBoundsType__")
-        
-        row = self.layout.row()
-        
-        if context.object.t3dBoundsType__ == 'AABB':
-            row.prop(context.object, "t3dAABBCustomEnabled__")
-            if context.object.t3dAABBCustomEnabled__:
-                row = self.layout.row()
-                row.prop(context.object, "t3dAABBCustomSize__")
-        elif context.object.t3dBoundsType__ == 'CAPSULE':
-            row.prop(context.object, "t3dCapsuleCustomEnabled__")
-            if context.object.t3dCapsuleCustomEnabled__:
-                row = self.layout.row()
-                row.prop(context.object, "t3dCapsuleCustomRadius__")
-                row.prop(context.object, "t3dCapsuleCustomHeight__")
-        elif context.object.t3dBoundsType__ == 'SPHERE':
-            row.prop(context.object, "t3dSphereCustomEnabled__")
-            if context.object.t3dSphereCustomEnabled__:
-                row = self.layout.row()
-                row.prop(context.object, "t3dSphereCustomRadius__")
-        elif context.object.t3dBoundsType__ == 'TRIANGLES':
-            row.prop(context.object, "t3dTrianglesCustomBroadphaseEnabled__")
-            if context.object.t3dTrianglesCustomBroadphaseEnabled__:
-                row.prop(context.object, "t3dTrianglesCustomBroadphaseGridSize__")
+                lightvolumeBox = baseBox.box()
+                row = lightvolumeBox.row()
+                row.label(text="Light Volume Cell Size:")
 
-        row = self.layout.row()
-        row.separator()
+                row = lightvolumeBox.row()
+                row.prop(context.object, "t3dLightVolumeCellSize__", text="")
+            elif context.object.t3dObjectType__ == "MESH":
+                sectorBox = baseBox.box()
+                row = sectorBox.row()
+                row.label(text="Sector Type:")
+                
+                if isCollection:
+                    row = sectorBox.row()
+                    row.enabled = context.object.t3dObjectType__ == 'MESH'
+                    row.prop(context.object, "t3dSectorTypeOverride__", expand=True)
+
+                row = sectorBox.row()
+                if isCollection:
+                    row.enabled = context.object.t3dSectorTypeOverride__
+                else:
+                    row.enabled = context.object.t3dObjectType__ == 'MESH'
+                row.prop(context.object, "t3dSectorType__", expand=True)
+
+            boundsBox = baseBox.box()
+
+            row = boundsBox.row()
+            row.prop(context.object, "t3dBoundsType__")
+            
+            row = boundsBox.row()
+            
+            if context.object.t3dBoundsType__ == 'AABB':
+                row.prop(context.object, "t3dAABBCustomEnabled__")
+                if context.object.t3dAABBCustomEnabled__:
+                    row = boundsBox.row()
+                    row.prop(context.object, "t3dAABBCustomSize__")
+            elif context.object.t3dBoundsType__ == 'CAPSULE':
+                row.prop(context.object, "t3dCapsuleCustomEnabled__")
+                if context.object.t3dCapsuleCustomEnabled__:
+                    row = boundsBox.row()
+                    row.prop(context.object, "t3dCapsuleCustomRadius__")
+                    row.prop(context.object, "t3dCapsuleCustomHeight__")
+            elif context.object.t3dBoundsType__ == 'SPHERE':
+                row.prop(context.object, "t3dSphereCustomEnabled__")
+                if context.object.t3dSphereCustomEnabled__:
+                    row = boundsBox.row()
+                    row.prop(context.object, "t3dSphereCustomRadius__")
+            elif context.object.t3dBoundsType__ == 'TRIANGLES':
+                row.prop(context.object, "t3dTrianglesCustomBroadphaseEnabled__")
+                if context.object.t3dTrianglesCustomBroadphaseEnabled__:
+                    row.prop(context.object, "t3dTrianglesCustomBroadphaseGridSize__")
 
         if isCollection:
 
-            row = self.layout.row()
+            collectionBox = self.layout.box()
+            row = collectionBox.row()
             row.label(text="Collection Object Properties")
-            row.prop(context.scene, "t3dExpandOverrideProps__", icon="TRIA_DOWN" if context.scene.t3dExpandOverrideProps__ else "TRIA_RIGHT", icon_only=True, emboss=False)
+            row.prop(context.window_manager, "t3dExpandOverrideProps__", icon="TRIA_DOWN" if context.window_manager.t3dExpandOverrideProps__ else "TRIA_RIGHT", icon_only=True, emboss=False)
 
-            if context.scene.t3dExpandOverrideProps__:
+            if context.window_manager.t3dExpandOverrideProps__:
 
                 col = context.object.instance_collection
 
@@ -891,33 +1065,34 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
 
                     if object.parent == None:
 
-                        row = self.layout.row()
-                        box = row.box()
-                        box.label(text="Object: " + object.name)
-                        box.row().separator()
+                        row = collectionBox.row()
+                        collectionObjectBox = row.box()
+                        collectionObjectBox.label(text="Object: " + object.name)
+                        collectionObjectBox.row().separator()
                             
-                        handleT3DProperties(self, object.t3dGameProperties__, "object", False, objectIndex)
+                        handleT3DProperties(self, collectionObjectBox, object.t3dGameProperties__, "object", False, objectIndex)
 
-        row = self.layout.row()
+        box = self.layout.box()
+
+        row = box.row()
         row.label(text="Game Properties")
-        row.prop(context.scene, "t3dExpandGameProps__", icon="TRIA_DOWN" if context.scene.t3dExpandGameProps__ else "TRIA_RIGHT", icon_only=True, emboss=False)
+        row.prop(context.window_manager, "t3dExpandGameProps__", icon="TRIA_DOWN" if context.window_manager.t3dExpandGameProps__ else "TRIA_RIGHT", icon_only=True, emboss=False)
 
-        if context.scene.t3dExpandGameProps__:
+        if context.window_manager.t3dExpandGameProps__:
 
-            row = self.layout.row()
+            row = box.row()
 
             add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
             add.mode = "object"
 
             row.operator("object.tetra3dcopyprops", text="Overwrite All Game Properties", icon="COPYDOWN")
 
-            handleT3DProperties(self, context.active_object.t3dGameProperties__, "object")
-
-            row = self.layout.row()
-
+            row = box.row()
             # No scene equivalent for this, so there is no mode property for this class
             clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
             clear.mode = "object"
+
+            handleT3DProperties(self, box, context.active_object.t3dGameProperties__, "object")
 
 
 class SCENE_PT_tetra3d(bpy.types.Panel):
@@ -933,15 +1108,24 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
 
     def draw(self, context):
 
-        row = self.layout.row()
-        add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
-        add.mode = "scene"
+        box = self.layout.box()
 
-        handleT3DProperties(self, context.scene.t3dGameProperties__, "scene")
-        
-        row = self.layout.row()
-        clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
-        clear.mode = "scene"
+        row = box.row()
+        row.label(text="Game Properties")
+
+        row.prop(context.window_manager, "t3dExpandGameProps__", icon="TRIA_DOWN" if context.window_manager.t3dExpandGameProps__ else "TRIA_RIGHT", icon_only=True, emboss=False)
+
+        if context.window_manager.t3dExpandGameProps__:
+
+            row = box.row()
+            add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
+            add.mode = "scene"
+            
+            row = box.row()
+            clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
+            clear.mode = "scene"
+
+            handleT3DProperties(self, box, context.scene.t3dGameProperties__, "scene")
 
 class CAMERA_PT_tetra3d(bpy.types.Panel):
     bl_idname = "CAMERA_PT_tetra3d"
@@ -982,11 +1166,11 @@ class CAMERA_PT_tetra3d(bpy.types.Panel):
         row.prop(context.object.data, "t3dPerspectiveCorrectedTextureMapping__")
 
 
-def handleT3DProperties(self, props, operatorType, enabled=True, objectIndex=0):
+def handleT3DProperties(self, base, props, operatorType, enabled=True, objectIndex=0):
 
     for index, prop in enumerate(props):
 
-        box = self.layout.box()
+        box = base.box()
 
         row = box.row()
         row.enabled = enabled # Don't forget to disable the row for all operators if it's an instance property
@@ -1158,19 +1342,24 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.label(text="Lighting Mode:")
         row.prop(context.material, "t3dMaterialLightingMode__", text="")
 
+
         if context.object.active_material != None:
 
-            row = self.layout.row()
+            box = self.layout.box()
+            row = box.row()
+            row.label(text="Material Properties")
+
+            row = box.row()
             add = row.operator("object.tetra3daddprop", text="Add Game Property", icon="PLUS")
             add.mode = "material"
 
             row.operator("material.tetra3dcopyprops", icon="COPYDOWN")
             
-            handleT3DProperties(self, context.object.active_material.t3dGameProperties__, "material")
-
-            row = self.layout.row()
+            row = box.row()
             clear = row.operator("object.tetra3dclearprops", text="Clear All Game Properties", icon="CANCEL")
             clear.mode = "material"
+
+            handleT3DProperties(self, box, context.object.active_material.t3dGameProperties__, "material")
 
 class WORLD_PT_tetra3d(bpy.types.Panel):
     bl_idname = "WORLD_PT_tetra3d"
@@ -1209,10 +1398,15 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
         
 # The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
 def globalGet(propName, default=None):
-    if propName not in bpy.data.scenes[0] and default is not None:
-        bpy.data.scenes[0][propName] = default
+    # if propName not in bpy.data.scenes[0] and default is not None:
+    #     bpy.data.scenes[0][propName] = default
         
-    return bpy.data.scenes[0][propName]
+    # return bpy.data.scenes[0][propName]
+
+    if propName in bpy.data.scenes[0]:
+        return bpy.data.scenes[0][propName]
+
+    return default
 
 def globalSet(propName, value):
     bpy.data.scenes[0][propName] = value
@@ -1228,78 +1422,106 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
     bl_context = "render"
     
     def draw(self, context):
-
-        row = self.layout.row()
-        row.operator(EXPORT_OT_tetra3d.bl_idname)
-        row = self.layout.row()
-        row.prop(context.scene, "t3dExportOnSave__")
-
-        row = self.layout.row()
-        row.prop(context.scene, "t3dExportFilepath__")
-        
-        row = self.layout.row()
-        row.prop(context.scene, "t3dExportFormat__")
         
         box = self.layout.box()
-        row = box.row()
-        row.active = context.scene.t3dExportFormat__ == "GLB"
-        row.prop(context.scene, "t3dPackTextures__")
 
-        box.prop(context.scene, "t3dExportCameras__")
-        box.prop(context.scene, "t3dExportLights__")
-        box.prop(context.scene, "t3dRenameInstancedObjects__")
+        row = box.row()
+        row.label(text="Export Settings")
+
+        row.prop(context.window_manager, "t3dExpandExportSettings__", icon="TRIA_DOWN" if context.window_manager.t3dExpandExportSettings__ else "TRIA_RIGHT", icon_only=True, emboss=False)
+
+        if context.window_manager.t3dExpandExportSettings__:
+
+            row = box.row()
+            row.operator(EXPORT_OT_tetra3d.bl_idname)
+            row = box.row()
+            row.prop(context.scene, "t3dExportOnSave__")
+
+            row = box.row()
+            row.prop(context.scene, "t3dExportFilepath__")
+            
+            row = box.row()
+            row.prop(context.scene, "t3dExportFormat__")
+            
+            box2 = box.box()
+            
+            row = box2.row()
+            row.label(text="Export File Options")
+
+            row = box2.row()
+            row.active = context.scene.t3dExportFormat__ == "GLB"
+            row.prop(context.scene, "t3dPackTextures__")
+
+            box2.prop(context.scene, "t3dExportCameras__")
+            box2.prop(context.scene, "t3dExportLights__")
+            box2.prop(context.scene, "t3dRenameInstancedObjects__")
+
+        box = self.layout.box()
+
+        row = box.row()
+        row.label(text="Resolution Settings")
+
+        row.prop(context.window_manager, "t3dExpandResolutionSettings__", icon="TRIA_DOWN" if context.window_manager.t3dExpandResolutionSettings__ else "TRIA_RIGHT", icon_only=True, emboss=False)
+
+        if context.window_manager.t3dExpandResolutionSettings__:
+
+            row = box.row()
+            row.prop(context.scene, "t3dRenderResolutionW__")
+            row.prop(context.scene, "t3dRenderResolutionH__")
+           
+            row = box.row()
+            row.label(text="PS1-like:")
+            op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="224p")
+            op.resolutionHeight = 224
+
+            op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="480p")
+            op.resolutionHeight = 480
+
+            row = box.row()
+            row.label(text="Other:")
+
+            op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="720p")
+            op.resolutionHeight = 720
+
+            op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="1080p")
+            op.resolutionHeight = 1080
+
+
+        box = self.layout.box()
+        row = box.row()
+        row.label(text="Sector Settings")
+        row.prop(context.window_manager, "t3dExpandSectorSettings__", icon="TRIA_DOWN" if context.window_manager.t3dExpandSectorSettings__ else "TRIA_RIGHT", icon_only=True, emboss=False)
+
+        if context.window_manager.t3dExpandSectorSettings__:
+            row = box.row()
+            row.label(text="Detection type:")
+            row.prop(context.scene, "t3dSectorDetectionType__", expand=True)
 
         box = self.layout.box()
 
         row = box.row()
-        row.label(text="Quick set render resolution:")
+        row.label(text="Animation Settings")
 
+        row.prop(context.window_manager, "t3dExpandAnimationSettings__", icon="TRIA_DOWN" if context.window_manager.t3dExpandAnimationSettings__ else "TRIA_RIGHT", icon_only=True, emboss=False)
 
-        row = box.row()
-        row.label(text="PS1-like:")
-        op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="224p")
-        op.resolutionHeight = 224
+        if context.window_manager.t3dExpandAnimationSettings__:
 
-        op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="480p")
-        op.resolutionHeight = 480
-
-        row = box.row()
-        row.label(text="Other:")
-
-        op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="720p")
-        op.resolutionHeight = 720
-
-        op = row.operator(RENDER_OT_tetra3dQuickSetRenderResolution.bl_idname, text="1080p")
-        op.resolutionHeight = 1080
-
-        row = box.row()
-        row.prop(context.scene, "t3dRenderResolutionW__")
-        row.prop(context.scene, "t3dRenderResolutionH__")
-        
-        box = self.layout.box()
-        row = box.row()
-        row.label(text="Sector detection type:")
-
-        row = box.row()
-        row.prop(context.scene, "t3dSectorDetectionType__", expand=True)
-
-        box = self.layout.box()
-        row = box.row()
-        row.label(text="Animation Playback Framerate (in Blender):")
-        row = box.row()
-        row.prop(context.scene, "t3dPlaybackFPS__")
-        row = box.row().separator()
-        row = box.row()
-        row.prop(context.scene, "t3dAnimationSampling__")
-        row = box.row()
-        row.label(text="Set interpolation for animations:")
-        row = box.row()
-        row.prop(context.scene, "t3dAnimationInterpolation__")
-        row = box.row()
-        op = row.operator(OBJECT_OT_tetra3dSetAnimationInterpolationAll.bl_idname)
-        op.interpolationType = context.scene.t3dAnimationInterpolation__
-        op = row.operator(OBJECT_OT_tetra3dSetAnimationInterpolation.bl_idname)
-        op.interpolationType = context.scene.t3dAnimationInterpolation__
+            row = box.row()
+            row.label(text="Animation Playback Framerate (in Blender):")
+            row = box.row()
+            row.prop(context.scene, "t3dPlaybackFPS__")
+            row = box.row().separator()
+            row = box.row()
+            row.prop(context.scene, "t3dAnimationSampling__")
+            row = box.row()
+            row.label(text="Set interpolation for animations:")
+            row = box.row()
+            row.prop(context.scene, "t3dAnimationInterpolation__")
+            row = box.row()
+            op = row.operator(OBJECT_OT_tetra3dSetAnimationInterpolationAll.bl_idname)
+            op.interpolationType = context.scene.t3dAnimationInterpolation__
+            op = row.operator(OBJECT_OT_tetra3dSetAnimationInterpolation.bl_idname)
+            op.interpolationType = context.scene.t3dAnimationInterpolation__
 
 
 def export():
@@ -1402,7 +1624,7 @@ def export():
 
     currentFrame = {}
 
-    autoSubdivides = {}
+    # autoSubdivides = {}
 
     referencedActions = {}
 
@@ -1468,18 +1690,18 @@ def export():
                                 obj["t3dGridConnections__"] = gridConnections
                                 obj["t3dGridEntries__"] = gridEntries
 
-                            if obj.data.t3dAutoSubdivide__:
+                            # if obj.data.t3dAutoSubdivide__:
 
-                                if not obj.data.name in autoSubdivides:
+                            #     if not obj.data.name in autoSubdivides:
 
-                                    autoSubdivides[obj.data.name] = {
-                                        "usedBy": [],
-                                        "original": obj.data,
-                                        "edit": obj.data.copy(),
-                                        "size": obj.data.t3dAutoSubdivideSize__,
-                                    }
+                            #         autoSubdivides[obj.data.name] = {
+                            #             "usedBy": [],
+                            #             "original": obj.data,
+                            #             "edit": obj.data.copy(),
+                            #             "size": obj.data.t3dAutoSubdivideSize__,
+                            #         }
 
-                                autoSubdivides[obj.data.name]["usedBy"].append(obj)
+                            #     autoSubdivides[obj.data.name]["usedBy"].append(obj)
 
                     # Record relevant information for curves
                     if obj.type == "CURVE":
@@ -1501,51 +1723,51 @@ def export():
                         # 2) will apply the collection's offset to the object's position for some reason (which is annoying because we use OpenGL's axes for positioning compared to Blender)
                         obj.instance_collection = None
 
-            for meshName in autoSubdivides:
+            # for meshName in autoSubdivides:
         
-                mesh = autoSubdivides[meshName]
+            #     mesh = autoSubdivides[meshName]
 
-                for o in mesh["usedBy"]:
-                    o.data = mesh["edit"]
+            #     for o in mesh["usedBy"]:
+            #         o.data = mesh["edit"]
 
-                bm = bmesh.new()
+            #     bm = bmesh.new()
 
-                bm.from_mesh(mesh["edit"])
-                bm.select_mode = {"EDGE", "VERT", "FACE"}
+            #     bm.from_mesh(mesh["edit"])
+            #     bm.select_mode = {"EDGE", "VERT", "FACE"}
                 
-                # Cribbed from StackOverflow here: https://blender.stackexchange.com/questions/196367/how-to-use-loopcut-slide-operation-without-any-ui
-                # Thanks a lot for your help!
-                def edge_loops(edge):
-                    tagged = []
-                    def walk(edge):
-                        yield edge
-                        edge.tag = True
-                        tagged.append(edge)
-                        for l in edge.link_loops:
-                            loop = l.link_loop_radial_next.link_loop_next.link_loop_next
-                            if not (len(loop.face.verts) != 4 or loop.edge.tag):
-                                yield from walk(loop.edge)
-                    res = list(walk(edge))
-                    for e in tagged:
-                        e.tag = False
-                    return res
+            #     # Cribbed from StackOverflow here: https://blender.stackexchange.com/questions/196367/how-to-use-loopcut-slide-operation-without-any-ui
+            #     # Thanks a lot for your help!
+            #     def edge_loops(edge):
+            #         tagged = []
+            #         def walk(edge):
+            #             yield edge
+            #             edge.tag = True
+            #             tagged.append(edge)
+            #             for l in edge.link_loops:
+            #                 loop = l.link_loop_radial_next.link_loop_next.link_loop_next
+            #                 if not (len(loop.face.verts) != 4 or loop.edge.tag):
+            #                     yield from walk(loop.edge)
+            #         res = list(walk(edge))
+            #         for e in tagged:
+            #             e.tag = False
+            #         return res
 
-                for x in range(10):
+            #     for x in range(10):
 
-                    subdivision_happened = False
+            #         subdivision_happened = False
 
-                    for edge in bm.edges:
+            #         for edge in bm.edges:
 
-                        if edge.calc_length() > mesh["size"]:
-                            bmesh.ops.subdivide_edges(bm, edges=edge_loops(edge), cuts=1, smooth=0, use_grid_fill=True)
-                            subdivision_happened = True
+            #             if edge.calc_length() > mesh["size"]:
+            #                 bmesh.ops.subdivide_edges(bm, edges=edge_loops(edge), cuts=1, smooth=0, use_grid_fill=True)
+            #                 subdivision_happened = True
 
-                    if not subdivision_happened:
-                        break
+            #         if not subdivision_happened:
+            #             break
 
-                bm.to_mesh(mesh["edit"])
+            #     bm.to_mesh(mesh["edit"])
 
-                bm.free()
+            #     bm.free()
 
     # Gather marker information and put them into the actions.
     for action in bpy.data.actions:
@@ -1623,28 +1845,28 @@ def export():
     
     # Undo changes that we've made after export
 
-    for meshName in autoSubdivides:
+    # for meshName in autoSubdivides:
 
-        mesh = autoSubdivides[meshName]
+    #     mesh = autoSubdivides[meshName]
 
-        removed = False
+    #     removed = False
 
-        for o in mesh["usedBy"]:
-            o.data = mesh["original"]
+    #     for o in mesh["usedBy"]:
+    #         o.data = mesh["original"]
 
-        try:
-            mesh["edit"].user_clear()
-            removed = True
-        except:
-            pass
+    #     try:
+    #         mesh["edit"].user_clear()
+    #         removed = True
+    #     except:
+    #         pass
 
-        if removed:
-            try:
-                bpy.data.meshes.remove(mesh["edit"])
-            except:
-                pass
+    #     if removed:
+    #         try:
+    #             bpy.data.meshes.remove(mesh["edit"])
+    #         except:
+    #             pass
 
-    autoSubdivides.clear()
+    # autoSubdivides.clear()
 
     for scene in bpy.data.scenes:
 
@@ -1663,8 +1885,8 @@ def export():
                     if obj is None:
                         continue
 
-                    if "t3dOriginalMesh" in obj:
-                        del(obj["t3dOriginalMesh"])
+                    # if "t3dOriginalMesh" in obj:
+                    #     del(obj["t3dOriginalMesh"])
 
                     if "t3dOriginalLocalPosition__" in obj:
                         del(obj["t3dOriginalLocalPosition__"])
@@ -1905,9 +2127,7 @@ def setSectorDetectionType(self, value):
 #####
 
 def getRenderResolutionW(self):
-    s = globalGet("t3dRenderResolutionW__", 640)
-    bpy.context.scene.render.resolution_x = s
-    return s
+    return globalGet("t3dRenderResolutionW__", 640)
 
 def setRenderResolutionW(self, value):
     globalSet("t3dRenderResolutionW__", value)
@@ -1916,9 +2136,7 @@ def setRenderResolutionW(self, value):
 #####
 
 def getRenderResolutionH(self):
-    s = globalGet("t3dRenderResolutionH__", 360)
-    bpy.context.scene.render.resolution_y = s
-    return s
+    return globalGet("t3dRenderResolutionH__", 360)
 
 def setRenderResolutionH(self, value):
     globalSet("t3dRenderResolutionH__", value)
@@ -1927,9 +2145,7 @@ def setRenderResolutionH(self, value):
 ######
 
 def getPlaybackFPS(self):
-    s = globalGet("t3dPlaybackFPS__", 60)
-    bpy.context.scene.render.fps = s
-    return s
+    return globalGet("t3dPlaybackFPS__", 60)
 
 def setPlaybackFPS(self, value):
     globalSet("t3dPlaybackFPS__", value)
@@ -2072,7 +2288,7 @@ objectProps = {
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
     "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
     "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
-    "t3dLightVolumeCellSize__" : bpy.props.FloatVectorProperty(name="Cell Size", description="Width (X), height (Y), and depth (Z) of the cells for the light volume object", min=0.0, default=[2,2,2], step=0.5),
+    "t3dLightVolumeCellSize__" : bpy.props.FloatVectorProperty(name="Cell Size", description="Width (X), height (Y), and depth (Z) of the cells for the light volume object", min=0, default=[4,4,4], step=1),
     "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),    
     "t3dSectorType__" : bpy.props.EnumProperty(items=listSectorTypes,name="Sector Type", description="The type of sector capability this object has; only used if rendered with a camera with Sector Rendering on"),
     "t3dSectorTypeOverride__" : bpy.props.BoolProperty(name="Override Sector Type", description="If the collection object should override the sector type for ALL its objects"),
@@ -2081,189 +2297,6 @@ objectProps = {
 ####
 
 keymaps = []
-
-def register():
-    
-    bpy.utils.register_class(OBJECT_PT_tetra3d)
-    bpy.utils.register_class(ACTION_PT_tetra3d)
-    bpy.utils.register_class(MESH_PT_tetra3d)
-    bpy.utils.register_class(RENDER_PT_tetra3d)
-    bpy.utils.register_class(CAMERA_PT_tetra3d)
-    bpy.utils.register_class(MATERIAL_PT_tetra3d)
-    bpy.utils.register_class(WORLD_PT_tetra3d)
-    bpy.utils.register_class(SCENE_PT_tetra3d)
-    
-    bpy.utils.register_class(OBJECT_OT_tetra3dAddProp)
-    bpy.utils.register_class(OBJECT_OT_tetra3dDeleteProp)
-    bpy.utils.register_class(OBJECT_OT_tetra3dReorderProps)
-    bpy.utils.register_class(OBJECT_OT_tetra3dCopyProps)
-    bpy.utils.register_class(OBJECT_OT_tetra3dCopyOneProperty)
-    bpy.utils.register_class(OBJECT_OT_tetra3dClearProps)
-    bpy.utils.register_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
-    bpy.utils.register_class(OBJECT_OT_tetra3dOverrideProp)
-
-    bpy.utils.register_class(MATERIAL_OT_tetra3dMaterialCopyProps)
-    bpy.utils.register_class(MATERIAL_OT_tetra3dAutoUV)
-
-    bpy.utils.register_class(OBJECT_OT_tetra3dSetVector)
-    
-    bpy.utils.register_class(EXPORT_OT_tetra3d)
-    bpy.utils.register_class(RENDER_OT_tetra3dQuickSetRenderResolution)
-
-    bpy.utils.register_class(OBJECT_OT_tetra3dPlaySample)
-    bpy.utils.register_class(OBJECT_OT_tetra3dStopSample)
-    
-    bpy.utils.register_class(t3dGamePropertyItem__)
-    bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
-    bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
-    bpy.utils.register_class(OBJECT_OT_tetra3dFocusObject)
-    bpy.utils.register_class(OBJECT_OT_tetra3dSelectWithSameProperty)
-    bpy.utils.register_class(OBJECT_OT_tetra3dSearchStringProperties)
-
-    for propName, prop in objectProps.items():
-        setattr(bpy.types.Object, propName, prop)
-
-    # We don't actually need to store or export the FOV; we just modify the camera's actual field of view (angle) property
-    bpy.types.Camera.t3dFOV__ = bpy.props.IntProperty(name="FOV", description="Vertical field of view", default=75,
-    get=getFOV, set=setFOV, min=1, max=179)
-    
-    bpy.types.Camera.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not", default=False)
-    
-    bpy.types.Camera.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=1, min=0)
-
-    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined", default='VERTICES', 
-    get=getSectorDetectionType, set=setSectorDetectionType)
-
-    bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
-
-    bpy.types.Action.t3dGameProperties__ = objectProps["t3dGameProperties__"]
-    bpy.types.Action.t3dRelativeMotion__ = bpy.props.BoolProperty(name="Relative Motion", description="Whether the animation's movements happen relative to the starting position and orientation of the object or not", default=False)
-
-    perspectiveDescription = ("Whether the game should be rendered with perspective-corrected "
-    "texture mapping or not. When enabled, it will look more like modern 3D texturing; when disabled, "
-    "it will look like PS1 affine texture mapping (which is the default)."
-    "This feature is experimental / not perfect currently (it looks fuzzy, and triangles aren't clipped properly at the edges of the viewport, "
-    "which means you still get texture skewing when a triangle is largely offscreen)")
-    bpy.types.Camera.t3dPerspectiveCorrectedTextureMapping__ = bpy.props.BoolProperty(name="Perspective-corrected Texture Mapping (Experimental)", description=perspectiveDescription, default=False)
-
-    bpy.types.Camera.t3dMaxLightCount__ = bpy.props.IntProperty(name="Max light count", description="How many lights (sorted by distance to the camera, including ambient lights) should be used to light objects; if 0, then there is no limit", default=0, min = 0)
-
-    bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
-    get=getExportOnSave, set=setExportOnSave)
-    
-    bpy.types.Scene.t3dExportFilepath__ = bpy.props.StringProperty(name="Export Filepath", description="Filepath to export GLTF file. If left blank, it will export to the same directory as the blend file and will have the same filename; in this case, if the blend file has not been saved, nothing will happen", 
-    default="", subtype="FILE_PATH", get=getExportFilepath, set=setExportFilepath)
-    
-    bpy.types.Scene.t3dExportFormat__ = bpy.props.EnumProperty(items=gltfExportTypes, name="Export Format", description="What format to export the file in", default="GLB",
-    get=getExportFormat, set=setExportFormat)
-    
-    bpy.types.Scene.t3dExportCameras__ = bpy.props.BoolProperty(name="Export Cameras", description="Whether Blender should export cameras to the GLTF file", default=True,
-    get=getExportCameras, set=setExportCameras)
-
-    bpy.types.Scene.t3dExportLights__ = bpy.props.BoolProperty(name="Export Lights", description="Whether Blender should export lights to the GLTF file", default=True,
-    get=getExportLights, set=setExportLights)
-
-    bpy.types.Scene.t3dRenameInstancedObjects__ = bpy.props.BoolProperty(name="Rename Collection-Instanced Objects", description="Whether collection instances' names should be used for their instanced top-level objects", default=True,
-    get=getRenameInstancedObjects, set=setRenameInstancedObjects)
-
-    bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(name="Pack Textures", description="Whether Blender should pack textures into the GLTF file on export", default=False,
-    get=getPackTextures, set=setPackTextures)
-
-    bpy.types.Scene.t3dRenderResolutionW__ = bpy.props.IntProperty(name="Render Width", description="How wide to render the game scene in pixels", default=640, min=0,
-    get=getRenderResolutionW, set=setRenderResolutionW)
-
-    bpy.types.Scene.t3dRenderResolutionH__ = bpy.props.IntProperty(name="Render Height", description="How tall to render the game scene in pixels", default=360, min=0,
-    get=getRenderResolutionH, set=setRenderResolutionH)
-
-    bpy.types.Scene.t3dPlaybackFPS__ = bpy.props.IntProperty(name="Playback FPS", description="Animation Playback Framerate (in Blender)", default=60, min=0,
-    get=getPlaybackFPS, set=setPlaybackFPS)
-
-    bpy.types.Scene.t3dAnimationSampling__ = bpy.props.BoolProperty(name="Sampled Animations", description="When enabled, animations are sampled (so you can use advanced techniques in your animations and then Blender will bake the results into your GLTF file). When disabled, only plain constant and linear animation keyframes (not cubic spline) will export. However, non-sampled animations export much more quickly than sampled animations, which means this option is useful when developing", default=True,
-    get=getAnimationSampling, set=setAnimationSampling)
-
-    bpy.types.Scene.t3dAnimationInterpolation__ = bpy.props.EnumProperty(
-        items=[
-            ("CONSTANT", "Constant", "Constant interpolation", 0, 0), 
-            ("LINEAR", "Linear", "Linear interpolation", 0, 1), 
-            ("BEZIER", "Bezier", "Bezier interpolation", 0, 2), 
-            ("SINE", "Sine", "Sine interpolation", 0, 3), 
-            ("QUAD", "Quad", "Quad interpolation", 0, 4), 
-            ("CUBIC", "Cubic", "Cubic interpolation", 0, 5), 
-            ("QUART", "Quart", "Quart interpolation", 0, 6), 
-            ("QUINT", "Quint", "Quint interpolation", 0, 7), 
-            ("EXPO", "Expo", "Exponential interpolation", 0, 8), 
-            ("CIRC", "Circ", "Circ interpolation", 0, 7), 
-            ("BACK", "Back", "Back interpolation", 0, 8), 
-            ("BOUNCE", "Bounce", "Bounce interpolation", 0, 9), 
-            ("ELASTIC", "Elastic", "Elastic interpolation", 0, 10),
-        ], 
-        name="Type", 
-        description="What type to use for applying interpolation", 
-        default="BEZIER",
-        get=getAnimationInterpolation,
-        set=setAnimationInterpolation)
-
-    bpy.types.Scene.t3dExpandGameProps__ = bpy.props.BoolProperty(name="Expand Game Properties", default=True)
-    bpy.types.Scene.t3dExpandOverrideProps__ = bpy.props.BoolProperty(name="Expand Overridden Properties", default=True)
-
-    bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
-    bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
-    bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
-    bpy.types.Material.t3dBlendMode__ = bpy.props.EnumProperty(items=materialBlendModes, name="Blend Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
-    bpy.types.Material.t3dTransparencyMode__ = bpy.props.EnumProperty(items=materialTransparencyModes, name="Transparency Mode", description="Transparency mode for this material", default="AUTO")
-    bpy.types.Material.t3dBillboardEnabled__ = bpy.props.BoolProperty(name="Billboarding Enabled", description="If the object with this material should rotate to face the camera for this material; doesn't take effect on armature skinned meshes", default=False)
-    bpy.types.Material.t3dBillboardLockX__ = bpy.props.BoolProperty(name="Lock X Axis Rotation", description="If rotation is locked on the global X axis", default=False)
-    bpy.types.Material.t3dBillboardLockY__ = bpy.props.BoolProperty(name="Lock Y Axis Rotation", description="If rotation is locked on the global Y axis", default=False)
-    bpy.types.Material.t3dBillboardLockZ__ = bpy.props.BoolProperty(name="Lock Z Axis Rotation", description="If rotation is locked on the global Z axis", default=False)
-    bpy.types.Material.t3dBillboardUpDirection__ = bpy.props.EnumProperty(items=billboardingYDirections,name="Billboarding Y (Up) Direction", description="The direction for upwards direction for billboarding", default="GLOBAL_Y")
-    bpy.types.Material.t3dDepthMode__ = bpy.props.EnumProperty(items=depthModes, name="Depth Rendering Modes", description="How depth should be rendered for meshes that use this materials", default="DEFAULT")
-    bpy.types.Material.t3dMaterialLightingMode__ = bpy.props.EnumProperty(items=materialLightingModes, name="Lighting mode", description="How materials should be lit", default="DEFAULT")
-    bpy.types.Material.t3dVisible__ = bpy.props.BoolProperty(name="Visible", description="Whether this material is visible", default=True)
-    bpy.types.Material.t3dSolidToCollisions__ = bpy.props.BoolProperty(name="Report Collisions", description="Whether this material contributes to collision checks for BoundingTriangles meshes", default=True)
-    bpy.types.Material.t3dSolidToRays__ = bpy.props.BoolProperty(name="Report Raycasts", description="Whether this material contributes to ray checks for BoundingTriangles meshes", default=True)
-
-    bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode")
-    bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5)
-    bpy.types.Material.t3dAutoUVRotation__ = bpy.props.FloatProperty(name="Rotation", description="How many degrees to rotate the UVs after projection", step = 500, update=autoUVChange)
-    bpy.types.Material.t3dAutoUVOffset__ = bpy.props.FloatVectorProperty(name="Offset", description="How many texels to offset the texture after projection", default=[0,0], size=2, update=autoUVChange, step=1)
-        
-    bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
-
-    bpy.types.Mesh.t3dUniqueMesh__ = bpy.props.BoolProperty(name="Unique Mesh", description="Whether each Model that uses this mesh will have a unique clone of it or not. When enabled, any Models that use this mesh will clone the mesh on creation")
-    bpy.types.Mesh.t3dUniqueMaterials__ = bpy.props.BoolProperty(name="Unique Materials", description="Whether each Model that uses this mesh's materials will have unique clones of them or not. When enabled, any Models that use this mesh will clone the materials on creation")
-    bpy.types.Mesh.t3dAutoSubdivide__ = bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, Tetra3D will do its best to loop cut edges that are too large before export")
-    bpy.types.Mesh.t3dAutoSubdivideSize__ = bpy.props.FloatProperty(name="Max Edge Length", description="The maximum length an edge is allowed to be before automatically cutting prior to export", min=0.0, default=2.0)
-
-    bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
-    bpy.types.World.t3dSyncClearColor__ = bpy.props.BoolProperty(name="Sync Clear Color to World Color", description="If the clear color should be a copy of the world's color")
-    bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="The color of fog for this world", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
-    bpy.types.World.t3dSyncFogColor__ = bpy.props.BoolProperty(name="Sync Fog Color to Clear Color", description="If the fog color should be a copy of the screen clear color")
-    bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")
-    bpy.types.World.t3dFogDithered__ = bpy.props.FloatProperty(name="Fog Dither Size", description="How large bayer matrix dithering is when using fog. If set to 0, dithering is disabled", default=0, min=0, step=1)
-
-    bpy.types.World.t3dFogCurve__ = bpy.props.EnumProperty(items=worldFogCurveTypes, name="Fog Curve", description="What curve to use for the fog's gradience", default="LINEAR")
-    bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
-    bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
-
-    bpy.types.View3DShading.t3dDrawProperties__ = bpy.props.EnumProperty(items=t3dDrawObjectPropertiesModes, name="Draw Object Properties", description="Whether to draw Tetra3D object properties for selected objects in the 3D view")
-    bpy.types.VIEW3D_HT_header.append(T3D_DRAW_GAME_PROPERTIES)
-
-    # Handlers and callbacks
-
-    if not exportOnSave in bpy.app.handlers.save_post:
-        bpy.app.handlers.save_post.append(exportOnSave)
-    if not onLoad in bpy.app.handlers.load_post:
-        bpy.app.handlers.load_post.append(onLoad)
-
-    keyconfig = bpy.context.window_manager.keyconfigs.addon
-
-    kc = keyconfig.keymaps.new(name="Window", space_type='EMPTY')
-    shortcut = kc.keymap_items.new("export.tetra3dgltf", 'E', 'PRESS', ctrl=True, shift=True)
-
-    global keymaps, fontHandler
-    keymaps.append((kc, shortcut))
-
-    fontHandler = bpy.types.SpaceView3D.draw_handler_add(drawGameProperties, (None, None), "WINDOW", "POST_PIXEL")
 
 @persistent
 def T3D_DRAW_GAME_PROPERTIES(self, context):
@@ -2375,7 +2408,206 @@ def drawGameProperties(self, context):
 
     return
 
+def register():
+
+    bpy.utils.register_class(OBJECT_PT_tetra3d)
+    bpy.utils.register_class(ACTION_PT_tetra3d)
+    bpy.utils.register_class(MESH_PT_tetra3d)
+    bpy.utils.register_class(RENDER_PT_tetra3d)
+    bpy.utils.register_class(CAMERA_PT_tetra3d)
+    bpy.utils.register_class(MATERIAL_PT_tetra3d)
+    bpy.utils.register_class(WORLD_PT_tetra3d)
+    bpy.utils.register_class(SCENE_PT_tetra3d)
+    
+    bpy.utils.register_class(OBJECT_OT_tetra3dAddProp)
+    bpy.utils.register_class(OBJECT_OT_tetra3dDeleteProp)
+    bpy.utils.register_class(OBJECT_OT_tetra3dReorderProps)
+    bpy.utils.register_class(OBJECT_OT_tetra3dCopyProps)
+    bpy.utils.register_class(OBJECT_OT_tetra3dCopyOneProperty)
+    bpy.utils.register_class(OBJECT_OT_tetra3dClearProps)
+    bpy.utils.register_class(OBJECT_OT_tetra3dCopyNodePathToClipboard)
+    bpy.utils.register_class(OBJECT_OT_tetra3dOverrideProp)
+
+    bpy.utils.register_class(MATERIAL_OT_tetra3dMaterialCopyProps)
+    bpy.utils.register_class(MATERIAL_OT_tetra3dAutoUV)
+
+    bpy.utils.register_class(OBJECT_OT_tetra3dSetVector)
+    
+    bpy.utils.register_class(EXPORT_OT_tetra3d)
+    bpy.utils.register_class(RENDER_OT_tetra3dQuickSetRenderResolution)
+
+    bpy.utils.register_class(t3dAutoSubdivisionLevel__)
+    bpy.utils.register_class(MESH_OT_tetra3dAddAutoSubdivisionLevel)
+    bpy.utils.register_class(MESH_OT_tetra3dClearAutoSubdivisionLevels)
+    bpy.utils.register_class(MESH_OT_tetra3dCopyAutoSubdivisionLevels)
+    bpy.utils.register_class(MESH_OT_tetra3dDeleteAutoSubdivisionLevel)
+    bpy.utils.register_class(MESH_OT_tetra3dReorderAutoSubdivisionLevel)
+
+    bpy.utils.register_class(OBJECT_OT_tetra3dPlaySample)
+    bpy.utils.register_class(OBJECT_OT_tetra3dStopSample)
+    
+    bpy.utils.register_class(t3dGamePropertyItem__)
+    bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolation)
+    bpy.utils.register_class(OBJECT_OT_tetra3dSetAnimationInterpolationAll)
+    bpy.utils.register_class(OBJECT_OT_tetra3dFocusObject)
+    bpy.utils.register_class(OBJECT_OT_tetra3dSelectWithSameProperty)
+    bpy.utils.register_class(OBJECT_OT_tetra3dSearchStringProperties)
+
+    for propName, prop in objectProps.items():
+        setattr(bpy.types.Object, propName, prop)
+
+    bpy.types.Scene.t3dAutoSubdivisionLevels__ = bpy.props.CollectionProperty(type=t3dAutoSubdivisionLevel__)
+    bpy.types.Mesh.t3dAutoSubdivisionLevels__ = bpy.props.CollectionProperty(type=t3dAutoSubdivisionLevel__)
+
+    # We don't actually need to store or export the FOV; we just modify the camera's actual field of view (angle) property
+    bpy.types.Camera.t3dFOV__ = bpy.props.IntProperty(name="FOV", description="Vertical field of view", default=75,
+    get=getFOV, set=setFOV, min=1, max=179)
+    
+    bpy.types.Camera.t3dSectorRendering__ = bpy.props.BoolProperty(name="Sector-based Rendering", description="Whether scenes should be rendered according to sector or not", default=False)
+    
+    bpy.types.Camera.t3dSectorRenderDepth__ = bpy.props.IntProperty(name="Sector Render Depth", description="How many sector neighbors are rendered at a time", default=1, min=0)
+
+    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(items=sectorDetectionType, name="Sector Detection Type", description="How sector neighbors should be determined", default='VERTICES', 
+    get=getSectorDetectionType, set=setSectorDetectionType)
+
+    bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
+
+    bpy.types.Action.t3dGameProperties__ = objectProps["t3dGameProperties__"]
+    bpy.types.Action.t3dRelativeMotion__ = bpy.props.BoolProperty(name="Relative Motion", description="Whether the animation's movements happen relative to the starting position and orientation of the object or not", default=False)
+
+    perspectiveDescription = ("Whether the game should be rendered with perspective-corrected "
+    "texture mapping or not. When enabled, it will look more like modern 3D texturing; when disabled, "
+    "it will look like PS1 affine texture mapping (which is the default)."
+    "This feature is experimental / not perfect currently (it looks fuzzy, and triangles aren't clipped properly at the edges of the viewport, "
+    "which means you still get texture skewing when a triangle is largely offscreen)")
+    bpy.types.Camera.t3dPerspectiveCorrectedTextureMapping__ = bpy.props.BoolProperty(name="Perspective-corrected Texture Mapping (Experimental)", description=perspectiveDescription, default=False)
+
+    bpy.types.Camera.t3dMaxLightCount__ = bpy.props.IntProperty(name="Max light count", description="How many lights (sorted by distance to the camera, including ambient lights) should be used to light objects; if 0, then there is no limit", default=0, min = 0)
+
+    bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(name="Export on Save", description="Whether the current file should export to GLTF on save or not", default=False, 
+    get=getExportOnSave, set=setExportOnSave)
+    
+    bpy.types.Scene.t3dExportFilepath__ = bpy.props.StringProperty(name="Export Filepath", description="Filepath to export GLTF file. If left blank, it will export to the same directory as the blend file and will have the same filename; in this case, if the blend file has not been saved, nothing will happen", 
+    default="", subtype="FILE_PATH", get=getExportFilepath, set=setExportFilepath)
+    
+    bpy.types.Scene.t3dExportFormat__ = bpy.props.EnumProperty(items=gltfExportTypes, name="Export Format", description="What format to export the file in", default="GLB",
+    get=getExportFormat, set=setExportFormat)
+    
+    bpy.types.Scene.t3dExportCameras__ = bpy.props.BoolProperty(name="Export Cameras", description="Whether Blender should export cameras to the GLTF file", default=True,
+    get=getExportCameras, set=setExportCameras)
+
+    bpy.types.Scene.t3dExportLights__ = bpy.props.BoolProperty(name="Export Lights", description="Whether Blender should export lights to the GLTF file", default=True,
+    get=getExportLights, set=setExportLights)
+
+    bpy.types.Scene.t3dRenameInstancedObjects__ = bpy.props.BoolProperty(name="Rename Collection-Instanced Objects", description="Whether collection instances' names should be used for their instanced top-level objects", default=True,
+    get=getRenameInstancedObjects, set=setRenameInstancedObjects)
+
+    bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(name="Pack Textures", description="Whether Blender should pack textures into the GLTF file on export", default=False,
+    get=getPackTextures, set=setPackTextures)
+
+    bpy.types.Scene.t3dRenderResolutionW__ = bpy.props.IntProperty(name="Render Width", description="How wide to render the game scene in pixels", default=640, min=0,
+    get=getRenderResolutionW, set=setRenderResolutionW)
+
+    bpy.types.Scene.t3dRenderResolutionH__ = bpy.props.IntProperty(name="Render Height", description="How tall to render the game scene in pixels", default=360, min=0,
+    get=getRenderResolutionH, set=setRenderResolutionH)
+
+    bpy.types.Scene.t3dPlaybackFPS__ = bpy.props.IntProperty(name="Playback FPS", description="Animation Playback Framerate (in Blender)", default=60, min=0,
+    get=getPlaybackFPS, set=setPlaybackFPS)
+
+    bpy.types.Scene.t3dAnimationSampling__ = bpy.props.BoolProperty(name="Sampled Animations", description="When enabled, animations are sampled (so you can use advanced techniques in your animations and then Blender will bake the results into your GLTF file). When disabled, only plain constant and linear animation keyframes (not cubic spline) will export. However, non-sampled animations export much more quickly than sampled animations, which means this option is useful when developing", default=True,
+    get=getAnimationSampling, set=setAnimationSampling)
+
+    bpy.types.Scene.t3dAnimationInterpolation__ = bpy.props.EnumProperty(
+        items=[
+            ("CONSTANT", "Constant", "Constant interpolation", 0, 0), 
+            ("LINEAR", "Linear", "Linear interpolation", 0, 1), 
+            ("BEZIER", "Bezier", "Bezier interpolation", 0, 2), 
+            ("SINE", "Sine", "Sine interpolation", 0, 3), 
+            ("QUAD", "Quad", "Quad interpolation", 0, 4), 
+            ("CUBIC", "Cubic", "Cubic interpolation", 0, 5), 
+            ("QUART", "Quart", "Quart interpolation", 0, 6), 
+            ("QUINT", "Quint", "Quint interpolation", 0, 7), 
+            ("EXPO", "Expo", "Exponential interpolation", 0, 8), 
+            ("CIRC", "Circ", "Circ interpolation", 0, 7), 
+            ("BACK", "Back", "Back interpolation", 0, 8), 
+            ("BOUNCE", "Bounce", "Bounce interpolation", 0, 9), 
+            ("ELASTIC", "Elastic", "Elastic interpolation", 0, 10),
+        ], 
+        name="Type", 
+        description="What type to use for applying interpolation", 
+        default="BEZIER",
+        get=getAnimationInterpolation,
+        set=setAnimationInterpolation)
+
+    bpy.types.WindowManager.t3dExpandExportSettings__ = bpy.props.BoolProperty(name="Expand Export Settings", default=True)
+    bpy.types.WindowManager.t3dExpandAutoSubdivisionSettings__ = bpy.props.BoolProperty(name="Expand Auto-subdivision Settings", default=True)
+    bpy.types.WindowManager.t3dExpandResolutionSettings__ = bpy.props.BoolProperty(name="Expand Resolution Settings", default=True)
+    bpy.types.WindowManager.t3dExpandAnimationSettings__ = bpy.props.BoolProperty(name="Expand Animation Settings", default=True)
+    bpy.types.WindowManager.t3dExpandSectorSettings__ = bpy.props.BoolProperty(name="Expand Sector Settings", default=True)
+    bpy.types.WindowManager.t3dExpandGameProps__ = bpy.props.BoolProperty(name="Expand Game Properties", default=True)
+    bpy.types.WindowManager.t3dExpandObjectProps__ = bpy.props.BoolProperty(name="Expand Object Properties", default=True)
+    bpy.types.WindowManager.t3dExpandOverrideProps__ = bpy.props.BoolProperty(name="Expand Overridden Properties", default=True)
+
+    bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(name="Material Color", description="Material modulation color", default=[1,1,1,1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.Material.t3dMaterialShadeless__ = bpy.props.BoolProperty(name="Shadeless", description="Whether lighting should affect this material", default=False)
+    bpy.types.Material.t3dMaterialFogless__ = bpy.props.BoolProperty(name="Fogless", description="Whether fog affects this material", default=False)
+    bpy.types.Material.t3dBlendMode__ = bpy.props.EnumProperty(items=materialBlendModes, name="Blend Mode", description="Composite mode (i.e. additive, multiplicative, etc) for this material", default="DEFAULT")
+    bpy.types.Material.t3dTransparencyMode__ = bpy.props.EnumProperty(items=materialTransparencyModes, name="Transparency Mode", description="Transparency mode for this material", default="AUTO")
+    bpy.types.Material.t3dBillboardEnabled__ = bpy.props.BoolProperty(name="Billboarding Enabled", description="If the object with this material should rotate to face the camera for this material; doesn't take effect on armature skinned meshes", default=False)
+    bpy.types.Material.t3dBillboardLockX__ = bpy.props.BoolProperty(name="Lock X Axis Rotation", description="If rotation is locked on the global X axis", default=False)
+    bpy.types.Material.t3dBillboardLockY__ = bpy.props.BoolProperty(name="Lock Y Axis Rotation", description="If rotation is locked on the global Y axis", default=False)
+    bpy.types.Material.t3dBillboardLockZ__ = bpy.props.BoolProperty(name="Lock Z Axis Rotation", description="If rotation is locked on the global Z axis", default=False)
+    bpy.types.Material.t3dBillboardUpDirection__ = bpy.props.EnumProperty(items=billboardingYDirections,name="Billboarding Y (Up) Direction", description="The direction for upwards direction for billboarding", default="GLOBAL_Y")
+    bpy.types.Material.t3dDepthMode__ = bpy.props.EnumProperty(items=depthModes, name="Depth Rendering Modes", description="How depth should be rendered for meshes that use this materials", default="DEFAULT")
+    bpy.types.Material.t3dMaterialLightingMode__ = bpy.props.EnumProperty(items=materialLightingModes, name="Lighting mode", description="How materials should be lit", default="DEFAULT")
+    bpy.types.Material.t3dVisible__ = bpy.props.BoolProperty(name="Visible", description="Whether this material is visible", default=True)
+    bpy.types.Material.t3dSolidToCollisions__ = bpy.props.BoolProperty(name="Report Collisions", description="Whether this material contributes to collision checks for BoundingTriangles meshes", default=True)
+    bpy.types.Material.t3dSolidToRays__ = bpy.props.BoolProperty(name="Report Raycasts", description="Whether this material contributes to ray checks for BoundingTriangles meshes", default=True)
+
+    bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode")
+    bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5)
+    bpy.types.Material.t3dAutoUVRotation__ = bpy.props.FloatProperty(name="Rotation", description="How many degrees to rotate the UVs after projection", step = 500, update=autoUVChange)
+    bpy.types.Material.t3dAutoUVOffset__ = bpy.props.FloatVectorProperty(name="Offset", description="How many texels to offset the texture after projection", default=[0,0], size=2, update=autoUVChange, step=1)
+        
+    bpy.types.Material.t3dGameProperties__ = objectProps["t3dGameProperties__"]
+
+    bpy.types.Mesh.t3dUniqueMesh__ = bpy.props.BoolProperty(name="Unique Mesh", description="Whether each Model that uses this mesh will have a unique clone of it or not. When enabled, any Models that use this mesh will clone the mesh on creation")
+    bpy.types.Mesh.t3dUniqueMaterials__ = bpy.props.BoolProperty(name="Unique Materials", description="Whether each Model that uses this mesh's materials will have unique clones of them or not. When enabled, any Models that use this mesh will clone the materials on creation")
+    bpy.types.Mesh.t3dAutoSubdivide__ = bpy.props.BoolProperty(name="Auto-Subdivide Faces", description="If enabled, this mesh will be automatically subdivided as its triangles get closer to the camera")
+
+    bpy.types.World.t3dClearColor__ = bpy.props.FloatVectorProperty(name="Clear Color", description="Screen clear color; note that this won't actually be the background color automatically, but rather is simply set on the Scene.ClearColor property for you to use as you wish", default=[0.007, 0.008, 0.01, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.World.t3dSyncClearColor__ = bpy.props.BoolProperty(name="Sync Clear Color to World Color", description="If the clear color should be a copy of the world's color")
+    bpy.types.World.t3dFogColor__ = bpy.props.FloatVectorProperty(name="Fog Color", description="The color of fog for this world", default=[0, 0, 0, 1], subtype="COLOR", size=4, step=1, min=0, max=1)
+    bpy.types.World.t3dSyncFogColor__ = bpy.props.BoolProperty(name="Sync Fog Color to Clear Color", description="If the fog color should be a copy of the screen clear color")
+    bpy.types.World.t3dFogMode__ = bpy.props.EnumProperty(items=worldFogCompositeModes, name="Fog Mode", description="Fog mode", default="OFF")
+    bpy.types.World.t3dFogDithered__ = bpy.props.FloatProperty(name="Fog Dither Size", description="How large bayer matrix dithering is when using fog. If set to 0, dithering is disabled", default=0, min=0, step=1)
+
+    bpy.types.World.t3dFogCurve__ = bpy.props.EnumProperty(items=worldFogCurveTypes, name="Fog Curve", description="What curve to use for the fog's gradience", default="LINEAR")
+    bpy.types.World.t3dFogRangeStart__ = bpy.props.FloatProperty(name="Fog Range Start", description="With 0 being the near plane and 1 being the far plane of the camera, how far in should the fog start to appear", min=0.0, max=1.0, default=0, get=fogRangeStartGet, set=fogRangeStartSet)
+    bpy.types.World.t3dFogRangeEnd__ = bpy.props.FloatProperty(name="Fog Range End", description="With 0 being the near plane and 1 being the far plane of the camera, how far out should the fog be at maximum opacity", min=0.0, max=1.0, default=1, get=fogRangeEndGet, set=fogRangeEndSet)
+
+    bpy.types.View3DShading.t3dDrawProperties__ = bpy.props.EnumProperty(items=t3dDrawObjectPropertiesModes, name="Draw Object Properties", description="Whether to draw Tetra3D object properties for selected objects in the 3D view")
+    bpy.types.VIEW3D_HT_header.append(T3D_DRAW_GAME_PROPERTIES)
+
+    # Handlers and callbacks
+
+    if not exportOnSave in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.append(exportOnSave)
+    if not onLoad in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.append(onLoad)
+
+    keyconfig = bpy.context.window_manager.keyconfigs.addon
+
+    kc = keyconfig.keymaps.new(name="Window", space_type='EMPTY')
+    shortcut = kc.keymap_items.new("export.tetra3dgltf", 'E', 'PRESS', ctrl=True, shift=True)
+
+    global keymaps, fontHandler
+    keymaps.append((kc, shortcut))
+
+    fontHandler = bpy.types.SpaceView3D.draw_handler_add(drawGameProperties, (None, None), "WINDOW", "POST_PIXEL")
+
 def unregister():
+
     bpy.utils.unregister_class(OBJECT_PT_tetra3d)
     bpy.utils.unregister_class(ACTION_PT_tetra3d)
     bpy.utils.unregister_class(MESH_PT_tetra3d)
@@ -2403,6 +2635,13 @@ def unregister():
     
     bpy.utils.unregister_class(RENDER_OT_tetra3dQuickSetRenderResolution)
 
+    bpy.utils.unregister_class(t3dAutoSubdivisionLevel__)
+    bpy.utils.unregister_class(MESH_OT_tetra3dAddAutoSubdivisionLevel)
+    bpy.utils.unregister_class(MESH_OT_tetra3dClearAutoSubdivisionLevels)
+    bpy.utils.unregister_class(MESH_OT_tetra3dCopyAutoSubdivisionLevels)
+    bpy.utils.unregister_class(MESH_OT_tetra3dDeleteAutoSubdivisionLevel)
+    bpy.utils.unregister_class(MESH_OT_tetra3dReorderAutoSubdivisionLevel)
+
     bpy.utils.unregister_class(t3dGamePropertyItem__)
 
     if currentlyPlayingAudioHandle:
@@ -2420,6 +2659,8 @@ def unregister():
     
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
+
+    del bpy.types.Mesh.t3dAutoSubdivisionLevels__
 
     del bpy.types.Scene.t3dGameProperties__
     del bpy.types.Action.t3dGameProperties__
@@ -2440,8 +2681,14 @@ def unregister():
     del bpy.types.Scene.t3dRenderResolutionH__
     del bpy.types.Scene.t3dPlaybackFPS__
 
-    del bpy.types.Scene.t3dExpandGameProps__
-    del bpy.types.Scene.t3dExpandOverrideProps__
+    del bpy.types.WindowManager.t3dExpandExportSettings__ 
+    del bpy.types.WindowManager.t3dExpandAutoSubdivisionSettings__
+    del bpy.types.WindowManager.t3dExpandResolutionSettings__
+    del bpy.types.WindowManager.t3dExpandAnimationSettings__
+    del bpy.types.WindowManager.t3dExpandSectorSettings__
+    del bpy.types.WindowManager.t3dExpandGameProps__
+    del bpy.types.WindowManager.t3dExpandObjectProps__
+    del bpy.types.WindowManager.t3dExpandOverrideProps__
 
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__
@@ -2474,8 +2721,7 @@ def unregister():
 
     del bpy.types.Mesh.t3dUniqueMesh__
     del bpy.types.Mesh.t3dUniqueMaterials__
-    # del bpy.types.Mesh.t3dAutoSubdivide__
-    # del bpy.types.Mesh.t3dAutoSubdivideSize__
+    del bpy.types.Mesh.t3dAutoSubdivide__
 
     del bpy.types.Camera.t3dSectorRendering__
     del bpy.types.Camera.t3dSectorRenderDepth__

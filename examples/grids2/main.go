@@ -59,10 +59,10 @@ func (m *GridPointMarker) Update() {
 
 	for i, connection := range m.Gridpoint.Connections {
 		if connection.Passable {
-			m.lines[i].Mesh = lib.MeshByName("Line")
+			m.lines[i].SetMesh(lib.MeshByName("Line"))
 		} else {
 			red = true
-			m.lines[i].Mesh = lib.MeshByName("BrokenLine")
+			m.lines[i].SetMesh(lib.MeshByName("BrokenLine"))
 		}
 		if connection.Cost > 0 {
 			m.lines[i].Color = colors.Green()

@@ -52,7 +52,7 @@ func (g *Game) Init() {
 	cubes := []*tetra3d.Model{}
 
 	// We can reuse the mesh for all of the models.
-	cubeMesh := tetra3d.NewCubeMesh()
+	cubeMesh := tetra3d.NewCubeMesh(2, 2, 2)
 
 	// Create a new Model and add it to the Cubes slice. Note that we're not moving
 	// the cubes, so this for loop block creates 10x10x10 (or 1000) cubes overlaid exactly on top
@@ -84,7 +84,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	mat := merged.Mesh.MeshParts[0].Material
+	mat := merged.Mesh().MeshParts[0].Material
 	mat.Shadeless = true
 	mat.Texture = ebiten.NewImageFromImage(img)
 

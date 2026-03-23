@@ -140,7 +140,7 @@ func (prop *Property) AsInt() int {
 
 // IsColor returns true if the Property is a color.
 func (prop *Property) IsColor() bool {
-	if _, ok := prop.Value.(Color); ok {
+	if _, ok := prop.Value.(Color4); ok {
 		return true
 	}
 	return false
@@ -148,8 +148,8 @@ func (prop *Property) IsColor() bool {
 
 // AsColor returns the value associated with the Property as a Color.
 // Note that this does not sanity check to ensure the Property is a Color first.
-func (prop *Property) AsColor() Color {
-	return prop.Value.(Color)
+func (prop *Property) AsColor() Color4 {
+	return prop.Value.(Color4)
 }
 
 // IsVector3 returns true if the Property is a Vector3.

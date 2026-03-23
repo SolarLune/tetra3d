@@ -30,62 +30,42 @@ func (r RayHit) Distance() float32 {
 	return r.from.DistanceTo(r.Position)
 }
 
+// Returns if the Ray hit a material by a given name or not.
+func (r RayHit) HitMaterialByName(name string) bool {
+	return r.Triangle != nil && r.Triangle.MeshPart.Material != nil && r.Triangle.MeshPart.Material.name == name
+}
+
+// Returns if the Ray hit a material with a property of a given name or not.
+func (r RayHit) HitMaterialByPropName(propName string) bool {
+	return r.Triangle != nil && r.Triangle.MeshPart.Material != nil && r.Triangle.MeshPart.Material.properties.Has(propName)
+}
+
 const ErrorObjectHitNotBoundingTriangles = "error: object hit not a BoundingTriangles instance; no UV or vertex color data can be pulled from RayHit result"
+const ErrorObjectHitNotChildOfModel = "error: object hit not a child of a Model"
 
 // Returns the vertex color from the given channel in the position struck on the object struck.
 // Only works when testing against BoundingTriangles objects.
 // The returned vertex color is linearly interpolated across the triangle just like it would be when a triangle is rendered.
 // The function will return transparent black and an error if the BoundingObject hit was not a BoundingTriangles object, or if the channel index given
 // is higher than the number of vertex color channels on the BoundingTriangles' mesh.
-func (r RayHit) VertexColor(channelIndex int) (Color, error) {
+func (r RayHit) VertexColor(channelIndex int) (Color4, error) {
 
 	if r.Triangle == nil {
-		return NewColor(0, 0, 0, 0), errors.New(ErrorObjectHitNotBoundingTriangles)
+		return NewColor4(0, 0, 0, 0), errors.New(ErrorObjectHitNotBoundingTriangles)
 	}
 
 	mesh := r.Object.(*BoundingTriangles).Mesh
 
 	if len(mesh.VertexColors[0]) <= channelIndex {
-		return NewColor(0, 0, 0, 0), errors.New(ErrorVertexChannelOutsideRange)
+		return NewColor4(0, 0, 0, 0), errors.New(ErrorVertexChannelOutsideRange)
 	}
 
 	tri := r.Triangle
-	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndices[0]], mesh.VertexPositions[tri.VertexIndices[1]], mesh.VertexPositions[tri.VertexIndices[2]])
+	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndexA], mesh.VertexPositions[tri.VertexIndexB], mesh.VertexPositions[tri.VertexIndexC])
 
-	vc1 := mesh.VertexColors[channelIndex][tri.VertexIndices[0]]
-	vc2 := mesh.VertexColors[channelIndex][tri.VertexIndices[1]]
-	vc3 := mesh.VertexColors[channelIndex][tri.VertexIndices[2]]
-
-	output := vc1.Mix(vc2, float32(v)).Mix(vc3, float32(u))
-
-	return output, nil
-
-}
-
-// Returns the lighting color for the given position struck on the object struck.
-// Only works when testing against BoundingTriangles objects, and those for visible objects.
-// Note that this assumes the object rendered is rendered once; rendering multiple times will reset the lighting values between renders.
-// The function will return transparent black and an error if the BoundingObject hit was not a BoundingTriangles object.
-func (r RayHit) LightColor() (Color, error) {
-
-	if r.Triangle == nil {
-		return NewColor(0, 0, 0, 0), errors.New(ErrorObjectHitNotBoundingTriangles)
-	}
-
-	tri := r.Triangle
-
-	// Shadeless materials return full bright white
-	if tri.MeshPart.Material != nil && tri.MeshPart.Material.Shadeless {
-		return NewColor(1, 1, 1, 1), nil
-	}
-
-	mesh := r.Object.(*BoundingTriangles).Mesh
-
-	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndices[0]], mesh.VertexPositions[tri.VertexIndices[1]], mesh.VertexPositions[tri.VertexIndices[2]])
-
-	vc1 := mesh.vertexLights[tri.VertexIndices[0]]
-	vc2 := mesh.vertexLights[tri.VertexIndices[1]]
-	vc3 := mesh.vertexLights[tri.VertexIndices[2]]
+	vc1 := mesh.VertexColors[channelIndex][tri.VertexIndexA]
+	vc2 := mesh.VertexColors[channelIndex][tri.VertexIndexB]
+	vc3 := mesh.VertexColors[channelIndex][tri.VertexIndexC]
 
 	output := vc1.Mix(vc2, float32(v)).Mix(vc3, float32(u))
 
@@ -106,11 +86,11 @@ func (r RayHit) UV() (Vector2, error) {
 	mesh := r.Object.(*BoundingTriangles).Mesh
 
 	tri := r.Triangle
-	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndices[0]], mesh.VertexPositions[tri.VertexIndices[1]], mesh.VertexPositions[tri.VertexIndices[2]])
+	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndexA], mesh.VertexPositions[tri.VertexIndexB], mesh.VertexPositions[tri.VertexIndexC])
 
-	uv1 := mesh.VertexUVs[tri.VertexIndices[0]]
-	uv2 := mesh.VertexUVs[tri.VertexIndices[1]]
-	uv3 := mesh.VertexUVs[tri.VertexIndices[2]]
+	uv1 := mesh.VertexUVs[tri.VertexIndexA]
+	uv2 := mesh.VertexUVs[tri.VertexIndexB]
+	uv3 := mesh.VertexUVs[tri.VertexIndexC]
 
 	output := uv1.Lerp(uv2, v).Lerp(uv3, u)
 
@@ -241,12 +221,12 @@ func boundingAABBRayTest(from, to Vector3, test *BoundingAABB) (RayHit, bool) {
 
 	pos := test.WorldPosition()
 
-	t1 := (test.Dimensions.Min.X + pos.X - from.X) / rayLineUnit.X
-	t2 := (test.Dimensions.Max.X + pos.X - from.X) / rayLineUnit.X
-	t3 := (test.Dimensions.Min.Y + pos.Y - from.Y) / rayLineUnit.Y
-	t4 := (test.Dimensions.Max.Y + pos.Y - from.Y) / rayLineUnit.Y
-	t5 := (test.Dimensions.Min.Z + pos.Z - from.Z) / rayLineUnit.Z
-	t6 := (test.Dimensions.Max.Z + pos.Z - from.Z) / rayLineUnit.Z
+	t1 := (test.dimensions.Min.X + pos.X - from.X) / rayLineUnit.X
+	t2 := (test.dimensions.Max.X + pos.X - from.X) / rayLineUnit.X
+	t3 := (test.dimensions.Min.Y + pos.Y - from.Y) / rayLineUnit.Y
+	t4 := (test.dimensions.Max.Y + pos.Y - from.Y) / rayLineUnit.Y
+	t5 := (test.dimensions.Min.Z + pos.Z - from.Z) / rayLineUnit.Z
+	t6 := (test.dimensions.Max.Z + pos.Z - from.Z) / rayLineUnit.Z
 
 	tmin := math32.Max(math32.Max(math32.Min(t1, t2), math32.Min(t3, t4)), math32.Min(t5, t6))
 	tmax := math32.Min(math32.Min(math32.Max(t1, t2), math32.Max(t3, t4)), math32.Max(t5, t6))
@@ -284,6 +264,8 @@ func boundingAABBRayTest(from, to Vector3, test *BoundingAABB) (RayHit, bool) {
 
 }
 
+var workingAABB = NewBoundingAABB("", 1, 1, 1)
+
 func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doublesided bool) []RayHit {
 
 	check := false
@@ -299,7 +281,6 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 	if check {
 
 		center := from.Lerp(to, 0.5)
-		radius := from.DistanceTo(to)
 
 		_, _, r := test.Transform().Decompose()
 
@@ -308,9 +289,16 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 		invTo := invertedTransform.MultVec(to)
 		plane := newCollisionPlane()
 
-		test.Broadphase.ForEachTriangleInRange(center, radius, func(triID int) bool {
+		margin := float32(0.25)
+		dist := to.DistanceTo(from) + margin
 
-			tri := test.Mesh.Triangles[triID]
+		workingAABB.SetLocalPositionVec(center)
+		workingAABB.SetLocalScale(dist, dist, dist)
+		workingAABB.Transform()
+
+		test.Broadphase.ForEachTriangleFromBoundingObject(workingAABB, func(triIndex int) bool {
+
+			tri := test.Mesh.Triangles[triIndex]
 
 			// Skip if it's not collideable
 			if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportRays {
@@ -326,9 +314,9 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 				return true
 			}
 
-			v0 := test.Mesh.VertexPositions[tri.VertexIndices[0]]
-			v1 := test.Mesh.VertexPositions[tri.VertexIndices[1]]
-			v2 := test.Mesh.VertexPositions[tri.VertexIndices[2]]
+			v0 := test.Mesh.VertexPositions[tri.VertexIndexA]
+			v1 := test.Mesh.VertexPositions[tri.VertexIndexB]
+			v2 := test.Mesh.VertexPositions[tri.VertexIndexC]
 
 			// Skip because the triangle is degenerate and a collision plane cannot be set from it
 			// (i.e. for whatever reason, at least two vertices share location, so it's no longer a pure triangle)

@@ -35,17 +35,17 @@ type TextStyle struct {
 	AlignmentHorizontal  TextHorizontalAlignment // How the text should be horizontally aligned in the Text texture.
 	AlignmentVertical    TextVerticalAlignment
 
-	BGColor Color // The Background color for the text. Defaults to black (0, 0, 0, 1).
-	FGColor Color // The Foreground color for the text. Defaults to white (1, 1, 1, 1).
+	BGColor Color4 // The Background color for the text. Defaults to black (0, 0, 0, 1).
+	FGColor Color4 // The Foreground color for the text. Defaults to white (1, 1, 1, 1).
 
 	ShadowDirection Vector3 // A vector indicating direction of the shadow's heading. Defaults to down-right ( {1, 1, 0}, normalized ).
 	ShadowLength    int     // The length of the shadow in pixels. Defaults to 0 (no shadow).
-	ShadowColorNear Color   // The color of the shadow near the letters. Defaults to black (0, 0, 0, 1).
-	ShadowColorFar  Color   // The color of the shadow towards the end of the letters. Defaults to black (0, 0, 0, 1).
+	ShadowColorNear Color4  // The color of the shadow near the letters. Defaults to black (0, 0, 0, 1).
+	ShadowColorFar  Color4  // The color of the shadow towards the end of the letters. Defaults to black (0, 0, 0, 1).
 
-	OutlineThickness int   // Overall thickness of the outline in pixels. Defaults to 0 (no outline).
-	OutlineRounded   bool  // If the outline is rounded or not. Defaults to false (square outlines).
-	OutlineColor     Color // Color of the outline. Defaults to black (0, 0, 0, 1).
+	OutlineThickness int    // Overall thickness of the outline in pixels. Defaults to 0 (no outline).
+	OutlineRounded   bool   // If the outline is rounded or not. Defaults to false (square outlines).
+	OutlineColor     Color4 // Color of the outline. Defaults to black (0, 0, 0, 1).
 
 	// Margin (in pixels) of space to leave around the frame of the texture (left or right, depending on HorizontalAlignment, and from the top). Defaults to 0.
 	MarginHorizontal, MarginVertical int
@@ -58,14 +58,14 @@ func NewDefaultTextStyle() TextStyle {
 	return TextStyle{
 		Font:                 basicfont.Face7x13,
 		LineHeightMultiplier: 1,
-		BGColor:              NewColor(0, 0, 0, 1),
-		FGColor:              NewColor(1, 1, 1, 1),
+		BGColor:              NewColor4(0, 0, 0, 1),
+		FGColor:              NewColor4(1, 1, 1, 1),
 
-		OutlineColor: NewColor(0, 0, 0, 1),
+		OutlineColor: NewColor4(0, 0, 0, 1),
 
 		ShadowDirection: Vector3{1, 1, 0}.Unit(),
-		ShadowColorNear: NewColor(0, 0, 0, 1),
-		ShadowColorFar:  NewColor(0, 0, 0, 1),
+		ShadowColorNear: NewColor4(0, 0, 0, 1),
+		ShadowColorFar:  NewColor4(0, 0, 0, 1),
 	}
 }
 

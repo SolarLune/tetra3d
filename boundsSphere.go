@@ -28,6 +28,24 @@ func (sphere *BoundingSphere) Clone() INode {
 	return clone
 }
 
+func (sphere *BoundingSphere) Dimensions() Dimensions {
+	pos := sphere.WorldPosition()
+	r := sphere.Radius / 2
+	return Dimensions{
+		Min: NewVector3(
+			pos.X-r,
+			pos.Y-r,
+			pos.Z-r,
+		),
+
+		Max: NewVector3(
+			pos.X+r,
+			pos.Y+r,
+			pos.Z+r,
+		),
+	}
+}
+
 // WorldRadius returns the radius of the BoundingSphere in world units, after taking into account its scale.
 func (sphere *BoundingSphere) WorldRadius() float32 {
 	var scale Vector3

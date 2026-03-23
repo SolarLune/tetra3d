@@ -22,10 +22,10 @@ type FogMode int
 type World struct {
 	Name       string
 	id         uint32
-	ClearColor Color // The clear color of the screen; note that this doesn't clear the color of the camera buffer or screen automatically;
+	ClearColor Color4 // The clear color of the screen; note that this doesn't clear the color of the camera buffer or screen automatically;
 	// this is just what the color is if the scene was exported using the Tetra3D addon from Blender. It's up to you as to how you'd like to
 	// use it.
-	FogColor Color   // The Color of any fog present in the Scene.
+	FogColor Color4  // The Color of any fog present in the Scene.
 	FogMode  FogMode // The FogMode, indicating how the fog color is blended if it's on (not FogOff).
 	// FogRange is the depth range at which the fog is active. FogRange consists of two numbers,
 	// ranging from 0 to 1. The first indicates the start of the fog, and the second the end, in
@@ -45,12 +45,12 @@ func NewWorld(name string) *World {
 
 	w := &World{
 		Name:            name,
-		FogColor:        NewColor(0, 0, 0, 0),
+		FogColor:        NewColor4(0, 0, 0, 0),
 		FogRange:        []float32{0, 1},
 		FogOn:           true,
 		LightingOn:      true,
 		DitheredFogSize: 0,
-		ClearColor:      NewColor(0.08, 0.09, 0.1, 1),
+		ClearColor:      NewColor4(0.08, 0.09, 0.1, 1),
 		AmbientLight:    NewAmbientLight("ambient light", 1, 1, 1, 0),
 	}
 

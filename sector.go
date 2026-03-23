@@ -25,7 +25,7 @@ type Sector struct {
 // NewSector creates a new Sector for the provided Model.
 func NewSector(model *Model) *Sector {
 
-	mesh := model.Mesh
+	mesh := model.mesh
 	margin := float32(0.01)
 	sectorAABB := NewBoundingAABB("sector", mesh.Dimensions.Width()+margin, mesh.Dimensions.Height()+margin, mesh.Dimensions.Depth()+margin)
 	sectorAABB.SetLocalPositionVec(model.WorldPosition().Add(mesh.Dimensions.Center()))
@@ -77,11 +77,11 @@ func (sector *Sector) UpdateNeighbors(otherModels *NodeCollectionSet) {
 
 		exit:
 
-			for _, v := range sector.Model.Mesh.VertexPositions {
+			for _, v := range sector.Model.mesh.VertexPositions {
 
 				transformedV := modelMatrix.MultVec(v)
 
-				for _, v2 := range otherModel.Mesh.VertexPositions {
+				for _, v2 := range otherModel.mesh.VertexPositions {
 
 					transformedV2 := otherMatrix.MultVec(v2)
 
