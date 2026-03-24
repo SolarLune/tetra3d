@@ -38,7 +38,7 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float32) *
 		gridSize = math32.Ceil(maxDim / broadphaseGridSize)
 	}
 
-	bt.Broadphase = NewBroadphase(gridSize, gridSize, gridSize, bt)
+	bt.Broadphase = NewBroadphase(bt, gridSize, gridSize, gridSize)
 
 	bt.owner = bt
 

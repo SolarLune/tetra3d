@@ -24,44 +24,46 @@ type Broadphase struct {
 	cellCountZ int
 }
 
-// NewBroadphase returns a new Broadphase object.
-// gridCellCount is number of cells in the grid.
-// worldPosition is the world position of the broadphase object; this should be a zero vector if
-// it's being used for a mesh, and should be the position of the BoundingTriangles if it's being used for
-// collision testing.
-// mesh is the Mesh to be used for broadphase testing.
-func NewBroadphase(gridSizeX, gridSizeY, gridSizeZ float32, boundingTris *BoundingTriangles) *Broadphase {
+// NewBroadphase returns a new Broadphase object that performs broadphase triangle detection for a Mesh.
+func NewBroadphase(boundingTris *BoundingTriangles, cellSizeX, cellSizeY, cellSizeZ float32) *Broadphase {
 
 	b := &Broadphase{
 
 		boundingTriangles: boundingTris,
 		dimensions:        boundingTris.Mesh.Dimensions, // Specifically the untransformed dimensions
 
-		cellSizeX: gridSizeX,
-		cellSizeY: gridSizeY,
-		cellSizeZ: gridSizeZ,
+		cellSizeX: cellSizeX,
+		cellSizeY: cellSizeY,
+		cellSizeZ: cellSizeZ,
 
 		enabled: true,
 	}
 
-	b.Resize(gridSizeX, gridSizeY, gridSizeZ)
+	if cellSizeX > 0 && cellSizeY > 0 && cellSizeZ > 0 {
+		b.Resize(cellSizeX, cellSizeY, cellSizeZ)
+	}
 
 	return b
 }
 
 // Clone clones the Broadphase.
 func (b *Broadphase) Clone(newBoundingTriangles *BoundingTriangles) *Broadphase {
-	newBroadphase := NewBroadphase(b.cellSizeX, b.cellSizeY, b.cellSizeZ, newBoundingTriangles)
+
+	// Create a new broadphase with a cell size of 0 so it specifically does NOT resize again
+	newBroadphase := NewBroadphase(newBoundingTriangles, 0, 0, 0)
 
 	ts := make([][]int, 0, len(b.TriSets))
 
 	for _, set := range b.TriSets {
-		ts = append(ts, append([]int{}, set...))
+		newSet := make([]int, 0, len(set))
+		newSet = append(newSet, set...)
+		ts = append(ts, set)
 	}
 
 	newBroadphase.TriSets = ts
 
 	newBroadphase.enabled = b.enabled
+	newBroadphase.dimensions = b.dimensions
 
 	newBroadphase.cellSizeX = b.cellSizeX
 	newBroadphase.cellSizeY = b.cellSizeY
@@ -91,8 +93,6 @@ func (b *Broadphase) Resize(cellSizeX, cellSizeY, cellSizeZ float32) {
 
 	// maxDim := b.mesh.Dimensions.MaxDimension()
 
-	b.TriSets = [][]int{}
-
 	cellCountX := 0
 	cellCountY := 0
 	cellCountZ := 0
@@ -116,6 +116,12 @@ func (b *Broadphase) Resize(cellSizeX, cellSizeY, cellSizeZ float32) {
 		dimMax.Z = dimMin.Z + cellSizeZ
 	}
 	margin := max(cellSizeX, cellSizeY, cellSizeZ)
+
+	dimDiffZ := b.dimensions.Depth() / cellSizeZ
+	dimDiffY := b.dimensions.Height() / cellSizeY
+	dimDiffX := b.dimensions.Width() / cellSizeX
+
+	b.TriSets = make([][]int, 0, int(dimDiffX)*int(dimDiffY)*int(dimDiffZ))
 
 	for z := dimMin.Z; z < dimMax.Z; z += cellSizeZ {
 		cellCountY = 0
@@ -203,7 +209,7 @@ var broadphaseTestingTriIndices = Set[int]{}
 // once, of course.
 func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingObject, forEach func(triID int) bool) {
 
-	if !b.enabled {
+	if !b.enabled || len(b.TriSets) == 0 {
 		for t := range b.boundingTriangles.Mesh.Triangles {
 			if !forEach(t) {
 				return

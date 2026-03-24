@@ -74,6 +74,11 @@ func (g *Game) Init() {
 	// First, we'll bake the lighting into the lighting vertex color channel.
 	model.BakeLighting(ChannelLight, lights)
 
+	lights.ForEachLight(func(light tetra3d.ILight) bool {
+		light.SetVisible(false, false)
+		return true
+	})
+
 	// Next, we'll bake the AO into the AO vertex color channel.
 
 	// The AOBakeOptions struct controls how our AO should be baked. For readability, we create it

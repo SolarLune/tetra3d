@@ -1721,8 +1721,8 @@ func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model) {
 	t.visible = false
 
 	for _, level := range t.subdivisionLevels {
-		for _, subDiv := range level {
-			subDiv.visible = false
+		for _, subDividedTriangle := range level {
+			subDividedTriangle.visible = false
 		}
 	}
 
@@ -1733,8 +1733,10 @@ func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model) {
 			maxLevel = max(maxLevel, level.SubdivisionLevel)
 		}
 
+		subCount := (math32.Pow(2, float32(maxLevel)) + 1) * (math32.Pow(2, float32(maxLevel-1)+1))
+
 		for i := 0; i < maxLevel; i++ {
-			t.subdivisionLevels = append(t.subdivisionLevels, []*Triangle{})
+			t.subdivisionLevels = append(t.subdivisionLevels, make([]*Triangle, 0, int(subCount)))
 		}
 
 		t.performSubdivision(0, maxLevel, t, model)

@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -430,6 +431,7 @@ func (node *Node) Clone() INode {
 }
 
 func (node *Node) clone(newOwner INode) INode {
+
 	newNode := NewNode(node.name)
 	newNode.owner = newOwner
 	newNode.scene = node.scene
@@ -453,6 +455,8 @@ func (node *Node) clone(newOwner INode) INode {
 	if node.animationPlayer.RootNode == node {
 		newNode.animationPlayer.SetRoot(newNode)
 	}
+
+	newNode.children = slices.Grow(newNode.children, len(node.children))
 
 	for _, child := range node.children {
 		childClone := child.Clone()
