@@ -18,10 +18,10 @@ import (
 var assets embed.FS
 
 type Player struct {
-	Model   *tetra3d.Model
-	Bounds  *tetra3d.BoundingCapsule
-	Fallspd float32
-	Facing  tetra3d.Vector3
+	Model       *tetra3d.Model
+	Bounds      *tetra3d.BoundingCapsule
+	VerticalSpd float32
+	Facing      tetra3d.Vector3
 }
 
 func NewPlayer(model *tetra3d.Model) *Player {
@@ -90,23 +90,31 @@ func (p *Player) Update() {
 
 	onGround := false
 
-	tetra3d.RayTest(tetra3d.RayTestOptions{
-		From:        p.Model.WorldPosition(),
-		To:          p.Model.WorldPosition().SubY(2),
-		TestAgainst: solids,
-		OnHit: func(hit tetra3d.RayHit, index, count int) bool {
-			onGround = true
-			p.Fallspd = 0
-			p.Model.SetLocalY(hit.Position.Y + 1.2)
-			return false
-		},
-	})
+	if p.VerticalSpd <= 0 {
 
-	if !onGround {
-		p.Fallspd += 0.02
+		tetra3d.RayTest(tetra3d.RayTestOptions{
+			From:        p.Model.WorldPosition().AddY(p.VerticalSpd),
+			To:          p.Model.WorldPosition().AddY(p.VerticalSpd).SubY(2),
+			TestAgainst: solids,
+			OnHit: func(hit tetra3d.RayHit, index, count int) bool {
+				onGround = true
+				p.VerticalSpd = 0
+				p.Model.SetLocalY(hit.Position.Y + 1.2)
+				return false
+			},
+		})
+
 	}
 
-	p.Model.Move(0, -p.Fallspd, 0)
+	if !onGround {
+		p.VerticalSpd -= 0.02
+	}
+
+	if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		p.VerticalSpd = 0.1
+	}
+
+	p.Model.Move(0, p.VerticalSpd, 0)
 
 }
 
@@ -210,6 +218,14 @@ func (g *Game) Init() {
 
 	t := time.Now()
 
+	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("solid")).ForEachModel(func(model *tetra3d.Model) bool {
+		model.Mesh().ForEachMaterial(func(mat *tetra3d.Material) bool {
+			mat.LightVolumeShadingMode = tetra3d.LightVolumeShadingModePerVertexWithNormal
+			return true
+		})
+		return true
+	})
+
 	// So we get the LightVolume, which is a blank slate at this point.
 	// Now to populate it with light data!
 	lightvolume := g.Scene.Root.Get("LightVolume").(*tetra3d.LightVolume)
@@ -220,62 +236,84 @@ func (g *Game) Init() {
 
 	solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByParentProps("solid"))
 
-	selectedCellsForAnimation := []*tetra3d.LightVolumeCell{}
+	lightvolume.LightVolumeResize(lightvolume.Dimensions(), 2, 2, 2)
 
-	lightvolume.LightVolumeForEachCell(func(position tetra3d.Vector3, cell *tetra3d.LightVolumeCell) {
+	// Let's define some tags; tags are just numbers indicating information in a cell.
+	const TAG_LIGHT_FROM_ABOVE = 0
+	const TAG_LIGHT_FROM_BELOW = 1
 
-		tetra3d.RayTest(tetra3d.RayTestOptions{
-			From:        position,
-			To:          position.SubY(8),
-			TestAgainst: g.Scene.Root.Children(true),
-			OnHit: func(hit tetra3d.RayHit, index, count int) bool {
+	// Loop through each cell and do something with it.
+	lightvolume.LightVolumeForEachCell(func(cell *tetra3d.LightVolumeCell) bool {
 
-				if hit.Triangle != nil {
-					mat := hit.Triangle.MeshPart.Material
-					if mat.Name() == "LightCube" {
-						cell.UseLights(g.Scene.Root.Get("Underlight").(*tetra3d.DirectionalLight))
+		// Check for collision; if the cell collides with a wall, then we know it's against a ceiling, wall, floor, etc.
+		tetra3d.CollisionTestSphereVec(cell.WorldPosition(), 0.5, tetra3d.CollisionTestSettings{
 
-						selectedCellsForAnimation = append(selectedCellsForAnimation, cell)
+			TestAgainst: solids,
+
+			OnCollision: func(col *tetra3d.Collision, index, count int) bool {
+
+				// Loop through each collided material and see what we get.
+				col.ForEachCollidedMaterial(func(mat *tetra3d.Material) bool {
+					if mat.Name() == "Sky" {
+						// Touching the sky, so we can make the cell bright.
+						cell.AddTag(TAG_LIGHT_FROM_ABOVE)
+						cell.SetColorMonochrome(2)
+					} else if mat.Name() == "LightFloor" {
+						// Touching the LightFloor material, so it deals with light coming up from below.
+						cell.AddTag(TAG_LIGHT_FROM_BELOW)
+					} else if mat.Name() == "LightCeiling" {
+						cell.AddTag(TAG_LIGHT_FROM_ABOVE)
+						cell.SetColorMonochrome(3)
+					} else {
+						cell.SetBlockedAll(true)
 					}
-				}
+					return true
+				})
 
 				return true
 			},
 		})
 
-		up := tetra3d.RayTest(tetra3d.RayTestOptions{
-			From:        position.AddY(0.5),
-			To:          position.AddY(1000),
-			TestAgainst: solids,
-			Doublesided: true,
-		})
-
-		// Perform a ray test - if we hit a triangle that has the "Sky" material, then we'll say that this point
-		// is exposed to the sky / sun, and so is bright.
-		if up != nil {
-
-			mat := up.Triangle.MeshPart.Material
-
-			if mat.Name() == "Sky" {
-				cell.SetColorMonochrome(1.25)
-			} else if mat.Name() == "LightCube" {
-				vertexColor, _ := up.VertexColor(0)
-				cell.SetColor(vertexColor.MultiplyScalarRGB(1.5))
-			} else {
-				cell.SetColorMonochrome(-1)
-			}
-
-		} else {
-			cell.SetBlocked(true)
-		}
+		return true
 
 	})
 
+	underLight := g.Scene.Get("Underlight").(tetra3d.ILight)
+
+	// Propagate the light downwards for the sky or ceiling
+	lightvolume.LightVolumeForEachCell(func(cell *tetra3d.LightVolumeCell) bool {
+
+		if cell.HasTag(TAG_LIGHT_FROM_ABOVE) {
+			cell.ForEachNeighborInDirection(tetra3d.LightVolumeDirectionDown, func(neighbor *tetra3d.LightVolumeCell) bool {
+				if neighbor.Blocked(tetra3d.LightVolumeDirectionNone) {
+					return false
+				}
+				neighbor.SetColor(cell.Color())
+				return true
+			})
+		}
+
+		// Light floor
+
+		if cell.HasTag(TAG_LIGHT_FROM_BELOW) {
+
+			// We can call `cell.UseLights()` to simply light an object with another actual Light if it's within a Cell.
+			cell.UseLights(underLight)
+			cell.ForEachNeighborInDirection(tetra3d.LightVolumeDirectionUp, func(neighbor *tetra3d.LightVolumeCell) bool {
+				if neighbor.Blocked(0) {
+					return false
+				}
+				neighbor.UseLights(underLight)
+				return true
+			})
+		}
+
+		return true
+	})
+
+	lightvolume.LightVolumeBlur(1, 1, 1)
+
 	fmt.Println("time to check light cells:", time.Since(t))
-
-	lightvolume.LightVolumeResize(lightvolume.Dimensions(), 2, 2, 2)
-
-	lightvolume.LightVolumeBlur(1, 2, 1)
 
 	g.LightVolume = lightvolume
 
@@ -331,7 +369,7 @@ Press 1 to toggle the light volume.`
 	}
 
 	if g.DebugDrawingLightVolume {
-		g.LightVolume.LightVolumeDebugDraw(screen, g.Camera.Camera)
+		g.LightVolume.LightVolumeDebugDraw(screen, g.Camera.Camera, g.Camera.Parent().WorldPosition(), 8)
 	}
 
 }

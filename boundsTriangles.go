@@ -8,7 +8,7 @@ import (
 type BoundingTriangles struct {
 	*Node
 	BoundingAABB *BoundingAABB
-	Broadphase   *Broadphase
+	broadphase   *Broadphase
 	Mesh         *Mesh
 }
 
@@ -38,7 +38,7 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float32) *
 		gridSize = math32.Ceil(maxDim / broadphaseGridSize)
 	}
 
-	bt.Broadphase = NewBroadphase(bt, gridSize, gridSize, gridSize)
+	bt.broadphase = NewBroadphase(bt, gridSize, gridSize, gridSize)
 
 	bt.owner = bt
 
@@ -49,7 +49,12 @@ func NewBoundingTriangles(name string, mesh *Mesh, broadphaseGridSize float32) *
 // To turn broadphase collision back on, simply call Broadphase.Resize(gridSize) with a gridSize value above 0.
 func (bt *BoundingTriangles) EnableBroadphase(enabled bool) {
 	// bt.Broadphase.Resize(0)
-	bt.Broadphase.enabled = enabled
+	bt.broadphase.enabled = enabled
+}
+
+// Returns the Broadphase object for broadphase collision detection.
+func (bt *BoundingTriangles) Broadphase() *Broadphase {
+	return bt.broadphase
 }
 
 // Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
@@ -78,7 +83,7 @@ func (bt *BoundingTriangles) Dimensions() Dimensions {
 // Clone returns a new BoundingTriangles Node with the same values set as the original.
 func (bt *BoundingTriangles) Clone() INode {
 	clone := NewBoundingTriangles(bt.name, bt.Mesh, 0) // Broadphase size is set to 0 so cloning doesn't create the broadphase triangle sets
-	clone.Broadphase = bt.Broadphase.Clone(clone)
+	clone.broadphase = bt.broadphase.Clone(clone)
 	clone.Node = bt.Node.clone(clone).(*Node)
 	clone.Node.onTransformUpdate = clone.UpdateTransform
 	if runCallbacks && clone.Callbacks().OnClone != nil {

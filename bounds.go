@@ -35,6 +35,14 @@ func (intersection *Intersection) SlideAgainstNormal(movementVec Vector3) Vector
 
 }
 
+func (intersection *Intersection) Distance() float32 {
+	return intersection.StartingPoint.DistanceTo(intersection.ContactPoint)
+}
+
+func (intersection *Intersection) DistanceSquared() float32 {
+	return intersection.StartingPoint.DistanceSquaredTo(intersection.ContactPoint)
+}
+
 // Collision represents the result of a collision test. A Collision test may result in multiple intersections, and
 // so an Collision holds each of these individual intersections in its Intersections slice.
 // The intersections are sorted in order of distance from the starting point of the intersection (the center of the
@@ -143,6 +151,20 @@ func (result *Collision) AverageContactPoint() Vector3 {
 	return contactPoint
 }
 
+var collidedMaterialSet = newOrderedSet[*Material]()
+
+func (result *Collision) ForEachCollidedMaterial(forEach func(mat *Material) bool) {
+	collidedMaterialSet.Clear()
+	for _, inter := range result.Intersections {
+		if inter.Triangle != nil && inter.Triangle.MeshPart.Material != nil {
+			collidedMaterialSet.Add(inter.Triangle.MeshPart.Material)
+		}
+	}
+	collidedMaterialSet.ForEach(func(element *Material) bool {
+		return forEach(element)
+	})
+}
+
 func (result *Collision) CollidedWithMaterialByName(matName string) bool {
 	for _, inter := range result.Intersections {
 		if inter.Triangle != nil && inter.Triangle.MeshPart.Material != nil && inter.Triangle.MeshPart.Material.name == matName {
@@ -161,10 +183,10 @@ func (result *Collision) CollidedWithMaterialByName(matName string) bool {
 	return false
 }
 
-func (result *Collision) CollidedWithMaterialByPropName(propName string) bool {
+func (result *Collision) CollidedWithMaterialPropName(matHasPropNamed string) bool {
 	for _, inter := range result.Intersections {
 		if inter.Triangle != nil && inter.Triangle.MeshPart.Material != nil {
-			if inter.Triangle.MeshPart.Material.properties.Has(propName) {
+			if inter.Triangle.MeshPart.Material.properties.Has(matHasPropNamed) {
 				return true
 			}
 		}
@@ -173,12 +195,19 @@ func (result *Collision) CollidedWithMaterialByPropName(propName string) bool {
 		if model, ok := parent.Parent().(*Model); ok {
 			for _, meshPart := range model.Mesh().MeshParts {
 				if meshPart.Material != nil {
-					if meshPart.Material.properties.Has(propName) {
+					if meshPart.Material.properties.Has(matHasPropNamed) {
 						return true
 					}
 				}
 			}
 		}
+	}
+	return false
+}
+
+func (result *Collision) CollidedWithParentPropName(parentHasPropNamed string) bool {
+	if result.Object.Parent() != nil {
+		return result.Object.Parent().Properties().Has(parentHasPropNamed)
 	}
 	return false
 }
@@ -302,19 +331,13 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 
 	result := newCollision(triangles)
 
-	triangles.Broadphase.ForEachTriangleFromBoundingObject(sphere, func(triID int) bool {
-
-		tri := triangles.Mesh.Triangles[triID]
+	triangles.broadphase.ForEachTriangleFromBoundingObject(sphere, func(tri *Triangle) bool {
 
 		if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportCollisions {
 			return true
 		}
 
-		// MaxSpan / 0.66 because if you have a triangle where the two vertices are very close to each other, they'll pull the triangle center
-		// towards them by twice as much as the third vertex (i.e. the center won't be in the center)
-		if spherePos.DistanceSquaredTo(tri.Center) > ((tri.MaxSpan+tri.MaxSpan)*0.66)+sphereRadiusSquared {
-			return true // Skip
-		}
+		// We no longer need to avoid checking triangles that are too far away because our Broadphase does that for us
 
 		v0 := triangles.Mesh.VertexPositions[tri.VertexIndexA]
 		v1 := triangles.Mesh.VertexPositions[tri.VertexIndexB]
@@ -448,9 +471,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 	// Pretty sure I can avoid transforming the vertices (and normal) by transforming the AABB axes by an inverse
 
-	triangles.Broadphase.ForEachTriangleFromBoundingObject(box, func(triID int) bool {
-
-		tri := triangles.Mesh.Triangles[triID]
+	triangles.broadphase.ForEachTriangleFromBoundingObject(box, func(tri *Triangle) bool {
 
 		if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportCollisions {
 			return true
@@ -800,9 +821,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	closestSub := Vector3{}
 
-	triangles.Broadphase.ForEachTriangleFromBoundingObject(capsule, func(triIndex int) bool {
-
-		tri := triangles.Mesh.Triangles[triIndex]
+	triangles.broadphase.ForEachTriangleFromBoundingObject(capsule, func(tri *Triangle) bool {
 
 		if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportCollisions {
 			return true

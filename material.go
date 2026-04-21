@@ -48,9 +48,10 @@ const (
 )
 
 const (
-	LightVolumeShadingModePerVertexWithNormal    = iota // Shade vertices per vertex position; include normals so vertices outside of a light volume cell reflect it if facing that cell.
-	LightVolumeShadingModePerVertexWithoutNormal        // Shade vertices per vertex position; don't include the vertices' normals
+	LightVolumeShadingModePerVertexWithoutNormal = iota // Shade vertices per vertex position; include normals so vertices outside of a light volume cell reflect it if facing that cell.
+	LightVolumeShadingModePerVertexWithNormal           // Shade vertices per vertex position; don't include the vertices' normals
 	LightVolumeShadingModePerObject                     // Shade vertices per the vertices' overall object's position
+	LightVolumeShadingModeOff                           // Don't shade vertices per the vertices of objects as they move around in light volumes
 )
 
 type Material struct {

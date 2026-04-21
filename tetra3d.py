@@ -76,6 +76,13 @@ depthModes = [
     ("UNBILLBOARDED", "Unbillboarded", "When set, all vertices render depth as though the mesh were not billboarded", 0, 1),
 ]
 
+lightVolumeShadingModes = [
+    ("PERVERTEXPOSITION", "Per-Vertex Position", "The default; objects are shaded in light volumes as they move through the space", 0, 0),
+    ("PERVERTEXPOSITION+NORMAL", "Per-Vertex Position + Normal", "Objects are shaded in light volumes per vertex position and normal, so they are lit according to the light cells that they face. Best used for walls that face in towards mesh faces", 0, 1),
+    ("PEROBJECTPOSITION", "Per-Object Position", "Objects are shaded in light volumes according to their world positions (so all vertices are shaded the same)", 0, 2),
+    ("IGNORE", "Ignore", "Objects are not shaded by light volumes", 0, 3),
+]
+
 billboardingYDirections = [
     ("GLOBAL_Y", "Global Y-Up", "Upwards is global, world-up", 0, 0),
     ("CAMERA_Y", "Camera Y-Up", "Upwards is relative to the camera's local Y-up direction heading", 0, 1),
@@ -1341,6 +1348,9 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row = box.row()
         row.label(text="Lighting Mode:")
         row.prop(context.material, "t3dMaterialLightingMode__", text="")
+        row = box.row()
+        row.label(text="LightVolume Shading Mode:")
+        row.prop(context.material, "t3dLightVolumeShadingMode__", text="")
 
 
         if context.object.active_material != None:
@@ -2563,6 +2573,7 @@ def register():
     bpy.types.Material.t3dVisible__ = bpy.props.BoolProperty(name="Visible", description="Whether this material is visible", default=True)
     bpy.types.Material.t3dSolidToCollisions__ = bpy.props.BoolProperty(name="Report Collisions", description="Whether this material contributes to collision checks for BoundingTriangles meshes", default=True)
     bpy.types.Material.t3dSolidToRays__ = bpy.props.BoolProperty(name="Report Raycasts", description="Whether this material contributes to ray checks for BoundingTriangles meshes", default=True)
+    bpy.types.Material.t3dLightVolumeShadingMode__ = bpy.props.EnumProperty(items=lightVolumeShadingModes, name="Depth Rendering Modes", description="How depth should be rendered for meshes that use this materials", default="PERVERTEXPOSITION")
 
     bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode")
     bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5)
@@ -2710,6 +2721,7 @@ def unregister():
     del bpy.types.Material.t3dVisible__
     del bpy.types.Material.t3dSolidToCollisions__
     del bpy.types.Material.t3dSolidToRays__
+    del bpy.types.Material.t3dLightVolumeShadingMode__
 
     del bpy.types.World.t3dClearColor__
     del bpy.types.World.t3dFogColor__

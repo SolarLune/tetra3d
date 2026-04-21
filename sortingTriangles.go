@@ -25,7 +25,7 @@ type sortingTriangleBucket struct {
 
 func newSortingTriangleBucket() *sortingTriangleBucket {
 	bucket := &sortingTriangleBucket{}
-	bucket.unsetTris = make([]sortingTriangle, MaxTriangleCount)
+	bucket.unsetTris = make([]sortingTriangle, startingDisplayListSize)
 	return bucket
 }
 
@@ -66,9 +66,21 @@ func (s *sortingTriangleBucket) Sort(minRange, maxRange float32) {
 func (s *sortingTriangleBucket) Resize(binCount int) {
 	s.bins = make([]sortingTriangleBin, binCount)
 	for i := range s.bins {
-		s.bins[i].triangles = make([]sortingTriangle, MaxTriangleCount)
+		s.bins[i].triangles = make([]sortingTriangle, startingDisplayListSize)
 	}
 	s.Clear()
+}
+
+func (s *sortingTriangleBucket) resizeTriangleCount(triCount int) {
+	for range triCount - len(s.unsetTris) {
+		s.unsetTris = append(s.unsetTris, sortingTriangle{})
+	}
+
+	for _, bin := range s.bins {
+		for range triCount - len(bin.triangles) {
+			bin.triangles = append(bin.triangles, sortingTriangle{})
+		}
+	}
 }
 
 func (s *sortingTriangleBucket) Clear() {

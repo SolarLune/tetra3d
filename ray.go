@@ -296,9 +296,7 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 		workingAABB.SetLocalScale(dist, dist, dist)
 		workingAABB.Transform()
 
-		test.Broadphase.ForEachTriangleFromBoundingObject(workingAABB, func(triIndex int) bool {
-
-			tri := test.Mesh.Triangles[triIndex]
+		test.broadphase.ForEachTriangleFromBoundingObject(workingAABB, func(tri *Triangle) bool {
 
 			// Skip if it's not collideable
 			if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportRays {

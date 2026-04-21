@@ -64,7 +64,7 @@ func (box *BoundingAABB) updateSize() {
 		{-1, -1, -1},
 	}
 
-	dimensions := NewEmptyDimensions()
+	dimensions := newEmptyDimensions()
 
 	for _, c := range corners {
 

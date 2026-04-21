@@ -15,11 +15,21 @@ type Dimensions struct {
 	Min, Max Vector3
 }
 
-func NewEmptyDimensions() Dimensions {
+func newEmptyDimensions() Dimensions {
 	return Dimensions{
 		Vector3{float32(math.MaxFloat32), float32(math.MaxFloat32), float32(math.MaxFloat32)},
 		Vector3{-float32(math.MaxFloat32), -float32(math.MaxFloat32), -float32(math.MaxFloat32)},
 	}
+}
+
+// Returns a new Dimensions object, canonized in case it's malformed.
+func NewDimensions(min, max Vector3) Dimensions {
+	return Dimensions{min, max}.Canon()
+}
+
+// Returns a new Dimensions object, canonized in case it's malformed.
+func NewDimensionsXYZ(minX, minY, minZ, maxX, maxY, maxZ float32) Dimensions {
+	return Dimensions{NewVector3(minX, minY, minZ), NewVector3(maxX, maxY, maxZ)}.Canon()
 }
 
 // MaxDimension returns the maximum value from all of the axes in the Dimensions. For example, if the Dimensions have a min of [-1, -2, -2],
@@ -99,6 +109,7 @@ func (dim Dimensions) Projection(axis int) Projection {
 	}
 }
 
+// Returns the Dimensions set properly adjusted in case it's malformed (min is greater than max on any axis)
 func (dim Dimensions) Canon() Dimensions {
 
 	minX := dim.Min.X
@@ -146,7 +157,7 @@ func NewDimensionsFromPoints(points ...Vector3) Dimensions {
 		panic("error: no points passed to NewDimensionsFromPoints()")
 	}
 
-	dim := NewEmptyDimensions()
+	dim := newEmptyDimensions()
 
 	for _, point := range points {
 
@@ -523,6 +534,7 @@ func (mesh *Mesh) TriangleByIndex(index int) *Triangle {
 }
 
 // Materials returns a slice of the materials present in the Mesh's MeshParts.
+// If a material is used multiple times in the Mesh's mesh parts, it will be present multiple times.
 func (mesh *Mesh) Materials() []*Material {
 	mats := []*Material{}
 	for _, mp := range mesh.MeshParts {
@@ -531,6 +543,18 @@ func (mesh *Mesh) Materials() []*Material {
 		}
 	}
 	return mats
+}
+
+// Loops through each material in the Mesh, per mesh part.
+// If a material is used multiple times in the Mesh's mesh parts, it will be present multiple times.
+func (mesh *Mesh) ForEachMaterial(forEach func(mat *Material) bool) {
+	for _, mp := range mesh.MeshParts {
+		if mp.Material != nil {
+			if !forEach(mp.Material) {
+				return
+			}
+		}
+	}
 }
 
 // AddMeshPart allows you to add a new MeshPart to the Mesh with the given Material (with a nil Material reference also being valid).
@@ -599,7 +623,7 @@ func (mesh *Mesh) Library() *Library {
 // UpdateBounds updates the mesh's dimensions; call this after manually changing vertex positions.
 func (mesh *Mesh) UpdateBounds() {
 
-	mesh.Dimensions = NewEmptyDimensions()
+	mesh.Dimensions = newEmptyDimensions()
 
 	for _, position := range mesh.VertexPositions {
 
@@ -1530,31 +1554,33 @@ func NewCylinderMesh(sideCount int, radius, height float32, createCaps bool) *Me
 
 // A Triangle represents the smallest renderable object in Tetra3D. A Triangle is mainly used to help identify triads of vertices.
 type Triangle struct {
-	id            uint32  // The ID of the triangle
-	VertexIndexA  int     // Vertex indices that compose the triangle
-	VertexIndexB  int     // Vertex indices that compose the triangle
-	VertexIndexC  int     // Vertex indices that compose the triangle
-	MaxSpan       float32 // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
-	MaxEdgeLength float32
-	Center        Vector3   // The untransformed center of the Triangle.
-	Normal        Vector3   // The physical normal of the triangle (i.e. the direction the triangle is facing). This is different from the visual normals of a triangle's vertices (i.e. a selection of vertices can have inverted normals to be see through, for example).
-	MeshPart      *MeshPart // The specific MeshPart this Triangle belongs to.
+	id           uint32    // The ID of the triangle
+	VertexIndexA int       // Vertex indices that compose the triangle
+	VertexIndexB int       // Vertex indices that compose the triangle
+	VertexIndexC int       // Vertex indices that compose the triangle
+	MaxSpan      float32   // The maximum span from corner to corner of the triangle's dimensions; this is used in intersection testing.
+	Center       Vector3   // The untransformed center of the Triangle.
+	Normal       Vector3   // The physical normal of the triangle (i.e. the direction the triangle is facing). This is different from the visual normals of a triangle's vertices (i.e. a selection of vertices can have inverted normals to be see through, for example).
+	MeshPart     *MeshPart // The specific MeshPart this Triangle belongs to.
 
 	visible           bool
 	wouldRender       bool
 	subdivisionParent *Triangle
 	subdivisionLevels [][]*Triangle
+
+	broadphaseTriCheck []bool // A slice of bools indicating if the tri has already been checked by a broadphase TrianglesInDimensionsSet function call. See that function for more information on what this is and why it exists
 }
 
 // NewTriangle creates a new Triangle, and requires a reference to its owning MeshPart.
 func NewTriangle(meshPart *MeshPart, indices ...int) *Triangle {
 	tri := &Triangle{
-		MeshPart:          meshPart,
-		VertexIndexA:      indices[0],
-		VertexIndexB:      indices[1],
-		VertexIndexC:      indices[2],
-		visible:           true,
-		subdivisionLevels: [][]*Triangle{},
+		MeshPart:           meshPart,
+		VertexIndexA:       indices[0],
+		VertexIndexB:       indices[1],
+		VertexIndexC:       indices[2],
+		visible:            true,
+		subdivisionLevels:  [][]*Triangle{},
+		broadphaseTriCheck: make([]bool, 4),
 	}
 	return tri
 }
@@ -1568,7 +1594,7 @@ func (tri *Triangle) Clone() *Triangle {
 	newTri.Normal = tri.Normal
 	newTri.MeshPart = tri.MeshPart
 	for level := range tri.subdivisionLevels {
-		newTri.subdivisionLevels[level] = append([]*Triangle{}, tri.subdivisionLevels[level]...)
+		newTri.subdivisionLevels[level] = append(make([]*Triangle, 0, len(tri.subdivisionLevels[level])), tri.subdivisionLevels[level]...)
 	}
 	newTri.visible = tri.visible
 	return newTri
@@ -1846,7 +1872,6 @@ func (tri *Triangle) RecalculateCenter() {
 	}
 
 	tri.MaxSpan = dim.MaxSpan()
-	tri.MaxEdgeLength = dim.MaxDimension()
 
 }
 

@@ -562,6 +562,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		}
 
+		// TODO: Review this and do billboarding right (somehow?)
 		// This is the slowest part, for sure, but it's necessary to have a billboarded object still be accurate
 		p, s, r := base.Decompose()
 		base = r.Mult(NewMatrix4Scale(s.X, s.Y, s.Z)).Mult(lookat)
@@ -646,6 +647,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		for vi := range 3 {
 			vertexIndex := tri.VertexIndex(vi)
+
+			if vertexIndex > len(globalVertexTransforms) {
+				growDisplayLists()
+			}
 
 			if modelSkinned {
 

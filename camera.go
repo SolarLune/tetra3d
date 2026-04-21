@@ -2569,7 +2569,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 				if options.RenderBroadphases {
 
-					for _, b := range bounds.Broadphase.allAABBPositions() {
+					for _, b := range bounds.broadphase.allAABBPositions() {
 						camera.DrawDebugBoundsColored(screen, b, DrawDebugBoundsColoredSettings{
 							RenderAABBs: true,
 							AABBColor:   options.BroadphaseColor,

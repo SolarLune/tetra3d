@@ -153,9 +153,10 @@ func (s Set[E]) Remove(element E) {
 
 // Clear clears the set.
 func (s Set[E]) Clear() {
-	for v := range s {
-		delete(s, v)
-	}
+	clear(s)
+	// for v := range s {
+	// 	delete(s, v)
+	// }
 }
 
 // ForEach runs the provided function for each element in the set.
@@ -222,9 +223,11 @@ func (s *OrderedSet[E]) Clear() {
 }
 
 // ForEach runs the provided function for each element in the OrderedSet.
-func (s OrderedSet[E]) ForEach(f func(element E)) {
+func (s OrderedSet[E]) ForEach(f func(element E) bool) {
 	for _, element := range s {
-		f(element)
+		if !f(element) {
+			return
+		}
 	}
 
 }

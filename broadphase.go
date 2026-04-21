@@ -3,13 +3,12 @@ package tetra3d
 // Broadphase is a utility object specifically created to assist with quickly ruling out triangles
 // for collision detection or mesh rendering. This works largely automatically; you should generally
 // not have to tweak this too much.
-// The general idea is that the broadphase is composed of AABBs in a grid layout, completely covering
+// The general idea is that the broadphase is composed of rectangles in a grid layout, completely covering
 // the owning mesh. When you, say, check for a collision against a BoundingTriangles object, it first
-// checks to see if the colliding object is within the BoundingTriangles' overall AABB bounding box.
-// If so, it proceeds to the broadphase check, where it sees which set(s) of triangles the colliding
-// object could be colliding with, and then returns that set for finer examination.
+// checks the Broadphase object to determine which set(s) of triangles the colliding
+// object could be colliding with for finer examination.
 type Broadphase struct {
-	TriSets [][]int // The sets of triangles
+	triSets [][]int // The sets of triangles
 
 	boundingTriangles *BoundingTriangles
 	dimensions        Dimensions
@@ -52,15 +51,15 @@ func (b *Broadphase) Clone(newBoundingTriangles *BoundingTriangles) *Broadphase 
 	// Create a new broadphase with a cell size of 0 so it specifically does NOT resize again
 	newBroadphase := NewBroadphase(newBoundingTriangles, 0, 0, 0)
 
-	ts := make([][]int, 0, len(b.TriSets))
+	ts := make([][]int, 0, len(b.triSets))
 
-	for _, set := range b.TriSets {
+	for _, set := range b.triSets {
 		newSet := make([]int, 0, len(set))
 		newSet = append(newSet, set...)
 		ts = append(ts, set)
 	}
 
-	newBroadphase.TriSets = ts
+	newBroadphase.triSets = ts
 
 	newBroadphase.enabled = b.enabled
 	newBroadphase.dimensions = b.dimensions
@@ -121,7 +120,7 @@ func (b *Broadphase) Resize(cellSizeX, cellSizeY, cellSizeZ float32) {
 	dimDiffY := b.dimensions.Height() / cellSizeY
 	dimDiffX := b.dimensions.Width() / cellSizeX
 
-	b.TriSets = make([][]int, 0, int(dimDiffX)*int(dimDiffY)*int(dimDiffZ))
+	b.triSets = make([][]int, 0, int(dimDiffX)*int(dimDiffY)*int(dimDiffZ))
 
 	for z := dimMin.Z; z < dimMax.Z; z += cellSizeZ {
 		cellCountY = 0
@@ -152,7 +151,7 @@ func (b *Broadphase) Resize(cellSizeX, cellSizeY, cellSizeZ float32) {
 
 				}
 
-				b.TriSets = append(b.TriSets, set)
+				b.triSets = append(b.triSets, set)
 				cellCountX++
 			}
 
@@ -202,28 +201,54 @@ func (b *Broadphase) Mesh() *Mesh {
 	return b.boundingTriangles.Mesh
 }
 
-var broadphaseTestingTriIndices = Set[int]{}
+type BroadphaseTestFunction func(tri *Triangle) bool
 
-// TrianglesFromBoundingObject returns a set of triangle IDs, based on where the BoundingObject is
-// in relation to the Broadphase owning BoundingTriangles instance. The returned set contains each triangle only
-// once, of course.
-func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingObject, forEach func(triID int) bool) {
+var broadphaseForEachTriangleDepth = -1
 
-	if !b.enabled || len(b.TriSets) == 0 {
-		for t := range b.boundingTriangles.Mesh.Triangles {
-			if !forEach(t) {
-				return
-			}
-		}
+// Performs a function on each triangle within the given Dimensions object.
+// The function returns a boolean indicating if any triangle was found in the given bounds.
+func (b *Broadphase) ForEachTriangleInDimensions(dim Dimensions, forEach BroadphaseTestFunction) bool {
+
+	// OK, so the concept here is as follows:
+	//
+	// Overall, this is a fairly straightforward function to get the triangles from a given set of triangle sets that overlap with
+	// a given Dimensions object. However, we also need to handle duplicate entries, since triangles can exist in mulitple
+	// sets at once (e.g. in a 3x3 broadphase grid, a given triangle may span any number of cells).
+	//
+	// Previously, I just used a set to ensure the triangle is only added once, and then looped through the set at the end.
+	// However, traversing the map was slow. So for an alternative, I'll just set booleans on the Triangles themselves.
+	//
+	// Triangles can belong to multiple tri sets in a Broadphase grid. We want to avoid checking them more than once,
+	// both because it's wasteful if we already checked them once before, and because that would create duplicate
+	// results in collision and raycast calls.
+	//
+	// To get around this, we put a slice of booleans on Triangles that indicate if they've been checked in a broadphase
+	// ForEachTriangleInDimensionsSet call.
+	// At the beginning of the function call, we increment the depth and set the boolean indicating that the triangle has
+	// been checked to false.
+
+	if dim.Size().IsZero() {
+		return false
 	}
 
-	broadphaseTestingTriIndices.Clear()
+	tris := b.boundingTriangles.Mesh.Triangles
+
+	if !b.enabled || len(b.triSets) == 0 {
+		foundResult := false
+		for _, t := range tris {
+			foundResult = true
+			if forEach != nil && !forEach(t) {
+				break
+			}
+		}
+		return foundResult
+	}
+
+	broadphaseForEachTriangleDepth++
 
 	margin := float32(max(b.cellSizeX, b.cellSizeY, b.cellSizeZ))
 
 	invertedTransform := b.boundingTriangles.Transform().Inverted()
-
-	dim := boundingObject.Dimensions()
 
 	center := dim.Center()
 
@@ -236,6 +261,10 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 	dim.Min = invertedTransform.MultVec(dim.Min)
 
 	dim = dim.Canon()
+
+	foundOne := false
+
+earlyExit:
 
 	for z := 0; z < b.cellCountZ; z++ {
 		for y := 0; y < b.cellCountY; y++ {
@@ -262,9 +291,20 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 
 				triSetIndex := x + (y * b.cellCountX) + (z * b.cellCountY * b.cellCountX)
 
-				if triSetIndex >= 0 && triSetIndex < len(b.TriSets) {
-					for _, t := range b.TriSets[triSetIndex] {
-						broadphaseTestingTriIndices.Add(t)
+				if triSetIndex >= 0 && triSetIndex < len(b.triSets) {
+					if len(b.triSets[triSetIndex]) > 0 {
+						foundOne = true
+					}
+					if forEach != nil {
+						for _, t := range b.triSets[triSetIndex] {
+							tri := tris[t]
+							if !tri.broadphaseTriCheck[broadphaseForEachTriangleDepth] {
+								tris[t].broadphaseTriCheck[broadphaseForEachTriangleDepth] = true
+								if !forEach(tris[t]) {
+									break earlyExit
+								}
+							}
+						}
 					}
 				}
 
@@ -274,10 +314,20 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 
 	}
 
-	broadphaseTestingTriIndices.ForEach(func(element int) bool {
-		return forEach(element)
-	})
+	for _, t := range tris {
+		t.broadphaseTriCheck[broadphaseForEachTriangleDepth] = false
+	}
 
+	broadphaseForEachTriangleDepth--
+
+	return foundOne
+
+}
+
+// Performs a function on each triangle within the bounds of the given BoundingObject.
+// The function returns a boolean indicating if any triangle was found in the given bounds.
+func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingObject, forEach func(tri *Triangle) bool) bool {
+	return b.ForEachTriangleInDimensions(boundingObject.Dimensions(), forEach)
 }
 
 // func (b *Broadphase) ForEachTriangleInRange(pos Vector3, checkRadius float32, forEach func(triID int) bool) {
@@ -325,6 +375,7 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 // }
 
 func (b *Broadphase) allAABBPositions() []*BoundingAABB {
+	// TODO: Remove this, it's not necessary.
 
 	aabbs := []*BoundingAABB{}
 

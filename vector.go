@@ -134,6 +134,14 @@ func (vec Vector3) SubZ(value float32) Vector3 {
 	return vec
 }
 
+// Returns a copy of the calling vector, with the value provided subtracted from the given components.
+func (vec Vector3) SubXYZ(x, y, z float32) Vector3 {
+	vec.X -= x
+	vec.Y -= y
+	vec.Z -= z
+	return vec
+}
+
 // Expand expands the Vector3 by the margin specified, in absolute units, if each component is over the minimum argument.
 // To illustrate: Given a Vector3 of {1, 0.1, -0.3}, Vector.Expand(0.5, 0.2) would give you a Vector3 of {1.5, 0.1, -0.8}.
 // This function returns a copy of the Vector3 with the result.
@@ -383,6 +391,13 @@ func (vec Vector3) SetXYZ(x, y, z float32) Vector3 {
 	vec.Y = y
 	vec.Z = z
 	return vec
+}
+
+// Sets the components of the Vector3 to zero.
+func (vec *Vector3) SetToZero() {
+	vec.X = 0
+	vec.Y = 0
+	vec.Z = 0
 }
 
 // Set sets the values in the Vector3 to the values in the other Vector3.
@@ -687,6 +702,14 @@ func (ip *ModVector3) AddY(x float32) *ModVector3 {
 func (ip *ModVector3) AddZ(x float32) *ModVector3 {
 	ip.Z += x
 	return ip
+}
+
+// Returns a copy of the calling vector, with the values provided added.
+func (vec Vector3) AddXYZ(x, y, z float32) Vector3 {
+	vec.X += x
+	vec.Y += y
+	vec.Z += z
+	return vec
 }
 
 // Sub subtracts the other Vector3 from the calling ModVector.
@@ -1300,6 +1323,12 @@ func (vec Vector2) SetXY(x, y float32) Vector2 {
 	vec.X = x
 	vec.Y = y
 	return vec
+}
+
+// Sets the components of the Vector2 to zero.
+func (vec *Vector2) SetToZero() {
+	vec.X = 0
+	vec.Y = 0
 }
 
 // Set sets the values in the Vector3 to the values in the other Vector2.
