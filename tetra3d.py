@@ -22,7 +22,7 @@ bl_info = {
 }
 
 objectTypes = [
-    ("MESH", "Mesh", "A standard, visible mesh object.", 0, 0),
+    ("MODEL", "Model", "A standard 3D model.", 0, 0),
     ("GRID", "Grid", "A grid object; not visualized or 'physically present'. The vertices in Blender become grid points in Tetra3D; the edges become their connections.", 0, 1),
     ("LIGHTVOLUME", "LightVolume", "An AABB light volume object; not 'physically present'.", 0, 2),
 ]
@@ -35,7 +35,7 @@ sectorTypes = [
 
 def listSectorTypes(self, context):
 
-    if context.object.type == "MESH" or (context.object.instance_type == "COLLECTION" and context.object.instance_collection is not None):
+    if context.object.type == "MODEL" or (context.object.instance_type == "COLLECTION" and context.object.instance_collection is not None):
         return sectorTypes
     return sectorTypes[::2]
 
@@ -153,6 +153,17 @@ def filepathGet(self):
     return ""
 
 
+def updateValueReference(self, context):
+    if self.valueReference and len(self.valueReference.users_scene) > 0:
+        self.valueReferenceScene = self.valueReference.users_scene[0]
+    return
+
+def updateValueReferenceScene(self, context):
+    if self.valueReferenceScene and self.valueReference and not self.valueReferenceScene in self.valueReference.users_scene:
+        self.valueReference = None
+    if not self.valueReferenceScene:
+        self.valueReference = None
+
 class t3dGamePropertyItem__(bpy.types.PropertyGroup):
 
     name: bpy.props.StringProperty(name="Name", default="New Property")
@@ -162,8 +173,8 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueInt: bpy.props.IntProperty(name = "", description="The integer value of the property")
     valueFloat: bpy.props.FloatProperty(name = "", description="The float value of the property")
     valueString: bpy.props.StringProperty(name = "", description="The string value of the property")
-    valueReference: bpy.props.PointerProperty(name = "", type=bpy.types.Object, description="The object to reference")
-    valueReferenceScene: bpy.props.PointerProperty(name = "", type=bpy.types.Scene, description="The scene to search for an object to reference; if this is blank, all objects from all scenes will appear in the object search field")
+    valueReference: bpy.props.PointerProperty(name = "", type=bpy.types.Object, description="The object to reference", update=updateValueReference)
+    valueReferenceScene: bpy.props.PointerProperty(name = "", type=bpy.types.Scene, description="The scene to search for an object to reference; if this is blank, all objects from all scenes will appear in the object search field", update=updateValueReferenceScene)
     valueColor: bpy.props.FloatVectorProperty(name = "", description="The color value of the property", subtype="COLOR", default=[1, 1, 1, 1], size=4, min=0, max=1)
     valueVector3D: bpy.props.FloatVectorProperty(name = "", description="The 3D vector value of the property", subtype="COORDINATES")
     valueVector2D: bpy.props.FloatVectorProperty(name = "", description="The 2D vector value of the property", size=2)
@@ -334,7 +345,7 @@ class OBJECT_OT_tetra3dSelectWithSameProperty(bpy.types.Operator):
 
     bl_idname = "object.t3dselectwithsameproperty"
     bl_label = "" ## We don't want the label to show
-    bl_description= "Selects objeccts with the same property as the specified object. The properties must share names, types, and values"
+    bl_description= "Selects objects with the same property as the specified object. The properties must share names, types, and values"
     bl_options = {'REGISTER', 'UNDO'}
 
     index : bpy.props.IntProperty()
@@ -992,13 +1003,19 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             row.operator("object.tetra3dcopynodepath", text="Copy Node Path to Clipboard", icon="COPYDOWN")
             
             row = baseBox.row()
-            row.enabled = context.object.t3dObjectType__ == 'MESH' or context.object.t3dObjectType__ == 'LIGHTVOLUME' or context.object.type == "LIGHT"
+            row.enabled = context.object.t3dObjectType__ == 'MODEL' or context.object.t3dObjectType__ == 'LIGHTVOLUME' or context.object.type == "LIGHT"
             row.prop(context.object, "t3dVisible__")
 
+            colorRow = baseBox.row()
+            colorRow.label(text="Model Color:")
+            colorRow.prop(context.object, "t3dObjectColor__")
+            colorRow.enabled = context.object.t3dObjectType__ == 'MODEL'
+
             if context.object.type == "MESH":
+
                 autobatchBox = baseBox.box()
                 row = autobatchBox.row()
-                row.enabled = context.object.t3dObjectType__ == 'MESH'
+                row.enabled = context.object.t3dObjectType__ == 'MODEL'
                 row.prop(context.object, "t3dAutoBatch__")
                 row = autobatchBox.row()
                 row.label(text="Object Type: ")
@@ -1012,21 +1029,21 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
 
                 row = lightvolumeBox.row()
                 row.prop(context.object, "t3dLightVolumeCellSize__", text="")
-            elif context.object.t3dObjectType__ == "MESH":
+            elif context.object.t3dObjectType__ == "MODEL":
                 sectorBox = baseBox.box()
                 row = sectorBox.row()
                 row.label(text="Sector Type:")
                 
                 if isCollection:
                     row = sectorBox.row()
-                    row.enabled = context.object.t3dObjectType__ == 'MESH'
+                    row.enabled = context.object.t3dObjectType__ == 'MODEL'
                     row.prop(context.object, "t3dSectorTypeOverride__", expand=True)
 
                 row = sectorBox.row()
                 if isCollection:
                     row.enabled = context.object.t3dSectorTypeOverride__
                 else:
-                    row.enabled = context.object.t3dObjectType__ == 'MESH'
+                    row.enabled = context.object.t3dObjectType__ == 'MODEL'
                 row.prop(context.object, "t3dSectorType__", expand=True)
 
             boundsBox = baseBox.box()
@@ -1700,19 +1717,6 @@ def export():
                                 obj["t3dGridConnections__"] = gridConnections
                                 obj["t3dGridEntries__"] = gridEntries
 
-                            # if obj.data.t3dAutoSubdivide__:
-
-                            #     if not obj.data.name in autoSubdivides:
-
-                            #         autoSubdivides[obj.data.name] = {
-                            #             "usedBy": [],
-                            #             "original": obj.data,
-                            #             "edit": obj.data.copy(),
-                            #             "size": obj.data.t3dAutoSubdivideSize__,
-                            #         }
-
-                            #     autoSubdivides[obj.data.name]["usedBy"].append(obj)
-
                     # Record relevant information for curves
                     if obj.type == "CURVE":
                         points = []
@@ -1732,52 +1736,6 @@ def export():
                         # We don't want to export a linked collection directly, as that 1) will duplicate mesh data from externally linked blend files to put into the GLTF file, and
                         # 2) will apply the collection's offset to the object's position for some reason (which is annoying because we use OpenGL's axes for positioning compared to Blender)
                         obj.instance_collection = None
-
-            # for meshName in autoSubdivides:
-        
-            #     mesh = autoSubdivides[meshName]
-
-            #     for o in mesh["usedBy"]:
-            #         o.data = mesh["edit"]
-
-            #     bm = bmesh.new()
-
-            #     bm.from_mesh(mesh["edit"])
-            #     bm.select_mode = {"EDGE", "VERT", "FACE"}
-                
-            #     # Cribbed from StackOverflow here: https://blender.stackexchange.com/questions/196367/how-to-use-loopcut-slide-operation-without-any-ui
-            #     # Thanks a lot for your help!
-            #     def edge_loops(edge):
-            #         tagged = []
-            #         def walk(edge):
-            #             yield edge
-            #             edge.tag = True
-            #             tagged.append(edge)
-            #             for l in edge.link_loops:
-            #                 loop = l.link_loop_radial_next.link_loop_next.link_loop_next
-            #                 if not (len(loop.face.verts) != 4 or loop.edge.tag):
-            #                     yield from walk(loop.edge)
-            #         res = list(walk(edge))
-            #         for e in tagged:
-            #             e.tag = False
-            #         return res
-
-            #     for x in range(10):
-
-            #         subdivision_happened = False
-
-            #         for edge in bm.edges:
-
-            #             if edge.calc_length() > mesh["size"]:
-            #                 bmesh.ops.subdivide_edges(bm, edges=edge_loops(edge), cuts=1, smooth=0, use_grid_fill=True)
-            #                 subdivision_happened = True
-
-            #         if not subdivision_happened:
-            #             break
-
-            #     bm.to_mesh(mesh["edit"])
-
-            #     bm.free()
 
     # Gather marker information and put them into the actions.
     for action in bpy.data.actions:
@@ -1988,7 +1946,8 @@ class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
 
         old_selected = bpy.context.selected_objects.copy()
 
-        bpy.ops.object.select_all(action='DESELECT')
+        # Record what we were doing before applying the Auto UV
+        lastMode = bpy.context.mode
 
         for scene in bpy.data.scenes:
 
@@ -1996,63 +1955,64 @@ class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
 
                 for layer in scene.view_layers:
 
+                    ogSelected = layer.objects.active
+
                     if layer != bpy.context.view_layer:
                         continue
 
                     for obj in layer.objects:
 
-                        obj.select_set(True)
-
                         # If there's no polygons, we'll just return early
                         if obj.type != "MESH" or len(obj.data.polygons) == 0:
                             continue
-                        
-                        ogMode = obj.mode
 
-                        prevActiveMaterialIndex = obj.active_material_index
+                        obj.select_set(True)
 
-                        # We need to be in Object mode to get vertex / edge / polygon selection data
-                        bpy.ops.object.mode_set(mode='OBJECT')
+                        context.view_layer.objects.active = obj
+
+                        ogMatIndex = obj.active_material_index
+
+                        bpy.ops.object.mode_set(mode='OBJECT') # Switch back to Object mode so we can see and manipulate UV values
                         selectedVertices = [v.index for v in obj.data.vertices if v.select]
                         selectedEdges = [e.index for e in obj.data.edges if e.select]
                         selectedPolygons = [p.index for p in obj.data.polygons if p.select]
 
                         for matIndex, mat in enumerate(obj.data.materials):
 
-                            # mat could be None if it's just the slot and no Material is selected
                             if mat and mat.t3dAutoUV__:
 
                                 bpy.ops.object.mode_set(mode='EDIT')
-
+                                
                                 bpy.ops.mesh.select_all(action='DESELECT')
 
                                 obj.active_material_index = matIndex
                                 bpy.ops.object.material_slot_select()
 
-                                # TODO: Replace cube_project with maybe manually stretching the UV values to be able to handle walls that have fixed widths or heights better (e.g. walls with trim)?
                                 bpy.ops.uv.cube_project(cube_size=mat.t3dAutoUVUnitSize__)
+
+                                obj.update_from_editmode()
 
                                 bpy.ops.mesh.select_all(action='DESELECT')
 
-                                # Return to object mode to alter the UV map
-                                bpy.ops.object.mode_set(mode='OBJECT')
+                                bpy.ops.object.mode_set(mode='OBJECT') # Switch back to Object mode so we can see and manipulate UV values
 
                                 uvMap = obj.data.uv_layers.active.uv
+
+                                rot = mathutils.Matrix.Rotation(math.radians(mat.t3dAutoUVRotation__), 2)
 
                                 for poly in obj.data.polygons:
                                     if poly.material_index == matIndex:
                                         for loopIndex in poly.loop_indices:
+
                                             vec = uvMap[loopIndex].vector
                                             vec.x -= 0.5
                                             vec.y -= 0.5
-                                            vec.rotate(mathutils.Matrix.Rotation(math.radians(mat.t3dAutoUVRotation__), 2))
+                                            vec.rotate(rot)
                                             vec.x += 0.5
                                             vec.y += 0.5
 
                                             vec.x -= mat.t3dAutoUVOffset__[0]
                                             vec.y -= mat.t3dAutoUVOffset__[1]
-
-                        bpy.ops.object.mode_set(mode='OBJECT')
 
                         # Restore selection
                         for v in obj.data.vertices:
@@ -2070,14 +2030,35 @@ class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
                             if p.index in selectedPolygons:
                                 p.select = True
 
-                        # obj.active_material_index = prevActiveMaterialIndex
+                        obj.active_material_index = ogMatIndex
 
-                        bpy.ops.object.mode_set(mode=ogMode)
+                        obj.select_set(False)
+
+                    layer.objects.active = ogSelected
 
         bpy.ops.object.select_all(action='DESELECT')
 
         for obj in old_selected:
             obj.select_set(True)
+
+        # Try to go back to the previous mode Blender was in prior to adjusting the UV values for the meshes; note that
+        # lastMode (bpy.context.mode) uses different string enums than bpy.ops.object.mode_set(), which is why we have to
+        # check it like this.
+        if "EDIT" in lastMode:
+            bpy.ops.object.mode_set(mode="EDIT")
+        elif lastMode == "PAINT_WEIGHT":
+            bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
+        elif lastMode == "PAINT_VERTEX":
+            bpy.ops.object.mode_set(mode="VERTEX_PAINT")
+        elif lastMode == "PAINT_TEXTURE":
+            bpy.ops.object.mode_set(mode="TEXTURE_PAINT")
+        elif lastMode == "POSE":
+            bpy.ops.object.mode_set(mode="POSE")
+        elif lastMode == "SCULPT":
+            bpy.ops.object.mode_set(mode="SCULPT")
+        elif lastMode == "OBJECT":
+            bpy.ops.object.mode_set(mode="OBJECT")
+
 
         return {'FINISHED'}
 
@@ -2103,6 +2084,7 @@ def onModeChange():
 
 def autoUVChange(self, context):
     global inAutoUVUpdate
+
 
     inAutoUVUpdate = True
     obj = context.object
@@ -2297,7 +2279,8 @@ objectProps = {
     "t3dSphereCustomEnabled__" : bpy.props.BoolProperty(name="Custom Sphere Size", description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)", default=False),
     "t3dSphereCustomRadius__" : bpy.props.FloatProperty(name="Radius", description="Radius of the BoundingSphere node that will be created", min=0.0, default=1),
     "t3dGameProperties__" : bpy.props.CollectionProperty(type=t3dGamePropertyItem__),
-    "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is"),
+    "t3dObjectColor__": bpy.props.FloatVectorProperty(name = "", description="The color of the object", subtype="COLOR", default=[1, 1, 1, 1], size=4, min=0, max=1),
+    "t3dObjectType__" : bpy.props.EnumProperty(items=objectTypes, name="Object Type", description="The type of object this is", default="MODEL"),
     "t3dLightVolumeCellSize__" : bpy.props.FloatVectorProperty(name="Cell Size", description="Width (X), height (Y), and depth (Z) of the cells for the light volume object", min=0, default=[4,4,4], step=1),
     "t3dAutoBatch__" : bpy.props.EnumProperty(items=batchModes, name="Auto Batch", description="Whether objects should be automatically batched together; for dynamically batched objects, they can only have one, common Material. For statically merged objects, they can have however many materials"),    
     "t3dSectorType__" : bpy.props.EnumProperty(items=listSectorTypes,name="Sector Type", description="The type of sector capability this object has; only used if rendered with a camera with Sector Rendering on"),
@@ -2575,8 +2558,8 @@ def register():
     bpy.types.Material.t3dSolidToRays__ = bpy.props.BoolProperty(name="Report Raycasts", description="Whether this material contributes to ray checks for BoundingTriangles meshes", default=True)
     bpy.types.Material.t3dLightVolumeShadingMode__ = bpy.props.EnumProperty(items=lightVolumeShadingModes, name="Depth Rendering Modes", description="How depth should be rendered for meshes that use this materials", default="PERVERTEXPOSITION")
 
-    bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode")
-    bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5)
+    bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode", update=autoUVChange)
+    bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5, min=0)
     bpy.types.Material.t3dAutoUVRotation__ = bpy.props.FloatProperty(name="Rotation", description="How many degrees to rotate the UVs after projection", step = 500, update=autoUVChange)
     bpy.types.Material.t3dAutoUVOffset__ = bpy.props.FloatVectorProperty(name="Offset", description="How many texels to offset the texture after projection", default=[0,0], size=2, update=autoUVChange, step=1)
         

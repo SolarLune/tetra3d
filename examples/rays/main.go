@@ -50,6 +50,18 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
+	// Used to profile ray testing
+	//
+	// t := time.Now()
+	// for range 1000 {
+	// 	tetra3d.RayTest(tetra3d.RayTestOptions{
+	// 		From:        tetra3d.NewVector3(0, 0, 0),
+	// 		To:          tetra3d.NewVector3(0, -4, 0),
+	// 		TestAgainst: g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject)),
+	// 	})
+	// }
+	// fmt.Println("1000 ray tests:", time.Since(t))
+
 	g.Camera.MouseRayTest(tetra3d.MouseRayTestOptions{
 		// Depth: g.Camera.Far(),
 		TestAgainst: g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject)),

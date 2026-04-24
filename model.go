@@ -648,10 +648,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		for vi := range 3 {
 			vertexIndex := tri.VertexIndex(vi)
 
-			if vertexIndex > len(globalVertexTransforms) {
-				growDisplayLists()
-			}
-
 			if modelSkinned {
 
 				camera.DebugInfo.currentAnimationTime.StartTimer()
@@ -884,6 +880,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		sortingTriIndex++
 
 	})
+
+	if vertexListIndex >= len(colorVertexList) {
+		growDisplayLists()
+	}
 
 	globalSortingTriangleBucket.Sort(minDepth, maxDepth)
 

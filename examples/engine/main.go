@@ -57,7 +57,7 @@ func (g *Game) Init() {
 	for _, scene := range library.Scenes {
 
 		// Set up callbacks for each relevant node that creates the necessary game object logic.
-		scene.Root.Search(tetra3d.SearchOptions{}.ByProps("gameobject")).ForEach(func(node tetra3d.INode) bool {
+		scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("gameobject")).ForEach(func(node tetra3d.INode) bool {
 
 			switch node.Properties().Get("gameobject").AsString() {
 

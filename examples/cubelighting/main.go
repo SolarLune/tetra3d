@@ -46,7 +46,7 @@ func (g *Game) Init() {
 	g.Camera.Move(0, 10, 10)
 	g.System = examples.NewBasicSystemHandler(g)
 
-	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("cubelight")).ForEachModel(func(model *tetra3d.Model) bool {
+	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("cubelight")).ForEachModel(func(model *tetra3d.Model) bool {
 		cubeLight := tetra3d.NewCubeLightFromModel("cube light", model)
 		cubeLight.SetEnergy(3)
 		g.Scene.Root.AddChildren(cubeLight)

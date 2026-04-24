@@ -24,11 +24,15 @@ func (props Properties) Clear() {
 	}
 }
 
-// CopyFrom copies the properties from another Properties object.
-func (props Properties) CopyFrom(other Properties) {
-	props.Clear()
-	for key := range other {
-		props.Add(key).Set(other[key].Value)
+// CopyFrom copies the properties from the source Properties set (src).
+// It does not clear the properties set on props.
+// If overwrite is true, then all properties on src will be copied over to the destination calling Properties set.
+// If overwrite is false, then all properties on src that have not been already set on the destination calling Properties set will be copied over.
+func (props Properties) CopyFrom(src Properties, overwrite bool) {
+	for key := range src {
+		if overwrite || !props.Has(key) {
+			props.Add(key).Set(src[key].Value)
+		}
 	}
 }
 

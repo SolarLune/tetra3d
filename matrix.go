@@ -195,6 +195,24 @@ func (matrix Matrix4) Decompose() (Vector3, Vector3, Matrix4) {
 
 }
 
+func (matrix Matrix4) DecomposePosition() Vector3 {
+	return Vector3{X: matrix[3][0], Y: matrix[3][1], Z: matrix[3][2]}
+}
+
+func (matrix Matrix4) DecomposeRotation() Matrix4 {
+	rotation := NewMatrix4()
+	rotation.SetRow(0, matrix.Row(0).Unit())
+	rotation.SetRow(1, matrix.Row(1).Unit())
+	rotation.SetRow(2, matrix.Row(2).Unit())
+	return rotation
+}
+
+func (matrix Matrix4) DecomposeScale() Vector3 {
+	rotation := matrix.DecomposeRotation()
+	in := matrix.Mult(rotation.Transposed())
+	return Vector3{X: in.Row(0).Magnitude(), Y: in.Row(1).Magnitude(), Z: in.Row(2).Magnitude()}
+}
+
 // Transposed transposes a Matrix4, switching the Matrix from being Row Major to being Column Major. For orthonormalized Matrices (matrices
 // that have rows that are normalized (having a length of 1), like rotation matrices), this is equivalent to inverting it.
 func (matrix Matrix4) Transposed() Matrix4 {

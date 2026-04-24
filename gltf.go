@@ -934,6 +934,11 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					obj.(*Model).AutoBatchMode = int(s)
 				}
 
+				if nodeHasProp(node, "t3dObjectColor__") {
+					cc := node.Extras.(map[string]any)["t3dObjectColor__"].([]any)
+					obj.(*Model).Color = NewColor4(float32(cc[0].(float64)), float32(cc[1].(float64)), float32(cc[2].(float64)), float32(cc[3].(float64))).ConvertTosRGB()
+				}
+
 			}
 
 		} else if node.Camera != nil {

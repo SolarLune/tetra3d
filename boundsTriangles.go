@@ -184,17 +184,16 @@ func (plane *collisionPlane) ClosestPoint(point Vector3) Vector3 {
 
 }
 
-func (plane *collisionPlane) RayAgainstPlane(from, to Vector3, doublesided bool) (Vector3, bool) {
+func (plane *collisionPlane) RayAgainstPlane(from, dir Vector3, doublesided bool) (Vector3, bool) {
 
-	dir := to.Sub(from).Unit()
-
+	// faster to precalculate dir than to do it here all of the time
 	nd := dir.Dot(plane.Normal)
-	pn := from.Dot(plane.Normal)
 
 	if !doublesided && nd >= 0 {
 		return Vector3{}, false
 	}
 
+	pn := from.Dot(plane.Normal)
 	t := (plane.Distance - pn) / nd
 
 	if t >= 0 {

@@ -76,7 +76,7 @@ func (p *Player) Update() {
 	p.Model.MoveVec(mv.Unit().Scale(movespd))
 
 	sceneTree := p.Bounds.Scene().Root.Children(true)
-	solids := p.Bounds.Scene().Root.Search(tetra3d.SearchOptions{}.ByProps("solid").WithReturnChildren(true))
+	solids := p.Bounds.Scene().Root.Search(tetra3d.SearchOptions{}.ByPropNamesParent("solid"))
 
 	p.Bounds.CollisionTest(tetra3d.CollisionTestSettings{
 		TestAgainst: sceneTree,
@@ -207,9 +207,9 @@ func (g *Game) Init() {
 
 	g.Scene = library.SceneByName("Scene")
 
-	g.Player = NewPlayer(g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("player")).First().(*tetra3d.Model))
+	g.Player = NewPlayer(g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("player")).First().(*tetra3d.Model))
 
-	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("guy")).ForEach(func(node tetra3d.INode) bool {
+	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("guy")).ForEach(func(node tetra3d.INode) bool {
 		g.Guys = append(g.Guys, NewGuy(node.(*tetra3d.Model)))
 		return true
 	})
@@ -218,7 +218,7 @@ func (g *Game) Init() {
 
 	t := time.Now()
 
-	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByProps("solid")).ForEachModel(func(model *tetra3d.Model) bool {
+	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("solid")).ForEachModel(func(model *tetra3d.Model) bool {
 		model.Mesh().ForEachMaterial(func(mat *tetra3d.Material) bool {
 			mat.LightVolumeShadingMode = tetra3d.LightVolumeShadingModePerVertexWithNormal
 			return true
@@ -234,7 +234,7 @@ func (g *Game) Init() {
 	// and then we shade that cell - anything that passes through the cell is lightened, darkened, or otherwise colored
 	// depending on the color we put in the cell.
 
-	solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByParentProps("solid"))
+	solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNamesParent("solid"))
 
 	lightvolume.LightVolumeResize(lightvolume.Dimensions(), 2, 2, 2)
 

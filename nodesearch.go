@@ -143,61 +143,113 @@ func (n NodeCollectionSet) ToCameras() []*Camera {
 	return out
 }
 
+// Represents a set of options to control searching through a hierarchy of nodes recursively.
+// Note that the options do stack (e.g. if you specify SearchOptions such that nodes must have a given name and a given property name,
+// a node has to have both to pass).
 type SearchOptions struct {
-	Names              []string
+	Names       []string
+	NamesParent []string
+
 	PartialNames       []string
-	PropNames          []string
-	CustomFunc         func(node INode) bool
+	PartialNamesParent []string
+
+	PropNames       []string
+	ParentPropNames []string
+
+	PropValues       map[string]any
+	ParentPropValues map[string]any
+
+	NodeTypes       []NodeType
+	NodeTypesParent []NodeType
+
+	CustomFunc         func(node INode) bool // If the function is set, each node is run through the custom function; if it returns true, the node is added to the collection set
 	WithoutNodes       *NodeCollectionSet
-	PropValues         map[string]any
-	NodeTypes          []NodeType
-	ReturnChildren     bool // When enabled, if a Node fulfills the options set, the children are returned rather than the Node itself
-	ForEach            func(node INode) bool
-	NoReturnCollection bool // If NoReturnCollection is set, FindNodes returns an empty Collection Set.
-	NoRoot             bool // If NoRoot is set, the starting node is not included in the search (but its children and descendants are still).
+	ForEach            func(node INode) bool // If set, for each Node that passes the function set, ForEach is run on it. If it returns false, the loop is broken out of early
+	NoReturnCollection bool                  // If NoReturnCollection is set, FindNodes returns an empty Collection Set (can be used in connection with ForEach to instead loop through all passing Nodes).
+	NoRoot             bool                  // If NoRoot is set, the starting node is not included in the search (but its children and descendants can still be).
 }
 
+// Filters out the search options to find Nodes with any of the names specified.
 func (f SearchOptions) ByNames(names ...string) SearchOptions {
 	f.Names = names
 	return f
 }
 
-func (f SearchOptions) ByNamesPartial(names ...string) SearchOptions {
-	f.PartialNames = names
+// Filters out the search options to find children of Nodes with any of the names specified.
+func (f SearchOptions) ByNamesParent(names ...string) SearchOptions {
+	f.NamesParent = names
 	return f
 }
 
-func (f SearchOptions) ByProps(propNames ...string) SearchOptions {
+// Filters out the search options to find Nodes with a part of any of the names specified.
+func (f SearchOptions) ByNamesPartial(partialNames ...string) SearchOptions {
+	f.PartialNames = partialNames
+	return f
+}
+
+// Filters out the search options to find children of Nodes with a part of any of the names specified.
+func (f SearchOptions) ByNamesPartialParent(partialNames ...string) SearchOptions {
+	f.PartialNamesParent = partialNames
+	return f
+}
+
+// Filters out the search options to find Nodes with properties by any of the names specified.
+func (f SearchOptions) ByPropNames(propNames ...string) SearchOptions {
 	f.PropNames = propNames
 	return f
 }
 
-// Syntactic sugar for SearchOptions.ByProp().WithReturnChildren(true)
-func (f SearchOptions) ByParentProps(propNames ...string) SearchOptions {
-	f.PropNames = propNames
-	f.ReturnChildren = true
+// Filters out the search options to find children of Nodes with properties by any of the names specified.
+func (f SearchOptions) ByPropNamesParent(propNames ...string) SearchOptions {
+	f.ParentPropNames = propNames
 	return f
 }
 
-func (f SearchOptions) ByPropValues(propPairs map[string]any) SearchOptions {
+// Filters out the search options to find Nodes with a property with the name specified set to the specified value.
+func (f SearchOptions) ByPropValuePair(propName string, value any) SearchOptions {
+	f.PropValues = map[string]any{propName: value}
+	return f
+}
+
+// Filters out the search options to find children of Nodes with a property with the name specified set to the specified value.
+func (f SearchOptions) ByPropValuePairParent(propName string, value any) SearchOptions {
+	f.ParentPropValues = map[string]any{propName: value}
+	return f
+}
+
+// Filters out the search options to find Nodes with properties with the names and values specified as keys and values in the given propPairs map.
+func (f SearchOptions) ByPropValuePairs(propPairs map[string]any) SearchOptions {
 	f.PropValues = propPairs
 	return f
 }
 
+// Filters out the search options to find children of Nodes with properties with the names and values specified as keys and values in the given propPairs map.
+func (f SearchOptions) ByPropValuePairsParent(propPairs map[string]any) SearchOptions {
+	f.ParentPropValues = propPairs
+	return f
+}
+
+// Filters out the search options to find Nodes of any of the given types.
 func (f SearchOptions) ByType(withNodeTypes ...NodeType) SearchOptions {
 	f.NodeTypes = withNodeTypes
 	return f
 }
 
-func (f SearchOptions) WithReturnChildren(withReturnChildren bool) SearchOptions {
-	f.ReturnChildren = withReturnChildren
+// Filters out the search options to find Nodes of any of the given types.
+func (f SearchOptions) ByTypeParent(withNodeTypes ...NodeType) SearchOptions {
+	f.NodeTypesParent = withNodeTypes
 	return f
 }
 
+// Sets the search options to run a custom function on each Node - if it passes, then the Node is added to the resulting collection set.
+func (f SearchOptions) ByCustomFunc(customFunc func(node INode) bool) SearchOptions {
+	f.CustomFunc = customFunc
+	return f
+}
+
+// Removes nodes from consideration from the Search.
 func (f SearchOptions) Not(nodes *NodeCollectionSet) SearchOptions {
-	if f.WithoutNodes == nil {
-		f.WithoutNodes = nodes
-	}
+	f.WithoutNodes = nodes
 	return f
 }
 
@@ -208,69 +260,155 @@ func (node *Node) Search(options SearchOptions) *NodeCollectionSet {
 
 	check := func(node INode, index, size int) bool {
 
-		add := false
-		nothingSet := true
+		add := true
 
 		if options.WithoutNodes != nil && options.WithoutNodes.Contains(node) {
-			nothingSet = false
 			add = false
 		} else {
 
-			if !add && options.Names != nil {
-				nothingSet = false
+			if options.Names != nil {
+				result := false
 				for _, n := range options.Names {
 					if node.Name() == n {
-						add = true
+						result = true
+						break
 					}
 				}
+				add = add && result
 			}
 
-			if !add && options.PartialNames != nil {
-				nothingSet = false
+			if options.NamesParent != nil {
+				result := false
+				if parent := node.Parent(); parent != nil {
+
+					for _, n := range options.NamesParent {
+						if parent.Name() == n {
+							result = true
+							break
+						}
+					}
+
+				}
+				add = add && result
+
+			}
+
+			if options.PartialNames != nil {
+				result := false
 				for _, n := range options.PartialNames {
 					if strings.Contains(node.Name(), n) {
-						add = true
+						result = true
+						break
 					}
 				}
+				add = add && result
 			}
 
-			if !add && options.PropNames != nil {
-				nothingSet = false
+			if options.PartialNamesParent != nil {
+				result := false
+				if parent := node.Parent(); parent != nil {
+
+					for _, n := range options.PartialNamesParent {
+						if strings.Contains(parent.Name(), n) {
+							result = true
+							break
+						}
+					}
+
+				}
+				add = add && result
+			}
+
+			if options.PropNames != nil {
+				result := false
 				for _, n := range options.PropNames {
 					if node.Properties().Has(n) {
-						add = true
+						result = true
+						break
 					}
 				}
+				add = add && result
 			}
 
-			if !add && options.PropValues != nil {
-				nothingSet = false
+			if options.ParentPropNames != nil {
+				result := false
+				if parent := node.Parent(); parent != nil {
+
+					for _, n := range options.ParentPropNames {
+						if parent.Properties().Has(n) {
+							result = true
+							break
+						}
+					}
+
+				}
+				add = add && result
+			}
+
+			if options.PropValues != nil {
+				result := false
 				for k, v := range options.PropValues {
 					if res := node.Properties().Get(k); res != nil && res.Value == v {
-						add = true
+						result = true
+						break
 					}
 				}
+				add = add && result
 			}
 
-			if !add && options.NodeTypes != nil {
-				nothingSet = false
+			if options.ParentPropValues != nil {
+				result := false
+				if parent := node.Parent(); parent != nil {
+					for k, v := range options.ParentPropValues {
+
+						if res := parent.Properties().Get(k); res != nil && res.Value == v {
+							result = true
+							break
+						}
+
+					}
+				}
+				add = add && result
+			}
+
+			if options.NodeTypes != nil {
+				result := false
 				for _, nt := range options.NodeTypes {
 					if node.Type().Is(nt) {
-						add = true
+						result = true
+						break
 					}
 				}
+				add = add && result
 			}
 
-			if !add && options.CustomFunc != nil {
-				nothingSet = false
-				if options.CustomFunc(node) {
-					add = true
+			if options.NodeTypesParent != nil {
+				result := false
+				if parent := node.Parent(); parent != nil {
+
+					for _, nt := range options.NodeTypesParent {
+						if parent.Type().Is(nt) {
+							result = true
+							break
+						}
+					}
+
 				}
+				add = add && result
+			}
+
+			if options.CustomFunc != nil {
+				result := false
+				if options.CustomFunc(node) {
+					result = true
+				}
+				add = add && result
 			}
 
 		}
 
-		if nothingSet || add {
+		// If no filters are set, then the function just returns each Node's children recursively.
+		if add {
 
 			if options.ForEach != nil {
 				if !options.ForEach(node) {
@@ -282,14 +420,7 @@ func (node *Node) Search(options SearchOptions) *NodeCollectionSet {
 				return true
 			}
 
-			if options.ReturnChildren {
-				node.ForEachChild(false, func(child INode, index, size int) bool {
-					output.Add(child)
-					return true
-				})
-			} else {
-				output.Add(node)
-			}
+			output.Add(node)
 
 		}
 

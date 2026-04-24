@@ -264,7 +264,7 @@ func boundingAABBRayTest(from, to Vector3, test *BoundingAABB) (RayHit, bool) {
 
 }
 
-var workingAABB = NewBoundingAABB("", 1, 1, 1)
+var boundingTrianglesRayTestResults = []RayHit{}
 
 func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doublesided bool) []RayHit {
 
@@ -276,31 +276,50 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 		check = true
 	}
 
-	results := []RayHit{}
+	boundingTrianglesRayTestResults = boundingTrianglesRayTestResults[:0]
 
 	if check {
 
-		center := from.Lerp(to, 0.5)
-
-		_, _, r := test.Transform().Decompose()
+		r := test.Transform().DecomposeRotation()
 
 		invertedTransform := test.Transform().Inverted()
 		invFrom := invertedTransform.MultVec(from)
 		invTo := invertedTransform.MultVec(to)
+		dir := invTo.Sub(invFrom).Unit()
 		plane := newCollisionPlane()
 
-		margin := float32(0.25)
-		dist := to.DistanceTo(from) + margin
+		// TODO: Review this - it seems like it's drastically faster (~4x) to not use the broadphase object for raytests, even for meshes with relatively high triangle counts.
+		// I guess the broadphase checking code is just way too slow? So we're just not going to use it for raycasting, I guess.
 
-		workingAABB.SetLocalPositionVec(center)
-		workingAABB.SetLocalScale(dist, dist, dist)
-		workingAABB.Transform()
+		// test.broadphase.ForEachTriangleFromBoundingObject(workingAABB, func(tri *Triangle) bool {
 
-		test.broadphase.ForEachTriangleFromBoundingObject(workingAABB, func(tri *Triangle) bool {
+		for _, tri := range test.Mesh.Triangles {
+
+			v0 := test.Mesh.VertexPositions[tri.VertexIndexA]
+			v1 := test.Mesh.VertexPositions[tri.VertexIndexB]
+			v2 := test.Mesh.VertexPositions[tri.VertexIndexC]
+
+			// Very simple culling - if the ray's start and end are wholly too far to the
+			// right, left, above, below, ahead, or behind all vertices, then it can't possibly strike the triangle.
+			// An additional ~30% speedup.
+			if (invFrom.X > v0.X && invFrom.X > v1.X && invFrom.X > v2.X &&
+				invTo.X > v0.X && invTo.X > v1.X && invTo.X > v2.X) ||
+				(invFrom.X < v0.X && invFrom.X < v1.X && invFrom.X < v2.X &&
+					invTo.X < v0.X && invTo.X < v1.X && invTo.X < v2.X) ||
+				(invFrom.Y > v0.Y && invFrom.Y > v1.Y && invFrom.Y > v2.Y &&
+					invTo.Y > v0.Y && invTo.Y > v1.Y && invTo.Y > v2.Y) ||
+				(invFrom.Y < v0.Y && invFrom.Y < v1.Y && invFrom.Y < v2.Y &&
+					invTo.Y < v0.Y && invTo.Y < v1.Y && invTo.Y < v2.Y) ||
+				(invFrom.Z > v0.Z && invFrom.Z > v1.Z && invFrom.Z > v2.Z &&
+					invTo.Z > v0.Z && invTo.Z > v1.Z && invTo.Z > v2.Z) ||
+				(invFrom.Z < v0.Z && invFrom.Z < v1.Z && invFrom.Z < v2.Z &&
+					invTo.Z < v0.Z && invTo.Z < v1.Z && invTo.Z < v2.Z) {
+				continue
+			}
 
 			// Skip if it's not collideable
 			if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportRays {
-				return true
+				continue
 			}
 
 			fs := tri.Normal.Dot(invFrom.Sub(tri.Center))
@@ -309,26 +328,24 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 			// If the start and end points of the ray lie on the same side of the triangle,
 			// then we know the triangle can't be struck and we can bail early
 			if (fs > 0 && ts > 0) || (fs < 0 && ts < 0) {
-				return true
+				continue
 			}
-
-			v0 := test.Mesh.VertexPositions[tri.VertexIndexA]
-			v1 := test.Mesh.VertexPositions[tri.VertexIndexB]
-			v2 := test.Mesh.VertexPositions[tri.VertexIndexC]
 
 			// Skip because the triangle is degenerate and a collision plane cannot be set from it
 			// (i.e. for whatever reason, at least two vertices share location, so it's no longer a pure triangle)
 			if v0.Equals(v1) || v1.Equals(v2) || v2.Equals(v0) {
-				return true
+				continue
 			}
 
-			plane.Set(v0, v1, v2)
+			// We can manually set the plane rather than using Plane.Set() as we have the triangle normal already.
+			plane.Normal = tri.Normal
+			plane.Distance = tri.Normal.Dot(v0)
 
-			if vec, ok := plane.RayAgainstPlane(invFrom, invTo, doublesided); ok {
+			if vec, ok := plane.RayAgainstPlane(invFrom, dir, doublesided); ok {
 
 				if isPointInsideTriangle(vec, v0, v1, v2) {
 
-					results = append(results, RayHit{
+					boundingTrianglesRayTestResults = append(boundingTrianglesRayTestResults, RayHit{
 						Object:                test,
 						Position:              test.Transform().MultVec(vec),
 						untransformedPosition: vec,
@@ -341,13 +358,11 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 
 			}
 
-			return true
-
-		})
+		}
 
 	}
 
-	return results
+	return boundingTrianglesRayTestResults
 
 }
 
