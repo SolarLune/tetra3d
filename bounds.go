@@ -343,7 +343,16 @@ func btSphereTriangles(sphere *BoundingSphere, triangles *BoundingTriangles) *Co
 		v1 := triangles.Mesh.VertexPositions[tri.VertexIndexB]
 		v2 := triangles.Mesh.VertexPositions[tri.VertexIndexC]
 
-		closest := closestPointOnTri(spherePos, v0, v1, v2)
+		if (spherePos.X-sphereRadius > v0.X && spherePos.X-sphereRadius > v1.X && spherePos.X-sphereRadius > v2.X) ||
+			(spherePos.X+sphereRadius < v0.X && spherePos.X+sphereRadius < v1.X && spherePos.X+sphereRadius < v2.X) ||
+			(spherePos.Y-sphereRadius > v0.Y && spherePos.Y-sphereRadius > v1.Y && spherePos.Y-sphereRadius > v2.Y) ||
+			(spherePos.Y+sphereRadius < v0.Y && spherePos.Y+sphereRadius < v1.Y && spherePos.Y+sphereRadius < v2.Y) ||
+			(spherePos.Z-sphereRadius > v0.Z && spherePos.Z-sphereRadius > v1.Z && spherePos.Z-sphereRadius > v2.Z) ||
+			(spherePos.Z+sphereRadius < v0.Z && spherePos.Z+sphereRadius < v1.Z && spherePos.Z+sphereRadius < v2.Z) {
+			return true
+		}
+
+		closest := closestPointOnTri(spherePos, v0, v1, v2, tri.Normal)
 		delta := spherePos.Sub(closest)
 
 		if mag := delta.MagnitudeSquared(); mag <= sphereRadiusSquared {
@@ -571,7 +580,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 			result.add(&Intersection{
 				StartingPoint: boxPos,
-				ContactPoint:  closestPointOnTri(boxPoint, v0, v1, v2),
+				ContactPoint:  closestPointOnTri(boxPoint, v0, v1, v2, axes[6]),
 				MTV:           mtv,
 				Triangle:      tri,
 				Normal:        axes[6],
@@ -808,9 +817,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	capsuleTop := invertedTransform.MultVec(capsule.lineTop())
 	capsuleBottom := invertedTransform.MultVec(capsule.lineBottom())
-	capsulePosition := invertedTransform.MultVec(capsule.WorldPosition())
 	capsuleLine := capsuleTop.Sub(capsuleBottom)
-	capSpread := capsuleLine.Magnitude() + capsuleRadius
 	capDot := capsuleLine.Dot(capsuleLine)
 
 	var closestCapsulePoint Vector3
@@ -821,15 +828,18 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 	closestSub := Vector3{}
 
-	triangles.broadphase.ForEachTriangleFromBoundingObject(capsule, func(tri *Triangle) bool {
+	// TODO: Review Broadphase to see why it's so slow / if it's still necessary
+	// triangles.broadphase.ForEachTriangleFromBoundingObject(capsule, func(tri *Triangle) bool {
+
+	for _, tri := range triangles.Mesh.Triangles {
 
 		if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportCollisions {
-			return true
+			continue
 		}
 
-		if capsulePosition.DistanceSquaredTo(tri.Center) > math32.Pow((tri.MaxSpan*0.66)+capSpread, 2) {
-			return true
-		}
+		// if capsulePosition.DistanceSquaredTo(tri.Center) > math32.Pow((tri.MaxSpan*0.66)+capSpread, 2) {
+		// 	return true
+		// }
 
 		if tri.Center.DistanceSquaredTo(capsuleTop) < tri.Center.DistanceSquaredTo(capsuleBottom) {
 			closestCapsulePoint = capsuleTop
@@ -841,7 +851,22 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 		v1 := triangles.Mesh.VertexPositions[tri.VertexIndexB]
 		v2 := triangles.Mesh.VertexPositions[tri.VertexIndexC]
 
-		closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2)
+		if (capsuleTop.X-capsuleRadius > v0.X && capsuleTop.X-capsuleRadius > v1.X && capsuleTop.X-capsuleRadius > v2.X &&
+			capsuleBottom.X-capsuleRadius > v0.X && capsuleBottom.X-capsuleRadius > v1.X && capsuleBottom.X-capsuleRadius > v2.X) ||
+			(capsuleTop.X+capsuleRadius < v0.X && capsuleTop.X+capsuleRadius < v1.X && capsuleTop.X+capsuleRadius < v2.X &&
+				capsuleBottom.X+capsuleRadius < v0.X && capsuleBottom.X+capsuleRadius < v1.X && capsuleBottom.X+capsuleRadius < v2.X) ||
+			(capsuleTop.Y-capsuleRadius > v0.Y && capsuleTop.Y-capsuleRadius > v1.Y && capsuleTop.Y-capsuleRadius > v2.Y &&
+				capsuleBottom.Y-capsuleRadius > v0.Y && capsuleBottom.Y-capsuleRadius > v1.Y && capsuleBottom.Y-capsuleRadius > v2.Y) ||
+			(capsuleTop.Y+capsuleRadius < v0.Y && capsuleTop.Y+capsuleRadius < v1.Y && capsuleTop.Y+capsuleRadius < v2.Y &&
+				capsuleBottom.Y+capsuleRadius < v0.Y && capsuleBottom.Y+capsuleRadius < v1.Y && capsuleBottom.Y+capsuleRadius < v2.Y) ||
+			(capsuleTop.Z-capsuleRadius > v0.Z && capsuleTop.Z-capsuleRadius > v1.Z && capsuleTop.Z-capsuleRadius > v2.Z &&
+				capsuleBottom.Z+capsuleRadius > v0.Z && capsuleBottom.Z+capsuleRadius > v1.Z && capsuleBottom.Z+capsuleRadius > v2.Z) ||
+			(capsuleTop.Z-capsuleRadius < v0.Z && capsuleTop.Z-capsuleRadius < v1.Z && capsuleTop.Z-capsuleRadius < v2.Z &&
+				capsuleBottom.Z+capsuleRadius < v0.Z && capsuleBottom.Z+capsuleRadius < v1.Z && capsuleBottom.Z+capsuleRadius < v2.Z) {
+			continue
+		}
+
+		closest := closestPointOnTri(closestCapsulePoint, v0, v1, v2, tri.Normal)
 		closestSub.X = closest.X - capsuleBottom.X
 		closestSub.Y = closest.Y - capsuleBottom.Y
 		closestSub.Z = closest.Z - capsuleBottom.Z
@@ -877,9 +902,7 @@ func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) 
 
 		}
 
-		return true
-
-	})
+	}
 
 	if len(result.Intersections) == 0 {
 		return nil

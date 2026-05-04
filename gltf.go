@@ -359,6 +359,29 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				}
 
+				if s, exists := dataMap["t3dTextureMapMode__"]; exists {
+					newMat.TextureMapMode = int(s.(float64))
+				}
+
+				if s, exists := dataMap["t3dTextureFilterMode__"]; exists {
+					switch int(s.(float64)) {
+					case 0:
+						newMat.TextureFilterMode = TextureFilterNearest
+					case 1:
+						newMat.TextureFilterMode = TextureFilterBilinear
+					}
+				}
+
+				if s, exists := dataMap["t3dTextureMapScreenSizeMultiplier__"]; exists {
+					ssMulti := s.([]any)
+					newMat.TextureMapScreenSizeMultiplierW = float32(ssMulti[0].(float64))
+					newMat.TextureMapScreenSizeMultiplierH = float32(ssMulti[1].(float64))
+				}
+
+				if s, exists := dataMap["t3dLightVolumeShadingMode__"]; exists {
+					newMat.LightVolumeShadingMode = int(s.(float64))
+				}
+
 				if s, exists := dataMap["t3dBillboardEnabled__"]; exists {
 					newMat.BillboardEnabled = s.(float64) > 0
 				}
@@ -1525,8 +1548,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 						world.FogMode = FogSub
 					case "OVERWRITE":
 						world.FogMode = FogOverwrite
-					case "TRANSPARENT":
-						world.FogMode = FogTransparent
 					}
 				}
 

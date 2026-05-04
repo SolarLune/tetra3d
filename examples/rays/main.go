@@ -52,12 +52,13 @@ func (g *Game) Update() error {
 
 	// Used to profile ray testing
 	//
+	// solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject))
 	// t := time.Now()
 	// for range 1000 {
 	// 	tetra3d.RayTest(tetra3d.RayTestOptions{
 	// 		From:        tetra3d.NewVector3(0, 0, 0),
 	// 		To:          tetra3d.NewVector3(0, -4, 0),
-	// 		TestAgainst: g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject)),
+	// 		TestAgainst: solids,
 	// 	})
 	// }
 	// fmt.Println("1000 ray tests:", time.Since(t))
@@ -81,7 +82,7 @@ func (g *Game) Update() error {
 				vc = hit.Object.Parent().(*tetra3d.Model).Mesh().MeshParts[0].Material.Color
 			}
 
-			tetra3d.NewVertexSelection().SelectByMeshPartIndex(marker.(*tetra3d.Model).Mesh(), 1).SetColor(0, vc)
+			marker.(*tetra3d.Model).Mesh().Select().ByMeshPartIndex(1).SetColor(0, vc)
 
 			marker.SetWorldPositionVec(hit.Position.Add(hit.Normal.Scale(0.5)))
 

@@ -143,6 +143,7 @@ func (b *Broadphase) Resize(cellSizeX, cellSizeY, cellSizeZ float32) {
 						mesh.VertexPositions[tri.VertexIndexA],
 						mesh.VertexPositions[tri.VertexIndexB],
 						mesh.VertexPositions[tri.VertexIndexC],
+						tri.Normal,
 					)
 
 					if nd.Contains(point) {

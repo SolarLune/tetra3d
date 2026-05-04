@@ -191,15 +191,8 @@ func (p *PointLight) beginModel(model *Model) {
 func (p *PointLight) VertexLight(index int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
 	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
-	var vertPos, vertNormal Vector3
-
-	if model.skinned {
-		vertPos = model.mesh.vertexSkinnedPositions[index]
-		vertNormal = model.mesh.vertexSkinnedNormals[index]
-	} else {
-		vertPos = model.mesh.VertexPositions[index]
-		vertNormal = model.mesh.VertexNormals[index]
-	}
+	vertPos := globalMeshAlteredVertexPositions[index]
+	vertNormal := globalMeshAlteredVertexNormals[index]
 
 	distance := p.workingPosition.DistanceSquaredTo(vertPos)
 
@@ -340,12 +333,12 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 
 func (sun *DirectionalLight) VertexLight(index int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
 
+	// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
 	var normal Vector3
 	if model.skinned {
-		// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
-		normal = model.mesh.vertexSkinnedNormals[index]
+		normal = globalMeshAlteredVertexNormals[index]
 	} else {
-		normal = sun.workingModelRotation.MultVec(model.mesh.VertexNormals[index])
+		normal = sun.workingModelRotation.MultVec(globalMeshAlteredVertexNormals[index])
 	}
 
 	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
@@ -562,15 +555,8 @@ func (cube *CubeLight) VertexLight(index int, tri *Triangle, model *Model, targe
 	// 	return light
 	// }
 
-	var vertPos, vertNormal Vector3
-
-	if model.skinned {
-		vertPos = model.mesh.vertexSkinnedPositions[index]
-		vertNormal = model.mesh.vertexSkinnedNormals[index]
-	} else {
-		vertPos = model.mesh.VertexPositions[index]
-		vertNormal = model.mesh.VertexNormals[index]
-	}
+	vertPos := globalMeshAlteredVertexPositions[index]
+	vertNormal := globalMeshAlteredVertexNormals[index]
 
 	var diffuse, diffuseFactor float32
 
@@ -890,23 +876,24 @@ func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, ta
 		var vertPos Vector3
 		var vertPosWithNormal Vector3
 
+		// Skinned; already transformed
 		if model.skinned {
-			vertPos = model.mesh.vertexSkinnedPositions[vertIndex]
 
+			vertPos = globalMeshAlteredVertexPositions[vertIndex]
 			if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
-				vertPosWithNormal = vertPos.Add(model.mesh.vertexSkinnedNormals[vertIndex])
+				vertPosWithNormal = vertPos.Add(globalMeshAlteredVertexNormals[vertIndex])
 			}
-			vertPos = vertPos.Add(l.lightBias)
 
 		} else {
 
-			vertPos = transform.MultVec(model.mesh.VertexPositions[vertIndex])
+			vertPos = transform.MultVec(globalMeshAlteredVertexPositions[vertIndex])
 			if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
-				vertPosWithNormal = transform.MultVec(model.mesh.VertexPositions[vertIndex].Add(model.mesh.VertexNormals[vertIndex].Mult(cellSize)))
+				vertPosWithNormal = transform.MultVec(globalMeshAlteredVertexPositions[vertIndex].Add(globalMeshAlteredVertexNormals[vertIndex].Mult(cellSize)))
 			}
-			vertPos = vertPos.Add(l.lightBias)
 
 		}
+
+		vertPos = vertPos.Add(l.lightBias)
 
 		if !l.dimensions.Contains(vertPos) {
 			return
@@ -1144,7 +1131,7 @@ func (l *LightVolume) LightVolumeBlur(cellRadius int, iterations int, blurStreng
 // cellRadius is the number of cells around each cell to sample each cell's value.
 // iterations is the number of times to run the filter.
 // Each application of the blur happens at the end of the iterations, not all at once.
-func (l *LightVolume) LightVolumePropagateAllDirections(cellRadius int, iterations int) {
+func (l *LightVolume) LightVolumePropagateAllDirections(cellRadius int, iterations int, propagationStrength float32, additiveLighting bool) {
 
 	if iterations < 1 {
 		iterations = 1
@@ -1201,8 +1188,8 @@ func (l *LightVolume) LightVolumePropagateAllDirections(cellRadius int, iteratio
 
 									if !isBlocked {
 										count++
-										if cell.color.Value() > current.color.Value() {
-											current.color = cell.color
+										if (additiveLighting && cell.color.Value()*propagationStrength > current.color.Value()) || (!additiveLighting && cell.color.Value()*propagationStrength < current.color.Value()) {
+											current.color = current.color.Mix(cell.color, propagationStrength)
 										}
 									}
 								}
@@ -1651,6 +1638,30 @@ func (c LightVolumeCell) IndexZ() int {
 	return c.indexZ
 }
 
+func (c LightVolumeCell) IsAtRightSide() bool {
+	return c.indexX == c.lightVolume.cellCountX-1
+}
+
+func (c LightVolumeCell) IsAtLeftSide() bool {
+	return c.indexX == 0
+}
+
+func (c LightVolumeCell) IsAtTopSide() bool {
+	return c.indexY == c.lightVolume.cellCountY-1
+}
+
+func (c LightVolumeCell) IsAtBottomSide() bool {
+	return c.indexY == 0
+}
+
+func (c LightVolumeCell) IsAtFrontSide() bool {
+	return c.indexZ == c.lightVolume.cellCountZ-1
+}
+
+func (c LightVolumeCell) IsAtBackSide() bool {
+	return c.indexZ == 0
+}
+
 func (c LightVolumeCell) Data() any {
 	return c.data
 }
@@ -1724,14 +1735,18 @@ func (c *LightVolumeCell) SetBlockedAll(blocked bool) {
 
 }
 
-func (c *LightVolumeCell) UseLights(lights ...ILight) {
+func (c *LightVolumeCell) SetUseLights(lights ...ILight) {
 	for _, l := range lights {
 		c.lightVolume.useLightsRenderSet.Add(l)
 	}
 	c.useLights = append(c.useLights, lights...)
 }
 
-func (c *LightVolumeCell) LightsInUse() []ILight {
+func (c *LightVolumeCell) ClearUseLights() {
+	c.useLights = c.useLights[:0]
+}
+
+func (c *LightVolumeCell) UseLights() []ILight {
 	return append(make([]ILight, 0, len(c.useLights)), c.useLights...)
 }
 
@@ -1774,7 +1789,7 @@ func (c *LightVolumeCell) ForEachNeighborInDirection(neighborDirection LightVolu
 	}
 }
 
-func (c *LightVolumeCell) AddTag(tag uint8) {
+func (c *LightVolumeCell) SetTag(tag uint8) {
 	c.tags = append(c.tags, tag)
 }
 

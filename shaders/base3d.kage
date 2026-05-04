@@ -11,7 +11,8 @@ var PerspectiveCorrection int
 var TextureFilterMode int
 
 var TextureMapMode int
-var TextureMapScreenSize float
+var TextureMapScreenSizeMultiplierW float
+var TextureMapScreenSizeMultiplierH float
 
 var BayerMatrix [16]float
 
@@ -33,21 +34,22 @@ func dstPosToSrcPos(dstPos vec2) vec2 {
 
 func bilinearFilter(srcPos vec2) vec4 {
 	
-	srcOrigin := imageSrc0Origin()
-	srcSize := imageSrc0Size()
+	p0 := mod(srcPos - 1/2.0, imageSrc0Size()) + imageSrc0Origin()
+	p1 := mod(srcPos + 1/2.0, imageSrc0Size()) + imageSrc0Origin()
 
-	s1 := imageSrc0UnsafeAt(mod(srcPos, srcSize) + srcOrigin)
-	s2 := imageSrc0UnsafeAt(mod(srcPos + vec2(1, 0), srcSize) + srcOrigin)
-	s3 := imageSrc0UnsafeAt(mod(srcPos + vec2(1, 1), srcSize) + srcOrigin)
-	s4 := imageSrc0UnsafeAt(mod(srcPos + vec2(0, 1), srcSize) + srcOrigin)
+	c0 := imageSrc0UnsafeAt(p0)
+	c1 := imageSrc0UnsafeAt(vec2(p1.x, p0.y))
+	c2 := imageSrc0UnsafeAt(vec2(p0.x, p1.y))
+	c3 := imageSrc0UnsafeAt(p1)
 
-	fu := fract((srcPos / srcSize) + 0.5) 
+	rate := fract(p1)
 
 	return mix(
-		mix(s1, s2, fu.x),
-		mix(s3, s4, fu.x),
-		fu.y,
+		mix(c0, c1, rate.x),
+		mix(c2, c3, rate.x),
+		rate.y,
 	)
+	
 }
 
 func nearestFilter(srcPos vec2) vec4 {
@@ -73,7 +75,7 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 		tx := srcPos - srcOrigin
 
 		if TextureMapMode == 1 {
-			tx = (dstPos.xy * TextureMapScreenSize) + (srcPos - srcOrigin)
+			tx = (dstPos.xy * vec2(TextureMapScreenSizeMultiplierW, TextureMapScreenSizeMultiplierH)) + (srcPos - srcOrigin)
 		} else if PerspectiveCorrection > 0 {
 			tx *= 1.0 / custom.x // depth is stored in ebiten.Vertex.Custom0
 		}
@@ -118,9 +120,9 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 					colorTex.rgb -= Fog.rgb * fogMult * colorTex.a
 				} else if Fog.a == 2 {
 					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, fogMult) * colorTex.a
-				} else if Fog.a == 3 {
-					colorTex.a *= abs(1-d) * step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
-					colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
+				// } else if Fog.a == 3 {
+				// 	colorTex.a *= abs(1-d) * step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
+				// 	colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
 				}
 
 			} else {
@@ -131,9 +133,9 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 					colorTex.rgb -= Fog.rgb * d * colorTex.a
 				} else if Fog.a == 2 {
 					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
-				} else if Fog.a == 3 {
-					colorTex.a *= abs(1-d)
-					colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
+				// } else if Fog.a == 3 {
+				// 	colorTex.a *= abs(1-d)
+				// 	colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
 				}
 
 			}

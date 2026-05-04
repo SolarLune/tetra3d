@@ -373,11 +373,9 @@ func (ps *ParticleSystem) Spawn() {
 
 		vertCount := len(model.mesh.VertexPositions)
 
-		if model.skinned {
-			pos = model.mesh.vertexSkinnedPositions[ps.vertexSpawnIndex]
-		} else {
-			pos = model.Transform().MultVec(model.mesh.VertexPositions[ps.vertexSpawnIndex])
-		}
+		// TODO: Reimplement this for skinned models; this was working, but only probably reliably if not more
+		// than one skinned model with the same mesh was active at any given time
+		pos = model.Transform().MultVec(model.mesh.VertexPositions[ps.vertexSpawnIndex])
 
 		switch ps.Settings.VertexSpawnMode {
 		case ParticleVertexSpawnModeAscending:

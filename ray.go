@@ -42,6 +42,7 @@ func (r RayHit) HitMaterialByPropName(propName string) bool {
 
 const ErrorObjectHitNotBoundingTriangles = "error: object hit not a BoundingTriangles instance; no UV or vertex color data can be pulled from RayHit result"
 const ErrorObjectHitNotChildOfModel = "error: object hit not a child of a Model"
+const ErrorVertexChannelOutsideRange = "error: vertex color channel not found by given name"
 
 // Returns the vertex color from the given channel in the position struck on the object struck.
 // Only works when testing against BoundingTriangles objects.

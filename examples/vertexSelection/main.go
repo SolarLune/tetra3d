@@ -74,7 +74,7 @@ func (g *Game) Init() {
 	mesh := g.Cube.Mesh()
 
 	// Select vertices that have non-black vertex color in the specified vertex color channel.
-	vertices, err := tetra3d.NewVertexSelection().SelectByVertexColorChannelNames(mesh, "Flash")
+	vertices := tetra3d.NewVertexSelection(mesh).ByVertexColorChannelNames("Flash")
 
 	// An error could happen if the color channel index passed to SelectInChannel is too high to be beyond the vertex color channel count set on the Model.
 	// If this happens, let's panic on it.

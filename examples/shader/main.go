@@ -68,9 +68,10 @@ func (g *Game) Init() {
 
 	// ... And here we specify a "vertex program" - in truth, this operates on CPU, rather than the GPU, but it still is useful.
 	// Much like a Fragment shader, it operates on all vertices that render with the material.
-	model.VertexTransformFunction = func(v *tetra3d.Vector3, id int) {
+	model.VertexTransformFunction = func(vertexPosition, vertexNormal tetra3d.Vector3, vertexIndex int) (tetra3d.Vector3, tetra3d.Vector3) {
 		waveHeight := float32(0.04)
-		v.Y += math32.Sin(g.Time*math32.Pi+(v.X*10)) * waveHeight
+		vertexPosition.Y += math32.Sin(g.Time*math32.Pi+(vertexPosition.X*10)) * waveHeight
+		return vertexPosition, vertexNormal
 	}
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)

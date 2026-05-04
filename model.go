@@ -38,18 +38,18 @@ type Model struct {
 	LightGroup *LightGroup
 
 	// VertexTransformFunction is a function that runs on the world position of each vertex position rendered with the material.
-	// It accepts the vertex position as an argument, along with the index of the vertex in the mesh.
+	// It accepts a vertex's position and normal as an argument, along with the index of the vertex in the mesh, and returns
+	// the transformed position and normal as outputs.
 	// One can use this to simply transform vertices of the mesh on CPU (note that this is, of course, not as performant as
 	// a traditional GPU vertex shader, but is fine for simple / low-poly mesh transformations).
 	// This function is run after skinning the vertex if the material belongs to a mesh that is skinned by an armature.
-	// Note that the VertexTransformFunction must return the vector passed.
-	VertexTransformFunction func(vertexPosition *Vector3, vertexIndex int)
+	VertexTransformFunction func(vertexPosition, vertexNormal Vector3, vertexIndex int) (Vector3, Vector3)
 
 	// VertexClipFunction is a function that runs on the clipped result of each vertex position rendered with the material.
 	// The function takes the vertex position along with the vertex index in the mesh.
 	// This program runs after the vertex position is clipped to screen coordinates.
 	// Note that the VertexClipFunction must return the vector passed.
-	VertexClipFunction func(vertexPosition *Vector4, vertexIndex int)
+	VertexClipFunction func(vertexPosition Vector4, vertexIndex int) Vector4
 
 	// Automatic batching mode; when set and a Model changes parenting, it will be automatically batched as necessary according to
 	// the AutoBatchMode set.
@@ -485,10 +485,12 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		return
 	}
 
-	var transformFunc func(vertPos *Vector3, index int)
+	var transformFunc func(vertPos, vertNormal Vector3, index int) (Vector3, Vector3)
+	transformFuncExists := false
 
 	if model.VertexTransformFunction != nil {
 		transformFunc = model.VertexTransformFunction
+		transformFuncExists = true
 	}
 
 	modelTransform := model.Transform()
@@ -585,8 +587,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		_, _, mvJustRForNormals = modelTransform.Mult(camera.ViewMatrix()).Decompose()
 	}
 
-	transformFuncExists := transformFunc != nil
-
 	minDepth := float32(math.MaxFloat32)
 	maxDepth := -float32(math.MaxFloat32)
 
@@ -655,16 +655,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				vert, normal = model.skinVertex(vertexIndex)
 
 				if transformFuncExists {
-					transformFunc(&vert, vertexIndex)
+					vert, normal = transformFunc(vert, normal, vertexIndex)
 				}
 
-				mesh.vertexSkinnedNormals[vertexIndex].X = normal.X
-				mesh.vertexSkinnedNormals[vertexIndex].Y = normal.Y
-				mesh.vertexSkinnedNormals[vertexIndex].Z = normal.Z
-
-				mesh.vertexSkinnedPositions[vertexIndex].X = vert.X
-				mesh.vertexSkinnedPositions[vertexIndex].Y = vert.Y
-				mesh.vertexSkinnedPositions[vertexIndex].Z = vert.Z
+				globalMeshAlteredVertexPositions[vertexIndex] = vert
+				globalMeshAlteredVertexNormals[vertexIndex] = normal
 
 				// MultVecW() matrix multiplication, but faster to do it right here rather than using functions and/or pointers
 				globalVertexTransforms[vertexIndex].X = vpMatrix[0][0]*vert.X + vpMatrix[1][0]*vert.Y + vpMatrix[2][0]*vert.Z + vpMatrix[3][0]
@@ -679,9 +674,16 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				vert.Y = mesh.VertexPositions[vertexIndex].Y
 				vert.Z = mesh.VertexPositions[vertexIndex].Z
 
+				normal.X = mesh.VertexNormals[vertexIndex].X
+				normal.Y = mesh.VertexNormals[vertexIndex].Y
+				normal.Z = mesh.VertexNormals[vertexIndex].Z
+
 				if transformFunc != nil {
-					transformFunc(&vert, vertexIndex)
+					vert, normal = transformFunc(vert, normal, vertexIndex)
 				}
+
+				globalMeshAlteredVertexPositions[vertexIndex] = vert
+				globalMeshAlteredVertexNormals[vertexIndex] = normal
 
 				globalVertexTransforms[vertexIndex].X = mvp[0][0]*vert.X + mvp[1][0]*vert.Y + mvp[2][0]*vert.Z + mvp[3][0]
 				globalVertexTransforms[vertexIndex].Y = mvp[0][1]*vert.X + mvp[1][1]*vert.Y + mvp[2][1]*vert.Z + mvp[3][1]
@@ -751,7 +753,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			// It's faster to store the indices of the triangles in a variable than constantly dereference a pointer
 			if modelSkinned {
-				skinnedTriCenter = skinnedTriCenter.Add(mesh.vertexSkinnedPositions[tri.VertexIndex(i)])
+				skinnedTriCenter = skinnedTriCenter.Add(globalMeshAlteredVertexPositions[tri.VertexIndex(i)])
 			}
 
 			w := globalVertexTransforms[tri.VertexIndex(i)].W
@@ -1001,7 +1003,7 @@ func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 
 			vertexIndex := tri.VertexIndex(i)
 
-			if !bakeOptions.TargetVertices.IsEmpty() && !bakeOptions.TargetVertices.Contains(model.mesh, vertexIndex) {
+			if !bakeOptions.TargetVertices.IsEmpty() && !bakeOptions.TargetVertices.Contains(vertexIndex) {
 				continue
 			}
 

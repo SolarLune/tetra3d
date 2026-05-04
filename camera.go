@@ -40,23 +40,118 @@ func (d *DebugInfoDuration) EndTimer() {
 // DebugInfo is a struct that holds debugging information for a Camera's render pass. These values are reset when Camera.Clear() is called.
 type DebugInfo struct {
 	On                   bool          // If not on, debug info is not filled out
-	FrameTime            time.Duration // Amount of CPU frame time spent transforming vertices and calling Image.DrawTriangles. Doesn't include time ebitengine spends flushing the command queue.
-	AnimationTime        time.Duration // Amount of CPU frame time spent animating vertices.
-	LightTime            time.Duration // Amount of CPU frame time spent lighting vertices.
+	totalFrameTime       time.Duration // Amount of CPU frame time spent transforming vertices and calling Image.DrawTriangles. Doesn't include time ebitengine spends flushing the command queue.
+	totalAnimationTime   time.Duration // Amount of CPU frame time spent animating vertices.
+	totalLightTime       time.Duration // Amount of CPU frame time spent lighting vertices.
 	currentAnimationTime DebugInfoDuration
 	currentLightTime     DebugInfoDuration
 	currentFrameTime     DebugInfoDuration
 	frameCount           int
-	NodeCount            int
-	DrawnParts           int // Number of draw calls, excluding those invisible or culled based on distance
-	TotalParts           int // Total number of draw calls
-	BatchedParts         int // Total batched number of draw calls
-	DrawnTris            int // Number of drawn triangles, excluding those hidden from backface culling
-	TotalTris            int // Total number of triangles
-	LightCount           int // Total number of lights
-	ActiveLightCount     int // Total active number of lights
+	nodeCount            int
+	drawnParts           int // Number of draw calls, excluding those invisible or culled based on distance
+	totalParts           int // Total number of draw calls
+	batchedParts         int // Total batched number of draw calls
+	drawnTris            int // Number of drawn triangles, excluding those hidden from backface culling
+	totalTris            int // Total number of triangles
+	lightCount           int // Total number of lights
+	activeLightCount     int // Total active number of lights
 
 	tickTime time.Time
+
+	combineWith []*DebugInfo
+}
+
+// Combines debug infos together for rendering
+func (d *DebugInfo) SetCombineWith(others ...*DebugInfo) {
+	d.combineWith = d.combineWith[:0]
+	d.combineWith = append(d.combineWith, others...)
+}
+
+func (d *DebugInfo) FrameTime() time.Duration {
+	metric := d.totalFrameTime
+	for _, other := range d.combineWith {
+		metric += other.totalFrameTime
+	}
+	return metric
+}
+
+func (d *DebugInfo) AnimationTime() time.Duration {
+	metric := d.totalAnimationTime
+	for _, other := range d.combineWith {
+		metric += other.totalAnimationTime
+	}
+	return metric
+}
+
+func (d *DebugInfo) LightTime() time.Duration {
+	metric := d.totalLightTime
+	for _, other := range d.combineWith {
+		metric += other.totalLightTime
+	}
+	return metric
+}
+
+func (d *DebugInfo) NodeCount() int {
+	metric := d.nodeCount
+	for _, other := range d.combineWith {
+		metric += other.nodeCount
+	}
+	return metric
+}
+
+func (d *DebugInfo) DrawnParts() int {
+	metric := d.drawnParts
+	for _, other := range d.combineWith {
+		metric += other.drawnParts
+	}
+	return metric
+}
+
+func (d *DebugInfo) BatchedParts() int {
+	metric := d.batchedParts
+	for _, other := range d.combineWith {
+		metric += other.batchedParts
+	}
+	return metric
+}
+
+func (d *DebugInfo) TotalParts() int {
+	metric := d.totalParts
+	for _, other := range d.combineWith {
+		metric += other.totalParts
+	}
+	return metric
+}
+
+func (d *DebugInfo) DrawnTris() int {
+	metric := d.drawnTris
+	for _, other := range d.combineWith {
+		metric += other.drawnTris
+	}
+	return metric
+}
+func (d *DebugInfo) TotalTris() int {
+	metric := d.totalTris
+	for _, other := range d.combineWith {
+		metric += other.totalTris
+	}
+	return metric
+}
+
+func (d *DebugInfo) LightCount() int {
+	metric := d.lightCount
+	for _, other := range d.combineWith {
+		metric += other.lightCount
+	}
+	return metric
+}
+
+func (d *DebugInfo) ActiveLightCount() int {
+	metric := d.activeLightCount
+	for _, other := range d.combineWith {
+		metric += other.activeLightCount
+	}
+	return metric
 }
 
 type AccumulationColorMode int
@@ -215,7 +310,9 @@ func NewCamera(w, h int) *Camera {
 
 		var PerspectiveCorrection int
 		var TextureMapMode int
-		var TextureMapScreenSize float
+		var TextureMapScreenSizeMultiplierW float
+		var TextureMapScreenSizeMultiplierH float
+		var TextureFilterMode int
 
 		func encodeDepth(depth float) vec4 {
 			r := floor(depth * 255) / 255
@@ -232,6 +329,30 @@ func NewCamera(w, h int) *Camera {
 			return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
 		}
 
+		func bilinearFilter(srcPos vec2) vec4 {
+	
+			p0 := mod(srcPos - 1/2.0, imageSrc1Size())
+			p1 := mod(srcPos + 1/2.0, imageSrc1Size())
+
+			c0 := imageSrc1UnsafeAt(p0)
+			c1 := imageSrc1UnsafeAt(vec2(p1.x, p0.y))
+			c2 := imageSrc1UnsafeAt(vec2(p0.x, p1.y))
+			c3 := imageSrc1UnsafeAt(p1)
+
+			rate := fract(p1)
+
+			return mix(
+				mix(c0, c1, rate.x),
+				mix(c2, c3, rate.x),
+				rate.y,
+			)
+			
+		}
+
+		func nearestFilter(srcPos vec2) vec4 {
+			return imageSrc1UnsafeAt(srcPos)
+		}
+
 		func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 
 			color := vc
@@ -243,7 +364,7 @@ func NewCamera(w, h int) *Camera {
 			tx := srcPos
 
 			if TextureMapMode == 1 {
-				tx = (dstPos.xy * TextureMapScreenSize) + (srcPos - imageSrc0Origin())
+				tx = (dstPos.xy * vec2(TextureMapScreenSizeMultiplierW, TextureMapScreenSizeMultiplierH)) + (srcPos - imageSrc0Origin())
 			} else if PerspectiveCorrection > 0 {
 				tx *= 1.0 / custom.x
 			}
@@ -257,9 +378,15 @@ func NewCamera(w, h int) *Camera {
 			// Multiply by the size to get the pixel coordinates again.
 			tx *= srcSize
 
-			tex := imageSrc1UnsafeAt(tx)
+			var tex vec4
 
-			if (tex.a == 0) {
+			if TextureFilterMode == 0 {
+				tex = nearestFilter(tx)
+			} else {
+				tex = bilinearFilter(tx)
+			}
+
+			if (tex.a <= 0.8) {
 				discard()
 			}
 
@@ -824,7 +951,7 @@ func (camera *Camera) ClearWithColor(clear Color4) {
 
 		if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 
-			camera.prevFrametimes = append(camera.prevFrametimes, float32(camera.DebugInfo.FrameTime.Seconds()))
+			camera.prevFrametimes = append(camera.prevFrametimes, float32(camera.DebugInfo.totalFrameTime.Seconds()))
 
 			for len(camera.prevFrametimes) > camera.prevDebugInfoFrametimeCap {
 				camera.prevFrametimes = camera.prevFrametimes[1:]
@@ -835,9 +962,9 @@ func (camera *Camera) ClearWithColor(clear Color4) {
 				frameCount = camera.DebugInfo.frameCount
 			}
 
-			camera.DebugInfo.FrameTime = camera.DebugInfo.currentFrameTime.duration / time.Duration(frameCount)
-			camera.DebugInfo.AnimationTime = camera.DebugInfo.currentAnimationTime.duration / time.Duration(frameCount)
-			camera.DebugInfo.LightTime = camera.DebugInfo.currentLightTime.duration / time.Duration(frameCount)
+			camera.DebugInfo.totalFrameTime = camera.DebugInfo.currentFrameTime.duration / time.Duration(frameCount)
+			camera.DebugInfo.totalAnimationTime = camera.DebugInfo.currentAnimationTime.duration / time.Duration(frameCount)
+			camera.DebugInfo.totalLightTime = camera.DebugInfo.currentLightTime.duration / time.Duration(frameCount)
 			camera.DebugInfo.tickTime = time.Now()
 
 			camera.DebugInfo.currentFrameTime.reset()
@@ -846,14 +973,14 @@ func (camera *Camera) ClearWithColor(clear Color4) {
 			camera.DebugInfo.frameCount = 0
 		}
 
-		camera.DebugInfo.NodeCount = 0
-		camera.DebugInfo.DrawnParts = 0
-		camera.DebugInfo.BatchedParts = 0
-		camera.DebugInfo.TotalParts = 0
-		camera.DebugInfo.TotalTris = 0
-		camera.DebugInfo.DrawnTris = 0
-		camera.DebugInfo.LightCount = 0
-		camera.DebugInfo.ActiveLightCount = 0
+		camera.DebugInfo.nodeCount = 0
+		camera.DebugInfo.drawnParts = 0
+		camera.DebugInfo.batchedParts = 0
+		camera.DebugInfo.totalParts = 0
+		camera.DebugInfo.totalTris = 0
+		camera.DebugInfo.drawnTris = 0
+		camera.DebugInfo.lightCount = 0
+		camera.DebugInfo.activeLightCount = 0
 
 	}
 
@@ -880,7 +1007,7 @@ var lights = NewNodeCollection()
 func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	if camera.DebugInfo.On {
-		camera.DebugInfo.NodeCount = rootNode.ChildCount(true)
+		camera.DebugInfo.nodeCount = rootNode.ChildCount(true)
 	}
 
 	meshes.Clear()
@@ -1049,7 +1176,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	if scene.World != nil {
 
-		camera.DebugInfo.LightCount++
+		camera.DebugInfo.lightCount++
 
 		if scene.World.LightingOn && scene.World.AmbientLight.IsVisible() {
 			scene.World.AmbientLight.beginRender()
@@ -1060,7 +1187,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	lights.ForEachLight(func(light ILight) bool {
 
-		camera.DebugInfo.LightCount++
+		camera.DebugInfo.lightCount++
 
 		if (scene.World == nil || scene.World.LightingOn) && light.IsVisible() {
 			light.beginRender()
@@ -1116,7 +1243,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 			if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
 				for range model.mesh.MeshParts {
-					camera.DebugInfo.TotalParts++
+					camera.DebugInfo.totalParts++
 				}
 			}
 
@@ -1205,7 +1332,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				}
 
 				if camera.DebugInfo.On {
-					camera.DebugInfo.TotalParts += len(modelSlice)
+					camera.DebugInfo.totalParts += len(modelSlice)
 				}
 
 			}
@@ -1256,7 +1383,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 	if camera.DebugInfo.On {
 		for _, light := range sceneLights {
 			if scene.World != nil && scene.World.LightingOn && light.IsVisible() {
-				camera.DebugInfo.ActiveLightCount++
+				camera.DebugInfo.activeLightCount++
 			}
 		}
 	}
@@ -1286,10 +1413,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 		if camera.DebugInfo.On {
 
-			camera.DebugInfo.TotalTris += meshPart.TriangleCount()
+			camera.DebugInfo.totalTris += meshPart.TriangleCount()
 
 			if model.DynamicBatchOwner != nil {
-				camera.DebugInfo.BatchedParts++
+				camera.DebugInfo.batchedParts++
 			}
 
 		}
@@ -1409,7 +1536,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				target := globalVertexTransforms[vertexIndex]
 
 				if vertexClipFunctionOn {
-					model.VertexClipFunction(&target, vertexIndex)
+					target = model.VertexClipFunction(target, vertexIndex)
 				}
 
 				dx := float32((target.X/w)*float32(camWidth) + halfCamWidth)
@@ -1433,11 +1560,6 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				} else {
 					uvU = float32(mesh.VertexUVs[vertexIndex].X * srcW)
 					uvV = float32((1 - mesh.VertexUVs[vertexIndex].Y) * srcH)
-				}
-
-				if mat != nil && mat.TextureMapMode == TextureMapModeScreen {
-					uvU = mat.TextureMapScreenOffset.X
-					uvV = mat.TextureMapScreenOffset.Y
 				}
 
 				colorVertexList[vertexListIndex].SrcX = uvU
@@ -1601,21 +1723,23 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 		textureFilterMode := 0
 		textureMapMode := 0
-		textureMapScreenSize := float32(1.0)
+		textureMapScreenSizeW := float32(1.0)
+		textureMapScreenSizeH := float32(1.0)
 
 		if mat != nil {
-			colorPassOptions.Filter = mat.TextureFilterMode
+			switch mat.TextureFilterMode {
+			case TextureFilterNearest:
+				colorPassOptions.Filter = ebiten.FilterNearest
+			case TextureFilterBilinear:
+				colorPassOptions.Filter = ebiten.FilterLinear
+			}
 			colorPassOptions.Address = mat.textureWrapMode
 
 			textureMapMode = mat.TextureMapMode
-			textureMapScreenSize = mat.TextureMapScreenSize
+			textureMapScreenSizeW = mat.TextureMapScreenSizeMultiplierW
+			textureMapScreenSizeH = mat.TextureMapScreenSizeMultiplierH
 
-			switch mat.TextureFilterMode {
-			case ebiten.FilterNearest:
-				textureFilterMode = 0
-			case ebiten.FilterLinear:
-				textureFilterMode = 1
-			}
+			textureFilterMode = int(mat.TextureFilterMode)
 
 		}
 
@@ -1653,9 +1777,11 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
 					Images: [4]*ebiten.Image{camera.resultDepthTexture, img},
 					Uniforms: map[string]any{
-						"PerspectiveCorrection": perspectiveCorrection,
-						"TextureMapMode":        textureMapMode,
-						"TextureMapScreenSize":  textureMapScreenSize,
+						"PerspectiveCorrection":           perspectiveCorrection,
+						"TextureMapMode":                  textureMapMode,
+						"TextureMapScreenSizeMultiplierW": textureMapScreenSizeW,
+						"TextureMapScreenSizeMultiplierH": textureMapScreenSizeH,
+						"TextureFilterMode":               textureFilterMode,
 					},
 				}
 				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.clipAlphaShader, shaderOpt)
@@ -1697,15 +1823,16 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 		if scene != nil && scene.World != nil {
 
 			colorPassShaderOptions.Uniforms = map[string]any{
-				"Fog":                   scene.World.fogAsFloatSlice(),
-				"FogRange":              scene.World.FogRange,
-				"DitherSize":            scene.World.DitheredFogSize,
-				"FogCurve":              float32(scene.World.FogCurve),
-				"BayerMatrix":           bayerMatrix,
-				"PerspectiveCorrection": perspectiveCorrection,
-				"TextureFilterMode":     textureFilterMode,
-				"TextureMapMode":        textureMapMode,
-				"TextureMapScreenSize":  textureMapScreenSize,
+				"Fog":                             scene.World.fogAsFloatSlice(),
+				"FogRange":                        scene.World.FogRange,
+				"DitherSize":                      scene.World.DitheredFogSize,
+				"FogCurve":                        float32(scene.World.FogCurve),
+				"BayerMatrix":                     bayerMatrix,
+				"PerspectiveCorrection":           perspectiveCorrection,
+				"TextureFilterMode":               textureFilterMode,
+				"TextureMapMode":                  textureMapMode,
+				"TextureMapScreenSizeMultiplierW": textureMapScreenSizeW,
+				"TextureMapScreenSizeMultiplierH": textureMapScreenSizeH,
 			}
 
 		} else {
@@ -1779,8 +1906,8 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 		}
 
 		if camera.DebugInfo.On {
-			camera.DebugInfo.DrawnTris += vertexListIndex / 3
-			camera.DebugInfo.DrawnParts++
+			camera.DebugInfo.drawnTris += vertexListIndex / 3
+			camera.DebugInfo.drawnParts++
 		}
 
 		vertexListIndex = 0
@@ -2020,13 +2147,13 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 // visible outside of debugging and profiling, like with pprof.
 func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float32, col Color4) {
 
-	m := camera.DebugInfo.FrameTime.Round(time.Microsecond).Microseconds()
+	m := camera.DebugInfo.totalFrameTime.Round(time.Microsecond).Microseconds()
 	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
 
-	m = camera.DebugInfo.AnimationTime.Round(time.Microsecond).Microseconds()
+	m = camera.DebugInfo.totalAnimationTime.Round(time.Microsecond).Microseconds()
 	at := fmt.Sprintf("%.2fms", float32(m)/1000)
 
-	m = camera.DebugInfo.LightTime.Round(time.Microsecond).Microseconds()
+	m = camera.DebugInfo.totalLightTime.Round(time.Microsecond).Microseconds()
 	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
 
 	sectorName := "<Sector Rendering Off>"
@@ -2046,14 +2173,14 @@ func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float3
 		ft,
 		at,
 		lt,
-		camera.DebugInfo.NodeCount,
-		camera.DebugInfo.DrawnParts,
-		camera.DebugInfo.TotalParts,
-		camera.DebugInfo.BatchedParts,
-		camera.DebugInfo.DrawnTris,
-		camera.DebugInfo.TotalTris,
-		camera.DebugInfo.ActiveLightCount,
-		camera.DebugInfo.LightCount,
+		camera.DebugInfo.NodeCount(),
+		camera.DebugInfo.DrawnParts(),
+		camera.DebugInfo.TotalParts(),
+		camera.DebugInfo.BatchedParts(),
+		camera.DebugInfo.DrawnTris(),
+		camera.DebugInfo.TotalTris(),
+		camera.DebugInfo.ActiveLightCount(),
+		camera.DebugInfo.LightCount(),
 		camera.WorldPosition(),
 		sectorName,
 	)

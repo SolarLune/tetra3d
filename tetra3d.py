@@ -83,6 +83,16 @@ lightVolumeShadingModes = [
     ("IGNORE", "Ignore", "Objects are not shaded by light volumes", 0, 3),
 ]
 
+textureMapModes = [
+    ("UV", "UV", "The default; objects use the UV values of the mesh to determine where textures are drawn", 0, 0),
+    ("UV+SCREEN", "UV + Screen", "Objects use the screen pixel positions rendered to determine where textures are drawn, with the UV serving as an offset amount", 0, 1),
+]
+
+textureFilterModes = [
+    ("NEAREST", "Nearest", "Sharp and pixelly", 0, 1),
+    ("BILINEAR", "Bilinear", "Blurs for a smoother texture", 0, 2),
+]
+
 billboardingYDirections = [
     ("GLOBAL_Y", "Global Y-Up", "Upwards is global, world-up", 0, 0),
     ("CAMERA_Y", "Camera Y-Up", "Upwards is relative to the camera's local Y-up direction heading", 0, 1),
@@ -183,6 +193,29 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     valueDirpath: bpy.props.StringProperty(name = "", description="The directory path of the property", subtype="DIR_PATH")
     # valueFilepathAbsolute
     # valueVector4D: bpy.props.FloatVectorProperty(name = "", description="The 4D vector value of the property")
+
+class MAT_OT_tetra3dCopyTextureFilterMode(bpy.types.Operator):
+    bl_idname = "material.tetra3dcopytexturefiltermode"
+    bl_label = "Copy Texture Filter Mode To All Materials"
+    bl_description= "Copies the selected texture filter mode to all materials in the current blend file"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode : bpy.props.StringProperty()
+
+    def execute(self, context):
+        
+        if self.mode == "scene":
+            target = context.scene
+        elif self.mode == "object":
+            target = context.object
+        elif self.mode == "material":
+            target = context.object.active_material
+        elif self.mode == "action":
+            target = context.active_action
+
+        # target = getattr(context, self.mode)
+        target.t3dGameProperties__.add()
+        return {'FINISHED'}
 
 class OBJECT_OT_tetra3dAddProp(bpy.types.Operator):
     bl_idname = "object.tetra3daddprop"
@@ -1004,7 +1037,13 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             
             row = baseBox.row()
             row.enabled = context.object.t3dObjectType__ == 'MODEL' or context.object.t3dObjectType__ == 'LIGHTVOLUME' or context.object.type == "LIGHT"
-            row.prop(context.object, "t3dVisible__")
+
+            visibleLabel = None
+
+            if context.object.type == "LIGHT":
+                visibleLabel = "On"
+            
+            row.prop(context.object, "t3dVisible__", text=visibleLabel)
 
             colorRow = baseBox.row()
             colorRow.label(text="Model Color:")
@@ -1326,12 +1365,22 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row = box.row()
         row.prop(context.material, "t3dSolidToCollisions__")
         row.prop(context.material, "t3dSolidToRays__")
+
         row = self.layout.row()
         row.label(text="Transparency Mode:")
         row.prop(context.material, "t3dTransparencyMode__", text="")
         row = self.layout.row()
         row.label(text="Blend Mode:")
         row.prop(context.material, "t3dBlendMode__", text="")
+        row = self.layout.row()
+        row.label(text="UV Mapping Mode:")
+        row.prop(context.material, "t3dTextureMapMode__", text="")
+        if context.material.t3dTextureMapMode__ == "UV+SCREEN":
+            row.prop(context.material, "t3dTextureMapScreenSizeMultiplier__", text="")
+        row = self.layout.row()
+        row.label(text="Texture Filter Mode:")
+        row.prop(context.material, "t3dTextureFilterMode__", text="")
+
         box = self.layout.box()
         row = box.row()
         row.prop(context.material, "t3dBillboardEnabled__")
@@ -1347,6 +1396,9 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
         row.enabled = context.material.t3dBillboardEnabled__
         row.label(text="Up Direction:")
         row.prop(context.material, "t3dBillboardUpDirection__", text="")
+        row = box.row()
+        row.enabled = context.material.t3dBillboardEnabled__
+        row.prop(context.material, "t3dDepthMode__")
 
         box = self.layout.box()
         row = box.row()
@@ -1361,14 +1413,11 @@ class MATERIAL_PT_tetra3d(bpy.types.Panel):
 
         box = self.layout.box()
         row = box.row()
-        row.prop(context.material, "t3dDepthMode__")
-        row = box.row()
         row.label(text="Lighting Mode:")
         row.prop(context.material, "t3dMaterialLightingMode__", text="")
         row = box.row()
         row.label(text="LightVolume Shading Mode:")
         row.prop(context.material, "t3dLightVolumeShadingMode__", text="")
-
 
         if context.object.active_material != None:
 
@@ -2267,7 +2316,7 @@ def setFOV(self, value):
 ####
 
 objectProps = {
-    "t3dVisible__" : bpy.props.BoolProperty(name="Visible", description="Whether the object is visible or not when exported to Tetra3D", default=True),
+    "t3dVisible__" : bpy.props.BoolProperty(name="Visible", description="Whether the object is visible or not", default=True),
     "t3dBoundsType__" : bpy.props.EnumProperty(items=boundsTypes, name="Bounds", description="What Bounding node type to create and parent to this object"),
     "t3dAABBCustomEnabled__" : bpy.props.BoolProperty(name="Custom AABB Size", description="If enabled, you can manually set the BoundingAABB node's size. If disabled, the AABB's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingAABB node will be generated)", default=False),
     "t3dAABBCustomSize__" : bpy.props.FloatVectorProperty(name="Size", description="Width (X), height (Y), and depth (Z) of the BoundingAABB node that will be created", min=0.0, default=[2,2,2]),
@@ -2557,6 +2606,9 @@ def register():
     bpy.types.Material.t3dSolidToCollisions__ = bpy.props.BoolProperty(name="Report Collisions", description="Whether this material contributes to collision checks for BoundingTriangles meshes", default=True)
     bpy.types.Material.t3dSolidToRays__ = bpy.props.BoolProperty(name="Report Raycasts", description="Whether this material contributes to ray checks for BoundingTriangles meshes", default=True)
     bpy.types.Material.t3dLightVolumeShadingMode__ = bpy.props.EnumProperty(items=lightVolumeShadingModes, name="Depth Rendering Modes", description="How depth should be rendered for meshes that use this materials", default="PERVERTEXPOSITION")
+    bpy.types.Material.t3dTextureMapMode__ = bpy.props.EnumProperty(items=textureMapModes, name="Texture Mapping Modes", description="How textures should be mapped", default="UV")
+    bpy.types.Material.t3dTextureMapScreenSizeMultiplier__ = bpy.props.FloatVectorProperty(name="Screen Size Multiplier", description="What multiplier to use for the screen size; a multiplier of 1 means a 32x32 texture will appear 32x32 in screen mapping mode, regardless of the triangle's size when rendering", default=[1,1], size=2, update=autoUVChange, step=1, min=0)
+    bpy.types.Material.t3dTextureFilterMode__ = bpy.props.EnumProperty(items=textureFilterModes, name="Texture Filter Modes", description="How textures should be filtered", default="NEAREST")
 
     bpy.types.Material.t3dAutoUV__ = bpy.props.BoolProperty(name="Auto UV-Map", description="If the UV map of the faces that use this material should automatically be Cube Projection UV mapped when exiting edit mode", update=autoUVChange)
     bpy.types.Material.t3dAutoUVUnitSize__ = bpy.props.FloatProperty(name="Unit Size", description="How many Blender Units equates to one texture size", default=4.0, update=autoUVChange, step=5, min=0)
@@ -2695,6 +2747,9 @@ def unregister():
     del bpy.types.Material.t3dBillboardUpDirection__
     del bpy.types.Material.t3dTransparencyMode__
     del bpy.types.Material.t3dMaterialLightingMode__
+    del bpy.types.Material.t3dTextureMapMode__
+    del bpy.types.Material.t3dTextureMapScreenSizeMultiplier__
+    del bpy.types.Material.t3dTextureFilterMode__
 
     del bpy.types.Material.t3dDepthMode__
     del bpy.types.Material.t3dGameProperties__

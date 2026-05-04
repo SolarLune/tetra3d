@@ -404,6 +404,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Checking multiple collisions at the same time
 - [x] -- Composing collision shapes out of multiple sub-shapes (this can be done by simply creating them, parenting them to some node, and then testing against that node)
 - [x] -- Bounding / Broadphase collision checking
+    - [ ] -- Review broadphase collision detection, because it seems slower than culling triangles based off of basic math and axis testing (e.g. `if rayStart.X > v0/v1/v2.X && rayEnd.X > v0/v1/v2.X { continue }`)
 
 - -- Supported collision types:
 

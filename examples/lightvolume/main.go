@@ -256,13 +256,13 @@ func (g *Game) Init() {
 				col.ForEachCollidedMaterial(func(mat *tetra3d.Material) bool {
 					if mat.Name() == "Sky" {
 						// Touching the sky, so we can make the cell bright.
-						cell.AddTag(TAG_LIGHT_FROM_ABOVE)
+						cell.SetTag(TAG_LIGHT_FROM_ABOVE)
 						cell.SetColorMonochrome(2)
 					} else if mat.Name() == "LightFloor" {
 						// Touching the LightFloor material, so it deals with light coming up from below.
-						cell.AddTag(TAG_LIGHT_FROM_BELOW)
+						cell.SetTag(TAG_LIGHT_FROM_BELOW)
 					} else if mat.Name() == "LightCeiling" {
-						cell.AddTag(TAG_LIGHT_FROM_ABOVE)
+						cell.SetTag(TAG_LIGHT_FROM_ABOVE)
 						cell.SetColorMonochrome(3)
 					} else {
 						cell.SetBlockedAll(true)
@@ -298,12 +298,12 @@ func (g *Game) Init() {
 		if cell.HasTag(TAG_LIGHT_FROM_BELOW) {
 
 			// We can call `cell.UseLights()` to simply light an object with another actual Light if it's within a Cell.
-			cell.UseLights(underLight)
+			cell.SetUseLights(underLight)
 			cell.ForEachNeighborInDirection(tetra3d.LightVolumeDirectionUp, func(neighbor *tetra3d.LightVolumeCell) bool {
 				if neighbor.Blocked(0) {
 					return false
 				}
-				neighbor.UseLights(underLight)
+				neighbor.SetUseLights(underLight)
 				return true
 			})
 		}

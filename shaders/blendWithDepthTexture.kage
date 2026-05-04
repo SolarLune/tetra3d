@@ -1,0 +1,68 @@
+//kage:unit pixels
+
+package main
+
+var TransparencyRange [2]float
+var DitherSize float
+var TransparencyCurve float
+
+var BayerMatrix [16]float
+
+func decodeDepth(rgba vec4) float {
+	return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+}
+
+func OutCirc(v float) float {
+	return sqrt(1 - pow(v - 1, 2))
+}
+
+func InCirc(v float) float {
+	return 1 - sqrt(1 - pow(v, 2))
+}
+
+func dstPosToSrcPos(dstPos vec2) vec2 {
+	return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
+}
+
+func Fragment(dstPos vec4, srcPos vec2) vec4 {
+
+	depth := imageSrc1UnsafeAt(dstPosToSrcPos(dstPos.xy))
+	
+	if depth.a > 0 {
+
+		// There's atlassing going on behind the scenes here, so:
+		// Subtract the source position by the src texture's origin on the atlas.
+		// This gives us the actual pixel coordinates.
+        colorTex := imageSrc0UnsafeAt(srcPos - imageSrc0Origin() + imageSrc0Origin())
+		
+        var d float
+    
+        if TransparencyCurve == 0 {
+            d = smoothstep(TransparencyRange[0], TransparencyRange[1], decodeDepth(depth))
+        } else if TransparencyCurve == 1 {
+            d = smoothstep(TransparencyRange[0], TransparencyRange[1], OutCirc(decodeDepth(depth)))
+        } else if TransparencyCurve == 2 {
+            d = smoothstep(TransparencyRange[0], TransparencyRange[1], InCirc(decodeDepth(depth)))
+        }
+
+        if DitherSize > 0 {
+
+            yc := int(dstPos.y / DitherSize)%4
+            xc := int(dstPos.x / DitherSize)%4
+            colorTex.a *= abs(1-d) * step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
+            colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
+
+        } else {
+
+            colorTex.a *= abs(1-d)
+            colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
+
+        }
+
+		return colorTex
+
+	}
+
+	discard()
+
+}

@@ -107,10 +107,8 @@ func (player *TexturePlayer) Update(dt float32) {
 // ApplyUVOffset applies a specified UV offset to all vertices a player is assigned to. This offset is not additive, but rather is
 // set once, regardless of how many times ApplyUVOffset is called.
 func (player *TexturePlayer) ApplyUVOffset(offsetX, offsetY float32) {
-	for mesh := range player.vertexSelection.SelectionSet {
-		for vertIndex, ogOffset := range player.OriginalOffsets {
-			mesh.VertexUVs[vertIndex].X = ogOffset.X + offsetX
-			mesh.VertexUVs[vertIndex].Y = ogOffset.Y + offsetY
-		}
+	for vertIndex, ogOffset := range player.OriginalOffsets {
+		player.vertexSelection.mesh.VertexUVs[vertIndex].X = ogOffset.X + offsetX
+		player.vertexSelection.mesh.VertexUVs[vertIndex].Y = ogOffset.Y + offsetY
 	}
 }

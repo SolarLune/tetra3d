@@ -105,7 +105,7 @@ func (g *Game) Init() {
 
 	// Finally, we'll set the models' active color channel here. By default, it's -1, indicating no vertex colors are active (unless
 	// the mesh was exported from Blender with an active vertex color channel).
-	model.Mesh().SetActiveColorChannel(ChannelCombined)
+	model.Mesh().VertexActiveColorChannel = ChannelCombined
 
 }
 
@@ -115,19 +115,19 @@ func (g *Game) Update() error {
 	gameMap := g.Scene.Root.Get("GameMap").(*tetra3d.Model)
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		gameMap.Mesh().Select().SetActiveColorChannel(ChannelColor)
+		gameMap.Mesh().VertexActiveColorChannel = ChannelColor
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		gameMap.Mesh().Select().SetActiveColorChannel(ChannelAO)
+		gameMap.Mesh().VertexActiveColorChannel = ChannelAO
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key3) {
-		gameMap.Mesh().Select().SetActiveColorChannel(ChannelLight)
+		gameMap.Mesh().VertexActiveColorChannel = ChannelLight
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key4) {
-		gameMap.Mesh().Select().SetActiveColorChannel(ChannelCombined)
+		gameMap.Mesh().VertexActiveColorChannel = ChannelCombined
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key5) {

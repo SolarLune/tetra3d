@@ -55,8 +55,9 @@ func (g *Game) Init() {
 
 	water := g.Scene.Root.Get("Water").(*tetra3d.Model)
 
-	water.VertexTransformFunction = func(v *tetra3d.Vector3, vertID int) {
-		v.Y += math32.Sin((g.Time*math.Pi)+(v.X*1.2)+(v.Z*0.739)) * 0.1
+	water.VertexTransformFunction = func(vertexPosition, vertexNormal tetra3d.Vector3, vertexIndex int) (tetra3d.Vector3, tetra3d.Vector3) {
+		vertexPosition.Y += math32.Sin((g.Time*math.Pi)+(vertexPosition.X*1.2)+(vertexPosition.Z*0.739)) * 0.1
+		return vertexPosition, vertexNormal
 	}
 
 }

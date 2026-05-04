@@ -31,6 +31,9 @@ var globalVertexTransforms = make([]Vector4, startingDisplayListSize)
 var globalVertexTransformedNormals = make([]Vector3, startingDisplayListSize)
 var globalVertexDepthUnbillboarded = make([]float32, startingDisplayListSize)
 
+var globalMeshAlteredVertexPositions = make([]Vector3, startingDisplayListSize)
+var globalMeshAlteredVertexNormals = make([]Vector3, startingDisplayListSize)
+
 func init() {
 	defaultImg.Fill(color.White)
 }

@@ -1,7 +1,6 @@
 package tetra3d
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -226,8 +225,6 @@ type Mesh struct {
 	VertexNormals                []Vector3
 	allocatedForAutoSubdivisions bool
 
-	vertexSkinnedNormals   []Vector3
-	vertexSkinnedPositions []Vector3
 	// vertexTransformedNormals []Vector3
 	VertexUVs                []Vector2            // The UV values for each vertex
 	VertexUVOriginalValues   []Vector2            // The original UV values for each vertex
@@ -335,17 +332,9 @@ func (mesh *Mesh) Clone() *Mesh {
 	// 	newMesh.vertexTransforms = append(newMesh.vertexTransforms, mesh.vertexTransforms[v])
 	// }
 
-	for v := range mesh.vertexSkinnedNormals {
-		newMesh.vertexSkinnedNormals = append(newMesh.vertexSkinnedNormals, mesh.vertexSkinnedNormals[v])
-	}
-
 	// for v := range mesh.vertexTransformedNormals {
 	// 	newMesh.vertexTransformedNormals = append(newMesh.vertexTransformedNormals, mesh.vertexTransformedNormals[v])
 	// }
-
-	for v := range mesh.vertexSkinnedPositions {
-		newMesh.vertexSkinnedPositions = append(newMesh.vertexSkinnedPositions, mesh.vertexSkinnedPositions[v])
-	}
 
 	newMesh.Triangles = make([]*Triangle, 0, len(mesh.Triangles))
 
@@ -413,8 +402,6 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 		}
 		mesh.VertexBones = make([][]uint16, 0, vertexCount)
 		mesh.VertexWeights = make([][]float32, 0, vertexCount)
-		mesh.vertexSkinnedNormals = make([]Vector3, 0, vertexCount)
-		mesh.vertexSkinnedPositions = make([]Vector3, 0, vertexCount)
 
 		mesh.vertexLights = make([]Color4, vertexCount)
 	} else {
@@ -427,8 +414,6 @@ func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
 		}
 		mesh.VertexBones = slices.Grow(mesh.VertexBones, vertexCount)
 		mesh.VertexWeights = slices.Grow(mesh.VertexWeights, vertexCount)
-		mesh.vertexSkinnedNormals = slices.Grow(mesh.vertexSkinnedNormals, vertexCount)
-		mesh.vertexSkinnedPositions = slices.Grow(mesh.vertexSkinnedPositions, vertexCount)
 		mesh.vertexLights = slices.Grow(mesh.vertexLights, vertexCount)
 
 		for range vertexCount - len(mesh.vertexLights) {
@@ -501,18 +486,13 @@ func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, so
 
 // SetVertexColor sets the specified vertex color for all vertices in the mesh for the target color channel.
 func (mesh *Mesh) SetVertexColor(targetChannel int, color Color4) {
-	NewVertexSelection().SelectByMeshes(mesh).SetColor(targetChannel, color)
-}
-
-// SetActiveColorChannel sets the active color channel for all vertices in the mesh to the specified channel index.
-func (mesh *Mesh) SetActiveColorChannel(targetChannel int) {
-	NewVertexSelection().SelectByMeshes(mesh).SetActiveColorChannel(targetChannel)
+	NewVertexSelection(mesh).SetColor(targetChannel, color)
 }
 
 // Select allows you to easily select the vertices associated with the Mesh.
 // Select is just syntactic sugar for tetra3d.NewVertexSelection().SelectMeshes(mesh).
 func (mesh *Mesh) Select() VertexSelection {
-	return NewVertexSelection().SelectByMeshes(mesh)
+	return NewVertexSelection(mesh)
 }
 
 // TriangleByID returns a triangle by the given ID, if it exists.
@@ -607,9 +587,7 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 
 		mesh.vertexLights = append(mesh.vertexLights, Color4{})
 		// mesh.vertexTransforms = append(mesh.vertexTransforms, Vector4{}) // x, y, z, w
-		mesh.vertexSkinnedNormals = append(mesh.vertexSkinnedNormals, Vector3{})
 		// mesh.vertexTransformedNormals = append(mesh.vertexTransformedNormals, Vector3{})
-		mesh.vertexSkinnedPositions = append(mesh.vertexSkinnedPositions, Vector3{})
 
 	}
 
@@ -668,130 +646,89 @@ func (mesh *Mesh) AutoNormal() {
 
 }
 
-// SelectVertices generates a new vertex selection for the current Mesh.
-// This selection should generally be retained to operate on sequentially.
-// func (mesh *Mesh) SelectVertices() VertexSelection {
-// 	return VertexSelection{Indices: newSet[int](), Mesh: mesh}
-// }
-
 // Properties returns this Mesh object's game Properties struct.
 func (mesh *Mesh) Properties() Properties {
 	return mesh.properties
 }
 
-// VertexSelectionSet represents a selection set of indices for a given Mesh.
-type VertexSelectionSet struct {
-	Indices   Set[int]
-	SelectAll bool
-}
-
-func (vs *VertexSelectionSet) Clone() *VertexSelectionSet {
-	newVSS := &VertexSelectionSet{}
-	newVSS.Indices = vs.Indices.Clone()
-	newVSS.SelectAll = vs.SelectAll
-	return newVSS
-}
-
-func (vs *VertexSelectionSet) Contains(index int) bool {
-	return vs.Indices.Contains(index)
-}
-
-// VertexSelection represents a selection of vertices on one or more Meshes.
+// VertexSelection represents a selection of vertices on a Mesh.
 type VertexSelection struct {
-	SelectionSet map[*Mesh]*VertexSelectionSet
+	mesh      *Mesh
+	Indices   Set[int]
+	selectAll bool
 }
 
-// NewVertexSelection selects all
-func NewVertexSelection() VertexSelection {
+// NewVertexSelection allows you to select some vertices of a Mesh.
+func NewVertexSelection(mesh *Mesh) VertexSelection {
 	return VertexSelection{
-		SelectionSet: map[*Mesh]*VertexSelectionSet{},
+		mesh:    mesh,
+		Indices: newSet[int](),
 	}
 }
 
 func (vs VertexSelection) Clone() VertexSelection {
-	newVS := NewVertexSelection()
-	for k, v := range vs.SelectionSet {
-		newVS.SelectionSet[k] = v.Clone()
-	}
+	newVS := NewVertexSelection(vs.mesh)
+	newVS.Indices = vs.Indices.Clone()
+	newVS.selectAll = vs.selectAll
 	return newVS
 }
 
-const ErrorVertexChannelOutsideRange = "error: vertex color channel not found by given name"
-
-func (vs VertexSelection) ensureSelectionSetExists(mesh *Mesh) {
-	if _, ok := vs.SelectionSet[mesh]; !ok {
-		vs.SelectionSet[mesh] = &VertexSelectionSet{
-			Indices: newSet[int](),
-		}
-	}
+func (vs *VertexSelection) Contains(index int) bool {
+	return vs.Indices.Contains(index)
 }
 
-// SelectByVertexColorChannelNames selects all vertices in the Mesh that have a non-pure black color in the vertex color channel
-// with the specified index. If the index is over the number of vertex colors currently on the Mesh, then the function
-// will not alter the VertexSelection and will return an error.
-func (vs VertexSelection) SelectByVertexColorChannelNames(mesh *Mesh, channelNames ...string) (VertexSelection, error) {
-
-	vs.ensureSelectionSetExists(mesh)
-
-	var err error
+// Selects all vertices in the Mesh that have a non-pure black color in the vertex color channel
+// with any of the specified names.
+func (vs VertexSelection) ByVertexColorChannelNames(channelNames ...string) VertexSelection {
 
 	for _, groupName := range channelNames {
 
-		if channelIndex, ok := mesh.VertexColorChannelNames[groupName]; ok {
+		if channelIndex, ok := vs.mesh.VertexColorChannelNames[groupName]; ok {
 
-			for vertexIndex := range mesh.VertexColors[channelIndex] {
+			for vertexIndex := range vs.mesh.VertexColors[channelIndex] {
 
-				color := mesh.VertexColors[channelIndex][vertexIndex]
+				color := vs.mesh.VertexColors[channelIndex][vertexIndex]
 
 				if color.R > 0.01 || color.G > 0.01 || color.B > 0.01 {
-					vs.SelectionSet[mesh].Indices.Add(vertexIndex)
+					vs.Indices.Add(vertexIndex)
 				}
 
 			}
 
-		} else {
-			err = errors.New(ErrorVertexChannelOutsideRange)
 			continue
 		}
 
 	}
 
-	return vs, err
+	return vs
 
 }
 
-const ErrorVertexGroupNotFound = "error: vertex channel name not found"
-
-// SelectByVertexGroupNames selects all vertices in the Mesh that are assigned to the specifiefd vertex groups.
-// If any of the vertex groups are not found, the function will return an error.
-func (vs VertexSelection) SelectByVertexGroupNames(mesh *Mesh, vertexGroupNames ...string) (VertexSelection, error) {
-
-	vs.ensureSelectionSetExists(mesh)
-
-	var err error
+// Selects all vertices in the Mesh that are assigned to the specified vertex groups.
+// If a vertex group name is not found, the function will continue.
+// Vertex groups are only exported through Tetra3D if the mesh is skinned / assigned to an armature.
+func (vs VertexSelection) ByVertexGroupNames(vertexGroupNames ...string) VertexSelection {
 
 	for _, groupName := range vertexGroupNames {
 
 		vertexGroupIndex := -1
 
-		for i, g := range mesh.VertexGroupNames {
+		for i, g := range vs.mesh.VertexGroupNames {
 			if g == groupName {
 				vertexGroupIndex = i
 			}
 		}
 
 		if vertexGroupIndex < 0 {
-			// return vs, errors.New(ErrorVertexGroupNotFound)
-			err = errors.New(ErrorVertexGroupNotFound)
 			continue
 		}
 
-		for vertexIndex := range mesh.VertexBones {
+		for vertexIndex := range vs.mesh.VertexBones {
 
-			boneSet := mesh.VertexBones[vertexIndex]
+			boneSet := vs.mesh.VertexBones[vertexIndex]
 			for _, b := range boneSet {
 				if b == uint16(vertexGroupIndex) {
-					vs.SelectionSet[mesh].Indices.Add(vertexIndex)
+					vs.Indices.Add(vertexIndex)
 				}
 			}
 
@@ -799,55 +736,36 @@ func (vs VertexSelection) SelectByVertexGroupNames(mesh *Mesh, vertexGroupNames 
 
 	}
 
-	return vs, err
-
-}
-
-// SelectByMeshes selects all vertices on the target meshes.
-func (vs VertexSelection) SelectByMeshes(meshes ...*Mesh) VertexSelection {
-
-	for _, mesh := range meshes {
-
-		vs.ensureSelectionSetExists(mesh)
-
-		vs.SelectionSet[mesh].Indices.Clear()
-		vs.SelectionSet[mesh].SelectAll = true
-
-	}
-
 	return vs
+
 }
 
 func (vs VertexSelection) Clear() VertexSelection {
-	clear(vs.SelectionSet)
+	vs.Indices.Clear()
+	vs.selectAll = false
 	return vs
 }
 
 func (vs VertexSelection) IsEmpty() bool {
-	return len(vs.SelectionSet) == 0
+	return len(vs.Indices) == 0
 }
 
-func (vs VertexSelection) Contains(mesh *Mesh, index int) bool {
-	if _, exists := vs.SelectionSet[mesh]; !exists {
-		return false
-	}
-	return vs.SelectionSet[mesh].Contains(index)
-}
-
-// SelectByMeshPart selects all vertices in the Mesh belonging to any of the specified MeshParts.
-func (vs VertexSelection) SelectByMeshPart(meshParts ...*MeshPart) VertexSelection {
+// Selects all vertices in the Mesh belonging to any of the specified MeshParts.
+func (vs VertexSelection) ByMeshPart(meshParts ...*MeshPart) VertexSelection {
 
 	for _, meshPart := range meshParts {
+
+		if meshPart.Mesh != vs.mesh {
+			continue
+		}
 
 		meshPart.ForEachTri(
 
 			func(tri *Triangle) {
 
-				vs.ensureSelectionSetExists(meshPart.Mesh)
-
 				for i := range 3 {
 					index := tri.VertexIndex(i)
-					vs.SelectionSet[meshPart.Mesh].Indices.Add(index)
+					vs.Indices.Add(index)
 				}
 
 			},
@@ -859,24 +777,24 @@ func (vs VertexSelection) SelectByMeshPart(meshParts ...*MeshPart) VertexSelecti
 
 }
 
-// SelectByMeshPartIndex selects all vertices in the Mesh belonging to the specified MeshPart by
+// Selects all vertices in the Mesh belonging to the specified MeshPart by
 // index.
-// If the MeshPart doesn't exist, this function will panic.
-func (vs VertexSelection) SelectByMeshPartIndex(mesh *Mesh, indexNumber int) VertexSelection {
-	vs.ensureSelectionSetExists(mesh)
-	vs.SelectByMeshPart(mesh.MeshParts[indexNumber])
+// If a MeshPart with the given index doesn't exist, this function will do nothing.
+func (vs VertexSelection) ByMeshPartIndex(meshpartIndex int) VertexSelection {
+	if meshpartIndex >= len(vs.mesh.MeshParts) || meshpartIndex < 0 {
+		return vs
+	}
+	vs.ByMeshPart(vs.mesh.MeshParts[meshpartIndex])
 	return vs
 
 }
 
-// SelectByMeshPartName selects all vertices in the Mesh belonging to materials with the specified
-// name.
-func (vs VertexSelection) SelectByMeshPartName(mesh *Mesh, materialNames ...string) VertexSelection {
+// ByMeshPartName selects all vertices in the Mesh belonging to materials with any of the specified names.
+func (vs VertexSelection) ByMeshPartName(materialNames ...string) VertexSelection {
 
-	vs.ensureSelectionSetExists(mesh)
 	for _, matName := range materialNames {
-		if mp := mesh.MeshPartByMaterialName(matName); mp != nil {
-			vs.SelectByMeshPart(mp)
+		if mp := vs.mesh.MeshPartByMaterialName(matName); mp != nil {
+			vs.ByMeshPart(mp)
 		}
 	}
 
@@ -884,67 +802,65 @@ func (vs VertexSelection) SelectByMeshPartName(mesh *Mesh, materialNames ...stri
 
 }
 
-// SelectByNormal selects vertex indices that belong to vertices that point in a specific direction.
-func (vs VertexSelection) SelectByNormal(mesh *Mesh, normal Vector3) VertexSelection {
-	vs.ensureSelectionSetExists(mesh)
-	for i, v := range mesh.VertexNormals {
+// Selects vertex indices that belong to vertices that point in a specific direction.
+func (vs VertexSelection) ByNormal(normal Vector3) VertexSelection {
+	for i, v := range vs.mesh.VertexNormals {
 		if v.Equals(normal) {
-			vs.SelectionSet[mesh].Indices.Add(i)
+			vs.Indices.Add(i)
 		}
 	}
 	return vs
 }
 
-// SelectByFunc selects vertex indices for vertices that pass a custom callback function.
+// Selects vertex indices for vertices that pass a custom callback function.
 // Vertices be added to the selection only if the function returns true.
-func (vs VertexSelection) SelectByFunc(mesh *Mesh, function func(index int) bool) VertexSelection {
-	vs.ensureSelectionSetExists(mesh)
-	for i := range mesh.VertexPositions {
+func (vs VertexSelection) ByFunc(function func(index int) bool) VertexSelection {
+	for i := range vs.mesh.VertexPositions {
 		if function(i) {
-			vs.SelectionSet[mesh].Indices.Add(i)
+			vs.Indices.Add(i)
 		}
 	}
 	return vs
 }
 
-// SelectIndices selects the passed vertex indices in the Mesh.
-// This is syntactic sugar for VertexSelection.Indices.Add(indices...)
-func (vs VertexSelection) SelectIndices(mesh *Mesh, indices ...int) VertexSelection {
-	vs.ensureSelectionSetExists(mesh)
+// Selects the passed vertex indices in the Mesh.
+func (vs VertexSelection) ByIndices(indices ...int) VertexSelection {
 	for _, i := range indices {
-		vs.SelectionSet[mesh].Indices.Add(i)
+		vs.Indices.Add(i)
 	}
 	return vs
 }
 
-// SelectTriangles selects the vertex indices composing the triangles passed.
-func (vs VertexSelection) SelectTriangles(mesh *Mesh, triangles ...*Triangle) VertexSelection {
-	vs.ensureSelectionSetExists(mesh)
+// Selects all vertices in the Mesh.
+func (vs VertexSelection) ByAll() VertexSelection {
+	vs.Indices.Clear()
+	vs.selectAll = true
+	return vs
+}
+
+// Selects the vertex indices composing the triangles passed.
+func (vs VertexSelection) ByTriangles(triangles ...*Triangle) VertexSelection {
 	for _, t := range triangles {
-		for i := range 3 {
-			vs.SelectionSet[mesh].Indices.Add(t.VertexIndex(i))
-		}
+		vs.Indices.Add(t.VertexIndexA)
+		vs.Indices.Add(t.VertexIndexB)
+		vs.Indices.Add(t.VertexIndexC)
 	}
 	return vs
 }
 
-// SelectTriangles selects vertices that share positions with already-selected vertices.
-func (vs VertexSelection) SelectSharedVertices() VertexSelection {
+// Selects vertices that share positions with already-selected vertices.
+func (vs VertexSelection) BySharedVertices() VertexSelection {
 
-	for mesh, set := range vs.SelectionSet {
+	for index := range vs.Indices {
 
-		for index := range set.Indices {
+		for i, vp := range vs.mesh.VertexPositions {
 
-			for i, vp := range mesh.VertexPositions {
+			if index == i {
+				continue
+			}
 
-				if index == i {
-					continue
-				}
-
-				if vp.Equals(mesh.VertexPositions[index]) {
-					set.Indices.Add(i)
-				}
-
+			if vp.Equals(vs.mesh.VertexPositions[index]) {
+				vs.Indices.Add(i)
 			}
 
 		}
@@ -959,10 +875,6 @@ func (vs VertexSelection) SelectSharedVertices() VertexSelection {
 // If the channelIndex provided is greater than the number of channels in the Mesh minus one, vertex color channels will be created for all vertices
 // up to the index provided (e.g. VertexSelection.SetColor(2, colors.White()) will make it so that the mesh has at least three color channels - 0, 1, and 2).
 func (vs VertexSelection) SetColor(channelIndex int, color Color4) {
-
-	for mesh := range vs.SelectionSet {
-		mesh.ensureEnoughVertexColorChannels(channelIndex)
-	}
 
 	vs.ForEachIndex(func(mesh *Mesh, index int) {
 		mesh.VertexColors[channelIndex][index].R = color.R
@@ -1050,19 +962,6 @@ func (vs VertexSelection) RotateUVs(rotation float32) {
 
 }
 
-// SetActiveColorChannel sets the active color channel in all vertices contained within the VertexSelection to the channel with the
-// specified index.
-// If the channelIndex provided is greater than the number of vertex color channels in the Mesh minus one, vertex color channels will be created for all vertices
-// up to the index provided (e.g. VertexSelection.SetActiveColorChannel(3) will make it so that the mesh has at least four color channels - 0, 1, 2, and 3).
-func (vs VertexSelection) SetActiveColorChannel(channelIndex int) {
-
-	for mesh := range vs.SelectionSet {
-		mesh.ensureEnoughVertexColorChannels(channelIndex)
-		mesh.VertexActiveColorChannel = channelIndex
-	}
-
-}
-
 // ApplyMatrix applies a Matrix4 to the position of all vertices contained within the VertexSelection.
 func (vs VertexSelection) ApplyMatrix(matrix Matrix4) {
 
@@ -1100,15 +999,13 @@ func (vs VertexSelection) MoveVec(vec Vector3) {
 
 // ForEachIndex calls the provided function for each index selected in the VertexSelection.
 func (vs VertexSelection) ForEachIndex(forEach func(mesh *Mesh, index int)) {
-	for mesh, set := range vs.SelectionSet {
-		if set.SelectAll {
-			for index := range mesh.VertexPositions {
-				forEach(mesh, index)
-			}
-		} else {
-			for index := range set.Indices {
-				forEach(mesh, index)
-			}
+	if vs.selectAll {
+		for index := range vs.mesh.VertexPositions {
+			forEach(vs.mesh, index)
+		}
+	} else {
+		for index := range vs.Indices {
+			forEach(vs.mesh, index)
 		}
 	}
 }
@@ -1116,12 +1013,10 @@ func (vs VertexSelection) ForEachIndex(forEach func(mesh *Mesh, index int)) {
 // Count returns the number of indices selected in the VertexSelection.
 func (vs VertexSelection) Count() int {
 	count := 0
-	for mesh, set := range vs.SelectionSet {
-		if set.SelectAll {
-			count += len(mesh.VertexPositions)
-		} else {
-			count += len(set.Indices)
-		}
+	if vs.selectAll {
+		count += len(vs.mesh.VertexPositions)
+	} else {
+		count += len(vs.Indices)
 	}
 	return count
 }
@@ -1777,6 +1672,7 @@ func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model) {
 		t.MeshPart.Mesh.VertexPositions[t.VertexIndexA],
 		t.MeshPart.Mesh.VertexPositions[t.VertexIndexB],
 		t.MeshPart.Mesh.VertexPositions[t.VertexIndexC],
+		t.Normal,
 	))
 
 	// dist := cameraPos.DistanceSquaredTo(t.Center)

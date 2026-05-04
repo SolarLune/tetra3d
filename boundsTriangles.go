@@ -206,9 +206,13 @@ func (plane *collisionPlane) RayAgainstPlane(from, dir Vector3, doublesided bool
 
 var colPlane = newCollisionPlane()
 
-func closestPointOnTri(point, v0, v1, v2 Vector3) Vector3 {
+func closestPointOnTri(point, v0, v1, v2, normal Vector3) Vector3 {
 
-	colPlane.Set(v0, v1, v2)
+	// colPlane.Set(v0, v1, v2)
+
+	colPlane.Normal = normal
+	colPlane.Distance = normal.Dot(v0)
+
 	if planePoint := colPlane.ClosestPoint(point); isPointInsideTriangle(planePoint, v0, v1, v2) {
 		return planePoint
 	}

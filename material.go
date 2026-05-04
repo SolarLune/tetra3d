@@ -54,6 +54,13 @@ const (
 	LightVolumeShadingModeOff                           // Don't shade vertices per the vertices of objects as they move around in light volumes
 )
 
+type TextureFilter int
+
+const (
+	TextureFilterNearest TextureFilter = iota
+	TextureFilterBilinear
+)
+
 type Material struct {
 	id                uint32
 	library           *Library       // library is a reference to the Library that this Material came from.
@@ -62,12 +69,12 @@ type Material struct {
 	Texture           *ebiten.Image  // The texture applied to the Material.
 	UseTexture        bool           // Whether to use the texture while rendering or not.
 	TexturePath       string         // The path to the texture, if it was not packed into the exporter.
-	TextureFilterMode ebiten.Filter  // Texture filtering mode
+	TextureFilterMode TextureFilter  // Texture filtering mode
 	textureWrapMode   ebiten.Address // Texture wrapping mode; this is ignored currently, as all triangles render through shaders, where looping is enforced.
 
-	TextureMapMode         int     // Texture mapping mode.
-	TextureMapScreenSize   float32 // The size multiplier of the texture when mapping to the screen in pixels. 1.0 means a 32px texture will appear 32px onscreen.
-	TextureMapScreenOffset Vector2 // Offset for screenspace texture mapping in pixels.
+	TextureMapMode                  int     // Texture mapping mode.
+	TextureMapScreenSizeMultiplierW float32 // The size multiplier of the texture when mapping to the screen in pixels. 1.0 means a 32px texture will appear 32px onscreen.
+	TextureMapScreenSizeMultiplierH float32 // The size multiplier of the texture when mapping to the screen in pixels. 1.0 means a 32px texture will appear 32px onscreen.
 
 	properties       Properties   // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
 	BackfaceCulling  bool         // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
@@ -127,23 +134,23 @@ var materialID uint32 = 1
 // NewMaterial creates a new Material with the name given.
 func NewMaterial(name string) *Material {
 	mat := &Material{
-		id:                    materialID,
-		name:                  name,
-		Color:                 NewColor4(1, 1, 1, 1),
-		properties:            NewProperties(),
-		TextureFilterMode:     ebiten.FilterNearest,
-		textureWrapMode:       ebiten.AddressRepeat,
-		BackfaceCulling:       true,
-		UseTexture:            true,
-		TriangleSortMode:      TriangleSortModeBackToFront,
-		TransparencyMode:      TransparencyModeAuto,
-		FragmentShaderOptions: &ebiten.DrawTrianglesShaderOptions{},
-		FragmentShaderOn:      true,
-		Blend:                 ebiten.BlendSourceOver,
-		Visible:               true,
-		ReportCollisions:      true,
-		ReportRays:            true,
-		TextureMapScreenSize:  1,
+		id:                              materialID,
+		name:                            name,
+		Color:                           NewColor4(1, 1, 1, 1),
+		properties:                      NewProperties(),
+		textureWrapMode:                 ebiten.AddressRepeat,
+		BackfaceCulling:                 true,
+		UseTexture:                      true,
+		TriangleSortMode:                TriangleSortModeBackToFront,
+		TransparencyMode:                TransparencyModeAuto,
+		FragmentShaderOptions:           &ebiten.DrawTrianglesShaderOptions{},
+		FragmentShaderOn:                true,
+		Blend:                           ebiten.BlendSourceOver,
+		Visible:                         true,
+		ReportCollisions:                true,
+		ReportRays:                      true,
+		TextureMapScreenSizeMultiplierW: 1,
+		TextureMapScreenSizeMultiplierH: 1,
 	}
 
 	materialID++
@@ -164,8 +171,8 @@ func (m *Material) Clone() *Material {
 	newMat.TextureFilterMode = m.TextureFilterMode
 	newMat.textureWrapMode = m.textureWrapMode
 	newMat.TextureMapMode = m.TextureMapMode
-	newMat.TextureMapScreenSize = m.TextureMapScreenSize
-	newMat.TextureMapScreenOffset = m.TextureMapScreenOffset
+	newMat.TextureMapScreenSizeMultiplierW = m.TextureMapScreenSizeMultiplierW
+	newMat.TextureMapScreenSizeMultiplierH = m.TextureMapScreenSizeMultiplierH
 
 	newMat.properties = m.properties.Clone()
 	newMat.BackfaceCulling = m.BackfaceCulling
