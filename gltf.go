@@ -483,11 +483,15 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		// If it's not exported through the Tetra addon, then just load the default GLTF material color value
 		if !t3dExport {
-			color := gltfMat.PBRMetallicRoughness.BaseColorFactor
-			newMat.Color.R = float32(color[0])
-			newMat.Color.G = float32(color[1])
-			newMat.Color.B = float32(color[2])
-			newMat.Color.A = float32(color[3])
+			if gltfMat.PBRMetallicRoughness != nil {
+				color := gltfMat.PBRMetallicRoughness.BaseColorFactor
+				newMat.Color.R = float32(color[0])
+				newMat.Color.G = float32(color[1])
+				newMat.Color.B = float32(color[2])
+				newMat.Color.A = float32(color[3])
+			} else {
+				newMat.Color = NewColor4(1, 1, 1, 1)
+			}
 		}
 
 		newMat.Color = newMat.Color.ConvertTosRGB()
