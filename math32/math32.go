@@ -21,17 +21,17 @@ func ToDegrees(radians float32) float32 {
 }
 
 // Min returns the minimum value out of two provided values.
-func Min[number float32 | float64 | int | int32 | int64](x, y number) number {
-	return number(math.Min(float64(x), float64(y)))
+func Min(x, y float32) float32 {
+	return float32(math.Min(float64(x), float64(y)))
 }
 
 // Max returns the maximum value out of two provided values.
-func Max[number float32 | float64 | int | int32 | int64](x, y number) number {
-	return number(math.Max(float64(x), float64(y)))
+func Max(x, y float32) float32 {
+	return float32(math.Max(float64(x), float64(y)))
 }
 
 // Clamp clamps a value to the minimum and maximum values provided.
-func Clamp[number float32 | float64 | int | int32 | int64](value, min, max number) number {
+func Clamp(value, min, max float32) float32 {
 	if value < min {
 		return min
 	} else if value > max {

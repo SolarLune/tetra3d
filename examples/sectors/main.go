@@ -44,6 +44,7 @@ func (g *Game) Init() {
 
 	// We use the existing camera for this.
 	g.Camera.Camera = g.Scene.Root.Get("Camera").(*tetra3d.Camera)
+	g.Camera.Camera.SectorRendering = true
 
 	g.System = examples.NewBasicSystemHandler(g)
 
@@ -79,14 +80,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 
-		txt := `This example shows how sector-based rendering works.
-Sectors are essentially "map chunks", allowing you to control which
-part of a game scene renders. Here, each colored room is a sector. 
-
-Sectors only render when either the camera is wholly within a Sector or
-within range of a neighbor. In this example the neighbor depth is 1, 
+		txt := `This example shows sector-based rendering, allowing you to control which
+part of a game scene renders. Here, each colored room is a sector.
+Sectors and their children only render when the camera is inside a Sector
+or a neighboring Sector. In this example the neighbor depth is 1,
 so the camera will render the current sector (room), + 1 neighboring room.
 
+Objects of Standalone sector type always render, regardless of their location.
 Press 1 to toggle sector-based rendering. It is: `
 
 		if g.Camera.SectorRendering {
@@ -95,7 +95,7 @@ Press 1 to toggle sector-based rendering. It is: `
 			txt += "Off"
 		}
 
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 
 	}
 

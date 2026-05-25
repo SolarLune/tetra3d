@@ -41,7 +41,7 @@ func (g *Game) Init() {
 	//kage:unit pixels
 
 	package main
-	
+
 	func Fragment(position vec4, texCoord vec2, color vec4) vec4 {
 		scrSize := imageDstTextureSize()
 		return vec4(position.x / scrSize.x, position.y / scrSize.y, 0, 1)
@@ -109,13 +109,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `This demo shows how custom shaders work.
 
-There are two kinds of shader programs: 
+There are two kinds of shader programs:
 Fragment shaders (which shade models' pixels), and
 Vertex programs (which move models' vertices).
 
 The cube on the left is running a fragment shader written in Kage,
 while the sphere on the right runs a vertex program written in Go.`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 	}
 }
 

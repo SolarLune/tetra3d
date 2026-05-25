@@ -103,7 +103,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.System.Draw(screen, g.Camera.Camera)
 
 	if g.System.DrawDebugText {
-		g.Camera.DrawDebugRenderInfo(screen, 1, colors.White())
+		g.Camera.DebugInfo.Draw(screen, 1, colors.White())
 		txt := `1 Key: Play [SmoothRoll] Animation On Table
 2 Key: Play [StepRoll] Animation on Table
 Note that models can blend between two different
@@ -111,7 +111,7 @@ animations (as shown on the table).
 F Key: Play Animation on Skinned Mesh
 Note that the nodes move as well (as can be
 seen in the debug mode).`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

@@ -93,12 +93,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.System.Draw(screen, g.Camera.Camera)
 
 	if g.System.DrawDebugText {
-		g.Camera.DrawDebugText(screen,
+		tetra3d.DrawDebugText(screen,
 			`This demo shows how composite modes work.
 The blue plane is opaque.
 The red one is additive.
 The green one is transparent.
-The white square cuts out all objects to show the background.`,
+The white square cuts out all objects to show what's drawn behind the camera texture.`,
 			0, 220, 1, colors.LightGray(),
 		)
 	}

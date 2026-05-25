@@ -91,9 +91,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 meaning they don't appear in the depth texture.
 Because of this, they can overlap at certain
 angles (which is bad), but also show things
-underneath (which is, of course, good).`
+underneath (which is, of course, good).
 
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
+Transparent objects are rendered in order of
+distance to the camera.`
+
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 
 	}
 }

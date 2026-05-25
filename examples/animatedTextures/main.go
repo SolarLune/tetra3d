@@ -57,7 +57,7 @@ func (g *Game) Init() {
 	mesh := library.MeshByName("Plane")
 
 	// We can select all vertices...
-	selection := tetra3d.NewVertexSelection(mesh)
+	selection := tetra3d.NewVertexSelection(mesh).SelectAll()
 
 	// ...And then create a TexturePlayer, which steps through all vertices contained in the passed vertex selection and assigns their UV values according
 	// to the TexturePlayer's playing animation.
@@ -119,7 +119,7 @@ The character faces the camera because his
 material has its BillboardMode set (so that
 it faces the camera, but doesn't tilt horizontally).
 1 key: Toggle playback`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

@@ -9,10 +9,8 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/tetra3d/math32"
-	"golang.org/x/image/font/basicfont"
 )
 
 type DebugInfoDuration struct {
@@ -37,6 +35,8 @@ func (d *DebugInfoDuration) EndTimer() {
 	}
 }
 
+const debugInfoPrevFrametimeCap = 20
+
 // DebugInfo is a struct that holds debugging information for a Camera's render pass. These values are reset when Camera.Clear() is called.
 type DebugInfo struct {
 	On                   bool          // If not on, debug info is not filled out
@@ -55,6 +55,8 @@ type DebugInfo struct {
 	totalTris            int // Total number of triangles
 	lightCount           int // Total number of lights
 	activeLightCount     int // Total active number of lights
+
+	prevFrametimes []float32
 
 	tickTime time.Time
 
@@ -154,6 +156,90 @@ func (d *DebugInfo) ActiveLightCount() int {
 	return metric
 }
 
+func (d *DebugInfo) PrevFrametimes() []float32 {
+	metric := make([]float32, debugInfoPrevFrametimeCap)
+	counts := make([]int, debugInfoPrevFrametimeCap)
+
+	for i := range metric {
+		counts[i] = 1
+	}
+
+	for _, other := range d.combineWith {
+		for i, ft := range other.prevFrametimes {
+			metric[i] += ft
+			counts[i] += 1
+		}
+	}
+	for i, c := range counts {
+		metric[i] /= float32(c)
+	}
+	return metric
+}
+
+// Draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
+// at the top-left of the provided screen *ebiten.Image, using the textScale and color provided.
+// Note that the frame-time mentioned here is purely the time that Tetra3D spends sending render commands to the command queue.
+// Any additional time that Ebitengine takes to flush that queue is not included in this average frame-time value, and is not
+// visible outside of debugging and profiling, like with pprof.
+func (d *DebugInfo) Draw(screen *ebiten.Image, textScale float32, col Color4) {
+
+	m := d.FrameTime().Round(time.Microsecond).Microseconds()
+	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
+
+	m = d.AnimationTime().Round(time.Microsecond).Microseconds()
+	at := fmt.Sprintf("%.2fms", float32(m)/1000)
+
+	m = d.LightTime().Round(time.Microsecond).Microseconds()
+	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
+
+	debugText := fmt.Sprintf(
+		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nNode Count: %d\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d",
+		ebiten.ActualTPS(),
+		ebiten.ActualFPS(),
+		ft,
+		at,
+		lt,
+		d.NodeCount(),
+		d.DrawnParts(),
+		d.TotalParts(),
+		d.BatchedParts(),
+		d.DrawnTris(),
+		d.TotalTris(),
+		d.ActiveLightCount(),
+		d.LightCount(),
+	)
+
+	DrawDebugText(screen, debugText, 0, 0, textScale, col)
+
+	barWidth := float32(64)
+	barHeight := float32(24)
+
+	vector.StrokeRect(screen, 128, 16, barWidth, barHeight, 1, color.White, false)
+
+	frametimes := d.PrevFrametimes()
+	for i := 0; i < len(frametimes)-1; i++ {
+
+		ip := 1.0 / float32(debugInfoPrevFrametimeCap)
+
+		db := frametimes[i]
+		nextdb := frametimes[i+1]
+
+		maxFt := 1.0 / float32(ebiten.TPS())
+
+		drawColor := color.RGBA{128, 255, 0, 255}
+
+		if db/maxFt > 1 {
+			drawColor = color.RGBA{255, 0, 0, 255}
+		}
+
+		cappedFrametimePerc := math32.Clamp(db/maxFt, 0, 1) * (barHeight - 3)
+		cappedNextFrametimePerc := math32.Clamp((nextdb)/maxFt, 0, 1) * (barHeight - 3)
+
+		vector.StrokeLine(screen, 128+1+(float32(i)*ip*barWidth), 38-cappedFrametimePerc, 128+1+(float32(i+1)*ip*barWidth), 38-cappedNextFrametimePerc, 2, drawColor, false)
+	}
+
+}
+
 type AccumulationColorMode int
 
 const (
@@ -204,9 +290,7 @@ type Camera struct {
 	// Defaults to 0 (off).
 	VertexSnapping float32
 
-	DebugInfo                 *DebugInfo
-	prevFrametimes            []float32
-	prevDebugInfoFrametimeCap int
+	DebugInfo *DebugInfo
 
 	depthShader     *ebiten.Shader
 	clipAlphaShader *ebiten.Shader
@@ -252,7 +336,6 @@ func NewCamera(w, h int) *Camera {
 		DebugInfo: &DebugInfo{
 			On: true,
 		},
-		prevDebugInfoFrametimeCap: 20,
 	}
 
 	cam.DebugInfo.currentAnimationTime.debugInfo = cam.DebugInfo
@@ -330,7 +413,7 @@ func NewCamera(w, h int) *Camera {
 		}
 
 		func bilinearFilter(srcPos vec2) vec4 {
-	
+
 			p0 := mod(srcPos - 1/2.0, imageSrc1Size())
 			p1 := mod(srcPos + 1/2.0, imageSrc1Size())
 
@@ -346,7 +429,7 @@ func NewCamera(w, h int) *Camera {
 				mix(c2, c3, rate.x),
 				rate.y,
 			)
-			
+
 		}
 
 		func nearestFilter(srcPos vec2) vec4 {
@@ -567,13 +650,13 @@ func (camera *Camera) Projection() Matrix4 {
 	}
 
 	if camera.perspective {
-		camera.cachedProjectionMatrix = NewProjectionPerspective(camera.fieldOfView, camera.near, camera.far, float32(camera.resultColorTexture.Bounds().Dx()), float32(camera.resultColorTexture.Bounds().Dy()))
+		camera.cachedProjectionMatrix = NewProjectionMatrix4Perspective(camera.fieldOfView, camera.near, camera.far, float32(camera.resultColorTexture.Bounds().Dx()), float32(camera.resultColorTexture.Bounds().Dy()))
 	} else {
 
 		w, h := camera.resultColorTexture.Size()
 		asr := float32(h) / float32(w)
 
-		camera.cachedProjectionMatrix = NewProjectionOrthographic(camera.near, camera.far, 1*camera.orthoScale, -1*camera.orthoScale, asr*camera.orthoScale, -asr*camera.orthoScale)
+		camera.cachedProjectionMatrix = NewProjectionMatrix4Orthographic(camera.near, camera.far, 1*camera.orthoScale, -1*camera.orthoScale, asr*camera.orthoScale, -asr*camera.orthoScale)
 	}
 
 	return camera.cachedProjectionMatrix
@@ -725,8 +808,8 @@ func (camera *Camera) ScreenToWorldPixels(x, y int, depth float32) Vector3 {
 	w := camera.ColorTexture().Bounds().Dx()
 	h := camera.ColorTexture().Bounds().Dy()
 
-	x = math32.Clamp(x, 0, w)
-	y = math32.Clamp(y, 0, h)
+	x = clamp(x, 0, w)
+	y = clamp(y, 0, h)
 
 	// For whatever reason, the depth isn't being properly transformed, so I do it manually sorta below
 	vec := Vector3{float32(x)/float32(w) - 0.5, -(float32(y)/float32(h) - 0.5), -1}
@@ -951,10 +1034,10 @@ func (camera *Camera) ClearWithColor(clear Color4) {
 
 		if time.Since(camera.DebugInfo.tickTime).Milliseconds() >= 100 {
 
-			camera.prevFrametimes = append(camera.prevFrametimes, float32(camera.DebugInfo.totalFrameTime.Seconds()))
+			camera.DebugInfo.prevFrametimes = append(camera.DebugInfo.prevFrametimes, float32(camera.DebugInfo.totalFrameTime.Seconds()))
 
-			for len(camera.prevFrametimes) > camera.prevDebugInfoFrametimeCap {
-				camera.prevFrametimes = camera.prevFrametimes[1:]
+			for len(camera.DebugInfo.prevFrametimes) > debugInfoPrevFrametimeCap {
+				camera.DebugInfo.prevFrametimes = camera.DebugInfo.prevFrametimes[1:]
 			}
 
 			frameCount := 1
@@ -1040,8 +1123,8 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 					panic("Can't make a sector " + model.Path() + " dynamically batched as well")
 				}
 
-				if sector.AABB.PointInside(camera.WorldPosition()) {
-					if insideSector == nil || sector.AABB.dimensions.MaxSpan() < insideSector.AABB.dimensions.MaxSpan() {
+				if sector.dimensions.Contains(camera.WorldPosition()) {
+					if insideSector == nil || sector.dimensions.MaxSpan() < insideSector.dimensions.MaxSpan() {
 						insideSector = sector
 					}
 				}
@@ -1059,43 +1142,43 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 				r.rendering = true
 			}
 
-			rootNode.ForEachChild(true, func(node INode, index, size int) bool {
-
-				if model, ok := node.(*Model); ok {
-
-					if model.sector != nil && model.sector.rendering {
-						if model.sector.rendering {
-							meshes.Add(model)
-						}
-					} else if model.DynamicBatchOwner == nil {
-
-						// If something is dynamically batching, then we don't want to deal with sectors, because the batched objects belong to sectors.
-						if model.DynamicBatcher() {
-							meshes.Add(model)
-						} else if model.SectorType() == SectorTypeStandalone || (model.SectorType() == SectorTypeObject && model.isInVisibleSector(sectorModels)) {
-							meshes.Add(model)
-						} else if s := model.sectorHierarchy(); s != nil && s.rendering {
-							meshes.Add(model)
-						}
-
-					}
-
-				}
-
-				if light, ok := node.(ILight); ok {
-
-					if light.SectorType() == SectorTypeStandalone || (light.SectorType() == SectorTypeObject && light.isInVisibleSector(sectorModels)) {
-						lights.Add(light)
-					} else if s := light.sectorHierarchy(); s != nil && s.rendering {
-						lights.Add(light)
-					}
-
-				}
-
-				return true
-			})
-
 		}
+
+		rootNode.ForEachChild(true, func(node INode, index, size int) bool {
+
+			if model, ok := node.(*Model); ok {
+
+				if model.sector != nil && model.sector.rendering {
+					if model.sector.rendering {
+						meshes.Add(model)
+					}
+				} else if model.DynamicBatchOwner == nil {
+
+					// If something is dynamically batching, then we don't want to deal with sectors, because the batched objects belong to sectors.
+					if model.DynamicBatcher() {
+						meshes.Add(model)
+					} else if model.SectorType() == SectorTypeStandalone || (model.SectorType() == SectorTypeObject && model.isInVisibleSector(sectorModels)) {
+						meshes.Add(model)
+					} else if s := model.sectorHierarchy(); s != nil && s.rendering {
+						meshes.Add(model)
+					}
+
+				}
+
+			}
+
+			if light, ok := node.(ILight); ok {
+
+				if light.SectorType() == SectorTypeStandalone || (light.SectorType() == SectorTypeObject && light.isInVisibleSector(sectorModels)) {
+					lights.Add(light)
+				} else if s := light.sectorHierarchy(); s != nil && s.rendering {
+					lights.Add(light)
+				}
+
+			}
+
+			return true
+		})
 
 	} else {
 
@@ -1151,6 +1234,8 @@ func (camera *Camera) CurrentSector() *Sector { return camera.currentSector }
 type renderPair struct {
 	Model    *Model
 	MeshPart *MeshPart
+	depth    float32
+	order    int
 }
 
 // Bayer Matrix for transparency dithering
@@ -1229,8 +1314,6 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 	solids := []renderPair{}
 	transparents := []renderPair{}
 
-	depths := map[*Model]float32{}
-
 	cameraPos := camera.WorldPosition()
 
 	depthMarginPercentage := (camera.far - camera.near) * camera.DepthMargin
@@ -1238,6 +1321,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 	camSpread := camera.far - camera.near + (depthMarginPercentage * 2)
 
 	models.ForEachModel(func(model *Model) bool {
+
+		if !model.visible || model.DynamicBatchOwner != nil {
+			return true
+		}
 
 		if camera.DebugInfo.On && !model.DynamicBatcher() {
 
@@ -1247,10 +1334,6 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				}
 			}
 
-		}
-
-		if !model.visible || model.DynamicBatchOwner != nil {
-			return true
 		}
 
 		if !model.DynamicBatcher() {
@@ -1265,25 +1348,28 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 			if model.mesh != nil {
 
-				modelIsTransparent := false
-
 				for _, mp := range model.mesh.MeshParts {
 
 					if !mp.isVisible() {
 						continue
 					}
 
-					if model.isTransparent(mp) {
-						transparents = append(transparents, renderPair{model, mp})
-						modelIsTransparent = true
-					} else {
-						solids = append(solids, renderPair{model, mp})
-					}
-				}
+					rp := renderPair{Model: model, MeshPart: mp, depth: cameraPos.DistanceSquaredTo(model.WorldPosition()), order: 0}
 
-				if !camera.RenderDepth || modelIsTransparent {
-					depths[model] = cameraPos.DistanceSquaredTo(model.WorldPosition())
-					// depths[model] = camera.WorldToScreen(model.WorldPosition()).Z
+					if model.isTransparent(mp) || !camera.RenderDepth {
+						rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
+					}
+
+					if mp.Material != nil {
+						rp.order = mp.Material.RenderOrder
+					}
+
+					if model.isTransparent(mp) {
+						transparents = append(transparents, rp)
+					} else {
+						solids = append(solids, rp)
+					}
+
 				}
 
 			}
@@ -1321,14 +1407,20 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 				}
 
+				rp := renderPair{Model: model, MeshPart: meshPart, depth: 0, order: 0}
+
+				if transparent || !camera.RenderDepth {
+					rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
+				}
+
+				if meshPart.Material != nil {
+					rp.order = meshPart.Material.RenderOrder
+				}
+
 				if transparent {
-					transparents = append(transparents, renderPair{model, meshPart})
-					depths[model] = cameraPos.DistanceSquaredTo(model.WorldPosition())
+					transparents = append(transparents, rp)
 				} else {
-					solids = append(solids, renderPair{model, meshPart})
-					if !camera.RenderDepth {
-						depths[model] = cameraPos.DistanceSquaredTo(model.WorldPosition())
-					}
+					solids = append(solids, rp)
 				}
 
 				if camera.DebugInfo.On {
@@ -1347,7 +1439,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 	if !camera.RenderDepth {
 
 		sort.SliceStable(solids, func(i, j int) bool {
-			return depths[solids[i].Model] > depths[solids[j].Model]
+			if solids[i].order < solids[j].order {
+				return true
+			}
+			return solids[i].depth > solids[j].depth
 		})
 
 	}
@@ -1377,7 +1472,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 			}
 			return pos.DistanceSquaredTo(sceneLights[i].WorldPosition()) < pos.DistanceSquaredTo(sceneLights[j].WorldPosition())
 		})
-		sceneLights = sceneLights[:math32.Min(camera.MaxLightCount, len(sceneLights))]
+		sceneLights = sceneLights[:min(camera.MaxLightCount, len(sceneLights))]
 	}
 
 	if camera.DebugInfo.On {
@@ -1427,7 +1522,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 		}
 
 		startingVertexListIndex := vertexListIndex
-		model.ProcessVertices(vpMatrix, camera, meshPart, true)
+		model.ProcessVertices(vpMatrix, camera, meshPart, true, scene.autosubdivisionLevels)
 		// lastVertexListIndex := vertexListIndex
 
 		if vertexListIndex == 0 {
@@ -1443,6 +1538,11 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 		}
 
 		camera.DebugInfo.currentLightTime.StartTimer()
+
+		// We have to set this and then restore it afterwards, because if we use light groups,
+		// then we are altering the sceneLights light slice pointer for all models rendered
+		// moving forward
+		ogSceneLights := sceneLights
 
 		if lighting {
 
@@ -1626,7 +1726,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 					// depth := (invertedCameraPos.Distance(mesh.VertexPositions[vertexListIndex]) - camera.near) / (camera.far - camera.near)
 
 					var vertexDepth float32
-					if rp.MeshPart.Material != nil && rp.MeshPart.Material.DepthMode == DepthModeUnbillboarded {
+					if rp.MeshPart.Material != nil && rp.MeshPart.Material.BillboardedDepthMode == DepthModeUnbillboarded {
 						vertexDepth = globalVertexDepthUnbillboarded[vertexIndex]
 					} else {
 						vertexDepth = globalVertexTransforms[vertexIndex].Z
@@ -1691,6 +1791,7 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 		// 	indexList[i] = uint16(i)
 		// }
 
+		sceneLights = ogSceneLights
 	}
 
 	flush := func(rp renderPair) {
@@ -1915,7 +2016,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 	}
 
 	sort.SliceStable(transparents, func(i, j int) bool {
-		return depths[transparents[i].Model] > depths[transparents[j].Model]
+		if transparents[i].order < transparents[j].order {
+			return true
+		}
+		return transparents[i].depth > transparents[j].depth
 	})
 
 	renderPasses := [][]renderPair{
@@ -1937,7 +2041,6 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 			// example).
 
 			if pair.Model.DynamicBatcher() {
-
 				modelSlice := pair.Model.DynamicBatchModels[pair.MeshPart]
 
 				sort.Slice(modelSlice, func(i, j int) bool {
@@ -2140,81 +2243,6 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 
 }
 
-// DrawDebugRenderInfo draws render debug information (like number of drawn objects, number of drawn triangles, frame time, etc)
-// at the top-left of the provided screen *ebiten.Image, using the textScale and color provided.
-// Note that the frame-time mentioned here is purely the time that Tetra3D spends sending render commands to the command queue.
-// Any additional time that Ebitengine takes to flush that queue is not included in this average frame-time value, and is not
-// visible outside of debugging and profiling, like with pprof.
-func (camera *Camera) DrawDebugRenderInfo(screen *ebiten.Image, textScale float32, col Color4) {
-
-	m := camera.DebugInfo.totalFrameTime.Round(time.Microsecond).Microseconds()
-	ft := fmt.Sprintf("%.2fms", float32(m)/1000)
-
-	m = camera.DebugInfo.totalAnimationTime.Round(time.Microsecond).Microseconds()
-	at := fmt.Sprintf("%.2fms", float32(m)/1000)
-
-	m = camera.DebugInfo.totalLightTime.Round(time.Microsecond).Microseconds()
-	lt := fmt.Sprintf("%.2fms", float32(m)/1000)
-
-	sectorName := "<Sector Rendering Off>"
-	if camera.SectorRendering {
-		if camera.currentSector == nil {
-			sectorName = "None"
-		} else {
-			sectorName = camera.currentSector.Model.name
-		}
-	}
-
-	debugText := fmt.Sprintf(
-		"TPS: %f\nFPS: %f\nTotal render frame-time: %s\nSkinned mesh animation time: %s\nLighting frame-time: %s\nNode Count: %d\nDraw calls: %d/%d (%d dynamically batched)\nRendered triangles: %d/%d\nActive Lights: %d/%d"+
-			"\nCamera World Position: %s\nCurrent Sector: %s",
-		ebiten.ActualTPS(),
-		ebiten.ActualFPS(),
-		ft,
-		at,
-		lt,
-		camera.DebugInfo.NodeCount(),
-		camera.DebugInfo.DrawnParts(),
-		camera.DebugInfo.TotalParts(),
-		camera.DebugInfo.BatchedParts(),
-		camera.DebugInfo.DrawnTris(),
-		camera.DebugInfo.TotalTris(),
-		camera.DebugInfo.ActiveLightCount(),
-		camera.DebugInfo.LightCount(),
-		camera.WorldPosition(),
-		sectorName,
-	)
-
-	camera.DrawDebugText(screen, debugText, 0, 0, textScale, col)
-
-	barWidth := float32(64)
-	barHeight := float32(24)
-
-	vector.StrokeRect(screen, 128, 16, barWidth, barHeight, 1, color.White, false)
-
-	for i := 0; i < len(camera.prevFrametimes)-1; i++ {
-
-		ip := 1.0 / float32(camera.prevDebugInfoFrametimeCap)
-
-		db := camera.prevFrametimes[i]
-		nextdb := camera.prevFrametimes[i+1]
-
-		maxFt := 1.0 / float32(ebiten.TPS())
-
-		drawColor := color.RGBA{128, 255, 0, 255}
-
-		if db/maxFt > 1 {
-			drawColor = color.RGBA{255, 0, 0, 255}
-		}
-
-		cappedFrametimePerc := math32.Clamp(db/maxFt, 0, 1) * (barHeight - 3)
-		cappedNextFrametimePerc := math32.Clamp((nextdb)/maxFt, 0, 1) * (barHeight - 3)
-
-		vector.StrokeLine(screen, 128+1+(float32(i)*ip*barWidth), 38-cappedFrametimePerc, 128+1+(float32(i+1)*ip*barWidth), 38-cappedNextFrametimePerc, 2, drawColor, false)
-	}
-
-}
-
 // DrawDebugWireframe draws the wireframe triangles of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
 func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, color Color4) {
@@ -2224,6 +2252,12 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 	camWidth, camHeight := camera.Size()
 
 	halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
+
+	autosubLevels := []AutoSubdivisionLevel{}
+
+	if rootNode.Scene() != nil {
+		autosubLevels = rootNode.Scene().autosubdivisionLevels
+	}
 
 	rootNode.ForEachChild(true, func(node INode, index, size int) bool {
 
@@ -2254,7 +2288,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 					globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
 				}
 
-				model.ProcessVertices(vpMatrix, camera, meshPart, false)
+				model.ProcessVertices(vpMatrix, camera, meshPart, false, autosubLevels)
 
 				globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
@@ -2319,6 +2353,12 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
+	autosubLevels := []AutoSubdivisionLevel{}
+
+	if rootNode.Scene() != nil {
+		autosubLevels = rootNode.Scene().autosubdivisionLevels
+	}
+
 	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
 
 		if model.FrustumCulling {
@@ -2337,13 +2377,13 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 				globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
 			}
 
-			model.ProcessVertices(vpMatrix, camera, meshPart, false)
+			model.ProcessVertices(vpMatrix, camera, meshPart, false, autosubLevels)
 
 			globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
 				screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(model.mesh.Triangles[triangle.ID()].Center))
 
-				camera.DrawDebugText(screen, fmt.Sprintf("%d", triIndex), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+				DrawDebugText(screen, fmt.Sprintf("%d", triIndex), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 			})
 
@@ -2361,6 +2401,12 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
+	autosubLevels := []AutoSubdivisionLevel{}
+
+	if rootNode.Scene() != nil {
+		autosubLevels = rootNode.Scene().autosubdivisionLevels
+	}
+
 	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
 
 		if model.FrustumCulling {
@@ -2379,13 +2425,13 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 				globalSortingTriangleBucket.sortMode = meshPart.Material.TriangleSortMode
 			}
 
-			model.ProcessVertices(vpMatrix, camera, meshPart, false)
+			model.ProcessVertices(vpMatrix, camera, meshPart, false, autosubLevels)
 
 			globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
 				screenPos := camera.WorldToScreenPixels(model.Transform().MultVec(triangle.Center))
 
-				camera.DrawDebugText(screen, fmt.Sprintf("%d", triangle.ID()), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+				DrawDebugText(screen, fmt.Sprintf("%d", triangle.ID()), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 			})
 
@@ -2413,7 +2459,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 
 		screenPos := camera.WorldToScreenPixels(model.WorldPosition())
 
-		camera.DrawDebugText(screen, fmt.Sprintf("%d", len(model.mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
+		DrawDebugText(screen, fmt.Sprintf("%d", len(model.mesh.MeshParts)), screenPos.X, screenPos.Y+(textScale*16), textScale, color)
 
 		return true
 	})
@@ -2475,50 +2521,7 @@ func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, col
 
 }
 
-func (camera *Camera) DrawDebugText(screen *ebiten.Image, txtStr string, posX, posY, textScale float32, color Color4) {
-
-	size := text.BoundString(basicfont.Face7x13, txtStr).Size()
-
-	if camera.debugTextTexture == nil || size.X > camera.debugTextTexture.Bounds().Dx() || size.Y > camera.debugTextTexture.Bounds().Dy() {
-		camera.debugTextTexture = ebiten.NewImage(size.X, size.Y+13)
-	}
-
-	camera.debugTextTexture.Clear()
-
-	opt := &ebiten.DrawImageOptions{}
-	opt.GeoM.Translate(0, 13)
-	text.DrawWithOptions(camera.debugTextTexture, txtStr, basicfont.Face7x13, opt)
-
-	// TODO: This is slow, this could be way faster by drawing once to an image and then drawing that result
-
-	dr := &ebiten.DrawImageOptions{}
-	dr.ColorScale.Scale(0, 0, 0, 1)
-
-	periodOffset := float32(8.0)
-
-	for y := -1; y < 2; y++ {
-
-		for x := -1; x < 2; x++ {
-
-			dr.GeoM.Reset()
-			dr.GeoM.Translate(float64(posX+4+float32(x)), float64(posY+4+float32(y)+periodOffset))
-			dr.GeoM.Scale(float64(textScale), float64(textScale))
-
-			screen.DrawImage(camera.debugTextTexture, dr)
-		}
-
-	}
-
-	dr.ColorScale.Reset()
-	dr.ColorScale.ScaleWithColor(color.ToNRGBA64())
-
-	dr.GeoM.Reset()
-	dr.GeoM.Translate(float64(posX+4), float64(posY+4+periodOffset))
-	dr.GeoM.Scale(float64(textScale), float64(textScale))
-
-	screen.DrawImage(camera.debugTextTexture, dr)
-
-}
+var debugTextTexture *ebiten.Image
 
 // ColorTexture returns the camera's final result color texture from any previous Render() or RenderNodes() calls.
 func (camera *Camera) ColorTexture() *ebiten.Image {

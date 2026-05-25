@@ -308,7 +308,7 @@ func (textObj *Text) SetText(txt string, arguments ...any) *Text {
 			textObj.typewriterIndex = 0
 		}
 
-		textObj.UpdateTexture()
+		textObj.updateTexture()
 
 	}
 
@@ -321,9 +321,9 @@ func (textObj *Text) ClearText() *Text {
 	return textObj.SetText("")
 }
 
-// UpdateTexture will update the Text's backing texture, clearing and/or redrawing the texture as necessary.
-// This won't do anything if the texture is nil (has been disposed).
-func (textObj *Text) UpdateTexture() {
+// Updates the Text's backing texture, clearing and/or redrawing the texture as necessary.
+// This won't do anything if the texture is nil (has been disposed). This does not usually need to be called manually.
+func (textObj *Text) updateTexture() {
 
 	if textObj.Texture == nil {
 		return
@@ -350,7 +350,7 @@ func (textObj *Text) UpdateTexture() {
 	textureWidth := textObj.Texture.Bounds().Dx()
 	textureHeight := textObj.Texture.Bounds().Dy()
 
-	blockHeight := math32.Max(len(textObj.parsedText)*multipliedLineHeight, lineHeight)
+	blockHeight := max(len(textObj.parsedText)*multipliedLineHeight, lineHeight)
 
 	for lineIndex, line := range textObj.parsedText {
 
@@ -402,7 +402,7 @@ func (textObj *Text) UpdateTexture() {
 			line += textObj.style.Cursor
 		}
 
-		text.Draw(textObj.Texture, line, textObj.style.Font, x, y, color.RGBA{255, 255, 255, 255})
+		text.Draw(textObj.Texture, line, textObj.style.Font, x, y+int(textObj.style.Font.Metrics().Ascent.Floor()), color.RGBA{255, 255, 255, 255})
 		// text.Draw(textObj.Texture, line, textObj.style.Font, x, y, textObj.style.FGColor.ToRGBA64())
 
 	}
@@ -456,7 +456,7 @@ func (text *Text) SetStyle(style TextStyle) {
 			text.SetText(setText)
 		}
 
-		text.UpdateTexture()
+		text.updateTexture()
 
 	}
 }
@@ -481,7 +481,7 @@ func (text *Text) SetTypewriterIndex(typewriterIndex int) {
 	}
 
 	if text.typewriterOn && oldIndex != text.typewriterIndex {
-		text.UpdateTexture()
+		text.updateTexture()
 	}
 
 }
@@ -517,7 +517,7 @@ func (text *Text) TypewriterFinished() bool {
 // SetTypewriterOn sets the typewriter effect on the Text object.
 func (text *Text) SetTypewriterOn(on bool) {
 	if text.typewriterOn != on {
-		text.UpdateTexture()
+		text.updateTexture()
 	}
 	text.typewriterOn = on
 }

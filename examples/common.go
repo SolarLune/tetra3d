@@ -101,7 +101,7 @@ func (system *BasicSystemHandler) Draw(screen *ebiten.Image, camera *tetra3d.Cam
 	}
 
 	if system.DrawDebugText {
-		camera.DrawDebugRenderInfo(screen, 1, colors.White())
+		camera.DebugInfo.Draw(screen, 1, colors.White())
 		var txt string
 
 		pcOn := "On"
@@ -124,7 +124,7 @@ F6: Toggle Perpsective Correction: %s
 ESC: Quit
 `, pcOn)
 		}
-		camera.DrawDebugText(screen, txt, 0, 144, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 144, 1, colors.LightGray())
 	}
 
 }

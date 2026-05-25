@@ -15,8 +15,8 @@ const (
 // Logically, a Sector is determined to be a neighbor of another Sector if they either intersect,
 // or share vertex positions. Which of these is the case depends on the Sectors' SectorDetectionType.
 type Sector struct {
-	Model               *Model              // The owning Model that forms the Sector
-	AABB                *BoundingAABB       // The AABB used to search for neighbors if the SectorDetectionType is set to SectorDetectionTypeAABB
+	Model               *Model // The owning Model that forms the Sector
+	dimensions          Dimensions
 	Neighbors           Set[*Sector]        // The Sector's neighbors
 	SectorDetectionType SectorDetectionType // How the Sector is detected
 	rendering           bool                // If the Sector was rendering in the last Camera.Render____() call.
@@ -25,15 +25,10 @@ type Sector struct {
 // NewSector creates a new Sector for the provided Model.
 func NewSector(model *Model) *Sector {
 
-	mesh := model.mesh
-	margin := float32(0.01)
-	sectorAABB := NewBoundingAABB("sector", mesh.Dimensions.Width()+margin, mesh.Dimensions.Height()+margin, mesh.Dimensions.Depth()+margin)
-	sectorAABB.SetLocalPositionVec(model.WorldPosition().Add(mesh.Dimensions.Center()))
-
 	return &Sector{
-		Model:     model,
-		AABB:      sectorAABB,
-		Neighbors: newSet[*Sector](),
+		Model:      model,
+		dimensions: model.Dimensions(),
+		Neighbors:  newSet[*Sector](),
 	}
 
 }
@@ -42,9 +37,9 @@ func NewSector(model *Model) *Sector {
 func (sector *Sector) Clone() *Sector {
 
 	newSector := &Sector{
-		Model:     sector.Model,
-		AABB:      sector.AABB.Clone().(*BoundingAABB),
-		Neighbors: make(Set[*Sector], len(sector.Neighbors)),
+		Model:      sector.Model,
+		dimensions: sector.dimensions,
+		Neighbors:  make(Set[*Sector], len(sector.Neighbors)),
 	}
 	for n := range sector.Neighbors {
 		newSector.Neighbors[n] = struct{}{}
@@ -58,15 +53,11 @@ func (sector *Sector) Clone() *Sector {
 // by this process (so clear the Sector's NeighborSet first if you need to do so).
 func (sector *Sector) UpdateNeighbors(otherModels *NodeCollectionSet) {
 
-	sector.AABB.updateSize()
-
 	otherModels.ForEachModel(func(otherModel *Model) bool {
 
 		if otherModel == sector.Model || otherModel.sector == nil || sector.Neighbors.Contains(otherModel.sector) {
 			return true
 		}
-
-		otherModel.sector.AABB.updateSize()
 
 		switch sector.SectorDetectionType {
 
@@ -98,7 +89,7 @@ func (sector *Sector) UpdateNeighbors(otherModels *NodeCollectionSet) {
 
 		case SectorDetectionTypeAABB:
 
-			if sector.AABB.Colliding(otherModel.sector.AABB) {
+			if sector.dimensions.Intersects(otherModel.sector.dimensions) {
 				sector.Neighbors.Add(otherModel.sector)
 				otherModel.sector.Neighbors.Add(sector)
 			}

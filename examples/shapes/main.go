@@ -11,7 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-//go:embed *.gltf *.bin *.png
+//go:embed *.glb *.png
 var shapes embed.FS
 
 type Game struct {
@@ -33,8 +33,7 @@ func (g *Game) Init() {
 
 	// Load the GLTF file and turn it into a Library, which is a collection of scenes and data shared between them (like meshes or animations).
 
-	// library, err := tetra3d.LoadGLTFFileSystem(shapes, "test.glb", nil)
-	library, err := tetra3d.LoadGLTFFileSystem(shapes, "shapes.gltf", nil)
+	library, err := tetra3d.LoadGLTFFileSystem(shapes, "shapes.glb", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -54,22 +53,27 @@ func (g *Game) Update() error {
 	if ebiten.IsKeyPressed(ebiten.Key1) {
 		g.Scene.World.FogOn = true
 		g.Scene.World.FogColor = tetra3d.NewColor4(1, 0, 0, 1)
+		g.Scene.World.ClearColor = g.Scene.World.FogColor
 		g.Scene.World.FogMode = tetra3d.FogAdd
 	} else if ebiten.IsKeyPressed(ebiten.Key2) {
 		g.Scene.World.FogOn = true
 		g.Scene.World.FogColor = tetra3d.NewColor4(1, 1, 1, 1)
 		g.Scene.World.FogMode = tetra3d.FogSub
+		g.Scene.World.ClearColor = g.Scene.World.FogColor.Invert()
 	} else if ebiten.IsKeyPressed(ebiten.Key3) {
 		g.Scene.World.FogOn = true
 		g.Scene.World.FogColor = tetra3d.NewColor4(0, 0, 0, 1)
+		g.Scene.World.ClearColor = g.Scene.World.FogColor
 		g.Scene.World.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key4) {
 		g.Scene.World.FogOn = true
 		g.Scene.World.FogColor = colors.White()
+		g.Scene.World.ClearColor = g.Scene.World.FogColor
 		g.Scene.World.FogMode = tetra3d.FogOverwrite
 	} else if ebiten.IsKeyPressed(ebiten.Key5) {
 		g.Scene.World.FogOn = false
 		g.Scene.World.FogColor = colors.Black() // With the fog being off, setting the color doesn't do anything directly, but the clear color is set below to the fog color
+		g.Scene.World.ClearColor = g.Scene.World.FogColor
 	}
 
 	g.Camera.Update()
@@ -79,8 +83,7 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 
-	g.Camera.ClearWithColor(g.Scene.World.FogColor)
-	// g.Camera.Clear()
+	g.Camera.Clear()
 
 	g.Camera.RenderScene(g.Scene)
 
@@ -94,7 +97,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 3: Change fog to black overwrite
 4: Change fog to white overwrite
 5: Turn off fog`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

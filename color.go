@@ -217,6 +217,14 @@ func (color Color4) ConvertTosRGB() Color4 {
 
 }
 
+// Inverts the color.
+func (c Color4) Invert() Color4 {
+	c.R = 1 - c.R
+	c.G = 1 - c.G
+	c.B = 1 - c.B
+	return c
+}
+
 // Lerp linearly interpolates the color from the starting color to the target by the percentage given.
 func (c Color4) Lerp(other Color4, percentage float32) Color4 {
 

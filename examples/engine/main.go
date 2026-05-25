@@ -139,7 +139,7 @@ using a traditional 'class-based' approach with Tetra3D.
 Arrow keys: Move player(s)
 Touch spikes to destroy player(s)`
 
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

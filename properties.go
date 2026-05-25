@@ -58,10 +58,18 @@ func (props Properties) Add(propName string) *Property {
 // Get returns the value associated with the specified property name. If a property with the
 // passed name (propName) doesn't exist, Get will return nil.
 func (props Properties) Get(propName string) *Property {
-	if _, ok := props[propName]; ok {
-		return props[propName]
+	if p, ok := props[propName]; ok {
+		return p
 	}
 	return nil
+}
+
+// Returns if the Properties object has a property of the given name with the given value.
+func (props Properties) HasNameAndValue(propName string, value any) bool {
+	if _, ok := props[propName]; ok {
+		return props[propName].Value == value
+	}
+	return false
 }
 
 // Set sets the given value to the property name, creating it if it doesn't exist.

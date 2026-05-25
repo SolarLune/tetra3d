@@ -21,3 +21,5 @@ require (
 
 // uncomment for local development
 // replace github.com/hajimehoshi/ebiten/v2 => ../../libraries/ebiten
+
+replace github.com/qmuntal/gltf => ../../libraries/gltf

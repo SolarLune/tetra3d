@@ -147,15 +147,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := `This demo shows how game properties work with
-the Tetra3D Blender add-on.
-Game properties are set in Blender, and
-exported from there to a GLTF file.
+the Tetra3D Blender add-on. Game properties are set in Blender.
 
 Collection instances can be used as prefabs,
 and properties set on a collection
 instance object get propagated to top-level objects
 in that collection.`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

@@ -33,7 +33,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFFileSystem(assets, "assets/lighting.gltf", nil)
+	library, err := tetra3d.LoadGLTFFileSystem(assets, "assets/lighting.glb", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -101,7 +101,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := "This example simply shows dynamic\nvertex-based lighting.\nThere are six lights in this scene:\nan ambient light, three point lights, \na single directional (sun) light,\nand one more point light parented to the camera.\n1 Key: Toggle all lighting\n2 Key: Toggle camera light"
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)

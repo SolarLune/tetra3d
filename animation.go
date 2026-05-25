@@ -204,9 +204,10 @@ type Animation struct {
 	library *Library
 	// A Channel represents a set of tracks (one for position, scale, and rotation) for the various nodes contained within the Animation.
 	Channels   map[string]*AnimationChannel
-	Length     float32    // Length of the animation in seconds
-	Markers    []Marker   // Markers as specified in the Animation from the modeler
-	properties Properties // Animation properties
+	Length     float32           // Length of the animation in seconds
+	Markers    []Marker          // Markers as specified in the Animation from the modeler
+	properties Properties        // Animation properties
+	loopMode   AnimationLoopMode // Looping mode for the animation
 
 	// RelativeMotion indicates if an animation's motion happens relative to the object's starting
 	// position.
@@ -266,6 +267,16 @@ func (animation *Animation) Properties() Properties {
 	return animation.properties
 }
 
+// Returns the loop mode for the Animation.
+func (animation *Animation) LoopMode() AnimationLoopMode {
+	return animation.loopMode
+}
+
+// Sets the loop mode for the given animation.
+func (animation *Animation) SetLoopMode(loopMode AnimationLoopMode) {
+	animation.loopMode = loopMode
+}
+
 // AnimationValues indicate the current position, scale, and rotation for a Node.
 type AnimationValues struct {
 	Position              Vector3
@@ -292,7 +303,6 @@ type AnimationPlayer struct {
 	justLooped             bool
 	PlaySpeed              float32                    // Playback speed in percentage - defaults to 1 (100%)
 	Playing                bool                       // Whether the player is playing back or not.
-	FinishMode             FinishMode                 // What to do when the player finishes playback. Defaults to looping.
 	OnFinish               func(animation *Animation) // Callback indicating the Animation has completed
 	finished               bool
 	OnMarkerTouch          func(marker Marker, animation *Animation) // Callback indicating when the AnimationPlayer has entered a marker
@@ -302,11 +312,7 @@ type AnimationPlayer struct {
 	prevAnimatedProperties map[INode]AnimationValues // The previous properties that have been animated from the previously Play()'d animation
 	BlendTime              float32                   // How much time in seconds to blend between two animations
 	blendStart             time.Time                 // The time that the blend started
-	// If the AnimationPlayer should play the last frame or not. For example, if you have an animation that starts on frame 1 and goes to frame 10,
-	// then if PlayLastFrame is on, it will play all frames, INCLUDING frame 10, and only then repeat (if it's set to repeat).
-	// Otherwise, it will only play frames 1 - 9, which can be good if your last frame is a repeat of the first to make a cyclical animation.
-	// The default for PlayLastFrame is false.
-	PlayLastFrame bool
+	queuedAnimations       []*Animation
 
 	startingPosition Vector3
 	startingScale    Vector3
@@ -318,12 +324,10 @@ func NewAnimationPlayer(node INode) *AnimationPlayer {
 	return &AnimationPlayer{
 		RootNode:               node,
 		PlaySpeed:              1,
-		FinishMode:             FinishModeLoop,
 		AnimatedProperties:     map[INode]AnimationValues{},
 		currentProperties:      map[INode]AnimationValues{},
 		prevAnimatedProperties: map[INode]AnimationValues{},
 		ChannelsToNodes:        map[*AnimationChannel]INode{},
-		PlayLastFrame:          false,
 	}
 }
 
@@ -339,10 +343,8 @@ func (ap *AnimationPlayer) Clone() *AnimationPlayer {
 	newAP.Animation = ap.Animation
 	newAP.Playhead = ap.Playhead
 	newAP.PlaySpeed = ap.PlaySpeed
-	newAP.FinishMode = ap.FinishMode
 	newAP.OnFinish = ap.OnFinish
 	newAP.Playing = ap.Playing
-	newAP.PlayLastFrame = ap.PlayLastFrame
 	return newAP
 }
 
@@ -356,13 +358,20 @@ func (ap *AnimationPlayer) SetRoot(node INode) {
 // playing, or if the animation is paused. If the animation is already playing, Play() does nothing.
 func (ap *AnimationPlayer) Play(animation *Animation) {
 
+	// No animation specified
 	if animation == nil {
 		return
 	}
 
+	// Already playing
 	if ap.Animation == animation && ap.Playing {
 		return
 	}
+
+	ap.ClearQueuedAnimations()
+	ap.play(animation)
+}
+func (ap *AnimationPlayer) play(animation *Animation) {
 
 	if ap.Animation != animation {
 		ap.startingPosition = ap.RootNode.LocalPosition()
@@ -400,6 +409,56 @@ func (ap *AnimationPlayer) PlayByName(animationName string) error {
 		ap.Play(anim)
 	}
 	return nil
+}
+
+// Queues the given animations up for play.
+// They will play once the AnimationPlayer is not playing anything, or the currently playing animation finishes.
+func (ap *AnimationPlayer) QueuePlay(animations ...*Animation) {
+	ap.queuedAnimations = append(ap.queuedAnimations, animations...)
+	ap.Playing = true
+}
+
+// Queues the named animations up for play.
+// The animations must be found in the same library as the node the AnimationPlayer originally belongs to.
+// They will play once the AnimationPlayer is not playing anything, or the currently playing animation finishes.
+func (ap *AnimationPlayer) QueuePlayByName(animationNames ...string) error {
+
+	for _, animationName := range animationNames {
+
+		if anim := ap.RootNode.Library().AnimationByName(animationName); anim == nil {
+			return errors.New("Animation named {" + animationName + "} not found in node's owning Library; did you export it and stash its action?")
+		} else {
+			ap.QueuePlay(anim)
+		}
+
+	}
+
+	return nil
+
+}
+
+// Clears all queued animations from the AnimationPlayer.
+func (ap *AnimationPlayer) ClearQueuedAnimations() {
+	ap.queuedAnimations = ap.queuedAnimations[:0]
+}
+
+// Returns the slice of queued animations for this AnimationPlayer (not a copy of the slice).
+func (ap *AnimationPlayer) QueuedAnimations() []*Animation {
+	return ap.queuedAnimations
+}
+
+func (ap *AnimationPlayer) consumeQueuedAnimation() {
+	ap.play(ap.queuedAnimations[0])
+
+	if ap.PlaySpeed > 0 {
+		ap.Playhead = 0
+	} else {
+		ap.Playhead = ap.Animation.Length
+	}
+
+	ap.justLooped = true // For marker detection
+
+	ap.queuedAnimations = ap.queuedAnimations[1:]
 }
 
 // Stop stops the AnimationPlayer's playback. Note that this is fundamentally the same as calling ap.Playing = false (for now).
@@ -526,10 +585,6 @@ func (ap *AnimationPlayer) updateValues(dt float32) {
 
 		ph := ap.Playhead
 
-		if !ap.PlayLastFrame {
-			ph += dt * ap.PlaySpeed
-		}
-
 		if ap.PlaySpeed != 0 {
 
 			for _, marker := range ap.Animation.Markers {
@@ -547,14 +602,15 @@ func (ap *AnimationPlayer) updateValues(dt float32) {
 
 		ap.justLooped = false
 
-		if ap.FinishMode == FinishModeLoop && (ph >= ap.Animation.Length || ph < 0) {
+		if ap.Animation.loopMode == AnimationLoopModeLoop && (ph >= ap.Animation.Length || ph < 0) {
 
+			// Set to be the start or end of the animation because otherwise the animation hitches
 			if ph >= ap.Animation.Length {
-				ap.Playhead -= ap.Animation.Length
+				ap.Playhead = 0
 			}
 
 			if ph < 0 {
-				ap.Playhead += ap.Animation.Length
+				ap.Playhead = ap.Animation.Length
 			}
 
 			ap.justLooped = true
@@ -565,10 +621,10 @@ func (ap *AnimationPlayer) updateValues(dt float32) {
 			ap.finished = true
 			ap.prevFinishedAnimation = ap.Animation.Name
 
-		} else if ap.FinishMode == FinishModePingPong && (ph >= ap.Animation.Length || ph < 0) {
+		} else if ap.Animation.loopMode == AnimationLoopModePingPong && (ph >= ap.Animation.Length || ph < 0) {
 
 			if ph >= ap.Animation.Length {
-				ap.Playhead -= ph - ap.Animation.Length
+				ap.Playhead = ap.Animation.Length
 			}
 
 			finishedLoop := false
@@ -588,21 +644,29 @@ func (ap *AnimationPlayer) updateValues(dt float32) {
 
 			ap.PlaySpeed *= -1
 
-		} else if ap.FinishMode == FinishModeStop && ((ph >= ap.Animation.Length && ap.PlaySpeed > 0) || (ph <= 0 && ap.PlaySpeed < 0)) {
+		} else if ap.Animation.loopMode == AnimationLoopModeOneshot && ((ph >= ap.Animation.Length && ap.PlaySpeed > 0) || (ph <= 0 && ap.PlaySpeed < 0)) {
 
-			if ph >= ap.Animation.Length {
-				ap.Playhead = ap.Animation.Length
-			} else if ph <= 0 {
-				ap.Playhead = 0
+			prevAnim := ap.Animation
+			ap.prevFinishedAnimation = prevAnim.Name
+
+			// Consume a queued animation if there's one to consume
+			if len(ap.queuedAnimations) > 0 {
+				ap.consumeQueuedAnimation()
+			} else {
+
+				if ph >= ap.Animation.Length {
+					ap.Playhead = ap.Animation.Length
+				} else if ph <= 0 {
+					ap.Playhead = 0
+				}
+
+				ap.finished = true
+				ap.Playing = false
 			}
 
 			if ap.OnFinish != nil {
-				ap.OnFinish(ap.Animation)
+				ap.OnFinish(prevAnim)
 			}
-			ap.finished = true
-			ap.prevFinishedAnimation = ap.Animation.Name
-
-			ap.Playing = false
 
 		}
 
@@ -619,6 +683,10 @@ func (ap *AnimationPlayer) Update(dt float32) {
 	if !ap.Playing && !ap.blendStart.IsZero() {
 		ap.blendStart = time.Time{}
 		clear(ap.prevAnimatedProperties)
+	}
+
+	if ap.Animation == nil && len(ap.queuedAnimations) > 0 {
+		ap.consumeQueuedAnimation()
 	}
 
 	if ap.Animation == nil || !ap.Playing {
@@ -785,9 +853,19 @@ func (ap *AnimationPlayer) FinishedPlayingByName(animName string) bool {
 	return ap.prevFinishedAnimation == animName && ap.Finished()
 }
 
-// IsPlayingByName returns if the AnimationPlayer is playing an animation of the given name.
+// Returns if the AnimationPlayer is playing an animation of the given name.
 func (ap *AnimationPlayer) IsPlayingByName(animName string) bool {
-	return ap.Animation != nil && ap.Animation.Name == animName
+	return ap.Playing && ap.Animation != nil && ap.Animation.Name == animName
+}
+
+// Returns if the AnimationPlayer is playing an animation with a property of the given name.
+func (ap *AnimationPlayer) IsPlayingByPropName(propName string) bool {
+	return ap.Playing && ap.Animation != nil && ap.Animation.Properties().Has(propName)
+}
+
+// Returns if the AnimationPlayer is playing an animation with a property of the given name and value.
+func (ap *AnimationPlayer) IsPlayingByPropNameValue(propName string, value any) bool {
+	return ap.Playing && ap.Animation != nil && ap.Animation.Properties().Has(propName) && ap.Animation.Properties().Get(propName).Value == value
 }
 
 // TouchedMarker returns if a marker with the specified name was touched this past frame - note that this relies on calling AnimationPlayer.Update().

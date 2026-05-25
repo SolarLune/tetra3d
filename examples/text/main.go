@@ -143,7 +143,7 @@ rotated and face a world axis directly (though the object can
 be rotated just fine).
 
 Press Q to reset the text.`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 	}
 
 }

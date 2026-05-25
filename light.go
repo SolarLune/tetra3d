@@ -265,9 +265,7 @@ func (p *PointLight) Light(tri *Triangle, model *Model, targetColors VertexColor
 	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
 
 	tri.ForEachVertexIndex(func(index int) {
-
 		p.VertexLight(index, tri, model, targetColors)
-
 	})
 
 }
@@ -373,268 +371,6 @@ func (sun *DirectionalLight) Light(tri *Triangle, model *Model, targetColors Ver
 // Type returns the NodeType for this object.
 func (sun *DirectionalLight) Type() NodeType {
 	return NodeTypeDirectionalLight
-}
-
-// CubeLight represents an AABB volume that lights triangles.
-type CubeLight struct {
-	*LightBase
-	Dimensions Dimensions // The overall dimensions of the CubeLight.
-	// A value between 0 and 1 indicating how much opposite faces are still lit within the volume (i.e. at LightBleed = 0.0,
-	// faces away from the light are dark; at 1.0, faces away from the light are fully illuminated)
-	bleed             float32
-	lightingAngle     Vector3 // The direction in which light is shining. Defaults to local Y down (0, -1, 0).
-	workingDimensions Dimensions
-	workingPosition   Vector3
-	workingAngle      Vector3
-}
-
-// NewCubeLight creates a new CubeLight with the given dimensions.
-func NewCubeLight(name string, dimensions Dimensions) *CubeLight {
-	cube := &CubeLight{
-		LightBase:     newLightBase(name, 1, 1, 1, 1),
-		Dimensions:    dimensions,
-		lightingAngle: Vector3{0, -1, 0},
-	}
-	cube.owner = cube
-	return cube
-}
-
-// NewCubeLightFromModel creates a new CubeLight from the Model's dimensions and world transform.
-// Note that this does not add it to the Model's hierarchy in any way - the newly created CubeLight
-// is still its own Node.
-func NewCubeLightFromModel(name string, model *Model) *CubeLight {
-	cube := NewCubeLight(name, model.mesh.Dimensions)
-	cube.SetWorldTransform(model.Transform())
-	cube.lightingAngle = model.WorldRotation().Up().Invert()
-	return cube
-}
-
-// Clone clones the CubeLight, returning a deep copy.
-func (cube *CubeLight) Clone() INode {
-	newCube := NewCubeLight(cube.name, cube.Dimensions)
-	newCube.energy = cube.energy
-	newCube.color = cube.color
-	newCube.on = cube.on
-	newCube.bleed = cube.bleed
-	newCube.lightingAngle = cube.lightingAngle
-	newCube.SetWorldTransform(cube.Transform())
-	newCube.Node = cube.Node.clone(newCube).(*Node)
-	if runCallbacks && newCube.Callbacks().OnClone != nil {
-		newCube.Callbacks().OnClone(newCube)
-	}
-	return newCube
-}
-
-// TransformedDimensions returns the AABB volume dimensions of the CubeLight as they have been scaled, rotated, and positioned to follow the
-// CubeLight's node.
-func (cube *CubeLight) TransformedDimensions() Dimensions {
-
-	p, s, r := cube.Transform().Decompose()
-
-	corners := [][]float32{
-		{1, 1, 1},
-		{1, -1, 1},
-		{-1, 1, 1},
-		{-1, -1, 1},
-		{1, 1, -1},
-		{1, -1, -1},
-		{-1, 1, -1},
-		{-1, -1, -1},
-	}
-
-	dimensions := newEmptyDimensions()
-
-	for _, c := range corners {
-
-		position := r.MultVec(Vector3{
-			(cube.Dimensions.Width() * c[0] * s.X / 2),
-			(cube.Dimensions.Height() * c[1] * s.Y / 2),
-			(cube.Dimensions.Depth() * c[2] * s.Z / 2),
-		})
-
-		if dimensions.Min.X > position.X {
-			dimensions.Min.X = position.X
-		}
-
-		if dimensions.Min.Y > position.Y {
-			dimensions.Min.Y = position.Y
-		}
-
-		if dimensions.Min.Z > position.Z {
-			dimensions.Min.Z = position.Z
-		}
-
-		if dimensions.Max.X < position.X {
-			dimensions.Max.X = position.X
-		}
-
-		if dimensions.Max.Y < position.Y {
-			dimensions.Max.Y = position.Y
-		}
-
-		if dimensions.Max.Z < position.Z {
-			dimensions.Max.Z = position.Z
-		}
-
-	}
-
-	dimensions.Min = dimensions.Min.Add(p)
-	dimensions.Max = dimensions.Max.Add(p)
-
-	return dimensions
-
-}
-
-func (cube *CubeLight) beginRender() {
-	cube.workingAngle = cube.WorldRotation().MultVec(cube.lightingAngle.Invert())
-}
-
-func (cube *CubeLight) beginModel(model *Model) {
-
-	p, s, r := model.Transform().Inverted().Decompose()
-	_, _, _ = p, s, r
-
-	// Rather than transforming all vertices of all triangles of a mesh, we can just transform the
-	// point light's position by the inversion of the model's transform to get the same effect and save processing time.
-	// The same technique is used for Sphere - Triangle collision in bounds.go.
-
-	lightStartPos := cube.WorldPosition().Add(cube.lightingAngle.Invert().Scale(cube.Dimensions.Height() / 2))
-
-	cube.workingDimensions = cube.TransformedDimensions()
-
-	if model.skinned {
-		cube.workingPosition = lightStartPos
-	} else {
-
-		sDen := Vector3{1 / s.X, 1 / s.Y, 1 / s.Z}
-
-		cube.workingPosition = r.MultVec(lightStartPos).Add(p.Mult(sDen))
-
-		// point.workingPosition = r.MultVec(point.WorldPosition()).Add(p.Mult(Vector{1 / s.X, 1 / s.Y, 1 / s.Z, s.W}))
-
-		cube.workingDimensions.Min = r.MultVec(cube.workingDimensions.Min.Mult(s))
-		cube.workingDimensions.Max = r.MultVec(cube.workingDimensions.Max.Mult(s))
-
-		cube.workingDimensions.Min = cube.workingDimensions.Min.Add(p)
-		cube.workingDimensions.Max = cube.workingDimensions.Max.Add(p)
-
-		cube.workingDimensions = cube.workingDimensions.Canon()
-
-	}
-
-}
-
-func (cube *CubeLight) VertexLight(index int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
-
-	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
-
-	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
-	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
-	// if the triangle were lit by a light, it would appear lit regardless of the positioning of the camera.
-
-	// var triCenter Vector
-
-	// if model.skinned {
-	// 	v0 := model.Mesh.vertexSkinnedPositions[triIndex*3].Clone()
-	// 	v1 := model.Mesh.vertexSkinnedPositions[triIndex*3+1]
-	// 	v2 := model.Mesh.vertexSkinnedPositions[triIndex*3+2]
-	// 	vector.In(v0).Add(v1).Add(v2).Scale(1.0 / 3.0)
-	// 	triCenter = v0
-	// } else {
-	// 	triCenter = model.Mesh.Triangles[triIndex].Center
-	// }
-
-	// dist := fastVectorDistanceSquared(cube.workingPosition, triCenter)
-
-	// if cube.Distance > 0 && dist > distanceSquared {
-	// 	return light
-	// }
-
-	// If you're on the other side of the plane, just assume it's not visible.
-	// if dot(model.Mesh.Triangles[triIndex].Normal, fastVectorSub(triCenter, point.cameraPosition).Unit()) < 0 {
-	// 	return light
-	// }
-
-	vertPos := globalMeshAlteredVertexPositions[index]
-	vertNormal := globalMeshAlteredVertexNormals[index]
-
-	var diffuse, diffuseFactor float32
-
-	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
-		vertNormal = cube.workingAngle
-	}
-
-	diffuse = vertNormal.Dot(cube.workingAngle)
-
-	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeDoubleSided {
-		diffuse = math32.Abs(diffuse)
-	}
-
-	if cube.bleed > 0 {
-
-		if diffuse < 0 {
-			diffuse = 0
-		}
-
-		// diffuse += cube.Bleed
-		diffuse = cube.bleed + ((1 - cube.bleed) * diffuse)
-
-		if diffuse > 1 {
-			diffuse = 1
-		}
-
-	}
-
-	if diffuse < 0 {
-		return
-	} else {
-
-		if !vertPos.IsInsideDimensions(cube.workingDimensions) {
-			diffuseFactor = 0
-		} else {
-			diffuseFactor = diffuse
-		}
-
-	}
-
-	if diffuseFactor <= 0 {
-		return
-	}
-
-	targetColors[index].R += cube.color.R * float32(diffuseFactor) * cube.energy
-	targetColors[index].G += cube.color.G * float32(diffuseFactor) * cube.energy
-	targetColors[index].B += cube.color.B * float32(diffuseFactor) * cube.energy
-
-}
-
-// Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (cube *CubeLight) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
-
-	tri.ForEachVertexIndex(func(index int) {
-		cube.VertexLight(index, tri, model, targetColors)
-	})
-
-}
-
-// Type returns the type of INode this is (NodeTypeCubeLight).
-func (cube *CubeLight) Type() NodeType {
-	return NodeTypeCubeLight
-}
-
-func (cube *CubeLight) LightingAngle() Vector3 {
-	return cube.lightingAngle
-}
-
-func (cube *CubeLight) SetLightingAngle(angle Vector3) {
-	cube.lightingAngle = angle
-}
-
-func (cube *CubeLight) Bleed() float32 {
-	return cube.bleed
-}
-
-func (cube *CubeLight) SetBleed(bleed float32) {
-	cube.bleed = bleed
 }
 
 // LightVolume represents a grid of colors representing light to color models that enter the space with.
@@ -855,23 +591,20 @@ func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, ta
 
 	if tri.MeshPart.Material != nil {
 		objectShadingMode = tri.MeshPart.Material.LightVolumeShadingMode
-
-		if tri.MeshPart.Material.LightVolumeShadingMode == LightVolumeShadingModePerObject {
-
-			x, y, z := l.convertToXYZIndicesVec(model.WorldPosition())
-
-			cell := l.getLightCell(x, y, z)
-			if cell != nil {
-				cellColor.R = cell.color.R
-				cellColor.G = cell.color.G
-				cellColor.B = cell.color.B
-			}
-
-		}
-
 	}
 
-	if objectShadingMode != LightVolumeShadingModePerObject {
+	if tri.MeshPart.Material.LightVolumeShadingMode == LightVolumeShadingModePerObject {
+
+		x, y, z := l.convertToXYZIndicesVec(model.WorldPosition())
+
+		cell := l.getLightCell(x, y, z)
+		if cell != nil {
+			cellColor.R = cell.color.R
+			cellColor.G = cell.color.G
+			cellColor.B = cell.color.B
+		}
+
+	} else {
 
 		var vertPos Vector3
 		var vertPosWithNormal Vector3
@@ -879,21 +612,21 @@ func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, ta
 		// Skinned; already transformed
 		if model.skinned {
 
-			vertPos = globalMeshAlteredVertexPositions[vertIndex]
 			if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
-				vertPosWithNormal = vertPos.Add(globalMeshAlteredVertexNormals[vertIndex])
+				vertPosWithNormal = vertPos.Add(globalMeshAlteredVertexNormals[vertIndex]).Add(l.lightBias)
+			} else {
+				vertPos = globalMeshAlteredVertexPositions[vertIndex].Add(l.lightBias)
 			}
 
 		} else {
 
-			vertPos = transform.MultVec(globalMeshAlteredVertexPositions[vertIndex])
 			if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
-				vertPosWithNormal = transform.MultVec(globalMeshAlteredVertexPositions[vertIndex].Add(globalMeshAlteredVertexNormals[vertIndex].Mult(cellSize)))
+				vertPosWithNormal = transform.MultVec(globalMeshAlteredVertexPositions[vertIndex].Add(globalMeshAlteredVertexNormals[vertIndex].Mult(cellSize))).Add(l.lightBias)
+			} else {
+				vertPos = transform.MultVec(globalMeshAlteredVertexPositions[vertIndex]).Add(l.lightBias)
 			}
 
 		}
-
-		vertPos = vertPos.Add(l.lightBias)
 
 		if !l.dimensions.Contains(vertPos) {
 			return
@@ -904,27 +637,17 @@ func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, ta
 		cellColor.B = 0
 
 		var cell *LightVolumeCell
+		var x, y, z int
 
 		if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
-
-			x, y, z := l.convertToXYZIndicesVec(vertPosWithNormal)
-
-			if cell = l.getLightCell(x, y, z); cell != nil {
-				cellColor = cell.color
-			}
-
+			x, y, z = l.convertToXYZIndicesVec(vertPosWithNormal)
 		} else {
-
-			x, y, z := l.convertToXYZIndicesVec(vertPos)
-
-			cell = l.getLightCell(x, y, z)
-			if cell != nil {
-				cellColor = cell.color
-			}
-
+			x, y, z = l.convertToXYZIndicesVec(vertPos)
 		}
 
-		if cell != nil {
+		if cell = l.getLightCell(x, y, z); cell != nil {
+			cellColor = cell.color
+
 			for _, light := range cell.useLights {
 				light.VertexLight(vertIndex, tri, model, targetColors)
 			}
@@ -1053,13 +776,36 @@ func (l *LightVolume) LightVolumeForEachCell(forEach func(cell *LightVolumeCell)
 // iterations is the number of times to run the blur.
 // blurStrength is the strength of the blur, ranging from 0 to 1.
 // Each application of the blur happens at the end of the iterations, not all at once.
-func (l *LightVolume) LightVolumeBlur(cellRadius int, iterations int, blurStrength float32) {
+func (l *LightVolume) LightVolumeBlur(cellRadius int, iterations int, blurStrength float32, blurDirections ...LightVolumeDirection) {
 
 	if iterations < 1 {
 		iterations = 1
 	}
 
 	ogLightValues := make([]*LightVolumeCell, 0, len(l.lightValues))
+
+	blurLeft := len(blurDirections) == 0
+	blurRight := len(blurDirections) == 0
+	blurForward := len(blurDirections) == 0
+	blurBack := len(blurDirections) == 0
+	blurUp := len(blurDirections) == 0
+	blurDown := len(blurDirections) == 0
+
+	for _, d := range blurDirections {
+		if d == LightVolumeDirectionRight {
+			blurLeft = true
+		} else if d == LightVolumeDirectionLeft {
+			blurRight = true
+		} else if d == LightVolumeDirectionForward {
+			blurBack = true
+		} else if d == LightVolumeDirectionBack {
+			blurForward = true
+		} else if d == LightVolumeDirectionUp {
+			blurDown = true
+		} else if d == LightVolumeDirectionDown {
+			blurUp = true
+		}
+	}
 
 	for range iterations {
 
@@ -1088,6 +834,21 @@ func (l *LightVolume) LightVolumeBlur(cellRadius int, iterations int, blurStreng
 					for rz := -cellRadius; rz <= cellRadius; rz++ {
 						for ry := -cellRadius; ry <= cellRadius; ry++ {
 							for rx := -cellRadius; rx <= cellRadius; rx++ {
+
+								if rz < 0 && !blurBack {
+									continue
+								} else if rz > 0 && !blurForward {
+									continue
+								} else if rx > 0 && !blurRight {
+									continue
+								} else if rx < 0 && !blurLeft {
+									continue
+								} else if ry > 0 && !blurUp {
+									continue
+								} else if ry < 0 && !blurDown {
+									continue
+								}
+
 								if cell := getOgLightCell(x+rx, y+ry, z+rz); cell != nil {
 
 									isBlocked := false
@@ -1110,6 +871,7 @@ func (l *LightVolume) LightVolumeBlur(cellRadius int, iterations int, blurStreng
 									}
 
 									if !isBlocked {
+
 										count++
 										baseColor = baseColor.Add(cell.color)
 									}
@@ -1626,43 +1388,47 @@ func (c *LightVolumeCell) clone() *LightVolumeCell {
 	return &newCell
 }
 
-func (c LightVolumeCell) IndexX() int {
+func (c *LightVolumeCell) IndexX() int {
 	return c.indexX
 }
 
-func (c LightVolumeCell) IndexY() int {
+func (c *LightVolumeCell) IndexY() int {
 	return c.indexY
 }
 
-func (c LightVolumeCell) IndexZ() int {
+func (c *LightVolumeCell) IndexZ() int {
 	return c.indexZ
 }
 
-func (c LightVolumeCell) IsAtRightSide() bool {
+func (c *LightVolumeCell) IsAtRightSide() bool {
 	return c.indexX == c.lightVolume.cellCountX-1
 }
 
-func (c LightVolumeCell) IsAtLeftSide() bool {
+func (c *LightVolumeCell) IsAtLeftSide() bool {
 	return c.indexX == 0
 }
 
-func (c LightVolumeCell) IsAtTopSide() bool {
+func (c *LightVolumeCell) IsAtTopSide() bool {
 	return c.indexY == c.lightVolume.cellCountY-1
 }
 
-func (c LightVolumeCell) IsAtBottomSide() bool {
+func (c *LightVolumeCell) IsAtBottomSide() bool {
 	return c.indexY == 0
 }
 
-func (c LightVolumeCell) IsAtFrontSide() bool {
+func (c *LightVolumeCell) IsAtFrontSide() bool {
 	return c.indexZ == c.lightVolume.cellCountZ-1
 }
 
-func (c LightVolumeCell) IsAtBackSide() bool {
+func (c *LightVolumeCell) IsAtBackSide() bool {
 	return c.indexZ == 0
 }
 
-func (c LightVolumeCell) Data() any {
+func (c *LightVolumeCell) IsDirectNeighborOf(other LightVolumeCell, direction LightVolumeDirection) bool {
+	return other.Neighbor(direction) == c
+}
+
+func (c *LightVolumeCell) Data() any {
 	return c.data
 }
 
@@ -1670,7 +1436,7 @@ func (c *LightVolumeCell) SetData(data any) {
 	c.data = data
 }
 
-func (c LightVolumeCell) Color() Color4 {
+func (c *LightVolumeCell) Color() Color4 {
 	return c.color
 }
 
@@ -1690,7 +1456,7 @@ func (c *LightVolumeCell) SetColorMonochrome(value float32) {
 	c.color.B = value
 }
 
-func (c LightVolumeCell) Blocked(dir LightVolumeDirection) bool {
+func (c *LightVolumeCell) Blocked(dir LightVolumeDirection) bool {
 	return c.blocked[dir]
 }
 

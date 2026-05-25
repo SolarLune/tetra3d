@@ -72,7 +72,7 @@ func (part *Particle) Update(dt float32) {
 
 	if !part.Velocity.IsZero() {
 
-		if friction := part.ParticleSystem.Settings.Friction; friction > 0 {
+		if friction := part.ParticleSystem.Settings().Friction; friction > 0 {
 			part.Velocity = part.Velocity.SubMagnitude(friction)
 		}
 
@@ -80,8 +80,8 @@ func (part *Particle) Update(dt float32) {
 
 	}
 
-	if part.ParticleSystem.Settings.MovementFunction != nil {
-		part.ParticleSystem.Settings.MovementFunction(part)
+	if part.ParticleSystem.Settings().MovementFunction != nil {
+		part.ParticleSystem.Settings().MovementFunction(part)
 	}
 
 	if !part.ScaleAdd.IsZero() {
@@ -96,7 +96,7 @@ func (part *Particle) Update(dt float32) {
 
 	scale := part.Model.LocalScale()
 
-	if !part.ParticleSystem.Settings.AllowNegativeScale && (scale.X < 0 || scale.Y < 0 || scale.Z < 0) {
+	if !part.ParticleSystem.Settings().AllowNegativeScale && (scale.X < 0 || scale.Y < 0 || scale.Z < 0) {
 		part.Life = part.Lifetime // Die because the particle got too small
 	}
 
@@ -105,29 +105,29 @@ func (part *Particle) Update(dt float32) {
 		part.ParticleSystem.Remove(part)
 	}
 
-	if curve := part.ParticleSystem.Settings.ColorCurve; len(curve.Points) > 0 {
+	if curve := part.ParticleSystem.Settings().ColorCurve; len(curve.Points) > 0 {
 		part.Model.Color = curve.Color(part.Life / part.Lifetime)
 	}
 
 }
 
 type ParticleSystemSettings struct {
-	SpawnOn     bool        // If the particle system should spawn particles at all
-	SpawnRate   FloatRange  // SpawnRate is how often a particle is spawned in seconds
-	SpawnCount  IntRange    // SpawnCount is how many particles are spawned at a time when a particle is spawned
-	Lifetime    FloatRange  // Lifetime is how long a particle lives in seconds
-	SpawnOffset VectorRange // The range indicating how far of an offset to move
+	SpawnOn     bool         // If the particle system should spawn particles at all
+	SpawnRate   FloatRange   // SpawnRate is how often a particle is spawned in seconds
+	SpawnCount  IntRange     // SpawnCount is how many particles are spawned at a time when a particle is spawned
+	Lifetime    FloatRange   // Lifetime is how long a particle lives in seconds
+	SpawnOffset Vector3Range // The range indicating how far of an offset to move
 
-	Velocity    VectorRange // The range indicating how fast a particle constantly moves per frame
-	VelocityAdd VectorRange // The range indicating how fast a particle accelerates per frame
+	Velocity    Vector3Range // The range indicating how fast a particle constantly moves per frame
+	VelocityAdd Vector3Range // The range indicating how fast a particle accelerates per frame
 
-	Scale    VectorRange // The range indicating how large the particle should spawn in as
-	ScaleAdd VectorRange // The range indicating how large the particle should grow per frame
+	Scale    Vector3Range // The range indicating how large the particle should spawn in as
+	ScaleAdd Vector3Range // The range indicating how large the particle should grow per frame
 
-	RotationAdd        VectorRange // The range indicating how fast a particle should spin per frame
-	LocalPosition      bool        // Whether the particles' positions should be local to the system or not; defaults to false.
-	Friction           float32     // Friction to apply to velocity
-	AllowNegativeScale bool        // If negative scale should be allowed for particles. By default, this is false.
+	RotationAdd        Vector3Range // The range indicating how fast a particle should spin per frame
+	LocalPosition      bool         // Whether the particles' positions should be local to the system or not (if true, particles move with the system); defaults to false.
+	Friction           float32      // Friction to apply to velocity
+	AllowNegativeScale bool         // If negative scale should be allowed for particles. By default, this is false.
 
 	VertexSpawnMode  int // VertexSpawnMode influences where a particle spawns. By default, this is ParticleVertexSpawnModeOff.
 	VertexSpawnModel *Model
@@ -144,8 +144,94 @@ type ParticleSystemSettings struct {
 	ColorCurve ColorCurve // ColorCurve is a curve indicating how the spawned particles should change color as they live.
 }
 
+func (p ParticleSystemSettings) WithSpawnOn(spawnOn bool) ParticleSystemSettings {
+	p.SpawnOn = spawnOn
+	return p
+}
+
+func (p ParticleSystemSettings) WithSpawnRate(spawnRate FloatRange) ParticleSystemSettings {
+	p.SpawnRate = spawnRate
+	return p
+}
+
+func (p ParticleSystemSettings) WithSpawnCount(spawnCount IntRange) ParticleSystemSettings {
+	p.SpawnCount = spawnCount
+	return p
+}
+
+func (p ParticleSystemSettings) WithLifetime(lifetime FloatRange) ParticleSystemSettings {
+	p.Lifetime = lifetime
+	return p
+}
+
+func (p ParticleSystemSettings) WithSpawnOffset(spawnOffset Vector3Range) ParticleSystemSettings {
+	p.SpawnOffset = spawnOffset
+	return p
+}
+
+func (p ParticleSystemSettings) WithVelocity(velocity Vector3Range) ParticleSystemSettings {
+	p.Velocity = velocity
+	return p
+}
+
+func (p ParticleSystemSettings) WithVelocityAdd(velocity Vector3Range) ParticleSystemSettings {
+	p.VelocityAdd = velocity
+	return p
+}
+
+func (p ParticleSystemSettings) WithScale(scale Vector3Range) ParticleSystemSettings {
+	p.Scale = scale
+	return p
+}
+
+func (p ParticleSystemSettings) WithScaleAdd(scale Vector3Range) ParticleSystemSettings {
+	p.ScaleAdd = scale
+	return p
+}
+
+func (p ParticleSystemSettings) WithRotationAdd(rotation Vector3Range) ParticleSystemSettings {
+	p.RotationAdd = rotation
+	return p
+}
+
+func (p ParticleSystemSettings) WithLocalPosition(localPosition bool) ParticleSystemSettings {
+	p.LocalPosition = localPosition
+	return p
+}
+
+func (p ParticleSystemSettings) WithFriction(friction float32) ParticleSystemSettings {
+	p.Friction = friction
+	return p
+}
+
+func (p ParticleSystemSettings) WithAllowNegativeScale(allow bool) ParticleSystemSettings {
+	p.AllowNegativeScale = allow
+	return p
+}
+
+func (p ParticleSystemSettings) WithVertexSpawn(model *Model, spawnMode int) ParticleSystemSettings {
+	p.VertexSpawnModel = model
+	p.VertexSpawnMode = spawnMode
+	return p
+}
+
+func (p ParticleSystemSettings) WithSpawnOffsetFunction(spawnOffsetFunction func(p *Particle)) ParticleSystemSettings {
+	p.SpawnOffsetFunction = spawnOffsetFunction
+	return p
+}
+
+func (p ParticleSystemSettings) WithMovementFunction(movementFunction func(p *Particle)) ParticleSystemSettings {
+	p.MovementFunction = movementFunction
+	return p
+}
+
+func (p ParticleSystemSettings) WithColorCurve(colorCurve ColorCurve) ParticleSystemSettings {
+	p.ColorCurve = colorCurve
+	return p
+}
+
 // NewParticleSystemSettings creates a new particle system settings.
-func NewParticleSystemSettings() *ParticleSystemSettings {
+func NewParticleSystemSettings() ParticleSystemSettings {
 
 	scale := NewVectorRange()
 	scale.SetRanges(1, 1)
@@ -159,7 +245,7 @@ func NewParticleSystemSettings() *ParticleSystemSettings {
 	spawnCount := NewIntRange()
 	spawnCount.Set(1, 1)
 
-	return &ParticleSystemSettings{
+	return ParticleSystemSettings{
 		SpawnOn:    true,
 		SpawnRate:  spawnRate,
 		SpawnCount: spawnCount,
@@ -177,9 +263,9 @@ func NewParticleSystemSettings() *ParticleSystemSettings {
 }
 
 // Clone duplicates the ParticleSystemSettings.
-func (pss *ParticleSystemSettings) Clone() *ParticleSystemSettings {
+func (pss *ParticleSystemSettings) Clone() ParticleSystemSettings {
 
-	newPS := &ParticleSystemSettings{
+	newPS := ParticleSystemSettings{
 		SpawnOn: pss.SpawnOn,
 
 		SpawnRate:  pss.SpawnRate,
@@ -216,19 +302,21 @@ type ParticleSystem struct {
 	DeadParticles   []*Particle
 	On              bool
 
-	ParticleFactories []*Model
-	Root              *Model
+	BaseParticleModels []*Model
 
 	spawnTimer       float32
-	Settings         *ParticleSystemSettings
+	settings         ParticleSystemSettings
+	model            *Model
 	vertexSpawnIndex int
 }
 
 // NewParticleSystem creates a new ParticleSystem, operating on the baseModel Model and
 // randomly creating particles from the provided collection of particle Models.
-func NewParticleSystem(baseModel *Model, particles ...*Model) *ParticleSystem {
+func NewParticleSystem(baseParticles ...*Model) *ParticleSystem {
 
-	for _, part := range particles {
+	baseModel := NewModel("particle system", NewMesh("particle system mesh"))
+
+	for _, part := range baseParticles {
 		mat := part.mesh.MeshParts[0].Material
 		if baseModel.mesh.MeshPartByMaterialName(mat.name) == nil {
 			baseModel.mesh.AddMeshPart(part.mesh.MeshParts[0].Material)
@@ -242,32 +330,42 @@ func NewParticleSystem(baseModel *Model, particles ...*Model) *ParticleSystem {
 	// }
 
 	partSys := &ParticleSystem{
-		ParticleFactories: particles,
-		Root:              baseModel,
+		model: baseModel,
+
+		BaseParticleModels: baseParticles,
 
 		LivingParticles: []*Particle{},
 		DeadParticles:   []*Particle{},
 		toRemove:        []*Particle{},
 
-		Settings: NewParticleSystemSettings(),
+		settings: NewParticleSystemSettings(),
 
 		On: true,
 	}
 
 	// We calculate the frustum sphere based off of the particles spawned
-	partSys.Root.updateFrustumSphere = false
+	partSys.model.updateFrustumSphere = false
 
-	// partSys.Root.SetVisible(false, false)
+	// partSys.root.SetVisible(false, false)
 
 	return partSys
 
 }
 
+func (ps *ParticleSystem) Settings() ParticleSystemSettings {
+	return ps.settings
+}
+
+func (ps *ParticleSystem) SetSettings(settings ParticleSystemSettings) {
+	ps.settings = settings
+}
+
 // Clone creates a duplicate of the given ParticleSystem.
 func (ps *ParticleSystem) Clone() *ParticleSystem {
 
-	newPS := NewParticleSystem(ps.Root, ps.ParticleFactories...)
-	newPS.Settings = ps.Settings
+	newPS := NewParticleSystem(ps.BaseParticleModels...)
+	newPS.model = ps.model.Clone().(*Model)
+	newPS.settings = ps.settings
 	return newPS
 
 }
@@ -275,20 +373,24 @@ func (ps *ParticleSystem) Clone() *ParticleSystem {
 // Update should be called once per tick.
 func (ps *ParticleSystem) Update(dt float32) {
 
+	if len(ps.BaseParticleModels) == 0 {
+		return
+	}
+
 	furthestDist := float32(0.0)
 	largestParticle := float32(0.0)
 
 	// This could be multithreaded if the particles don't interact at all
 	for _, part := range ps.LivingParticles {
 		part.Update(dt)
-		furthestDist = math32.Max(furthestDist, ps.Root.DistanceSquaredTo(part.Model))
+		furthestDist = math32.Max(furthestDist, ps.model.DistanceSquaredTo(part.Model))
 		largestParticle = math32.Max(largestParticle, part.Model.mesh.Dimensions.MaxSpan()*part.Model.scale.Magnitude())
 	}
 
-	ps.Root.frustumCullingSphere.position = ps.Root.WorldPosition()
-	ps.Root.frustumCullingSphere.Radius = (math32.Sqrt(furthestDist)) + largestParticle
-	ps.Root.frustumCullingSphere.scale = ps.Root.WorldScale()
-	// ps.Root.FrustumCulling = false
+	ps.model.frustumCullingSphere.position = ps.model.WorldPosition()
+	ps.model.frustumCullingSphere.Radius = (math32.Sqrt(furthestDist)) + largestParticle
+	ps.model.frustumCullingSphere.scale = ps.model.WorldScale()
+	// ps.root.FrustumCulling = false
 	// Rotation doesn't matter
 
 	for _, toRemove := range ps.toRemove {
@@ -309,21 +411,21 @@ func (ps *ParticleSystem) Update(dt float32) {
 		return
 	}
 
-	if ps.Settings.SpawnOn {
+	if ps.settings.SpawnOn {
 
 		if ps.spawnTimer <= 0 {
-			spawnCount := int(ps.Settings.SpawnCount.Value())
+			spawnCount := int(ps.settings.SpawnCount.value())
 			for i := 0; i < spawnCount; i++ {
 				ps.Spawn()
 			}
-			ps.spawnTimer = ps.Settings.SpawnRate.Value()
+			ps.spawnTimer = ps.settings.SpawnRate.value()
 		}
 
 		ps.spawnTimer -= dt
 	}
 
-	// if len(ps.Root.DynamicBatchModels) > 0 {
-	// 	ps.Root.SetVisible(true, true)
+	// if len(ps.root.DynamicBatchModels) > 0 {
+	// 	ps.root.SetVisible(true, true)
 	// }
 
 }
@@ -337,39 +439,42 @@ func (ps *ParticleSystem) Spawn() {
 		ps.DeadParticles[0] = nil
 		ps.DeadParticles = ps.DeadParticles[1:]
 	} else {
-		part = NewParticle(ps, ps.ParticleFactories)
+		part = NewParticle(ps, ps.BaseParticleModels)
 		for _, model := range part.ModelBank {
-			ps.Root.DynamicBatchAdd(model.mesh.MeshParts[0], model)
+			ps.model.DynamicBatchAdd(model.mesh.MeshParts[0], model)
 		}
 		// for _, newModel := range part.ModelBank {
-		// 	ps.Root.DynamicBatchAdd(ps.Root.Mesh.FindMeshPart(part.Model.Mesh.MeshParts[0].Material.Name), newModel)
+		// 	ps.root.DynamicBatchAdd(ps.root.Mesh.FindMeshPart(part.Model.Mesh.MeshParts[0].Material.Name), newModel)
 		// }
 	}
 
 	ps.LivingParticles = append(ps.LivingParticles, part)
 
-	part.Lifetime = ps.Settings.Lifetime.Value()
+	part.Lifetime = ps.settings.Lifetime.value()
 
 	part.Reinit()
 
-	if ps.Settings.LocalPosition {
-		ps.Root.AddChildren(part.Model)
+	if ps.settings.LocalPosition {
+		ps.model.AddChildren(part.Model)
 	} else {
-		ps.Root.Root().AddChildren(part.Model)
+		root := ps.model.Root()
+		if root != nil {
+			root.AddChildren(part.Model)
+		}
 	}
 
-	part.Model.SetWorldScaleVec(ps.Settings.Scale.Value())
+	part.Model.SetWorldScaleVec(ps.settings.Scale.value())
 
-	part.Velocity = ps.Settings.Velocity.Value()
-	part.VelocityAdd = ps.Settings.VelocityAdd.Value()
-	part.ScaleAdd = ps.Settings.ScaleAdd.Value()
-	part.RotationAdd = ps.Settings.RotationAdd.Value()
+	part.Velocity = ps.settings.Velocity.value()
+	part.VelocityAdd = ps.settings.VelocityAdd.value()
+	part.ScaleAdd = ps.settings.ScaleAdd.value()
+	part.RotationAdd = ps.settings.RotationAdd.value()
 
 	var pos Vector3
 
-	if ps.Settings.VertexSpawnMode != ParticleVertexSpawnModeOff && ps.Settings.VertexSpawnModel != nil {
+	if ps.settings.VertexSpawnMode != ParticleVertexSpawnModeOff && ps.settings.VertexSpawnModel != nil {
 
-		model := ps.Settings.VertexSpawnModel
+		model := ps.settings.VertexSpawnModel
 
 		vertCount := len(model.mesh.VertexPositions)
 
@@ -377,7 +482,7 @@ func (ps *ParticleSystem) Spawn() {
 		// than one skinned model with the same mesh was active at any given time
 		pos = model.Transform().MultVec(model.mesh.VertexPositions[ps.vertexSpawnIndex])
 
-		switch ps.Settings.VertexSpawnMode {
+		switch ps.settings.VertexSpawnMode {
 		case ParticleVertexSpawnModeAscending:
 			ps.vertexSpawnIndex++
 		case ParticleVertexSpawnModeDescending:
@@ -394,15 +499,20 @@ func (ps *ParticleSystem) Spawn() {
 		}
 
 	} else {
-		pos = ps.Root.WorldPosition()
+		pos = ps.model.WorldPosition()
 	}
 
-	part.Model.SetWorldPositionVec(pos.Add(ps.Settings.SpawnOffset.Value()))
+	part.Model.SetWorldPositionVec(pos.Add(ps.settings.SpawnOffset.value()))
 
-	if ps.Settings.SpawnOffsetFunction != nil {
-		ps.Settings.SpawnOffsetFunction(part)
+	if ps.settings.SpawnOffsetFunction != nil {
+		ps.settings.SpawnOffsetFunction(part)
 	}
 
+}
+
+// Returns the renderable model for the particle system - rendering this renders all particles it has spawned.
+func (ps *ParticleSystem) Model() *Model {
+	return ps.model
 }
 
 // Remove removes a particle from the ParticleSystem, recycling the Particle for the next time a particle is spawned.
@@ -411,7 +521,8 @@ func (ps *ParticleSystem) Remove(part *Particle) {
 }
 
 type FloatRange struct {
-	Min, Max float32
+	Min, Max   float32
+	CustomFunc func(floatRange *FloatRange) float32
 }
 
 func NewFloatRange() FloatRange {
@@ -423,13 +534,25 @@ func (ran *FloatRange) Set(min, max float32) {
 	ran.Max = max
 }
 
+func (ran *FloatRange) SetCustomFunc(customFunc func(floatRange *FloatRange) float32) {
+	ran.CustomFunc = customFunc
+}
+
+func (ran FloatRange) value() float32 {
+	if ran.CustomFunc != nil {
+		return ran.CustomFunc(&ran)
+	}
+	return ran.Value()
+}
+
 func (ran FloatRange) Value() float32 {
 	random := rand.Float32()
 	return ran.Min + ((ran.Max - ran.Min) * random)
 }
 
 type IntRange struct {
-	Min, Max int
+	Min, Max   int
+	CustomFunc func(intRange *IntRange) int
 }
 
 func NewIntRange() IntRange {
@@ -441,6 +564,17 @@ func (ran *IntRange) Set(min, max int) {
 	ran.Max = max
 }
 
+func (ran *IntRange) SetCustomFunc(customFunc func(nRange *IntRange) int) {
+	ran.CustomFunc = customFunc
+}
+
+func (ran IntRange) value() int {
+	if ran.CustomFunc != nil {
+		return ran.CustomFunc(&ran)
+	}
+	return ran.Value()
+}
+
 func (ran IntRange) Value() int {
 	if ran.Min >= ran.Max {
 		return ran.Min
@@ -448,22 +582,23 @@ func (ran IntRange) Value() int {
 	return ran.Min + rand.Intn(ran.Max-ran.Min)
 }
 
-// VectorRange represents a range of possible values, and allows Tetra3D to get a random value from within
+// Vector3Range represents a range of possible values, and allows Tetra3D to get a random value from within
 // that number range.
-type VectorRange struct {
-	Uniform bool    // If the random value returned by the NumberRange should be consistent across all axes or not
-	Min     Vector3 // Min is the set of minimum numbers allowed in the NumberRange
-	Max     Vector3 // Max is the set of maximum numbers allowed in the NumberRange
+type Vector3Range struct {
+	Uniform    bool    // If the random value returned by the NumberRange should be consistent across all axes or not
+	Min        Vector3 // Min is the set of minimum numbers allowed in the NumberRange
+	Max        Vector3 // Max is the set of maximum numbers allowed in the NumberRange
+	CustomFunc func(vectorRange *Vector3Range) Vector3
 }
 
 // NewVectorRange returns a new instance of a 3D NumberRange struct.
-func NewVectorRange() VectorRange {
-	return VectorRange{}
+func NewVectorRange() Vector3Range {
+	return Vector3Range{}
 }
 
 // SetAll sets the minimum and maximum values of all components of the number range at the same time to the value
 // passed.
-func (ran *VectorRange) SetAll(value float32) {
+func (ran *Vector3Range) SetAll(value float32) {
 	ran.Min.X = value
 	ran.Max.X = value
 	ran.Min.Y = value
@@ -474,19 +609,19 @@ func (ran *VectorRange) SetAll(value float32) {
 
 // SetAxes sets the minimum and maximum values of all components of the number range at the same time. Both
 // minimum and maximum boundaries of the NumberRange will be the same.
-func (ran *VectorRange) SetAxes(x, y, z float32) {
-	ran.Min.X = x
+func (ran *Vector3Range) SetAxes(x, y, z float32) {
+	ran.Min.X = -x
 	ran.Max.X = x
 
-	ran.Min.Y = y
+	ran.Min.Y = -y
 	ran.Max.Y = y
 
-	ran.Min.Z = z
+	ran.Min.Z = -z
 	ran.Max.Z = z
 }
 
 // SetRanges sets the minimum and maximum values of all components (axes) of the number range.
-func (ran *VectorRange) SetRanges(min, max float32) {
+func (ran *Vector3Range) SetRanges(min, max float32) {
 
 	ran.Min.X = min
 	ran.Min.Y = min
@@ -499,25 +634,32 @@ func (ran *VectorRange) SetRanges(min, max float32) {
 }
 
 // SetRangeX sets the minimum and maximum values of the X component of the number range.
-func (ran *VectorRange) SetRangeX(min, max float32) {
+func (ran *Vector3Range) SetRangeX(min, max float32) {
 	ran.Min.X = min
 	ran.Max.X = max
 }
 
 // SetRangeY sets the minimum and maximum values of the Y component of the number range.
-func (ran *VectorRange) SetRangeY(min, max float32) {
+func (ran *Vector3Range) SetRangeY(min, max float32) {
 	ran.Min.Y = min
 	ran.Max.Y = max
 }
 
 // SetRangeZ sets the minimum and maximum values of the Z component of the number range.
-func (ran *VectorRange) SetRangeZ(min, max float32) {
+func (ran *Vector3Range) SetRangeZ(min, max float32) {
 	ran.Min.Z = min
 	ran.Max.Z = max
 }
 
+func (ran *Vector3Range) value() Vector3 {
+	if ran.CustomFunc != nil {
+		return ran.CustomFunc(ran)
+	}
+	return ran.Value()
+}
+
 // Value returns a random value from within the bounds of the NumberRange.
-func (ran VectorRange) Value() Vector3 {
+func (ran Vector3Range) Value() Vector3 {
 
 	var vec Vector3
 

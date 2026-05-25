@@ -70,11 +70,8 @@ func (g *Game) Init() {
 
 	// (As an aside, by default, when we export a mesh with vertex colors, the first vertex color channel is active.)
 
-	// Here, we'll select our vertices and store it in the Game struct.
-	mesh := g.Cube.Mesh()
-
 	// Select vertices that have non-black vertex color in the specified vertex color channel.
-	vertices := tetra3d.NewVertexSelection(mesh).ByVertexColorChannelNames("Flash")
+	vertices := tetra3d.NewVertexSelection(g.Cube.Mesh()).SelectVertexColorChannelNames("Flash")
 
 	// An error could happen if the color channel index passed to SelectInChannel is too high to be beyond the vertex color channel count set on the Model.
 	// If this happens, let's panic on it.
@@ -126,12 +123,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := `This demo shows how to easily select specific
 vertices using vertex color in Tetra3D.
 In this example, the glowing faces are colored in the 'Flash'
-vertex color channel in Blender (which
-becomes channel 1 in Tetra3D as it's in the second slot).
+vertex color channel in Blender.
+
 The vertices that have a non-black color
 in the "Flash" channel are then assigned
 a flashing color here in Tetra3D.`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

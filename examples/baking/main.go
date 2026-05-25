@@ -6,7 +6,6 @@ import (
 	"github.com/solarlune/tetra3d"
 	"github.com/solarlune/tetra3d/colors"
 	"github.com/solarlune/tetra3d/examples"
-	"github.com/solarlune/tetra3d/math32"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -34,7 +33,6 @@ func NewGame() *Game {
 const (
 	ChannelColor    = iota // The default first vertex color channel
 	ChannelLight           // The light color channel
-	ChannelAO              // The AO color channel
 	ChannelCombined        // The combined color channel
 )
 
@@ -70,36 +68,20 @@ func (g *Game) Init() {
 	// in vertex channel #2. We will use named consts to make referencing these channels simple.
 
 	model := g.Scene.Get("GameMap").(*tetra3d.Model)
+	mesh := model.Mesh()
 
 	// First, we'll bake the lighting into the lighting vertex color channel.
-	model.BakeLighting(ChannelLight, lights)
+	model.BakeLighting(ChannelLight, g.Camera.Camera, lights)
 
 	lights.ForEachLight(func(light tetra3d.ILight) bool {
 		light.SetVisible(false, false)
 		return true
 	})
 
-	// Next, we'll bake the AO into the AO vertex color channel.
-
-	// The AOBakeOptions struct controls how our AO should be baked. For readability, we create it
-	// here, though we should, of course, create it outside our model loop if the options don't differ
-	// for each Model.
-	bakeOptions := tetra3d.NewDefaultAOBakeOptions()
-	bakeOptions.TargetMeshParts = []*tetra3d.MeshPart{ // Bake AO only to meshparts with the following materials
-		model.Mesh().MeshPartByMaterialName("BrickTile"),
-		model.Mesh().MeshPartByMaterialName("GroundTile"),
-		model.Mesh().MeshPartByMaterialName("Cube"),
-	}
-	bakeOptions.OcclusionAngle = math32.ToRadians(60)
-	bakeOptions.TargetChannel = ChannelAO // Set the target baking channel (as it's not 0)
-	// bakeOptions.OtherModels = models      // Specify what other objects should influence the AO (note that this is optional)
-	model.Mesh().SetVertexColor(ChannelAO, colors.White())
-	model.BakeAO(bakeOptions) // And bake the AO.
-
 	// We'll combine the channels together multiplicatively here.
-	model.Mesh().CombineVertexColors(ChannelCombined, true, ChannelColor, ChannelLight, ChannelAO)
+	mesh.CombineVertexColors(ChannelCombined, true, ChannelColor, ChannelLight)
 
-	for _, mat := range model.Mesh().Materials() {
+	for _, mat := range mesh.Materials() {
 		mat.Shadeless = true // We don't need lighting anymore.
 	}
 
@@ -119,18 +101,14 @@ func (g *Game) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
-		gameMap.Mesh().VertexActiveColorChannel = ChannelAO
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.Key3) {
 		gameMap.Mesh().VertexActiveColorChannel = ChannelLight
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key4) {
+	if inpututil.IsKeyJustPressed(ebiten.Key3) {
 		gameMap.Mesh().VertexActiveColorChannel = ChannelCombined
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key5) {
+	if inpututil.IsKeyJustPressed(ebiten.Key4) {
 		for _, mp := range gameMap.Mesh().MeshParts {
 			mp.Material.UseTexture = !mp.Material.UseTexture
 		}
@@ -162,12 +140,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `This example shows how lighting and primitive
 ambient occlusion can be baked into vertex colors.
-1 Key: Switch to vertex color-only channel 
+1 Key: Switch to vertex color-only channel
 2 Key: Switch to only AO
 3 key: Switch to only lighting
 4 Key: Switch to VC + AO + Lighting
 5 Key: Enable / disable texture channel`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

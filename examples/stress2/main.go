@@ -191,12 +191,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `Stress Test 2 - Here, cubes are moving. We can render them
 efficiently by dynamically batching them, though they
-will mimic the batching object (the character plane) visually - 
+will mimic the batching object (the character plane) visually -
 they now share textures, blend modes, filtering, etc.
 They also can no longer intersect, now just drawing in front of or behind each other.
 
 1 Key: Toggle batching cubes together`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

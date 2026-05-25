@@ -583,9 +583,9 @@ func (matrix Matrix4) Rotated(x, y, z, angle float32) Matrix4 {
 	return NewMatrix4Rotate(x, y, z, angle).Mult(matrix)
 }
 
-// NewProjectionPerspective generates a perspective frustum Matrix4. fovy is the vertical field of view in degrees, near and far are the near and far clipping plane,
+// NewProjectionMatrix4Perspective generates a perspective frustum Matrix4. fovy is the vertical field of view in degrees, near and far are the near and far clipping plane,
 // while viewWidth and viewHeight is the width and height of the backing texture / camera. Generally, you won't need to use this directly.
-func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float32) Matrix4 {
+func NewProjectionMatrix4Perspective(fovy, near, far, viewWidth, viewHeight float32) Matrix4 {
 
 	aspect := viewWidth / viewHeight
 
@@ -603,10 +603,10 @@ func NewProjectionPerspective(fovy, near, far, viewWidth, viewHeight float32) Ma
 
 }
 
-// NewProjectionOrthographic generates an orthographic frustum Matrix4. near and far are the near and far clipping plane. right, left, top, and bottom
+// NewProjectionMatrix4Orthographic generates an orthographic frustum Matrix4. near and far are the near and far clipping plane. right, left, top, and bottom
 // are the right, left, top, and bottom planes (usually 1 and -1 for right and left, and the aspect ratio of the window and negative for top and bottom).
 // Generally, you won't need to use this directly.
-func NewProjectionOrthographic(near, far, right, left, top, bottom float32) Matrix4 {
+func NewProjectionMatrix4Orthographic(near, far, right, left, top, bottom float32) Matrix4 {
 	return Matrix4{
 		{2 / (right - left), 0, 0, 0},
 		{0, 2 / (top - bottom), 0, 0},

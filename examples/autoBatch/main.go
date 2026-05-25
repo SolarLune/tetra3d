@@ -76,13 +76,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		txt := `This demo simply shows how automatic batching
 and merging work. By enabling Automatic Batching on an object
 in Blender, similar objects are either dynamically batched together,
-or merged together to minimize / eliminate draw calls. Of course, 
+or merged together to minimize / eliminate draw calls. Of course,
 this requires such objects to have the same material.
 
 In this example, the blue cubes are automatically
 dynamically batched (which is faster than rendering each individually),
 while the red cubes are statically merged (the fastest option).`
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 	}
 
 }

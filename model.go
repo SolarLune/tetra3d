@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"errors"
 	"math"
+	"slices"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/solarlune/tetra3d/math32"
@@ -298,109 +299,229 @@ func (model *Model) DynamicBatchTriangleCount() int {
 	return count
 }
 
+// Merges the vertices and triangles from the target meshpart of the target model into the calling Model, using the last
+// meshpart of the calling Model's mesh. If the model has no meshparts, then it will create exactly one for handling vertices
+// from the target meshpart.
+func (model *Model) StaticMerge(target *Model, targetMeshPart *MeshPart) {
+
+	// Internal note, 5/15/26: Static merging wasn't working correctly because of the way meshparts are contiguous
+	// sections of vertices in the owning Mesh's vertex list. Because I didn't want to drastically rework
+	// how vertices are laid out in Meshes, I opted to change Model.StaticMerge(). Now it takes a Model and one of its
+	// target MeshParts to merge into the first MeshPart on the calling Model. This means you would require one Model
+	// for each MeshPart (material). Not ideal, but better than not doing anything. This is handled automatically
+	// if you take advantage of auto static batching (e.g. one model is created for each different material).
+
+	totalSize := 0
+	if model == target {
+		return
+	}
+	totalSize += targetMeshPart.VertexIndexCount()
+
+	if totalSize == 0 {
+		return
+	}
+
+	vec := Vector3{}
+	verts := []VertexInfo{}
+	indices := []int{}
+
+	p, s, r := model.Transform().Decompose()
+	op, os, or := target.Transform().Decompose()
+
+	inverted := NewMatrix4Scale(os.X, os.Y, os.Z)
+	scaleMatrix := NewMatrix4Scale(s.X, s.Y, s.Z)
+	inverted = inverted.Mult(scaleMatrix)
+
+	inverted = inverted.Mult(r.Transposed().Mult(or))
+
+	inverted = inverted.Mult(NewMatrix4Translate(op.X-p.X, op.Y-p.Y, op.Z-p.Z))
+
+	if target.mesh.AutoSubdivide {
+		model.mesh.AutoSubdivide = true
+	}
+
+	verts = verts[:0]
+	indices = indices[:0]
+
+	verts = slices.Grow(verts, targetMeshPart.VertexIndexCount())
+	indices = slices.Grow(indices, targetMeshPart.TriangleCount()*3)
+
+	targetMeshPart.ForEachVertexIndex(func(vertIndex int) {
+
+		vertInfo := targetMeshPart.Mesh.GetVertexInfo(vertIndex)
+
+		vec.X = vertInfo.X
+		vec.Y = vertInfo.Y
+		vec.Z = vertInfo.Z
+
+		vec = inverted.MultVec(vec)
+
+		vertInfo.X = vec.X
+		vertInfo.Y = vec.Y
+		vertInfo.Z = vec.Z
+
+		verts = append(verts, vertInfo)
+
+	}, false)
+
+	// Step 1: Allocate vertices (for speed)
+	model.mesh.allocateVertexBuffers(len(verts))
+
+	// Step 2: Create a new meshpart as necessary
+	var mp *MeshPart
+	if len(model.mesh.MeshParts) == 0 {
+		mp = model.mesh.AddMeshPart(targetMeshPart.Material)
+	} else {
+		mp = model.mesh.MeshParts[len(model.mesh.MeshParts)-1]
+	}
+
+	// Step 3: Add vertices
+	model.mesh.AddVertices(verts...)
+
+	// Step 4: Add triangles
+	targetMeshPart.ForEachTri(func(tri *Triangle) {
+		for i := range 3 {
+			index := tri.VertexIndex(i)
+			indices = append(indices, index-targetMeshPart.VertexIndexStart+mp.VertexIndexEnd)
+		}
+	})
+	mp.AddTriangles(indices...)
+
+	// Step 5: Update bounds of the mesh's dimensions
+	model.mesh.UpdateBounds()
+
+	// Step 6: Update frustum culling sphere
+	model.frustumCullingSphere.SetLocalPositionVec(model.mesh.Dimensions.Center())
+	model.frustumCullingSphere.Radius = model.mesh.Dimensions.MaxSpan() / 2
+
+}
+
 // StaticMerge statically merges the provided models into the calling Model's mesh, such that their vertex properties (position, normal, UV, etc) are part of the calling Model's Mesh.
 // You can use this to merge several objects initially dynamically placed into the calling Model's mesh, thereby pulling back to a single draw call. Note that models are merged into MeshParts
 // (saving draw calls) based on maximum vertex count and shared materials (so to get any benefit from merging, ensure the merged models share materials; if they all have unique
 // materials, they will be turned into individual MeshParts, thereby forcing multiple draw calls). Also note that as the name suggests, this is static merging, which means that
 // after merging, the new vertices are static - part of the merging Model.
 // For more information, see this Wiki page on batching / merging: https://github.com/SolarLune/Tetra3d/wiki/Merging-and-Batching-Draw-Calls
-func (model *Model) StaticMerge(models ...*Model) {
+// func (model *Model) StaticMerge(models ...*Model) {
 
-	totalSize := 0
-	for _, other := range models {
-		if model == other {
-			continue
-		}
-		totalSize += len(other.mesh.VertexPositions)
-	}
+// 	totalSize := 0
+// 	for _, other := range models {
+// 		if model == other {
+// 			continue
+// 		}
+// 		totalSize += len(other.mesh.VertexPositions)
+// 	}
 
-	if totalSize == 0 {
-		return
-	}
+// 	if totalSize == 0 {
+// 		return
+// 	}
 
-	if int(model.mesh.triIndex)+totalSize > len(model.mesh.VertexPositions) {
-		model.mesh.allocateVertexBuffers(len(model.mesh.VertexPositions) + totalSize)
-	}
+// 	if int(model.mesh.triIndex)+totalSize > len(model.mesh.VertexPositions) {
+// 		model.mesh.allocateVertexBuffers(len(model.mesh.VertexPositions) + totalSize)
+// 	}
 
-	vec := Vector3{}
+// 	vec := Vector3{}
 
-	for _, other := range models {
+// 	// Optimize these two
+// 	verts := []VertexInfo{}
+// 	indices := []int{}
 
-		if model == other {
-			continue
-		}
+// 	autosubdivide := false
 
-		p, s, r := model.Transform().Decompose()
-		op, os, or := other.Transform().Decompose()
+// 	for _, other := range models {
 
-		inverted := NewMatrix4Scale(os.X, os.Y, os.Z)
-		scaleMatrix := NewMatrix4Scale(s.X, s.Y, s.Z)
-		inverted = inverted.Mult(scaleMatrix)
+// 		if model == other {
+// 			continue
+// 		}
 
-		inverted = inverted.Mult(r.Transposed().Mult(or))
+// 		p, s, r := model.Transform().Decompose()
+// 		op, os, or := other.Transform().Decompose()
 
-		inverted = inverted.Mult(NewMatrix4Translate(op.X-p.X, op.Y-p.Y, op.Z-p.Z))
+// 		inverted := NewMatrix4Scale(os.X, os.Y, os.Z)
+// 		scaleMatrix := NewMatrix4Scale(s.X, s.Y, s.Z)
+// 		inverted = inverted.Mult(scaleMatrix)
 
-		for _, otherPart := range other.mesh.MeshParts {
+// 		inverted = inverted.Mult(r.Transposed().Mult(or))
 
-			// Here, we'll merge models into the calling Model, using its existing mesh parts if the materials match and if adding the vertices wouldn't exceed the maximum triangle count (21845 in a single draw call).
+// 		inverted = inverted.Mult(NewMatrix4Translate(op.X-p.X, op.Y-p.Y, op.Z-p.Z))
 
-			var targetPart *MeshPart
+// 		if other.mesh.AutoSubdivide {
+// 			autosubdivide = true
+// 		}
 
-			for _, mp := range model.mesh.MeshParts {
-				if mp.Material == otherPart.Material && mp.TriangleCount()+otherPart.TriangleCount() < MaxTriangleCount {
-					targetPart = mp
-					break
-				}
-			}
+// 		for _, otherPart := range other.mesh.MeshParts {
 
-			if targetPart == nil {
-				targetPart = model.mesh.AddMeshPart(otherPart.Material)
-			}
+// 			verts = verts[:0]
+// 			indices = indices[:0]
 
-			// Optimize these two
-			verts := make([]VertexInfo, 0, otherPart.VertexIndexCount())
-			indices := make([]int, 0, otherPart.TriangleCount()*3)
+// 			verts = slices.Grow(verts, otherPart.VertexIndexCount())
+// 			indices = slices.Grow(indices, otherPart.TriangleCount()*3)
 
-			otherPart.ForEachVertexIndex(func(vertIndex int) {
+// 			otherPart.ForEachVertexIndex(func(vertIndex int) {
 
-				vertInfo := otherPart.Mesh.GetVertexInfo(vertIndex)
+// 				vertInfo := otherPart.Mesh.GetVertexInfo(vertIndex)
 
-				vec.X = vertInfo.X
-				vec.Y = vertInfo.Y
-				vec.Z = vertInfo.Z
+// 				vec.X = vertInfo.X
+// 				vec.Y = vertInfo.Y
+// 				vec.Z = vertInfo.Z
 
-				vec = inverted.MultVec(vec)
+// 				vec = inverted.MultVec(vec)
 
-				vertInfo.X = vec.X
-				vertInfo.Y = vec.Y
-				vertInfo.Z = vec.Z
+// 				vertInfo.X = vec.X
+// 				vertInfo.Y = vec.Y
+// 				vertInfo.Z = vec.Z
 
-				verts = append(verts, vertInfo)
+// 				verts = append(verts, vertInfo)
 
-			}, false)
+// 			}, false)
 
-			model.mesh.AddVertices(verts...)
+// 			// mpStart := 0
+// 			// if len(model.mesh.MeshParts) > 0 {
+// 			// 	mpStart = model.mesh.MeshParts[len(model.mesh.MeshParts)-1].VertexIndexEnd
+// 			// }
 
-			otherPart.ForEachTri(func(tri *Triangle) {
-				for i := range 3 {
-					index := tri.VertexIndex(i)
-					indices = append(indices, index-otherPart.VertexIndexStart+model.mesh.vertsAddStart)
-				}
-			})
+// 			// Step 1: Allocate vertices (for speed)
+// 			model.mesh.allocateVertexBuffers(len(verts))
 
-			targetPart.AddTriangles(indices...)
+// 			// Step 2: Create a new meshpart as necessary
+// 			var mp *MeshPart
+// 			for _, part := range model.mesh.MeshParts {
+// 				if part.Material == otherPart.Material {
+// 					mp = part
+// 					break
+// 				}
+// 			}
+// 			if mp == nil {
+// 				mp = model.mesh.AddMeshPart(otherPart.Material)
+// 			}
 
-		}
+// 			// Step 3: Add vertices
+// 			model.mesh.AddVertices(verts...)
 
-	}
+// 			otherPart.ForEachTri(func(tri *Triangle) {
+// 				for i := range 3 {
+// 					index := tri.VertexIndex(i)
+// 					indices = append(indices, index-otherPart.VertexIndexStart)
+// 				}
+// 			})
 
-	model.mesh.UpdateBounds()
+// 			fmt.Println(verts, indices)
 
-	model.frustumCullingSphere.SetLocalPositionVec(model.mesh.Dimensions.Center())
-	model.frustumCullingSphere.Radius = model.mesh.Dimensions.MaxSpan() / 2
+// 			// Step 4: Add triangles, and that's it
+// 			mp.AddTriangles(indices...)
 
-}
+// 		}
+
+// 	}
+
+// 	model.mesh.AutoSubdivide = autosubdivide
+
+// 	model.mesh.UpdateBounds()
+
+// 	model.frustumCullingSphere.SetLocalPositionVec(model.mesh.Dimensions.Center())
+// 	model.frustumCullingSphere.Radius = model.mesh.Dimensions.MaxSpan() / 2
+
+// }
 
 // ReassignBones reassigns the model to point to a different armature. armatureNode should be a pointer to the starting object Node of the
 // armature (not any of its bones).
@@ -477,7 +598,7 @@ func (model *Model) skinVertex(vertID int) (Vector3, Vector3) {
 
 // ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
 // matrix, a camera, and the MeshPart being rendered.
-func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, processOnlyVisible bool) {
+func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, processOnlyVisible bool, autoSubdivisionLevels []AutoSubdivisionLevel) {
 
 	globalSortingTriangleBucket.Clear()
 
@@ -577,7 +698,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	var unalteredMVP Matrix4
 	unbillboarded := false
 
-	if mat != nil && mat.DepthMode == DepthModeUnbillboarded {
+	if mat != nil && mat.BillboardedDepthMode == DepthModeUnbillboarded {
 		unbillboarded = true
 		unalteredMVP = modelTransform.Mult(vpMatrix)
 	}
@@ -608,25 +729,25 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		if mesh.AutoSubdivide {
 
-			if len(mesh.autoSubdivisionLevels) > 0 {
+			if len(autoSubdivisionLevels) > 0 {
 
 				if !mesh.allocatedForAutoSubdivisions {
 
 					maxLevel := float32(0)
-					for _, level := range mesh.autoSubdivisionLevels {
+					for _, level := range autoSubdivisionLevels {
 						maxLevel = max(maxLevel, float32(level.SubdivisionLevel))
 					}
 
 					subCount := (math32.Pow(2, maxLevel) + 1) * (math32.Pow(2, maxLevel-1) + 1)
 
-					mesh.allocateVertexBuffers(cap(mesh.VertexPositions) * int(subCount))
+					mesh.allocateVertexBuffers(len(mesh.Triangles) * int(subCount) * 3)
 
 					mesh.allocatedForAutoSubdivisions = true
 
 				}
 
 				meshPart.forEachTri(false, func(tri *Triangle) {
-					tri.handleSubdivision(invertedCamPos, model)
+					tri.handleSubdivision(invertedCamPos, model, autoSubdivisionLevels)
 				})
 
 			}
@@ -637,6 +758,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			})
 		}
 
+	}
+
+	if len(model.mesh.VertexPositions) >= len(colorVertexList) {
+		growDisplayLists()
 	}
 
 	meshPart.forEachTri(mesh.AutoSubdivide, func(tri *Triangle) {
@@ -773,7 +898,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		}
 
-		if outOfBounds {
+		if processOnlyVisible && outOfBounds {
 			vertexListIndex -= 3
 			return
 		}
@@ -783,12 +908,14 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			// If all transformed vertices are wholly out of bounds to the right, left, top, or bottom of the screen, then we can assume
 			// the triangle does not need to be rendered
-			if (transformedVertexPositions[0].X < -0.5 && transformedVertexPositions[1].X < -0.5 && transformedVertexPositions[2].X < -0.5) ||
-				(transformedVertexPositions[0].X > 0.5 && transformedVertexPositions[1].X > 0.5 && transformedVertexPositions[2].X > 0.5) ||
-				(transformedVertexPositions[0].Y < -0.5 && transformedVertexPositions[1].Y < -0.5 && transformedVertexPositions[2].Y < -0.5) ||
-				(transformedVertexPositions[0].Y > 0.5 && transformedVertexPositions[1].Y > 0.5 && transformedVertexPositions[2].Y > 0.5) {
-				vertexListIndex -= 3
-				return
+			if processOnlyVisible {
+				if (transformedVertexPositions[0].X < -0.5 && transformedVertexPositions[1].X < -0.5 && transformedVertexPositions[2].X < -0.5) ||
+					(transformedVertexPositions[0].X > 0.5 && transformedVertexPositions[1].X > 0.5 && transformedVertexPositions[2].X > 0.5) ||
+					(transformedVertexPositions[0].Y < -0.5 && transformedVertexPositions[1].Y < -0.5 && transformedVertexPositions[2].Y < -0.5) ||
+					(transformedVertexPositions[0].Y > 0.5 && transformedVertexPositions[1].Y > 0.5 && transformedVertexPositions[2].Y > 0.5) {
+					vertexListIndex -= 3
+					return
+				}
 			}
 
 			// Going back to using the transformed vertex positions for backface culling as it works better when the camera is super close to the
@@ -811,7 +938,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 				// We use this method of backface culling because it helps to ensure
 				// there's fewer graphical glitches when looking from very near a surface outwards; this
 				// doesn't help if a surface does not have backface culling, of course...
-				if nor < 0 {
+				if processOnlyVisible && nor < 0 {
 					vertexListIndex -= 3
 					return
 				}
@@ -820,7 +947,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			tri.wouldRender = true
 
-			if !tri.visible {
+			if processOnlyVisible && !tri.visible {
 				vertexListIndex -= 3
 				return
 			}
@@ -855,7 +982,7 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		}
 
-		if math32.IsNaN(depth) || math32.IsInf(depth, -1) || math32.IsInf(depth, 1) {
+		if processOnlyVisible && (math32.IsNaN(depth) || math32.IsInf(depth, -1) || math32.IsInf(depth, 1)) {
 			vertexListIndex -= 3
 			return
 		}
@@ -1092,7 +1219,7 @@ func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 // BakeLighting bakes the colors for the provided lights into a Model's Mesh's vertex colors. Note that the baked lighting overwrites whatever vertex colors
 // previously existed in the target channel (as otherwise, the colors could only get brighter with additive mixing, or only get darker with multiplicative mixing).
 // It will add the Model's scene's ambient lighting in, if it's not there already.
-func (model *Model) BakeLighting(targetChannel int, lights *NodeCollectionSet) {
+func (model *Model) BakeLighting(targetChannel int, camera *Camera, lights *NodeCollectionSet) {
 
 	if model.mesh == nil || targetChannel < 0 {
 		return
@@ -1118,6 +1245,8 @@ func (model *Model) BakeLighting(targetChannel int, lights *NodeCollectionSet) {
 
 	for _, mp := range model.mesh.MeshParts {
 
+		model.ProcessVertices(camera.ViewMatrix().Mult(camera.Projection()), camera, mp, false, nil)
+
 		if mp.Material != nil && mp.Material.Shadeless {
 
 			mp.ForEachVertexIndex(func(vertIndex int) {
@@ -1136,7 +1265,7 @@ func (model *Model) BakeLighting(targetChannel int, lights *NodeCollectionSet) {
 
 			lights.ForEachLight(func(light ILight) bool {
 				if light.IsVisible() {
-					mp.ForEachTri(func(tri *Triangle) {
+					mp.forEachTri(true, func(tri *Triangle) {
 						light.Light(tri, model, model.mesh.VertexColors[targetChannel])
 					})
 				}

@@ -37,7 +37,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	scene, err := tetra3d.LoadGLTFFileSystem(assets, "assets/scene.gltf", nil)
+	scene, err := tetra3d.LoadGLTFFileSystem(assets, "assets/scene.glb", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -117,7 +117,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	if g.System.DrawDebugText {
-		g.Camera.DrawDebugText(screen, "This is an example showing\nhow you can render a sprite in 2D, while\nmaintaining its ability to render over or under\nother 3D objects.\n\nArrow Keys: Move heart\nA: Toggle wireframe view of heart position", 0, 220, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, "This is an example showing\nhow you can render a 2D sprite in 3D space and\nmaintain its ability to render over or under\nother 3D objects.\n\nArrow Keys: Move heart\nA: Toggle wireframe view of heart position", 0, 220, 1, colors.LightGray())
 	}
 
 	if g.WireframeDrawHeart {

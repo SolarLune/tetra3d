@@ -96,13 +96,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 allow you to control how lights color specific Models.
 
 There's two point lights in this scene - a red one
-and a green one. By using LightGroups, the left cube 
+and a green one. By using LightGroups, the left cube
 is only lit by the green light, while the right
 is only lit by the red one. The center cube is lit by both.
 
 1 Key: Toggle light groups being active
 2 Key: Toggle all lighting`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 }
 

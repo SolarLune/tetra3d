@@ -215,6 +215,8 @@ func (result *Collision) CollidedWithParentPropName(parentHasPropNamed string) b
 // CollisionTestSettings controls how a CollisionTest() call evaluates.
 type CollisionTestSettings struct {
 
+	// TODO: Add backface culling for collision tests
+
 	// TestAgainst controls what objects to test against.
 	TestAgainst *NodeCollectionSet
 
@@ -507,7 +509,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 
 		for _, axis := range axes {
 
-			projectA := project(axis,
+			projectA := NewProjection(axis,
 				// boxPos,
 				boxPos.Add(WorldRight.Scale(boxSize.X)).Add(WorldUp.Scale(boxSize.Y)).Add(WorldForward.Scale(boxSize.Z)),
 				boxPos.Add(WorldRight.Scale(-boxSize.X)).Add(WorldUp.Scale(boxSize.Y)).Add(WorldForward.Scale(boxSize.Z)),
@@ -519,7 +521,7 @@ func btAABBTriangles(box *BoundingAABB, triangles *BoundingTriangles) *Collision
 				boxPos.Add(WorldRight.Scale(boxSize.X)).Add(WorldUp.Scale(-boxSize.Y)).Add(WorldForward.Scale(-boxSize.Z)),
 				boxPos.Add(WorldRight.Scale(-boxSize.X)).Add(WorldUp.Scale(-boxSize.Y)).Add(WorldForward.Scale(-boxSize.Z)),
 			)
-			projectB := project(axis, v0, v1, v2)
+			projectB := NewProjection(axis, v0, v1, v2)
 
 			overlap := projectA.Overlap(projectB)
 
@@ -711,8 +713,8 @@ func btTrianglesTriangles(trianglesA, trianglesB *BoundingTriangles) *Collision 
 
 				axis = axis.Unit()
 
-				p1 := project(axis, a[0], a[1], a[2])
-				p2 := project(axis, b[0], b[1], b[2])
+				p1 := NewProjection(axis, a[0], a[1], a[2])
+				p2 := NewProjection(axis, b[0], b[1], b[2])
 
 				overlap := p1.Overlap(p2)
 
@@ -962,11 +964,19 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) *Collision 
 
 }
 
+// Represents a distance between two points in space along a single axis.
 type Projection struct {
 	Min, Max float32
 }
 
-func project(axis Vector3, points ...Vector3) Projection {
+// Projects points on an axis to create a Projection, a distance between those points.
+// Useful for checking if zones overlap across on a single axis in 3D space.
+// For example, you can use this to get the distance from two points on a single axis thusly:
+//
+// `NewProjection(tetra3d.WorldRight, object1.WorldPosition(), object2.WorldPosition()).Distance()`
+//
+// Or create two projections on the same axis and use Projection.IsOverlapping(other) to see if they overlap.
+func NewProjection(axis Vector3, points ...Vector3) Projection {
 
 	projection := Projection{}
 	projection.Min = axis.Dot(points[0])

@@ -18,17 +18,24 @@ type Game struct {
 	Camera        examples.BasicFreeCam
 }
 
-//go:embed assets/*.gltf
+//go:embed assets/*.glb
 var assets embed.FS
 
+// To load an asset, normally, we would just call one of the tetra3d.LoadGLTF_____() functions,
+// but because we're working with data exported from other blend files, we have to set up dependent
+// library resolution. It's pretty simple, actually.
 func loadAsset(assetName string) *tetra3d.Library {
 
 	loadOptions := tetra3d.DefaultGLTFLoadOptions()
 
-	// If a dependent library is found, then try to load it using the loadAsset function as well; in truth, this should
-	// store the result in a map / dictionary and then return that if possible, rather than loading the asset again, for efficiency.
+	// If a dependent library is found, then in the process of loading, Tetra3D will
+	// call the given dependent library resolver function to attempt to retrieve that data as well.
+	// Here, we simply call loadAsset() again, substituting `.blend` in the filename with `.glb`.
+	//
+	// In practice, this should store the result somewhere and then return that
+	// if possible if dependent libraries are used more than once.
 	loadOptions.DependentLibraryResolver = func(blendPath string) *tetra3d.Library {
-		path := "assets/" + strings.Split(blendPath, ".blend")[0] + ".gltf"
+		path := "assets/" + strings.Split(blendPath, ".blend")[0] + ".glb"
 		return loadAsset(path)
 	}
 
@@ -51,7 +58,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library := loadAsset("assets/collections.gltf")
+	library := loadAsset("assets/collections.glb")
 
 	g.Scene = library.ExportedScene.Clone()
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
@@ -89,11 +96,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.SystemHandler.DrawDebugText {
 		txt := `This demo shows how external linking works.
-The cone is linked from another blend file (cone.blend) to the 
+The cone is linked from another blend file (cone.blend) to the
 main one (collections.blend). They both are exported to GLTF files,
 and when the main scene is loaded in Tetra3D, the dependent library is
 also loaded.`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

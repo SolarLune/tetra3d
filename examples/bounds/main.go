@@ -152,13 +152,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.System.Draw(screen, g.Camera.Camera)
 
 	if g.System.DrawDebugText {
-		txt := fmt.Sprintf(`This demo shows some basic movement 
+		txt := fmt.Sprintf(`This demo shows some basic movement
 and collision detection. The red and white cubes
 have BoundingAABB nodes, while the capsule and sphere are,
 naturally, capsule and sphere BoundingObjects.
 Arrow keys: Move %s
 F: switch between capsule and sphere`, g.Controlling.Name())
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

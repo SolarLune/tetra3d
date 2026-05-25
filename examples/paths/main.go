@@ -24,7 +24,7 @@ type Game struct {
 	PathStepper *tetra3d.PathStepper
 }
 
-//go:embed paths.gltf
+//go:embed paths.glb
 var libraryData []byte
 
 func NewGame() *Game {
@@ -64,14 +64,14 @@ func (g *Game) Update() error {
 
 	// Advance the stepper if you reach the target node...
 	if cubePos.Equals(pathNodePos) {
-		g.PathStepper.Next()
+		g.PathStepper.GotoNext()
 	}
 
 	// ... Or if you press right or left.
 	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
-		g.PathStepper.Next()
+		g.PathStepper.GotoNext()
 	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
-		g.PathStepper.Prev()
+		g.PathStepper.GotoPrev()
 	}
 
 	g.Scene.Root.Get("PointMarker").SetLocalPositionVec(pathNodePos)
@@ -100,10 +100,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `This demo shows how paths work.
 The cube will follow the path (which is invisible,
-as it is made up of Nodes).
+as it is made up of Nodes). Press F3 to see the points.
 Left, Right keys: Step 1 unit forward or
 back through the path`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)

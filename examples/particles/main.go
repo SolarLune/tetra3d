@@ -60,9 +60,11 @@ func (g *Game) Init() {
 
 	// We don't parent the fire particle system to the fire particle system node itself because we want the particles to move
 	// independent of the node
-	g.FireParticleSystem = tetra3d.NewParticleSystem(g.Scene.Get("Fire").(*tetra3d.Model), g.Scene.Root.Get("Particle").(*tetra3d.Model))
+	g.FireParticleSystem = tetra3d.NewParticleSystem(g.Scene.Root.Get("Particle").(*tetra3d.Model))
+	g.Scene.Root.Get("FireParticleSystem").ReplaceWith(g.FireParticleSystem.Model())
 
-	settings := g.FireParticleSystem.Settings
+	settings := g.FireParticleSystem.Settings()
+
 	settings.Lifetime.Set(1, 1)          // Lifetime can vary randomly; we're setting both the minimum and maximum bounds here to 1.
 	settings.SpawnRate.Set(0.025, 0.025) // How often particles are spawned
 	settings.SpawnCount.Set(2, 2)        // How many particles are spawned each time
@@ -86,11 +88,14 @@ func (g *Game) Init() {
 	settings.ColorCurve.Add(colors.White().SetValue(0.1), 0.35)
 	settings.ColorCurve.Add(colors.Black(), 1.0)
 
+	g.FireParticleSystem.SetSettings(settings)
+
 	// Now, for the Field particle system.
 
-	g.FieldParticleSystem = tetra3d.NewParticleSystem(g.Scene.Root.Get("Field").(*tetra3d.Model), g.Scene.Root.Get("Particle").(*tetra3d.Model), g.Scene.Root.Get("Particle2").(*tetra3d.Model))
+	g.FieldParticleSystem = tetra3d.NewParticleSystem(g.Scene.Root.Get("Particle").(*tetra3d.Model), g.Scene.Root.Get("Particle2").(*tetra3d.Model))
+	g.Scene.Root.Get("FieldParticleSystem").ReplaceWith(g.FieldParticleSystem.Model())
 
-	settings = g.FieldParticleSystem.Settings
+	settings = g.FieldParticleSystem.Settings()
 	settings.SpawnRate.Set(0.1, 0.1)
 	settings.SpawnCount.Set(4, 4)
 	settings.Lifetime.Set(2, 3)
@@ -107,7 +112,7 @@ func (g *Game) Init() {
 	// However, field particles move in a little bit more complex manner than the other particle systems, so we'll make use of the MovementFunction to tweak
 	// how the particles move. In the below function, we move them out from the center of the particle system after they spawn.
 	settings.MovementFunction = func(particle *tetra3d.Particle) {
-		diff := particle.Model.WorldPosition().Sub(particle.ParticleSystem.Root.WorldPosition())
+		diff := particle.Model.WorldPosition().Sub(particle.ParticleSystem.Model().WorldPosition())
 		diff.Y = 0
 		particle.Model.MoveVec(diff.Unit().Scale(0.01))
 	}
@@ -118,10 +123,13 @@ func (g *Game) Init() {
 	settings.ColorCurve.Add(colors.White(), 0.9)
 	settings.ColorCurve.Add(colors.White().SetAlpha(0), 1)
 
+	g.FieldParticleSystem.SetSettings(settings)
+
 	// And now, finally, the ring system.
 
-	g.RingParticleSystem = tetra3d.NewParticleSystem(g.Scene.Root.Get("Ring").(*tetra3d.Model), g.Scene.Root.Get("Particle").(*tetra3d.Model))
-	settings = g.RingParticleSystem.Settings
+	g.RingParticleSystem = tetra3d.NewParticleSystem(g.Scene.Root.Get("Particle").(*tetra3d.Model))
+	g.Scene.Root.Get("RingParticleSystem").ReplaceWith(g.RingParticleSystem.Model())
+	settings = g.RingParticleSystem.Settings()
 
 	// Similarly to the field system, the ring system spawns particles in a different manner - we want them to spawn in a ring that spins.
 	// To do this, we'll make use of a vector that controls how far out the particles spawn, and then rotate that ring after each spawn.
@@ -151,6 +159,8 @@ func (g *Game) Init() {
 	settings.ColorCurve.Add(colors.Blue(), 0.8)
 	settings.ColorCurve.Add(colors.Blue().MultiplyRGBA(0.25, 0.25, 0.25, 0), 1)
 
+	g.RingParticleSystem.SetSettings(settings)
+
 	// And that's about it!
 
 	g.Camera = examples.NewBasicFreeCam(g.Scene)
@@ -170,7 +180,7 @@ func (g *Game) Update() error {
 	g.FieldParticleSystem.Update(dt)
 	g.RingParticleSystem.Update(dt)
 
-	g.Scene.Root.Get("Fire").Move(math32.Sin(g.Time)*0.05, 0, 0)
+	g.FireParticleSystem.Model().Move(math32.Sin(g.Time)*0.05, 0, 0)
 
 	g.Camera.Update()
 
@@ -196,7 +206,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		txt := `This example shows how various particle systems work.`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 }

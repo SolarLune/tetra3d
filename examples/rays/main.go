@@ -82,7 +82,7 @@ func (g *Game) Update() error {
 				vc = hit.Object.Parent().(*tetra3d.Model).Mesh().MeshParts[0].Material.Color
 			}
 
-			marker.(*tetra3d.Model).Mesh().Select().ByMeshPartIndex(1).SetColor(0, vc)
+			tetra3d.NewVertexSelection(marker.(*tetra3d.Model).Mesh()).SelectMeshPartIndex(1).SetColor(0, vc)
 
 			marker.SetWorldPositionVec(hit.Position.Add(hit.Normal.Scale(0.5)))
 
@@ -115,12 +115,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `In this example, a ray is cast
 forward from the mouse's position. Whatever is hit will
-be marked with the arrow, which will also change color 
+be marked with the arrow, which will also change color
 to match the object struck. If the mouse is locked
 to the game window, then the ray shoots directly forward
 from the center of the screen.
 `
-		g.Camera.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.White())
 	}
 
 }

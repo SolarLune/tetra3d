@@ -4,6 +4,12 @@ import (
 	"fmt"
 )
 
+type AutoSubdivisionLevel struct {
+	DistanceSquared     float32
+	SubdivisionLevel    int
+	MinimumTriangleSize float32
+}
+
 // There is no zero ID; this is to make it so that systems that reference scenes by id can use 0 as an invalid reference.
 var sceneID uint32 = 1
 
@@ -23,9 +29,10 @@ type Scene struct {
 	data          any
 	View3DCameras []*Camera // Any 3D view cameras that were exported from Blender
 
-	updateAutobatch     bool
-	autobatchDynamicMap map[*Material]*Model
-	autobatchStaticMap  map[*Material]*Model
+	updateAutobatch       bool
+	autobatchDynamicMap   map[*Material]*Model
+	autobatchStaticMap    map[*Material]*Model
+	autosubdivisionLevels []AutoSubdivisionLevel
 
 	callbacks *SceneCallbacks
 }
@@ -71,10 +78,10 @@ func (scene *Scene) Clone() *Scene {
 
 	newScene.Root.scene = newScene
 	newScene.Root.cachedSceneRootNode = newScene.Root
+	newScene.autosubdivisionLevels = append(newScene.autosubdivisionLevels, scene.autosubdivisionLevels...)
 
 	newScene.World = scene.World // Here, we simply reference the same world; we don't clone it, since a single world can be shared across multiple Scenes
 	newScene.props = scene.props.Clone()
-
 	newScene.updateAutobatch = true
 
 	// Update sectors after cloning the scene
@@ -83,15 +90,15 @@ func (scene *Scene) Clone() *Scene {
 	})
 
 	models.ForEachModel(func(model *Model) bool {
-		if model.Sector() != nil {
-			model.Sector().Neighbors.Clear()
+		if model.sector != nil {
+			model.sector.Neighbors.Clear()
 		}
 		return true
 	})
 
 	models.ForEachModel(func(model *Model) bool {
-		if model.Sector() != nil {
-			model.Sector().AABB.updateSize()
+		if model.sector != nil {
+			model.sector.UpdateNeighbors(models)
 		}
 		return true
 	})
@@ -185,13 +192,13 @@ func (scene *Scene) HandleAutobatch() {
 
 				if !model.autoBatched {
 
-					mat := autobatchBlankMat
-
-					if mats := model.mesh.Materials(); len(mats) > 0 {
-						mat = mats[0]
-					}
-
 					if model.AutoBatchMode == AutoBatchDynamic {
+
+						mat := autobatchBlankMat
+
+						if mats := model.mesh.Materials(); len(mats) > 0 {
+							mat = mats[0]
+						}
 
 						if _, exists := scene.autobatchDynamicMap[mat]; !exists {
 							mesh := NewMesh("auto dynamic batch")
@@ -206,15 +213,25 @@ func (scene *Scene) HandleAutobatch() {
 
 					} else if model.AutoBatchMode == AutoBatchStatic {
 
-						if _, exists := scene.autobatchStaticMap[mat]; !exists {
-							m := NewModel("auto static merge", NewMesh("auto static merge"))
-							m.sectorType = SectorTypeStandalone
-							scene.autobatchStaticMap[mat] = m
-							scene.Root.AddChildren(scene.autobatchStaticMap[mat])
-						}
-						scene.autobatchStaticMap[mat].StaticMerge(model)
-						if len(scene.autobatchStaticMap[mat].mesh.VertexColors) > 0 {
-							scene.autobatchStaticMap[mat].mesh.VertexActiveColorChannel = 0
+						for _, mp := range model.Mesh().MeshParts {
+
+							mat := autobatchBlankMat
+
+							if mp.Material != nil {
+								mat = mp.Material
+							}
+
+							if _, exists := scene.autobatchStaticMap[mat]; !exists {
+								m := NewModel("__auto static merge", NewMesh("__auto static merge : "+mat.Name()))
+								m.sectorType = SectorTypeStandalone
+								scene.autobatchStaticMap[mat] = m
+								scene.Root.AddChildren(scene.autobatchStaticMap[mat])
+							}
+							scene.autobatchStaticMap[mat].StaticMerge(model, mp)
+							if len(scene.autobatchStaticMap[mat].mesh.VertexColors) > 0 {
+								scene.autobatchStaticMap[mat].mesh.VertexActiveColorChannel = 0
+							}
+
 						}
 
 					}

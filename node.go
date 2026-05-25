@@ -165,6 +165,9 @@ type INode interface {
 	// RemoveChildren removes the provided children from this object.
 	RemoveChildren(...INode)
 
+	// Replaces the node with the other target node.
+	ReplaceWith(other INode)
+
 	// updateLocalTransform(newParent INode)
 	dirtyTransform()
 
@@ -245,16 +248,22 @@ type INode interface {
 	Move(x, y, z float32)
 	// MoveVec moves a Node in local space using the vector provided.
 	MoveVec(moveVec Vector3)
-	// MoveByOrientation moves a Node in local space, by the object's world orientation, by the x, y, and z values provided.
+	// Moves a Node in local space, by the object's world orientation, by the x, y, and z values provided.
 	MoveByOrientation(x, y, z float32)
-	// MoveByOrientationVec moves a Node in local space, by the object's world orientation, using the vector provided.
+	// Moves a Node in local space, by the object's world orientation, using the vector provided.
 	MoveByOrientationVec(moveVec Vector3)
-	// MoveTowardsNode moves a Node towards the node provided by the distance given in world space.
+	// Moves a Node towards the node provided by the distance given in world space.
 	MoveTowardsNode(target INode, distance float32)
-	// MoveTowardsVec moves a Node towards the node provided by the distance given in world space.
+	// Linearly interpolates movement of the node towards the target location by the given percentage.
+	MoveTowardsNodeLerp(target INode, percentage float32)
+	// Moves a Node towards the node provided by the distance given in world space.
 	MoveTowardsVec(target Vector3, distance float32)
-	// MoveTowardsXYZ moves a Node towards the node provided by the distance given in world space.
+	// Linearly interpolates movement of the node towards the target location by the given percentage.
+	MoveTowardsVecLerp(target Vector3, percentage float32)
+	// Moves a Node towards the node provided by the distance given in world space.
 	MoveTowards(x, y, z, distance float32)
+	// Linearly interpolates movement of the node towards the target location by the given percentage.
+	MoveTowardsLerp(x, y, z, percentage float32)
 	// Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
 	Rotate(x, y, z, angle float32)
 	// RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
@@ -935,16 +944,31 @@ func (node *Node) MoveTowardsNode(target INode, distance float32) {
 	node.SetWorldPositionVec(node.WorldPosition().MoveTowards(target.WorldPosition(), distance))
 }
 
+// Linearly interpolates the node moving towards the target vector in world space by the percentage provided.
+func (node *Node) MoveTowardsNodeLerp(target INode, percentage float32) {
+	node.SetWorldPositionVec(node.WorldPosition().Lerp(target.WorldPosition(), percentage))
+}
+
 // MoveTowards moves the node towards a given location in world space by the distance provided.
 // The movement is capped to the distance to the target location.
 func (node *Node) MoveTowards(x, y, z float32, distance float32) {
 	node.SetWorldPositionVec(node.WorldPosition().MoveTowards(NewVector3(x, y, z), distance))
 }
 
+// Linearly interpolates the node moving towards the target position in world space by the percentage provided.
+func (node *Node) MoveTowardsLerp(x, y, z float32, percentage float32) {
+	node.SetWorldPositionVec(node.WorldPosition().Lerp(NewVector3(x, y, z), percentage))
+}
+
 // MoveTowardsVec moves the node towards the target vector in world space by the distance provided.
 // The movement is capped to the distance to the target location.
 func (node *Node) MoveTowardsVec(vec Vector3, distance float32) {
 	node.SetWorldPositionVec(node.WorldPosition().MoveTowards(vec, distance))
+}
+
+// Linearly interpolates the node moving towards the target vector in world space by the percentage provided.
+func (node *Node) MoveTowardsVecLerp(vec Vector3, percentage float32) {
+	node.SetWorldPositionVec(node.WorldPosition().Lerp(vec, percentage))
 }
 
 // Rotate rotates a Node on its local orientation on a vector composed of the given x, y, and z values, by the angle provided in radians.
@@ -1078,7 +1102,7 @@ func (node *Node) getOwner() INode {
 	return node
 }
 
-// RemoveChildren removes the provided children from this object.
+// RemoveChildren immediately removes the provided children from this object.
 func (node *Node) RemoveChildren(children ...INode) {
 
 	for _, c1 := range children {
@@ -1157,6 +1181,17 @@ func (node *Node) Index() int {
 		})
 	}
 	return index
+}
+
+// Replaces a node with the other node specified.
+func (node *Node) ReplaceWith(other INode) {
+	if parent := node.Parent(); parent != nil {
+		ogIndex := node.Index()
+		parent.AddChildren(other)
+		parent.ReindexChild(other, ogIndex)
+	}
+	other.SetWorldTransform(node.Transform())
+	node.Unparent()
 }
 
 // Children returns the Node's children as a slice of INodes.
@@ -1501,7 +1536,7 @@ func (node *Node) Sector() *Sector {
 
 			root.ForEachChild(true, func(child INode, index, size int) bool {
 				if model, ok := child.(*Model); ok && model.sector != nil {
-					if model.sector.AABB.PointInside(pos) {
+					if model.sector.dimensions.Contains(pos) {
 						node.cachedSector = model.sector
 					}
 				}
@@ -1518,7 +1553,7 @@ func (node *Node) Sector() *Sector {
 
 func (node *Node) isInVisibleSector(sectorModels []*Model) bool {
 	for _, model := range sectorModels {
-		if model.sector.rendering && model.sector.AABB.PointInside(node.WorldPosition()) {
+		if model.sector.rendering && model.sector.dimensions.Contains(node.WorldPosition()) {
 			return true
 		}
 	}

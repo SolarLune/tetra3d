@@ -71,7 +71,10 @@ func (g *Game) Init() {
 	// you want to freely position in your modeler, for example, before combining them for
 	// increased render speed in-game. Note that the maximum number of rendered triangles
 	// in a single draw call is 21845.
-	merged.StaticMerge(cubes...)
+
+	for _, c := range cubes {
+		merged.StaticMerge(c, c.Mesh().MeshParts[0])
+	}
 
 	// After merging the cubes, the merged mesh has multiple MeshParts, but because the cube Models
 	// shared a single Mesh (which has a single Material (aptly named "Cube")), the MeshParts also
@@ -151,7 +154,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 All of the cubes are statically merged
 together into as few render calls as possible.`
 
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 	g.System.Draw(screen, g.Camera.Camera)

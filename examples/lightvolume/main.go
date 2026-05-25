@@ -365,7 +365,7 @@ As you walk around the map, the character
 gets darker or lighter depending on his
 environment.
 Press 1 to toggle the light volume.`
-		g.Camera.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 
 	if g.DebugDrawingLightVolume {

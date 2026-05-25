@@ -235,16 +235,13 @@ type Mesh struct {
 	maxTriangleSpan          float32
 	VertexActiveColorChannel int // VertexActiveColorChannel is the active vertex color used for coloring the mesh
 
-	vertexLights  []Color4
-	vertsAddStart int
-	vertsAddEnd   int
+	vertexLights []Color4
 
 	VertexColorChannelNames map[string]int // VertexColorChannelNames is a map allowing you to get the index of a mesh's vertex color channel by its name.
 	Dimensions              Dimensions
 	properties              Properties
 
-	AutoSubdivide         bool
-	autoSubdivisionLevels []AutoSubdivisionLevel
+	AutoSubdivide bool
 
 	// If Unique is set to a value other than MeshUniqueNone, whenever a Mesh is used for a Model and the Model is cloned,
 	// the Mesh or Mesh and Materials are cloned with it. Useful for things like sprites.
@@ -253,9 +250,8 @@ type Mesh struct {
 
 var meshID uint32 = 1
 
-// NewMesh takes a name and a slice of *Vertex instances, and returns a new Mesh. If you provide *Vertex instances, the number must be divisible by 3,
-// or NewMesh will panic.
-func NewMesh(name string, verts ...VertexInfo) *Mesh {
+// NewMesh takes a name and a slice of VertexInfo instances, and returns a new Mesh.
+func NewMesh(name string) *Mesh {
 
 	mesh := &Mesh{
 		Name:                     name,
@@ -265,10 +261,6 @@ func NewMesh(name string, verts ...VertexInfo) *Mesh {
 		VertexColorChannelNames:  map[string]int{},
 		properties:               NewProperties(),
 		VertexActiveColorChannel: -1,
-	}
-
-	if len(verts) > 0 {
-		mesh.AddVertices(verts...)
 	}
 
 	meshID++
@@ -352,9 +344,6 @@ func (mesh *Mesh) Clone() *Mesh {
 		newPart.AssignToMesh(newMesh)
 	}
 
-	newMesh.vertsAddEnd = mesh.vertsAddEnd
-	newMesh.vertsAddStart = mesh.vertsAddStart
-
 	for channelName, index := range mesh.VertexColorChannelNames {
 		newMesh.VertexColorChannelNames[channelName] = index
 	}
@@ -386,37 +375,37 @@ func (mesh *Mesh) Clone() *Mesh {
 
 // allocateVertexBuffers allows us to allocate the slices for vertex properties all at once rather than resizing multiple times as
 // we append to a slice and have its backing buffer automatically expanded (which is slower).
-func (mesh *Mesh) allocateVertexBuffers(vertexCount int) {
+func (mesh *Mesh) allocateVertexBuffers(addedVertexCount int) {
 
-	if cap(mesh.VertexPositions) >= vertexCount {
+	if cap(mesh.VertexPositions) >= addedVertexCount {
 		return
 	}
 
 	if len(mesh.VertexPositions) == 0 {
-		mesh.VertexPositions = make([]Vector3, 0, vertexCount)
-		mesh.VertexNormals = make([]Vector3, 0, vertexCount)
-		mesh.VertexUVs = make([]Vector2, 0, vertexCount)
-		mesh.VertexUVOriginalValues = make([]Vector2, 0, vertexCount)
+		mesh.VertexPositions = make([]Vector3, 0, addedVertexCount)
+		mesh.VertexNormals = make([]Vector3, 0, addedVertexCount)
+		mesh.VertexUVs = make([]Vector2, 0, addedVertexCount)
+		mesh.VertexUVOriginalValues = make([]Vector2, 0, addedVertexCount)
 		for ci := range mesh.VertexColors {
-			mesh.VertexColors[ci] = make(VertexColorChannel, 0, vertexCount)
+			mesh.VertexColors[ci] = make(VertexColorChannel, 0, addedVertexCount)
 		}
-		mesh.VertexBones = make([][]uint16, 0, vertexCount)
-		mesh.VertexWeights = make([][]float32, 0, vertexCount)
+		mesh.VertexBones = make([][]uint16, 0, addedVertexCount)
+		mesh.VertexWeights = make([][]float32, 0, addedVertexCount)
 
-		mesh.vertexLights = make([]Color4, vertexCount)
+		mesh.vertexLights = make([]Color4, addedVertexCount)
 	} else {
-		mesh.VertexPositions = slices.Grow(mesh.VertexPositions, vertexCount)
-		mesh.VertexNormals = slices.Grow(mesh.VertexNormals, vertexCount)
-		mesh.VertexUVs = slices.Grow(mesh.VertexUVs, vertexCount)
-		mesh.VertexUVOriginalValues = slices.Grow(mesh.VertexUVOriginalValues, vertexCount)
+		mesh.VertexPositions = slices.Grow(mesh.VertexPositions, addedVertexCount)
+		mesh.VertexNormals = slices.Grow(mesh.VertexNormals, addedVertexCount)
+		mesh.VertexUVs = slices.Grow(mesh.VertexUVs, addedVertexCount)
+		mesh.VertexUVOriginalValues = slices.Grow(mesh.VertexUVOriginalValues, addedVertexCount)
 		for ci := range mesh.VertexColors {
-			mesh.VertexColors[ci] = slices.Grow(mesh.VertexColors[ci], vertexCount)
+			mesh.VertexColors[ci] = slices.Grow(mesh.VertexColors[ci], addedVertexCount)
 		}
-		mesh.VertexBones = slices.Grow(mesh.VertexBones, vertexCount)
-		mesh.VertexWeights = slices.Grow(mesh.VertexWeights, vertexCount)
-		mesh.vertexLights = slices.Grow(mesh.vertexLights, vertexCount)
+		mesh.VertexBones = slices.Grow(mesh.VertexBones, addedVertexCount)
+		mesh.VertexWeights = slices.Grow(mesh.VertexWeights, addedVertexCount)
+		mesh.vertexLights = slices.Grow(mesh.vertexLights, addedVertexCount)
 
-		for range vertexCount - len(mesh.vertexLights) {
+		for range addedVertexCount - len(mesh.vertexLights) {
 			mesh.vertexLights = append(mesh.vertexLights, Color4{})
 		}
 
@@ -486,13 +475,7 @@ func (mesh *Mesh) CombineVertexColors(targetChannel int, multiplicative bool, so
 
 // SetVertexColor sets the specified vertex color for all vertices in the mesh for the target color channel.
 func (mesh *Mesh) SetVertexColor(targetChannel int, color Color4) {
-	NewVertexSelection(mesh).SetColor(targetChannel, color)
-}
-
-// Select allows you to easily select the vertices associated with the Mesh.
-// Select is just syntactic sugar for tetra3d.NewVertexSelection().SelectMeshes(mesh).
-func (mesh *Mesh) Select() VertexSelection {
-	return NewVertexSelection(mesh)
+	NewVertexSelection(mesh).SelectAll().SetColor(targetChannel, color)
 }
 
 // TriangleByID returns a triangle by the given ID, if it exists.
@@ -538,12 +521,10 @@ func (mesh *Mesh) ForEachMaterial(forEach func(mat *Material) bool) {
 }
 
 // AddMeshPart allows you to add a new MeshPart to the Mesh with the given Material (with a nil Material reference also being valid).
-func (mesh *Mesh) AddMeshPart(material *Material, indices ...int) *MeshPart {
+func (mesh *Mesh) AddMeshPart(material *Material) *MeshPart {
 	mp := NewMeshPart(mesh, material)
 	mesh.MeshParts = append(mesh.MeshParts, mp)
-	if len(indices) > 0 {
-		mp.AddTriangles(indices...)
-	}
+	mp.VertexIndexStart = len(mesh.VertexPositions)
 	return mp
 }
 
@@ -559,14 +540,13 @@ func (mesh *Mesh) MeshPartByMaterialName(materialName string) *MeshPart {
 
 func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 
-	mesh.vertsAddStart = len(mesh.VertexPositions)
-	mesh.vertsAddEnd = mesh.vertsAddStart + len(verts)
-
 	if len(verts) == 0 {
 		panic("Error: Mesh.AddVertices() given 0 vertices.")
 	}
 
 	mesh.allocateVertexBuffers(len(mesh.VertexPositions) + len(verts))
+
+	addStart := len(mesh.VertexPositions)
 
 	for i := 0; i < len(verts); i++ {
 
@@ -579,15 +559,13 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 		mesh.ensureEnoughVertexColorChannels(len(vertInfo.Colors) - 1)
 
 		for channelIndex := 0; channelIndex < len(vertInfo.Colors); channelIndex++ {
-			mesh.VertexColors[channelIndex][mesh.vertsAddStart+i] = vertInfo.Colors[channelIndex]
+			mesh.VertexColors[channelIndex][addStart+i] = vertInfo.Colors[channelIndex]
 		}
 
 		mesh.VertexBones = append(mesh.VertexBones, vertInfo.Bones)
 		mesh.VertexWeights = append(mesh.VertexWeights, vertInfo.Weights)
 
 		mesh.vertexLights = append(mesh.vertexLights, Color4{})
-		// mesh.vertexTransforms = append(mesh.vertexTransforms, Vector4{}) // x, y, z, w
-		// mesh.vertexTransformedNormals = append(mesh.vertexTransformedNormals, Vector3{})
 
 	}
 
@@ -658,12 +636,21 @@ type VertexSelection struct {
 	selectAll bool
 }
 
-// NewVertexSelection allows you to select some vertices of a Mesh.
+// NewVertexSelection allows you to select some vertices of a Mesh. By default, no vertices of the Mesh are selected.
 func NewVertexSelection(mesh *Mesh) VertexSelection {
 	return VertexSelection{
 		mesh:    mesh,
 		Indices: newSet[int](),
 	}
+}
+
+func (vs *VertexSelection) Clear() {
+	vs.Indices.Clear()
+	vs.selectAll = false
+}
+
+func (vs VertexSelection) IsEmpty() bool {
+	return len(vs.Indices) == 0
 }
 
 func (vs VertexSelection) Clone() VertexSelection {
@@ -673,13 +660,13 @@ func (vs VertexSelection) Clone() VertexSelection {
 	return newVS
 }
 
-func (vs *VertexSelection) Contains(index int) bool {
+func (vs VertexSelection) Contains(index int) bool {
 	return vs.Indices.Contains(index)
 }
 
 // Selects all vertices in the Mesh that have a non-pure black color in the vertex color channel
 // with any of the specified names.
-func (vs VertexSelection) ByVertexColorChannelNames(channelNames ...string) VertexSelection {
+func (vs VertexSelection) SelectVertexColorChannelNames(channelNames ...string) VertexSelection {
 
 	for _, groupName := range channelNames {
 
@@ -707,7 +694,7 @@ func (vs VertexSelection) ByVertexColorChannelNames(channelNames ...string) Vert
 // Selects all vertices in the Mesh that are assigned to the specified vertex groups.
 // If a vertex group name is not found, the function will continue.
 // Vertex groups are only exported through Tetra3D if the mesh is skinned / assigned to an armature.
-func (vs VertexSelection) ByVertexGroupNames(vertexGroupNames ...string) VertexSelection {
+func (vs VertexSelection) SelectVertexGroupNames(vertexGroupNames ...string) VertexSelection {
 
 	for _, groupName := range vertexGroupNames {
 
@@ -740,18 +727,8 @@ func (vs VertexSelection) ByVertexGroupNames(vertexGroupNames ...string) VertexS
 
 }
 
-func (vs VertexSelection) Clear() VertexSelection {
-	vs.Indices.Clear()
-	vs.selectAll = false
-	return vs
-}
-
-func (vs VertexSelection) IsEmpty() bool {
-	return len(vs.Indices) == 0
-}
-
 // Selects all vertices in the Mesh belonging to any of the specified MeshParts.
-func (vs VertexSelection) ByMeshPart(meshParts ...*MeshPart) VertexSelection {
+func (vs VertexSelection) SelectMeshPart(meshParts ...*MeshPart) VertexSelection {
 
 	for _, meshPart := range meshParts {
 
@@ -780,21 +757,21 @@ func (vs VertexSelection) ByMeshPart(meshParts ...*MeshPart) VertexSelection {
 // Selects all vertices in the Mesh belonging to the specified MeshPart by
 // index.
 // If a MeshPart with the given index doesn't exist, this function will do nothing.
-func (vs VertexSelection) ByMeshPartIndex(meshpartIndex int) VertexSelection {
+func (vs VertexSelection) SelectMeshPartIndex(meshpartIndex int) VertexSelection {
 	if meshpartIndex >= len(vs.mesh.MeshParts) || meshpartIndex < 0 {
 		return vs
 	}
-	vs.ByMeshPart(vs.mesh.MeshParts[meshpartIndex])
+	vs.SelectMeshPart(vs.mesh.MeshParts[meshpartIndex])
 	return vs
 
 }
 
-// ByMeshPartName selects all vertices in the Mesh belonging to materials with any of the specified names.
-func (vs VertexSelection) ByMeshPartName(materialNames ...string) VertexSelection {
+// SelectMeshPartName selects all vertices in the Mesh belonging to materials with any of the specified names.
+func (vs VertexSelection) SelectMeshPartName(materialNames ...string) VertexSelection {
 
 	for _, matName := range materialNames {
 		if mp := vs.mesh.MeshPartByMaterialName(matName); mp != nil {
-			vs.ByMeshPart(mp)
+			vs.SelectMeshPart(mp)
 		}
 	}
 
@@ -803,7 +780,7 @@ func (vs VertexSelection) ByMeshPartName(materialNames ...string) VertexSelectio
 }
 
 // Selects vertex indices that belong to vertices that point in a specific direction.
-func (vs VertexSelection) ByNormal(normal Vector3) VertexSelection {
+func (vs VertexSelection) SelectNormal(normal Vector3) VertexSelection {
 	for i, v := range vs.mesh.VertexNormals {
 		if v.Equals(normal) {
 			vs.Indices.Add(i)
@@ -814,7 +791,7 @@ func (vs VertexSelection) ByNormal(normal Vector3) VertexSelection {
 
 // Selects vertex indices for vertices that pass a custom callback function.
 // Vertices be added to the selection only if the function returns true.
-func (vs VertexSelection) ByFunc(function func(index int) bool) VertexSelection {
+func (vs VertexSelection) SelectFunc(function func(index int) bool) VertexSelection {
 	for i := range vs.mesh.VertexPositions {
 		if function(i) {
 			vs.Indices.Add(i)
@@ -824,7 +801,7 @@ func (vs VertexSelection) ByFunc(function func(index int) bool) VertexSelection 
 }
 
 // Selects the passed vertex indices in the Mesh.
-func (vs VertexSelection) ByIndices(indices ...int) VertexSelection {
+func (vs VertexSelection) SelectIndices(indices ...int) VertexSelection {
 	for _, i := range indices {
 		vs.Indices.Add(i)
 	}
@@ -832,14 +809,14 @@ func (vs VertexSelection) ByIndices(indices ...int) VertexSelection {
 }
 
 // Selects all vertices in the Mesh.
-func (vs VertexSelection) ByAll() VertexSelection {
+func (vs VertexSelection) SelectAll() VertexSelection {
 	vs.Indices.Clear()
 	vs.selectAll = true
 	return vs
 }
 
 // Selects the vertex indices composing the triangles passed.
-func (vs VertexSelection) ByTriangles(triangles ...*Triangle) VertexSelection {
+func (vs VertexSelection) SelectTriangles(triangles ...*Triangle) VertexSelection {
 	for _, t := range triangles {
 		vs.Indices.Add(t.VertexIndexA)
 		vs.Indices.Add(t.VertexIndexB)
@@ -849,7 +826,7 @@ func (vs VertexSelection) ByTriangles(triangles ...*Triangle) VertexSelection {
 }
 
 // Selects vertices that share positions with already-selected vertices.
-func (vs VertexSelection) BySharedVertices() VertexSelection {
+func (vs VertexSelection) SelectSharedVertices() VertexSelection {
 
 	for index := range vs.Indices {
 
@@ -1021,6 +998,27 @@ func (vs VertexSelection) Count() int {
 	return count
 }
 
+//
+// --------------------------
+//  Creating meshes by hand
+// --------------------------
+//
+// I'm not exactly sure where to put this, but the order of processes to create a mesh from
+// scratch are currently as follows:
+//
+// 1. Allocate the vertex buffers. Not strictly necessary, but good for speed to do it as
+//    little as possible, rather than as the buffers grow as you add vertices if you do it
+//    several times per mesh.
+// 2. Create a new mesh part. You need to do this before adding vertices, since this is how
+//    the mesh part knows where it begins in the vertex list.
+// 3. Add the vertices you desire for the meshpart using Mesh.AddVertices().
+// 4. Add triangles using Mesh.AddTriangles(), with sets of three indices indicating each triangle.
+// 5. Now repeat 2-4 as necessary for the next mesh part / material.
+// 6. Call Mesh.UpdateBounds() and Mesh.AutoNormal() to update the bounds of the mesh and set normals for the triangles.
+//
+// That's it.
+//
+
 // NewCubeMesh creates a new Cube Mesh with the given dimensions and gives it a new material (suitably named "Cube").
 func NewCubeMesh(w, h, d float32) *Mesh {
 
@@ -1028,7 +1026,11 @@ func NewCubeMesh(w, h, d float32) *Mesh {
 	h /= 2
 	d /= 2
 
-	mesh := NewMesh("Cube",
+	mesh := NewMesh("Cube")
+	mesh.allocateVertexBuffers(24) // 6 faces * 4 vertices per face
+
+	mp := mesh.AddMeshPart(NewMaterial("Cube"))
+	mesh.AddVertices(
 
 		// Top
 
@@ -1073,9 +1075,7 @@ func NewCubeMesh(w, h, d float32) *Mesh {
 		NewVertex(-w, -h, d, 0, 1),
 	)
 
-	mesh.AddMeshPart(
-
-		NewMaterial("Cube"),
+	mp.AddTriangles(
 
 		// Top
 		0, 1, 2,
@@ -1116,7 +1116,13 @@ func NewCubeMesh(w, h, d float32) *Mesh {
 // NewPrismMesh creates a new prism Mesh and gives it a new material (suitably named "Prism").
 func NewPrismMesh() *Mesh {
 
-	mesh := NewMesh("Prism",
+	mesh := NewMesh("Prism")
+
+	mp := mesh.AddMeshPart(NewMaterial("Prism"))
+
+	mesh.allocateVertexBuffers(6)
+
+	mesh.AddVertices(
 
 		// Top
 
@@ -1134,9 +1140,7 @@ func NewPrismMesh() *Mesh {
 		NewVertex(0, -1, 0, 1, 0),
 	)
 
-	mesh.AddMeshPart(
-
-		NewMaterial("Prism"),
+	mp.AddTriangles(
 
 		// Upper half
 		0, 1, 2,
@@ -1279,9 +1283,13 @@ func NewIcosphereMesh(detailLevel int) *Mesh {
 
 	}
 
+	mesh.allocateVertexBuffers(len(vertices))
+
+	mp := mesh.AddMeshPart(NewMaterial("Icosphere"))
+
 	mesh.AddVertices(vertices...)
 
-	mesh.AddMeshPart(NewMaterial("Icosphere"), indices...)
+	mp.AddTriangles(indices...)
 
 	mesh.AutoNormal()
 
@@ -1318,7 +1326,13 @@ func NewPlaneMesh(vertexCountX, vertexCountZ int) *Mesh {
 
 	}
 
-	mesh := NewMesh("Plane", verts...)
+	mesh := NewMesh("Plane")
+
+	mesh.allocateVertexBuffers(vertexCountX * vertexCountZ)
+
+	mp := mesh.AddMeshPart(NewMaterial("Plane"))
+
+	mesh.AddVertices(verts...)
 
 	indices := []int{}
 
@@ -1337,7 +1351,7 @@ func NewPlaneMesh(vertexCountX, vertexCountZ int) *Mesh {
 
 	}
 
-	mesh.AddMeshPart(NewMaterial("Plane"), indices...)
+	mp.AddTriangles(indices...)
 
 	mesh.UpdateBounds()
 	mesh.AutoNormal()
@@ -1380,8 +1394,6 @@ func NewCylinderMesh(sideCount int, radius, height float32, createCaps bool) *Me
 		verts = append(verts, NewVertex(0, -height/2, 0, 0, 0))
 	}
 
-	mesh.AddVertices(verts...)
-
 	indices := []int{}
 	for i := 0; i < sideCount; i++ {
 		if i < sideCount-1 {
@@ -1407,7 +1419,11 @@ func NewCylinderMesh(sideCount int, radius, height float32, createCaps bool) *Me
 		}
 	}
 
-	mesh.AddMeshPart(NewMaterial("Cylinder"), indices...)
+	mesh.allocateVertexBuffers(len(verts))
+
+	mp := mesh.AddMeshPart(NewMaterial("Cylinder"))
+	mesh.AddVertices(verts...)
+	mp.AddTriangles(indices...)
 
 	mesh.UpdateBounds()
 	mesh.AutoNormal()
@@ -1510,12 +1526,6 @@ func (t *Triangle) VertexIndex(index int) int {
 }
 
 const subdividedTriangleID = 999999
-
-type AutoSubdivisionLevel struct {
-	DistanceSquared     float32
-	SubdivisionLevel    int
-	MinimumTriangleSize float32
-}
 
 func (t *Triangle) performSubdivision(subdivisionLevel, maxSubdivisionLevel int, base *Triangle, model *Model) {
 
@@ -1636,7 +1646,7 @@ func (t *Triangle) disableSubdivision() {
 	}
 }
 
-func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model) {
+func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model, autoSubdivisionLevels []AutoSubdivisionLevel) {
 
 	t.wouldRender = false
 	t.visible = false
@@ -1650,7 +1660,7 @@ func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model) {
 	if len(t.subdivisionLevels) == 0 {
 
 		maxLevel := 0
-		for _, level := range t.MeshPart.Mesh.autoSubdivisionLevels {
+		for _, level := range autoSubdivisionLevels {
 			maxLevel = max(maxLevel, level.SubdivisionLevel)
 		}
 
@@ -1677,7 +1687,7 @@ func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model) {
 
 	// dist := cameraPos.DistanceSquaredTo(t.Center)
 
-	for _, l := range t.MeshPart.Mesh.autoSubdivisionLevels {
+	for _, l := range autoSubdivisionLevels {
 		if dist < l.DistanceSquared && l.DistanceSquared < closestDistance && t.MaxSpan >= l.MinimumTriangleSize {
 			closestDistance = l.DistanceSquared
 			closestLevel = l.SubdivisionLevel - 1
@@ -1938,10 +1948,9 @@ type MeshPart struct {
 // NewMeshPart creates a new MeshPart that renders using the specified Material.
 func NewMeshPart(mesh *Mesh, material *Material) *MeshPart {
 	mp := &MeshPart{
-		Mesh:             mesh,
-		Material:         material,
-		TriangleStart:    math.MaxInt,
-		VertexIndexStart: mesh.vertsAddStart,
+		Mesh:          mesh,
+		Material:      material,
+		TriangleStart: math.MaxInt,
 	}
 
 	return mp
@@ -2032,8 +2041,6 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 	// 	}
 	// }
 
-	part.VertexIndexEnd = part.Mesh.vertsAddEnd
-
 	// for _, index := range indices {
 
 	// 	// index += uint32(part.VertexIndexEnd)
@@ -2089,6 +2096,8 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 		}
 		log.Println("warning: mesh [" + part.Mesh.Name + "] has part with material named [" + matName + "], which has " + fmt.Sprintf("%d", part.TriangleCount()) + " triangles. This exceeds the renderable maximum of 21845 triangles total for one MeshPart; please break up the mesh into multiple MeshParts using materials, or split it up into multiple models. Otherwise, the game will crash if it renders over the maximum number of triangles.")
 	}
+
+	part.VertexIndexEnd = len(part.Mesh.VertexPositions)
 
 }
 

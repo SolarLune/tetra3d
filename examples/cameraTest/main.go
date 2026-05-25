@@ -107,7 +107,7 @@ The left and right arrow keys cycle through the cameras.`
 		} else {
 			txt += fmt.Sprintf("\n\nName: %s\nType: Orthographic Camera\nOrtho-Scale: %s", g.Camera.Name(), strconv.FormatFloat(float64(g.Camera.OrthoScale()), 'f', 1, 64))
 		}
-		g.Camera.DrawDebugText(screen, txt, 0, 210, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 210, 1, colors.LightGray())
 	}
 
 }

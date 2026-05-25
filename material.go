@@ -61,6 +61,8 @@ const (
 	TextureFilterBilinear
 )
 
+type CustomMaterialDepthFunction func(model *Model, camera *Camera, meshPart *MeshPart, vertIndex int, originalDepth float32) float32
+
 type Material struct {
 	id                uint32
 	library           *Library       // library is a reference to the Library that this Material came from.
@@ -115,18 +117,29 @@ type Material struct {
 	// all non-transparent materials.
 	TransparencyMode int
 
-	DepthMode    int // What depth mode to use for writing depth for this material
-	LightingMode int // How materials are lit
+	BillboardedDepthMode int // What depth mode to use for writing depth for this material
+	LightingMode         int // How materials are lit
 
 	// CustomDepthFunction is a customizeable function that takes the depth value of each vertex of a rendered MeshPart and
-	// optionally transforms it, returning a different value.
-	// A good use for this would be to render sprites on billboarded planes with a higher or fixed depth, thereby fixing them
-	// "cutting" into geometry that's further back.
+	// transforms it, returning a different value.
 	// model is a reference to the rendering model, camera the rendering camera, meshPart the rendering mesh part, vertIndex
 	// the depth for the vertex being rendered of the given index, and originalDepth being the vertex's original transformed
 	// depth. The function should return the ideal depth of the vertex from the camera in world units.
-	// The default value for CustomDepthFunction is nil.
-	CustomDepthFunction func(model *Model, camera *Camera, meshPart *MeshPart, vertIndex int, originalDepth float32) float32
+	// The default value for CustomDepthFunction is nil (so the depth of each vertex is unaltered).
+	CustomDepthFunction CustomMaterialDepthFunction
+	RenderOrder         int
+}
+
+func NewCustomMaterialDepthFunctionPlus(offset float32) CustomMaterialDepthFunction {
+	return func(model *Model, camera *Camera, meshPart *MeshPart, vertIndex int, originalDepth float32) float32 {
+		return originalDepth + offset
+	}
+}
+
+func NewCustomMaterialDepthFunctionSet(setTo float32) CustomMaterialDepthFunction {
+	return func(model *Model, camera *Camera, meshPart *MeshPart, vertIndex int, originalDepth float32) float32 {
+		return setTo
+	}
 }
 
 var materialID uint32 = 1
@@ -202,7 +215,7 @@ func (m *Material) Clone() *Material {
 	}
 
 	newMat.TransparencyMode = m.TransparencyMode
-	newMat.DepthMode = m.DepthMode
+	newMat.BillboardedDepthMode = m.BillboardedDepthMode
 	newMat.LightingMode = m.LightingMode
 
 	newMat.CustomDepthFunction = m.CustomDepthFunction

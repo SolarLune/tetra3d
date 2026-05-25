@@ -106,7 +106,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	if g.System.DrawDebugText {
 		txt := `This example just shows how you could use
 Tetra3D for 2D skeletal animations as well as 3D.`
-		camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }

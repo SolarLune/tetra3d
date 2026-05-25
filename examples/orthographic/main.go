@@ -14,7 +14,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-//go:embed *.gltf *.bin *.png
+//go:embed *.glb *.png
 var sceneData embed.FS
 
 type Game struct {
@@ -35,7 +35,7 @@ func NewGame() *Game {
 
 func (g *Game) Init() {
 
-	library, err := tetra3d.LoadGLTFFileSystem(sceneData, "orthographic.gltf", nil)
+	library, err := tetra3d.LoadGLTFFileSystem(sceneData, "orthographic.glb", nil)
 	if err != nil {
 		panic(err)
 	}
@@ -115,12 +115,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.System.Draw(screen, camera)
 
 	if g.System.DrawDebugText {
-		camera.DrawDebugRenderInfo(screen, 1, colors.White())
+		camera.DebugInfo.Draw(screen, 1, colors.White())
 		txt := `Arrow Keys: Pan
 W, S: Zoom in and Out
 Q, E: Rotate View
 R: Restart`
-		camera.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.LightGray())
 	}
 
 }
