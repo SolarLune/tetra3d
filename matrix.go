@@ -845,10 +845,18 @@ func NewMatrix4LookAt(from, to, up Vector3) Matrix4 {
 	}
 }
 
-// Lerp lerps a matrix to another, destination Matrix by the percent given. It does this by converting both
+// Linearly interpolates a matrix to another, destination Matrix by the percent given. It does this by converting both
 // Matrices to Quaternions, lerping them, then converting the result back to a Matrix4.
 func (mat Matrix4) Lerp(other Matrix4, percent float32) Matrix4 {
 	q1 := mat.ToQuaternion()
 	q2 := other.ToQuaternion()
 	return q1.Lerp(q2, percent).ToMatrix4()
+}
+
+// Spherically lerps a matrix to another, destination Matrix by the percent given. It does this by converting both
+// Matrices to Quaternions, lerping them, then converting the result back to a Matrix4.
+func (mat Matrix4) Slerp(other Matrix4, percent float32) Matrix4 {
+	q1 := mat.ToQuaternion()
+	q2 := other.ToQuaternion()
+	return q1.Slerp(q2, percent).ToMatrix4()
 }

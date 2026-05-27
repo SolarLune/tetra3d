@@ -268,6 +268,8 @@ type INode interface {
 	Rotate(x, y, z, angle float32)
 	// RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
 	RotateVec(vec Vector3, angle float32)
+	// Rotates a Node on its local orientation using a rotation Matrix4.
+	RotateMatrix4(mat Matrix4)
 	// Grow scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
 	Grow(x, y, z float32)
 	// GrowVec scales the object additively (i.e. calling Node.Grow(1, 0, 0) will scale it +1 on the X-axis).
@@ -984,6 +986,13 @@ func (node *Node) Rotate(x, y, z, angle float32) {
 // RotateVec rotates a Node on its local orientation on the given vector, by the angle provided in radians.
 func (node *Node) RotateVec(vec Vector3, angle float32) {
 	node.Rotate(vec.X, vec.Y, vec.Z, angle)
+}
+
+// Rotate rotates a Node on its local orientation using a Matrix4.
+func (node *Node) RotateMatrix4(mat Matrix4) {
+	localRot := node.LocalRotation()
+	localRot = localRot.Mult(mat)
+	node.SetLocalRotation(localRot)
 }
 
 // Grow scales the object additively using the x, y, and z arguments provided (i.e. calling

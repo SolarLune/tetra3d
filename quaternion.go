@@ -2,58 +2,61 @@ package tetra3d
 
 import "github.com/solarlune/tetra3d/math32"
 
-// Quaternion is a tool to rotate objects, similar to rotation Matrix4s. However, a difference is that they can very easily be lerped without
-// losing data - if you were to lerp two rotation matrices, you can easily end up with a zero matrix, making your rotating object disappear.
-// Instead, you can create the two Quaternions you need (either from Matrix4s or directly), and then lerp them together.
+// Quaternion is a tool to rotate objects, similar to rotation Matrix4s. The main difference is that they can easily be smoothly interpolated
+// between without losing data. If you were to lerp two rotation matrices, you can easily end up with a zero matrix, making your rotating object
+// disappear.
+// Instead, you can create the two Quaternions you need (either from Matrix4s or directly), and then lerp them together, then
+// use them for rotation (either directly, or converting them into Matrix4s).
 type Quaternion struct {
 	X, Y, Z, W float32
 }
 
+// Creates a new Quaternion of the given X, Y, Z, and W values.
 func NewQuaternion(x, y, z, w float32) Quaternion {
 	return Quaternion{x, y, z, w}
 }
 
-// func (quat *Quaternion) Slerp(other *Quaternion, percent float32) *Quaternion {
+// Returns if the Quaternion is all zero values.
+func (quat Quaternion) IsZero() bool {
+	return quat.X == 0 && quat.Y == 0 && quat.Z == 0 && quat.W == 0
+}
 
-// 	if percent <= 0 {
-// 		return quat.Clone()
-// 	} else if percent >= 1 {
-// 		return other.Clone()
-// 	}
+// Spherical interpolates between the starting quaternion to the ending one
+// by the given percentage.
+func (quat Quaternion) Slerp(end Quaternion, percent float32) Quaternion {
 
-// 	newQuat := quat.Clone()
+	cosOmega := quat.Dot(end)
 
-// 	angle := quat.Dot(other)
+	if cosOmega < 0 {
+		end.W *= -1
+		end.X *= -1
+		end.Y *= -1
+		end.Z *= -1
+		cosOmega *= -1
+	}
 
-// 	if Abs(angle) >= 1 {
-// 		return newQuat
-// 	}
+	k0 := float32(0)
+	k1 := float32(0)
+	if cosOmega > 0.9999 {
+		k0 = 1 - percent
+		k1 = percent
+	} else {
+		sinOmega := math32.Sqrt(1 - (cosOmega * cosOmega))
+		omega := math32.Atan2(sinOmega, cosOmega)
+		oneOverSinOmega := 1 / sinOmega
 
-// 	sinHalfTheta := Sqrt(1 - angle*angle)
-// 	halfTheta := Atan2(sinHalfTheta, angle)
+		k0 = math32.Sin((1-percent)*omega) * oneOverSinOmega
+		k1 = math32.Sin(percent*omega) * oneOverSinOmega
+	}
 
-// 	if angle < 0 {
-// 		newQuat.W = -other.W
-// 		newQuat.X = -other.X
-// 		newQuat.Y = -other.Y
-// 		newQuat.Z = -other.Z
-// 	}
+	quat.W = quat.W*k0 + end.W*k1
+	quat.X = quat.X*k0 + end.X*k1
+	quat.Y = quat.Y*k0 + end.Y*k1
+	quat.Z = quat.Z*k0 + end.Z*k1
 
-// 	if angle >= 1 {
-// 		return quat.Clone()
-// 	}
+	return quat
 
-// 	ratioA := Sin((1-percent)*halfTheta) / sinHalfTheta
-// 	ratioB := Sin(percent*halfTheta) / sinHalfTheta
-
-// 	newQuat.W = quat.W*ratioA + other.W*ratioB
-// 	newQuat.X = quat.X*ratioA + other.X*ratioB
-// 	newQuat.Y = quat.Y*ratioA + other.Y*ratioB
-// 	newQuat.Z = quat.Z*ratioA + other.Z*ratioB
-
-// 	return newQuat
-
-// }
+}
 
 func (quat Quaternion) Lerp(end Quaternion, percent float32) Quaternion {
 
@@ -64,7 +67,7 @@ func (quat Quaternion) Lerp(end Quaternion, percent float32) Quaternion {
 	}
 
 	if quat.Dot(end) < 0 {
-		end = end.Negated()
+		end = end.Inverted()
 	}
 
 	x := quat.X - percent*(quat.X-end.X)
@@ -98,7 +101,7 @@ func (quat Quaternion) Normalized() Quaternion {
 	return quat
 }
 
-func (quat Quaternion) Negated() Quaternion {
+func (quat Quaternion) Inverted() Quaternion {
 	return NewQuaternion(-quat.X, -quat.Y, -quat.Z, -quat.W)
 }
 

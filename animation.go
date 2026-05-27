@@ -24,11 +24,11 @@ type Data struct {
 	contents any
 }
 
-func (data *Data) AsVector() Vector3 {
+func (data Data) AsVector() Vector3 {
 	return data.contents.(Vector3)
 }
 
-func (data *Data) AsQuaternion() Quaternion {
+func (data Data) AsQuaternion() Quaternion {
 	return data.contents.(Quaternion)
 }
 
@@ -106,7 +106,7 @@ func (track *AnimationTrack) ValueAsVector(time float32) (Vector3, bool) {
 
 	// We still need to implement InterpolationCubic
 	// if track.Type == TrackTypePosition || track.Type == TrackTypeScale {
-	return fd.Add(ld.Sub(fd).Scale(t)), true
+	return fd.Lerp(ld, t), true
 	// }
 
 }
@@ -155,7 +155,7 @@ func (track *AnimationTrack) ValueAsQuaternion(time float32) (Quaternion, bool) 
 			// Linear interpolation
 			t := (time - first.Time) / (last.Time - first.Time)
 
-			return fd.Lerp(ld, t), true
+			return fd.Slerp(ld, t), true
 
 		}
 
@@ -314,9 +314,10 @@ type AnimationPlayer struct {
 	blendStart             time.Time                 // The time that the blend started
 	queuedAnimations       []*Animation
 
-	startingPosition Vector3
-	startingScale    Vector3
-	startingRotation Matrix4
+	relativePrevPosition  Vector3
+	relativePrevScale     Vector3
+	relativePrevRotation  Quaternion
+	relativeNotFirstFrame bool
 }
 
 // NewAnimationPlayer returns a new AnimationPlayer for the Node.
@@ -373,12 +374,6 @@ func (ap *AnimationPlayer) Play(animation *Animation) {
 }
 func (ap *AnimationPlayer) play(animation *Animation) {
 
-	if ap.Animation != animation {
-		ap.startingPosition = ap.RootNode.LocalPosition()
-		ap.startingRotation = ap.RootNode.LocalRotation()
-		ap.startingScale = ap.RootNode.LocalScale()
-	}
-
 	ap.Animation = animation
 	ap.Playing = true
 
@@ -397,6 +392,8 @@ func (ap *AnimationPlayer) play(animation *Animation) {
 		}
 		ap.blendStart = time.Now()
 	}
+
+	ap.relativeNotFirstFrame = false
 
 }
 
@@ -753,7 +750,7 @@ func (ap *AnimationPlayer) forceUpdate(dt float32) {
 			}
 
 			if start.RotationExists && props.RotationExists {
-				targetRotation = start.Rotation.Lerp(props.Rotation, bp).Normalized()
+				targetRotation = start.Rotation.Slerp(props.Rotation, bp).Normalized()
 				rotSet = true
 			} else if props.RotationExists {
 				targetRotation = props.Rotation
@@ -817,29 +814,40 @@ func (ap *AnimationPlayer) forceUpdate(dt float32) {
 
 		if posSet {
 			if ap.Animation.RelativeMotion {
-				node.SetLocalPositionVec(ap.startingPosition.Add(targetPosition.Sub(props.channel.startingPosition)))
+				if ap.relativeNotFirstFrame {
+					node.MoveVec(targetPosition.Sub(ap.relativePrevPosition))
+				}
 			} else {
 				node.SetLocalPositionVec(targetPosition)
 			}
+			ap.relativePrevPosition = targetPosition
 		}
 
 		if scaleSet {
 			if ap.Animation.RelativeMotion {
-				node.SetLocalScaleVec(ap.startingScale.Mult(targetScale))
+				if ap.relativeNotFirstFrame {
+					node.GrowVec(targetScale.Sub(ap.relativePrevScale))
+				}
 			} else {
 				node.SetLocalScaleVec(targetScale)
 			}
+			ap.relativePrevScale = targetScale
 		}
 
 		if rotSet {
 			if ap.Animation.RelativeMotion {
-				node.SetLocalRotation(ap.startingRotation.Mult(targetRotation.ToMatrix4()))
+				if ap.relativeNotFirstFrame {
+					node.RotateMatrix4(ap.relativePrevRotation.Mult(targetRotation).Inverted().ToMatrix4())
+				}
 			} else {
 				node.SetLocalRotation(targetRotation.ToMatrix4())
 			}
+			ap.relativePrevRotation = targetRotation
 		}
 
 	}
+
+	ap.relativeNotFirstFrame = true
 
 }
 
