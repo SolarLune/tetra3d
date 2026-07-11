@@ -51,11 +51,13 @@ func (sector *Sector) Clone() *Sector {
 
 // UpdateNeighbors updates the Sector's neighbors to refresh it, in case it moves. The Neighbors set is updated, not replaced,
 // by this process (so clear the Sector's NeighborSet first if you need to do so).
-func (sector *Sector) UpdateNeighbors(otherModels *NodeCollectionSet) {
+func (sector *Sector) UpdateNeighbors(otherModels NodeIterator) {
 
-	otherModels.ForEachModel(func(otherModel *Model) bool {
+	otherModels.ForEach(func(node INode, index int) bool {
 
-		if otherModel == sector.Model || otherModel.sector == nil || sector.Neighbors.Contains(otherModel.sector) {
+		otherModel, _ := node.(*Model) // like if otherModel, ok := node.(*Model), but we don't care; if otherModel isn't a model, then we don't care
+
+		if otherModel == nil || otherModel == sector.Model || otherModel.sector == nil || sector.Neighbors.Contains(otherModel.sector) {
 			return true
 		}
 

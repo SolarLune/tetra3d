@@ -15,14 +15,14 @@ type BoundingAABB struct {
 
 // NewBoundingAABB returns a new BoundingAABB Node.
 func NewBoundingAABB(name string, width, height, depth float32) *BoundingAABB {
-	min := float32(0.0001)
-	if width <= 0 {
+	min := float32(0.001)
+	if width <= min {
 		width = min
 	}
-	if height <= 0 {
+	if height <= min {
 		height = min
 	}
-	if depth <= 0 {
+	if depth <= min {
 		depth = min
 	}
 	bounds := &BoundingAABB{

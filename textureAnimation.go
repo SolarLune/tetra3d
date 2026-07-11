@@ -43,13 +43,13 @@ func NewTextureAnimationPixels(fps float32, image *ebiten.Image, framePositions 
 
 // TexturePlayer is a struct that allows you to animate a collection of vertices' UV values using a TextureAnimation.
 type TexturePlayer struct {
-	OriginalOffsets map[int]Vector2   // OriginalOffsets is a map of vertex indices to their base UV offsets. All animating happens relative to these values.
-	Animation       *TextureAnimation // Animation is a pointer to the currently playing Animation.
-	// Playhead increases as the TexturePlayer plays. The integer portion of Playhead is the frame that the TexturePlayer
-	// resides in (so a Playhead of 1.2 indicates that it is in frame 1, the second frame).
-	Playhead        float32
+	originalOffsets map[int]Vector2   // OriginalOffsets is a map of vertex indices to their base UV offsets. All animating happens relative to these values.
+	animation       *TextureAnimation // Animation is a pointer to the currently playing Animation.
+	// playhead increases as the TexturePlayer plays. The integer portion of playhead is the frame that the TexturePlayer
+	// resides in (so a playhead of 1.2 indicates that it is in frame 1, the second frame).
+	playhead        float32
 	Speed           float32 // Speed indicates the playback speed and direction of the TexturePlayer, with a value of 1.0 being 100%.
-	Playing         bool    // Playing indicates whether the TexturePlayer is currently playing or not.
+	playing         bool    // Playing indicates whether the TexturePlayer is currently playing or not.
 	vertexSelection VertexSelection
 }
 
@@ -66,38 +66,48 @@ func NewTexturePlayer(vertexSelection VertexSelection) *TexturePlayer {
 // Reset resets a TexturePlayer to be ready to run on a new selection of vertices. Note that this also resets the base UV offsets
 // to use the current values of the passed vertices in the slice.
 func (player *TexturePlayer) Reset(vertexSelection VertexSelection) {
-	player.OriginalOffsets = map[int]Vector2{}
+	player.originalOffsets = map[int]Vector2{}
 	vertexSelection.ForEachIndex(func(mesh *Mesh, index int) {
-		player.OriginalOffsets[index] = mesh.VertexUVs[index]
+		player.originalOffsets[index] = mesh.VertexUVs[index]
 	})
 }
 
 // Play plays the passed TextureAnimation, resetting the playhead if the TexturePlayer is not playing an animation. If the player is not playing, it will begin playing.
 func (player *TexturePlayer) Play(animation *TextureAnimation) {
-	if !player.Playing || player.Animation != animation {
-		player.Animation = animation
-		player.Playhead = 0
+	if !player.playing || player.animation != animation {
+		player.animation = animation
+		player.playhead = 0
 	}
-	player.Playing = true
+	player.playing = true
+}
+
+// Returns the currently playing animation for the TexturePlayer.
+func (player *TexturePlayer) Animation() *TextureAnimation {
+	return player.animation
+}
+
+// Sets the currently playing animation for the TexturePlayer.
+func (player *TexturePlayer) SetAnimation(anim *TextureAnimation) {
+	player.animation = anim
 }
 
 // Update updates the TexturePlayer, using the passed delta time variable to animate the TexturePlayer's vertices.
 func (player *TexturePlayer) Update(dt float32) {
 
-	if player.Animation != nil && player.Playing && len(player.Animation.Frames) > 0 {
+	if player.animation != nil && player.playing && len(player.animation.Frames) > 0 {
 
-		player.Playhead += dt * player.Animation.FPS * player.Speed
+		player.playhead += dt * player.animation.FPS * player.Speed
 
-		playhead := int(player.Playhead)
-		for playhead >= len(player.Animation.Frames) {
-			playhead -= len(player.Animation.Frames)
+		playhead := int(player.playhead)
+		for playhead >= len(player.animation.Frames) {
+			playhead -= len(player.animation.Frames)
 		}
 
 		for playhead < 0 {
-			playhead += len(player.Animation.Frames)
+			playhead += len(player.animation.Frames)
 		}
 
-		frameOffset := player.Animation.Frames[playhead]
+		frameOffset := player.animation.Frames[playhead]
 		player.ApplyUVOffset(frameOffset.X, frameOffset.Y)
 
 	}
@@ -107,8 +117,16 @@ func (player *TexturePlayer) Update(dt float32) {
 // ApplyUVOffset applies a specified UV offset to all vertices a player is assigned to. This offset is not additive, but rather is
 // set once, regardless of how many times ApplyUVOffset is called.
 func (player *TexturePlayer) ApplyUVOffset(offsetX, offsetY float32) {
-	for vertIndex, ogOffset := range player.OriginalOffsets {
+	for vertIndex, ogOffset := range player.originalOffsets {
 		player.vertexSelection.mesh.VertexUVs[vertIndex].X = ogOffset.X + offsetX
 		player.vertexSelection.mesh.VertexUVs[vertIndex].Y = ogOffset.Y + offsetY
 	}
+}
+
+func (player *TexturePlayer) IsPlaying() bool {
+	return player.playing
+}
+
+func (player *TexturePlayer) SetPlaying(isPlaying bool) {
+	player.playing = isPlaying
 }

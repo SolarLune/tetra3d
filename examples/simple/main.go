@@ -47,8 +47,8 @@ func (g *Game) Init() {
 	cube.Color = tetra3d.NewColor4(0, 0.5, 1, 1)
 	g.Scene.Root.AddChildren(cube)
 
-	// Create a camera, move it back on the Z axis (depth). The camera automatically looks forward.
-	g.Camera = tetra3d.NewCamera(g.Width, g.Height)
+	// Create a camera, move it back on the Z axis (depth). The camera automatically looks forward (-Z).
+	g.Camera = tetra3d.NewCamera("Camera", g.Width, g.Height)
 	g.Camera.Move(0, 0, 5)
 
 	// Again, we don't need to actually add the camera to the scenegraph, but we'll do it anyway because why not.

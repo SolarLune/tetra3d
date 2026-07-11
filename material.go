@@ -78,7 +78,7 @@ type Material struct {
 	TextureMapScreenSizeMultiplierW float32 // The size multiplier of the texture when mapping to the screen in pixels. 1.0 means a 32px texture will appear 32px onscreen.
 	TextureMapScreenSizeMultiplierH float32 // The size multiplier of the texture when mapping to the screen in pixels. 1.0 means a 32px texture will appear 32px onscreen.
 
-	properties       Properties   // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
+	properties       *Properties  // Properties allows you to specify auxiliary data on the Material. This is loaded from GLTF files or Blender's Custom Properties if the setting is enabled on the export menu.
 	BackfaceCulling  bool         // If backface culling is enabled (which it is by default), faces turned away from the camera aren't rendered.
 	TriangleSortMode int          // TriangleSortMode influences how triangles with this Material are sorted.
 	Shadeless        bool         // If the material should be shadeless (unlit) or not
@@ -301,13 +301,13 @@ func (m *Material) Library() *Library {
 
 func (m *Material) String() string {
 	if ReadableReferences {
-		return "<" + m.name + ">"
+		return "< Material : " + m.name + ">"
 	} else {
 		return fmt.Sprintf("%p", m)
 	}
 }
 
 // Properties returns this Material's game Properties struct.
-func (m *Material) Properties() Properties {
+func (m *Material) Properties() *Properties {
 	return m.properties
 }

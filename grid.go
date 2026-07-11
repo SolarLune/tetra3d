@@ -492,11 +492,12 @@ func (grid *Grid) Combine(others ...*Grid) {
 			continue
 		}
 
-		for _, p := range other.Children(false).ToNodes() {
+		other.ForEachChild(false, func(p INode, index int) bool {
 			pos := p.WorldPosition()
 			grid.AddChildren(p)
 			p.SetWorldPositionVec(pos)
-		}
+			return true
+		})
 
 		// for _, p := range grid.Points() {
 

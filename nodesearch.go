@@ -4,435 +4,623 @@ import (
 	"strings"
 )
 
-type NodeCollectionSet struct {
-	OrderedSet[INode]
+type NodeIterator interface {
+	ForEach(forEach func(node INode, index int) bool)
 }
 
-func NewNodeCollection(nodes ...INode) *NodeCollectionSet {
-	set := &NodeCollectionSet{
-		OrderedSet: newOrderedSet[INode](),
-	}
-	set.Add(nodes...)
-	return set
-}
+type NodeList []INode
 
-func (n *NodeCollectionSet) Clone() *NodeCollectionSet {
-	newOrderedSet := NewNodeCollection()
-	return newOrderedSet.Combine(n)
-}
-
-func (n *NodeCollectionSet) Combine(others ...*NodeCollectionSet) *NodeCollectionSet {
-	for _, o := range others {
-		n.OrderedSet.Combine(o.OrderedSet)
-	}
-	return n
-}
-
-func (n *NodeCollectionSet) First() INode {
-	if len(n.OrderedSet) > 0 {
-		return n.OrderedSet[0]
-	}
-	return nil
-}
-
-func (n *NodeCollectionSet) Last() INode {
-	if len(n.OrderedSet) > 0 {
-		return n.OrderedSet[len(n.OrderedSet)-1]
-	}
-	return nil
-}
-
-func (n *NodeCollectionSet) Get(index int) INode {
-	if len(n.OrderedSet) > 0 {
-		for index < 0 {
-			index += len(n.OrderedSet)
-		}
-		for index >= len(n.OrderedSet) {
-			index -= len(n.OrderedSet)
-		}
-		return n.OrderedSet[index]
-	}
-	return nil
-}
-
-func (n *NodeCollectionSet) Count() int {
-	return len(n.OrderedSet)
-}
-
-func (n *NodeCollectionSet) ForEach(forEach func(node INode) bool) {
-	for _, node := range n.OrderedSet {
-		if !forEach(node) {
-			break
+func (n NodeList) ForEach(forEach func(node INode, index int) bool) {
+	for i, node := range n {
+		if !forEach(node, i) {
+			return
 		}
 	}
 }
 
-func (n *NodeCollectionSet) ForEachLight(forEach func(light ILight) bool) {
-	for _, node := range n.OrderedSet {
-		if light, ok := node.(ILight); ok {
-			if !forEach(light) {
-				break
-			}
-		}
-	}
-}
-
-func (n *NodeCollectionSet) ForEachModel(forEach func(model *Model) bool) {
-	for _, node := range n.OrderedSet {
-		if light, ok := node.(*Model); ok {
-			if !forEach(light) {
-				break
-			}
-		}
-	}
-}
-
-func (n *NodeCollectionSet) ForEachCamera(forEach func(camera *Camera) bool) {
-	for _, node := range n.OrderedSet {
-		if camera, ok := node.(*Camera); ok {
-			if !forEach(camera) {
-				break
-			}
-		}
-	}
-}
-
-func (n *NodeCollectionSet) ForEachBoundingObject(forEach func(boundingObject IBoundingObject) bool) {
-	for _, node := range n.OrderedSet {
-		if boundingObject, ok := node.(IBoundingObject); ok {
-			if !forEach(boundingObject) {
-				break
-			}
-		}
-	}
-}
-
-func (n NodeCollectionSet) ToLights() []ILight {
-	out := []ILight{}
-	n.ForEachLight(func(light ILight) bool {
-		out = append(out, light)
+func (n *NodeList) Combine(other NodeIterator) {
+	other.ForEach(func(node INode, index int) bool {
+		n.Add(node)
 		return true
 	})
-	return out
 }
 
-func (n NodeCollectionSet) ToModels() []*Model {
-	out := []*Model{}
-	n.ForEachModel(func(model *Model) bool {
-		out = append(out, model)
+func (n NodeList) Count() int {
+	return len(n)
+}
+
+func (n NodeList) Capacity() int {
+	return cap(n)
+}
+
+func (n *NodeList) Add(node INode) {
+	(*n) = append((*n), node)
+}
+
+// Returns the element in the NodeSlice at the given index.
+// The index loops around the bounds of the slice, such that NodeSlice.Get(-1)
+// returns the last element in the slice.
+func (n NodeList) Get(index int) INode {
+	if len(n) == 0 {
+		return nil
+	}
+
+	return n[index%len(n)]
+}
+
+func (n NodeList) First() INode {
+	if len(n) == 0 {
+		return nil
+	}
+	return n[0]
+}
+
+func (n NodeList) Last() INode {
+	if len(n) == 0 {
+		return nil
+	}
+	return n[len(n)-1]
+}
+
+func (n *NodeList) Clear() {
+	// clear(*n)
+	*n = (*n)[:0]
+}
+
+// Represents a set of options to control searching through a hierarchy of nodes recursively, evaluating filters to find
+// nodes that fit criteria, and do so lazily (e.g. one at a time as necessary).
+// The object can also process the results and output them to a NodeSlice (a slice of Nodes).
+// Note that the filtering options do stack (e.g. if you specify `startingNode.Search().ByNames("Player").ByPropPair("hunger", 100)“,
+// a node would have to be a descendant of `startingNode`, be named "Player", and have a property named "hunger" that has a value of 100
+// to pass the filters and be considered "found").
+type SearchOptions struct {
+	Start          INode
+	noStartingNode bool
+	filterStack    func(node INode) bool
+}
+
+func (s SearchOptions) ByNames(names ...string) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		add := false
+		name := node.Name()
+		for _, n := range names {
+			if name == n {
+				add = true
+				break
+			}
+		}
+		if add {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByNamesPartial(names ...string) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		add := false
+		name := node.Name()
+		for _, n := range names {
+			if strings.Contains(name, n) {
+				add = true
+				break
+			}
+		}
+		if add {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByParentNames(names ...string) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		add := false
+		if node.Parent() != nil {
+			name := node.Parent().Name()
+			for _, n := range names {
+				if name == n {
+					add = true
+					break
+				}
+			}
+			if add {
+				if last != nil {
+					return last(node)
+				} else {
+					return true
+				}
+			}
+
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByParentNamesPartial(names ...string) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		add := false
+		if node.Parent() != nil {
+			name := node.Parent().Name()
+			for _, n := range names {
+				if strings.Contains(name, n) {
+					add = true
+					break
+				}
+			}
+			if add {
+				if last != nil {
+					return last(node)
+				} else {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByPropNames(names ...string) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		add := false
+		props := node.Properties()
+		for _, n := range names {
+			if props.Has(n) {
+				add = true
+				break
+			}
+		}
+		if add {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByParentPropNames(names ...string) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		add := false
+		if node.Parent() != nil {
+			props := node.Parent().Properties()
+			for _, n := range names {
+				if props.Has(n) {
+					add = true
+					break
+				}
+			}
+			if add {
+				if last != nil {
+					return last(node)
+				} else {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByPropValues(values ...any) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		add := false
+		props := node.Properties()
+		for _, value := range values {
+			for _, prop := range props.data {
+				if prop.Value == value {
+					add = true
+					break
+				}
+			}
+			if add {
+				break
+			}
+		}
+		if add {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByParentPropValues(values ...any) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		add := false
+
+		if parent := node.Parent(); parent != nil {
+
+			props := parent.Properties()
+			for _, value := range values {
+				for _, prop := range props.data {
+					if prop.Value == value {
+						add = true
+						break
+					}
+				}
+				if add {
+					break
+				}
+			}
+
+		}
+
+		if add {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByPropPair(name string, value any) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		if prop := node.Properties().GetByName(name); prop != nil && prop.Value == value {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByParentPropPair(name string, value any) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		if node.Parent() != nil {
+			if prop := node.Parent().Properties().GetByName(name); prop != nil && prop.Value == value {
+				if last != nil {
+					return last(node)
+				} else {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByType(nt NodeType) SearchOptions {
+	last := s.filterStack
+
+	s.filterStack = func(node INode) bool {
+		if node.Type().Is(nt) {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByParentType(nt NodeType) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		if node.Parent() != nil && node.Parent().Type().Is(nt) {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByPropHasBitfieldValue(bitValue Bitfield) SearchOptions {
+	last := s.filterStack
+
+	s.filterStack = func(node INode) bool {
+		for _, prop := range node.Properties().data {
+
+			if prop.IsBitfield() && prop.AsBitfield().Contains(bitValue) {
+				if last != nil {
+					return last(node)
+				} else {
+					return true
+				}
+			}
+
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByParentPropHasBitfieldValue(bitValue Bitfield) SearchOptions {
+	last := s.filterStack
+
+	s.filterStack = func(node INode) bool {
+		if parent := node.Parent(); parent != nil {
+			for _, prop := range parent.Properties().data {
+
+				if prop.IsBitfield() && prop.AsBitfield().Contains(bitValue) {
+					if last != nil {
+						return last(node)
+					} else {
+						return true
+					}
+				}
+
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByPropHasBitfieldValueByName(bitfieldValueName string) SearchOptions {
+	last := s.filterStack
+
+	bitfieldValue := Bitfield(0)
+
+	s.filterStack = func(node INode) bool {
+
+		if bitfieldValue == 0 {
+			if scene := node.Scene(); scene != nil {
+				bitfieldValue = scene.BitfieldValueByName(bitfieldValueName)
+			}
+		}
+
+		for _, prop := range node.Properties().data {
+			if prop.IsBitfield() {
+				if scene := node.Scene(); scene != nil && prop.AsBitfield().Contains(bitfieldValue) {
+					if last != nil {
+						return last(node)
+					} else {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByParentPropHasBitfieldValueByName(bitfieldValueName string) SearchOptions {
+	last := s.filterStack
+
+	bitfieldValue := Bitfield(0)
+
+	s.filterStack = func(node INode) bool {
+
+		if bitfieldValue == 0 {
+			if scene := node.Scene(); scene != nil {
+				bitfieldValue = scene.BitfieldValueByName(bitfieldValueName)
+			}
+		}
+
+		if parent := node.Parent(); parent != nil {
+			for _, prop := range parent.Properties().data {
+				if prop.IsBitfield() {
+					if scene := node.Scene(); scene != nil && prop.AsBitfield().Contains(bitfieldValue) {
+						if last != nil {
+							return last(node)
+						} else {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false
+	}
+	return s
+}
+
+func (s SearchOptions) ByCustomFunc(customFunc func(INode) bool) SearchOptions {
+	if customFunc == nil {
+		return s
+	}
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		if customFunc(node) {
+			if last != nil {
+				return last(node)
+			} else {
+				return true
+			}
+		}
+		return false
+	}
+	return s
+}
+
+// Returns a copy of SearchOptions with the specified Nodes included as being precluded from testing and searching.
+// Their descendants still are, though.
+func (s SearchOptions) NotNode(node INode) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(n INode) bool {
+		if node == n {
+			return false
+		}
+
+		if last != nil {
+			return last(node)
+		}
 		return true
-	})
-	return out
+	}
+	return s
 }
 
-func (n NodeCollectionSet) ToNodes() []INode {
-	out := []INode{}
-	n.ForEach(func(node INode) bool {
+// Returns a copy of SearchOptions with the specified Nodes included as being precluded from testing and searching.
+// Their descendants still are, though.
+func (s SearchOptions) NotNodes(nodes NodeIterator) SearchOptions {
+	last := s.filterStack
+	s.filterStack = func(node INode) bool {
+		found := false
+		nodes.ForEach(func(n INode, index int) bool {
+			if node == n {
+				found = true
+				return false
+			}
+			return true
+		})
+
+		if found {
+			return false
+		}
+
+		if last != nil {
+			return last(node)
+		}
+		return true
+	}
+	return s
+}
+
+// Returns a copy of SearchOptions with the option to preclude the starting node from being included in the iteration process.
+// Its descendants still are, though.
+func (s SearchOptions) WithStartingNode(withStartingNode bool) SearchOptions {
+	s.noStartingNode = !withStartingNode
+	return s
+}
+
+// Evaluates and returns all Nodes that pass the filter set in the form of a NodeList.
+// If a NodeList `out` is passed in, it will be cleared and reused for this purpose to avoid memory allocation.
+// Otherwise, a new one will be allocated for this purpose.
+// If no nodes pass the filter set, the function returns a nil NodeList (slice).
+func (s SearchOptions) GetNodeList() NodeList {
+	var out = NodeList{}
+	s.ForEach(func(node INode, index int) bool {
 		out = append(out, node)
 		return true
 	})
 	return out
 }
 
-func (n NodeCollectionSet) ToCameras() []*Camera {
-	out := []*Camera{}
-	n.ForEachCamera(func(camera *Camera) bool {
-		out = append(out, camera)
+// Evaluates and returns the first Node that passes the filter set.
+// If no nodes pass the filter set, the function returns nil.
+func (s SearchOptions) GetFirst() INode {
+	var out INode
+	s.ForEach(func(node INode, index int) bool {
+		out = node
+		return false
+	})
+	return out
+}
+
+// Evaluates and returns the first Node that passes the filter set.
+// If no nodes pass the filter set, the function returns nil.
+func (s SearchOptions) Get(index int) INode {
+	var out INode
+	i := 0
+	s.ForEach(func(node INode, forEachIndex int) bool {
+		if i == index {
+			out = node
+			return false
+		}
+		i++
 		return true
 	})
 	return out
 }
 
-// Represents a set of options to control searching through a hierarchy of nodes recursively.
-// Note that the options do stack (e.g. if you specify SearchOptions such that nodes must have a given name and a given property name,
-// a node has to have both to pass).
-type SearchOptions struct {
-	Names       []string
-	NamesParent []string
-
-	PartialNames       []string
-	PartialNamesParent []string
-
-	PropNames       []string
-	ParentPropNames []string
-
-	PropValues       map[string]any
-	ParentPropValues map[string]any
-
-	NodeTypes       []NodeType
-	NodeTypesParent []NodeType
-
-	CustomFunc         func(node INode) bool // If the function is set, each node is run through the custom function; if it returns true, the node is added to the collection set
-	WithoutNodes       *NodeCollectionSet
-	ForEach            func(node INode) bool // If set, for each Node that passes the function set, ForEach is run on it. If it returns false, the loop is broken out of early
-	NoReturnCollection bool                  // If NoReturnCollection is set, FindNodes returns an empty Collection Set (can be used in connection with ForEach to instead loop through all passing Nodes).
-	NoRoot             bool                  // If NoRoot is set, the starting node is not included in the search (but its children and descendants can still be).
-}
-
-// Filters out the search options to find Nodes with any of the names specified.
-func (f SearchOptions) ByNames(names ...string) SearchOptions {
-	f.Names = names
-	return f
-}
-
-// Filters out the search options to find children of Nodes with any of the names specified.
-func (f SearchOptions) ByNamesParent(names ...string) SearchOptions {
-	f.NamesParent = names
-	return f
-}
-
-// Filters out the search options to find Nodes with a part of any of the names specified.
-func (f SearchOptions) ByNamesPartial(partialNames ...string) SearchOptions {
-	f.PartialNames = partialNames
-	return f
-}
-
-// Filters out the search options to find children of Nodes with a part of any of the names specified.
-func (f SearchOptions) ByNamesPartialParent(partialNames ...string) SearchOptions {
-	f.PartialNamesParent = partialNames
-	return f
-}
-
-// Filters out the search options to find Nodes with properties by any of the names specified.
-func (f SearchOptions) ByPropNames(propNames ...string) SearchOptions {
-	f.PropNames = propNames
-	return f
-}
-
-// Filters out the search options to find children of Nodes with properties by any of the names specified.
-func (f SearchOptions) ByPropNamesParent(propNames ...string) SearchOptions {
-	f.ParentPropNames = propNames
-	return f
-}
-
-// Filters out the search options to find Nodes with a property with the name specified set to the specified value.
-func (f SearchOptions) ByPropValuePair(propName string, value any) SearchOptions {
-	f.PropValues = map[string]any{propName: value}
-	return f
-}
-
-// Filters out the search options to find children of Nodes with a property with the name specified set to the specified value.
-func (f SearchOptions) ByPropValuePairParent(propName string, value any) SearchOptions {
-	f.ParentPropValues = map[string]any{propName: value}
-	return f
-}
-
-// Filters out the search options to find Nodes with properties with the names and values specified as keys and values in the given propPairs map.
-func (f SearchOptions) ByPropValuePairs(propPairs map[string]any) SearchOptions {
-	f.PropValues = propPairs
-	return f
-}
-
-// Filters out the search options to find children of Nodes with properties with the names and values specified as keys and values in the given propPairs map.
-func (f SearchOptions) ByPropValuePairsParent(propPairs map[string]any) SearchOptions {
-	f.ParentPropValues = propPairs
-	return f
-}
-
-// Filters out the search options to find Nodes of any of the given types.
-func (f SearchOptions) ByType(withNodeTypes ...NodeType) SearchOptions {
-	f.NodeTypes = withNodeTypes
-	return f
-}
-
-// Filters out the search options to find Nodes of any of the given types.
-func (f SearchOptions) ByTypeParent(withNodeTypes ...NodeType) SearchOptions {
-	f.NodeTypesParent = withNodeTypes
-	return f
-}
-
-// Sets the search options to run a custom function on each Node - if it passes, then the Node is added to the resulting collection set.
-func (f SearchOptions) ByCustomFunc(customFunc func(node INode) bool) SearchOptions {
-	f.CustomFunc = customFunc
-	return f
-}
-
-// Removes nodes from consideration from the Search.
-func (f SearchOptions) Not(nodes *NodeCollectionSet) SearchOptions {
-	f.WithoutNodes = nodes
-	return f
-}
-
-// Searches through a Node's hierarchical tree for any nodes that fulfill the given
-// search parameters (including the node's start).
-func (node *Node) Search(options SearchOptions) *NodeCollectionSet {
-	output := NewNodeCollection()
-
-	check := func(node INode, index, size int) bool {
-
-		add := true
-
-		if options.WithoutNodes != nil && options.WithoutNodes.Contains(node) {
-			add = false
-		} else {
-
-			if options.Names != nil {
-				result := false
-				for _, n := range options.Names {
-					if node.Name() == n {
-						result = true
-						break
-					}
-				}
-				add = add && result
-			}
-
-			if options.NamesParent != nil {
-				result := false
-				if parent := node.Parent(); parent != nil {
-
-					for _, n := range options.NamesParent {
-						if parent.Name() == n {
-							result = true
-							break
-						}
-					}
-
-				}
-				add = add && result
-
-			}
-
-			if options.PartialNames != nil {
-				result := false
-				for _, n := range options.PartialNames {
-					if strings.Contains(node.Name(), n) {
-						result = true
-						break
-					}
-				}
-				add = add && result
-			}
-
-			if options.PartialNamesParent != nil {
-				result := false
-				if parent := node.Parent(); parent != nil {
-
-					for _, n := range options.PartialNamesParent {
-						if strings.Contains(parent.Name(), n) {
-							result = true
-							break
-						}
-					}
-
-				}
-				add = add && result
-			}
-
-			if options.PropNames != nil {
-				result := false
-				for _, n := range options.PropNames {
-					if node.Properties().Has(n) {
-						result = true
-						break
-					}
-				}
-				add = add && result
-			}
-
-			if options.ParentPropNames != nil {
-				result := false
-				if parent := node.Parent(); parent != nil {
-
-					for _, n := range options.ParentPropNames {
-						if parent.Properties().Has(n) {
-							result = true
-							break
-						}
-					}
-
-				}
-				add = add && result
-			}
-
-			if options.PropValues != nil {
-				result := false
-				for k, v := range options.PropValues {
-					if res := node.Properties().Get(k); res != nil && res.Value == v {
-						result = true
-						break
-					}
-				}
-				add = add && result
-			}
-
-			if options.ParentPropValues != nil {
-				result := false
-				if parent := node.Parent(); parent != nil {
-					for k, v := range options.ParentPropValues {
-
-						if res := parent.Properties().Get(k); res != nil && res.Value == v {
-							result = true
-							break
-						}
-
-					}
-				}
-				add = add && result
-			}
-
-			if options.NodeTypes != nil {
-				result := false
-				for _, nt := range options.NodeTypes {
-					if node.Type().Is(nt) {
-						result = true
-						break
-					}
-				}
-				add = add && result
-			}
-
-			if options.NodeTypesParent != nil {
-				result := false
-				if parent := node.Parent(); parent != nil {
-
-					for _, nt := range options.NodeTypesParent {
-						if parent.Type().Is(nt) {
-							result = true
-							break
-						}
-					}
-
-				}
-				add = add && result
-			}
-
-			if options.CustomFunc != nil {
-				result := false
-				if options.CustomFunc(node) {
-					result = true
-				}
-				add = add && result
-			}
-
-		}
-
-		// If no filters are set, then the function just returns each Node's children recursively.
-		if add {
-
-			if options.ForEach != nil {
-				if !options.ForEach(node) {
-					return false
-				}
-			}
-
-			if options.NoReturnCollection {
-				return true
-			}
-
-			output.Add(node)
-
-		}
-
+// Evaluates and returns the last Node that passes the filter set.
+// If no nodes pass the filter set, the function returns nil.
+func (s SearchOptions) GetLast() INode {
+	var out INode
+	s.ForEach(func(node INode, index int) bool {
+		out = node
 		return true
+	})
+	return out
+}
 
+// Evaluates and returns the number of Nodes that pass the filter set.
+// If no nodes pass the filter set, the function returns 0.
+func (s SearchOptions) GetCount() int {
+	count := 0
+	s.ForEach(func(node INode, index int) bool {
+		count++
+		return true
+	})
+	return count
+}
+
+// Loops through each node starting with the root node specified when creating the SearchOptions
+// and runs the specified function on the hierarchy if the node has passed the filter options.
+// If the function returns true, the next Node in the hierarchy is returned; if not, the loop is ended prematurely.
+func (s SearchOptions) ForEach(forEach func(node INode, index int) bool) {
+
+	if forEach == nil {
+		return
 	}
 
-	if !options.NoRoot {
-		check(node, 0, 1)
+	index := 0
+
+	if !s.noStartingNode {
+		if s.filterStack == nil || s.filterStack(s.Start) {
+			if !forEach(s.Start, index) {
+				return
+			}
+			index++
+		}
 	}
 
-	node.ForEachChild(true, check)
+	s.Start.ForEachChild(true, func(node INode, index int) bool {
+		if s.filterStack != nil && !s.filterStack(node) {
+			return true
+		}
+		if !forEach(node, index) {
+			return false
+		}
+		index++
+		return true
+	})
 
-	return output
+}
+
+// Creates a SearchOptions object starting with the given Node.
+// You create a SearchOptions object with Node.Search(), specify filters like ByNames(), and then iterate over all
+// passing Nodes with SearchOptions.ForEach, or get a slice with GetSlice(). You can also get just the first or last
+// with GetFirst() and GetLast().
+func (n *Node) Search() SearchOptions {
+	return SearchOptions{
+		Start: n,
+		// filterStack: func(node INode) bool { return true},
+	}
 }

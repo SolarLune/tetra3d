@@ -23,6 +23,7 @@ type BasicSystemHandler struct {
 	DrawDebugText      bool
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
+	DrawDebugBounds    bool
 	DrawDebugCenters   bool
 
 	Game              GameI
@@ -69,6 +70,10 @@ func (system *BasicSystemHandler) Update() error {
 		system.DrawDebugCenters = !system.DrawDebugCenters
 	}
 
+	if inpututil.IsKeyJustPressed(ebiten.KeyF7) {
+		system.DrawDebugBounds = !system.DrawDebugBounds
+	}
+
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
 		StartProfiling()
 	}
@@ -96,6 +101,10 @@ func (system *BasicSystemHandler) Draw(screen *ebiten.Image, camera *tetra3d.Cam
 		camera.DrawDebugWireframe(screen, camera.Scene().Root, colors.White())
 	}
 
+	if system.DrawDebugBounds {
+		camera.DrawDebugBoundsColored(screen, camera.Scene().Root, tetra3d.DefaultDrawDebugBoundsSettings())
+	}
+
 	if system.DrawDebugCenters {
 		camera.DrawDebugCenters(screen, camera.Scene().Root, colors.SkyBlue())
 	}
@@ -115,16 +124,18 @@ Right Click to Lock / Unlock Mouse Cursor
 F1: Toggle help text - F2: Toggle depth debug,
 F3: Wireframe debug - F4: fullscreen - F5: node center debug
 F6: Toggle Perpsective Correction: %s
+F7: Collision bounds debug
 ESC: Quit
 `, pcOn)
 		} else {
 			txt = fmt.Sprintf(`F1: Toggle help text - F2: Toggle depth debug,
 F3: Wireframe debug - F4: fullscreen - F5: node center debug
 F6: Toggle Perpsective Correction: %s
+F7: Collision bounds debug
 ESC: Quit
 `, pcOn)
 		}
-		tetra3d.DrawDebugText(screen, txt, 0, 144, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, txt, 0, 120, 1, colors.LightGray())
 	}
 
 }
@@ -148,7 +159,7 @@ func NewBasicFreeCam(scene *tetra3d.Scene) BasicFreeCam {
 		Scene: scene,
 	}
 
-	freecam.Camera = tetra3d.NewCamera(640, 360)
+	freecam.Camera = tetra3d.NewCamera("FreeCam", 640, 360)
 	freecam.Camera.SetFieldOfView(60)
 	freecam.Camera.SetLocalPosition(0, 0, 10)
 
@@ -278,7 +289,7 @@ func NewBasicTargetedCam(target tetra3d.INode) BasicTargetedCam {
 		Orbiter: tetra3d.NewNode("Orbiter"),
 	}
 
-	cam.Camera = tetra3d.NewCamera(640, 360)
+	cam.Camera = tetra3d.NewCamera("OrbiterCam", 640, 360)
 	cam.Camera.SetFieldOfView(60)
 
 	cam.Orbiter.AddChildren(cam.Camera)

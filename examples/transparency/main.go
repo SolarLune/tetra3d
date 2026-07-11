@@ -86,6 +86,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.System.Draw(screen, g.Camera.Camera)
 
+	// Note that opaque objects are also sorted in order of material render order,
+	// but only if depth rendering is off on the rendering camera.
 	if g.System.DrawDebugText {
 		txt := `Transparent materials draw in a second pass,
 meaning they don't appear in the depth texture.
@@ -94,6 +96,7 @@ angles (which is bad), but also show things
 underneath (which is, of course, good).
 
 Transparent objects are rendered in order of
+their materials' render order, and then in order of
 distance to the camera.`
 
 		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.White())

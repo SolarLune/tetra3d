@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -93,6 +94,48 @@ func (nt NodeType) String() string {
 	panic("This should never happen")
 }
 
+// Represents a bit set of boolean values.
+// This, for example, provides faster filtering for Nodes than checking properties' names or values.
+type Bitfield uint32
+
+func (b Bitfield) String() string {
+	return fmt.Sprintf("%d", b)
+}
+
+// Converts the bit of the given index to a Bitfield value (e.g. ToBitfield(0) == 2, ToBitfield(1) == 4).
+func ToBitfield(index int) Bitfield {
+	return 2 << index
+}
+
+// Returns true if the object contains the given bit value.
+func (b Bitfield) Contains(value Bitfield) bool {
+	if value == 0 {
+		return false
+	}
+	if b == value {
+		return true
+	}
+	return b&value == value
+}
+
+func (b Bitfield) Add(value Bitfield) Bitfield {
+	if int(b)+int(value) < math.MaxUint32 {
+		b += value
+	} else {
+		b = 0
+	}
+	return b
+}
+
+func (b Bitfield) Sub(value Bitfield) Bitfield {
+	if int(b)-int(value) > 0 {
+		b -= value
+	} else {
+		b = 0
+	}
+	return b
+}
+
 // INode represents an object that exists in 3D space and can be positioned relative to an origin point.
 // By default, this origin point is {0, 0, 0} (or world origin), but Nodes can be parented
 // to other Nodes to change this origin (making their movements relative and their transforms
@@ -124,6 +167,7 @@ type INode interface {
 	// Parent returns the Node's parent. If the Node has no parent, this will return nil.
 	Parent() INode
 	// Unparent unparents the Node from its parent, removing it from the scenegraph.
+	// Beware of using this in a hierarchical loop!
 	Unparent()
 	getOwner() INode
 	// DescendantOf returns if a Node is a descendant child of a parent Node.
@@ -147,22 +191,23 @@ type INode interface {
 	// If the node doesn't have a parent, its index will be -1.
 	Index() int
 
-	// Children() returns the Node's children as an INode.
-	Children(recursive bool) *NodeCollectionSet
+	// Returns the Node's children as a NodeCollectionSet.
+	Children(recursive bool) NodeList
 
 	// Returns the number of children under the Node.
 	// When recursive, it traverses the entire tree underneath the Node;
 	// otherwise, it just returns the number of children directly beneath the Node.
-	ChildCount(recursive bool) int
+	ChildrenCount(recursive bool) int
 
 	// ForEachChild() runs a callback for each child in the Node's children set.
 	// If the callback returns false, then the execution stops with the current child.
-	ForEachChild(recursive bool, forEach func(node INode, index, size int) bool)
+	ForEachChild(recursive bool, forEach func(node INode, index int) bool)
 
 	// AddChildren parents the provided children Nodes to the passed parent Node, inheriting its transformations and being under it in the scenegraph
 	// hierarchy. If the children are already parented to other Nodes, they are unparented before doing so.
 	AddChildren(...INode)
 	// RemoveChildren removes the provided children from this object.
+	// Beware of using this in a hierarchical loop!
 	RemoveChildren(...INode)
 
 	// Replaces the node with the other target node.
@@ -193,6 +238,7 @@ type INode interface {
 	// it was first instantiated in the Scene or cloned.
 	ResetWorldRotation()
 
+	getOriginalTransform() Matrix4
 	setOriginalTransform()
 
 	// SetWorldTransform sets the Node's global (world) transform to the full 4x4 transformation matrix provided.
@@ -294,7 +340,7 @@ type INode interface {
 	Get(path string) INode
 
 	// Search searches a node's hierarchy using a string to find the specified Node.
-	Search(options SearchOptions) *NodeCollectionSet
+	Search() SearchOptions
 
 	// HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.
 	// This is a useful function to debug the layout of a node tree, for example.
@@ -305,7 +351,10 @@ type INode interface {
 	Path() string
 
 	// Properties returns this object's game Properties struct.
-	Properties() Properties
+	Properties() *Properties
+
+	// Returns if the Node contains a property that has a bit flipped that is named in the Node's Scene by the given name.
+	PropertiesContainsBitByName(bitfieldBitName string) bool
 
 	// IsBone returns if the Node is a "bone" (a node that was a part of an armature and so can play animations back to influence a skinned mesh).
 	IsBone() bool
@@ -357,7 +406,7 @@ type Node struct {
 	parent            INode
 	cachedTransform   Matrix4
 	isTransformDirty  bool
-	props             Properties // Properties is an unordered set of properties, representing a means of identifying and setting game properties on Nodes.
+	props             *Properties // Properties is an unordered set of properties, representing a means of identifying and setting game properties on Nodes.
 	animationPlayer   *AnimationPlayer
 	inverseBindMatrix Matrix4 // Specifically for bones in an armature used for animating skinned meshes
 	isBone            bool
@@ -392,7 +441,6 @@ func NewNode(name string) *Node {
 		cachedTransform: NewMatrix4(),
 		callbacks:       &NodeCallbacks{},
 		// originalLocalPosition: NewVectorZero(),
-		// sectorType: NewBitMask(0 + 1 + 2 + 3 + 4 + 5 + 6 + 7),
 	}
 
 	nodeID++
@@ -669,6 +717,10 @@ func (node *Node) setOriginalTransform() {
 	node.originalTransform = node.Transform()
 }
 
+func (node *Node) getOriginalTransform() Matrix4 {
+	return node.originalTransform
+}
+
 // WorldPosition returns a 3D Vector consisting of the object's world position (position relative to the world origin point of {0, 0, 0}).
 func (node *Node) WorldPosition() Vector3 {
 	return node.Transform().RowAsVector3(3) // We don't want to have to decompose if we don't have to
@@ -797,8 +849,7 @@ func (node *Node) WorldScale() Vector3 {
 
 	// Only decompose if we absolutely need to
 	if needToDecompose {
-		_, scale, _ := node.Transform().Decompose()
-		return scale
+		return node.Transform().DecomposeScale()
 	}
 
 	return node.LocalScale()
@@ -867,8 +918,7 @@ func (node *Node) WorldRotation() Matrix4 {
 
 	// Only decompose if we absolutely need to
 	if needToDecompose {
-		_, _, rotation := node.Transform().Decompose()
-		return rotation
+		return node.Transform().DecomposeRotation()
 	}
 
 	return node.LocalRotation()
@@ -991,7 +1041,8 @@ func (node *Node) RotateVec(vec Vector3, angle float32) {
 // Rotate rotates a Node on its local orientation using a Matrix4.
 func (node *Node) RotateMatrix4(mat Matrix4) {
 	localRot := node.LocalRotation()
-	localRot = localRot.Mult(mat)
+	// localRot = localRot.Mult(mat) // Rotate kinda globally
+	localRot = mat.Mult(localRot) // Rotate locally
 	node.SetLocalRotation(localRot)
 }
 
@@ -1035,7 +1086,7 @@ func (node *Node) setParent(parent INode) {
 	for _, child := range node.children {
 		child.setParent(node)
 	}
-	node.ForEachChild(true, func(child INode, index, size int) bool {
+	node.ForEachChild(true, func(child INode, index int) bool {
 		child.setCachedSceneRoot(node.cachedSceneRootNode)
 		return true
 	})
@@ -1112,6 +1163,7 @@ func (node *Node) getOwner() INode {
 }
 
 // RemoveChildren immediately removes the provided children from this object.
+// Beware of using this in a hierarchical loop!
 func (node *Node) RemoveChildren(children ...INode) {
 
 	for _, c1 := range children {
@@ -1143,6 +1195,7 @@ func (node *Node) RemoveChildren(children ...INode) {
 }
 
 // Unparent unparents the Node from its parent, removing it from the scenegraph.
+// Beware of using this in a hierarchical loop!
 func (node *Node) Unparent() {
 	if node.parent != nil {
 		node.parent.RemoveChildren(node)
@@ -1181,7 +1234,7 @@ func (node *Node) ReindexChild(child INode, newIndex int) int {
 func (node *Node) Index() int {
 	var index = -1
 	if node.parent != nil {
-		node.parent.ForEachChild(false, func(child INode, i, size int) bool {
+		node.parent.ForEachChild(false, func(child INode, i int) bool {
 			if child == node {
 				index = i
 				return false
@@ -1206,20 +1259,20 @@ func (node *Node) ReplaceWith(other INode) {
 // Children returns the Node's children as a slice of INodes.
 // recursive controls whether it returns all nodes recursive moving down the Node's hierarchy or not.
 // If recursive is true, it's syntactic sugar for Node.FindNodes(FindNodeOptions{}).
-func (node *Node) Children(recursive bool) *NodeCollectionSet {
+func (node *Node) Children(recursive bool) NodeList {
 	if recursive {
-		return node.Search(SearchOptions{})
+		return node.Search().WithStartingNode(false).GetNodeList()
 	}
-	return NewNodeCollection(node.children...)
+	return append(make([]INode, 0, len(node.children)), node.children...)
 }
 
 // ForEachChild runs the provided callback function for each child in the node's children slice.
 // If the callback returns false, then it stops execution with the current child.
-// The function loops through the children list in reverse so removing children is non-problematic.
-func (node *Node) ForEachChild(recursive bool, forEach func(node INode, index, size int) bool) {
-	size := len(node.children)
-	for i := len(node.children) - 1; i >= 0; i-- {
-		if !forEach(node.children[i], i, size) {
+// Beware of removing children from a node in this loop (it's better to make a copy of children through
+// a node.Search call if you're going to remove some).
+func (node *Node) ForEachChild(recursive bool, forEach func(node INode, index int) bool) {
+	for i := 0; i < len(node.children); i++ {
+		if !forEach(node.children[i], i) {
 			return
 		}
 		if recursive {
@@ -1230,10 +1283,10 @@ func (node *Node) ForEachChild(recursive bool, forEach func(node INode, index, s
 
 // Returns the number of children under the Node.
 // When recursive, it traverses the entire tree underneath the Node;
-// otherwise, it just returns the number of children directly beneath the Node.
-func (node *Node) ChildCount(recursive bool) int {
+// otherwise, it just returns the number of the Node's direct descendants.
+func (node *Node) ChildrenCount(recursive bool) int {
 	count := 0
-	node.ForEachChild(recursive, func(child INode, index, size int) bool {
+	node.ForEachChild(recursive, func(child INode, index int) bool {
 		count++
 		return true
 	})
@@ -1255,9 +1308,18 @@ func (node *Node) SetVisible(visible bool, recursive bool) {
 	node.visible = visible
 }
 
-// Properties represents an unordered set of game properties that can be used to identify this object.
-func (node *Node) Properties() Properties {
+// Properties represents an ordered set of game properties that can be used to identify this object.
+func (node *Node) Properties() *Properties {
 	return node.props
+}
+
+// Returns if the Node contains a property that has a bit flipped that is named in the Node's Scene by the given name.
+func (node *Node) PropertiesContainsBitByName(bitfieldBitName string) bool {
+	bv := node.Scene().BitfieldValueByName(bitfieldBitName)
+	for _, p := range node.props.data {
+		return p.IsBitfield() && p.AsBitfield().Contains(bv)
+	}
+	return false
 }
 
 // HierarchyAsString returns a string displaying the hierarchy of this Node, and all recursive children.
@@ -1339,7 +1401,7 @@ func (node *Node) HierarchyAsString() string {
 		}
 		str += " [" + prefix + "] " + node.Name() + fmt.Sprintf(" : %d : ", node.ID()) + wpStr + "\n"
 
-		node.ForEachChild(false, func(node INode, index, size int) bool {
+		node.ForEachChild(false, func(node INode, index int) bool {
 			str += printNode(node, level+1)
 			return true
 		})
@@ -1399,7 +1461,7 @@ func (node *Node) Get(path string) INode {
 
 		var foundNode INode
 
-		node.ForEachChild(false, func(child INode, index, size int) bool {
+		node.ForEachChild(false, func(child INode, index int) bool {
 
 			if child.Name() == split[0] {
 
@@ -1543,7 +1605,7 @@ func (node *Node) Sector() *Sector {
 
 			pos := node.WorldPosition()
 
-			root.ForEachChild(true, func(child INode, index, size int) bool {
+			root.ForEachChild(true, func(child INode, index int) bool {
 				if model, ok := child.(*Model); ok && model.sector != nil {
 					if model.sector.dimensions.Contains(pos) {
 						node.cachedSector = model.sector

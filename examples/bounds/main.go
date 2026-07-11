@@ -63,7 +63,7 @@ func (g *Game) Update() error {
 	gravity := float32(0.05)
 
 	bounds := g.Controlling.Children(false).First().(tetra3d.IBoundingObject)
-	solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.Not(tetra3d.NewNodeCollection(bounds))) // Either not the bounds or just the solid objects; either would work here
+	solids := g.Scene.Root.Search().NotNode(bounds)
 
 	movement := g.Movement.Modify() // Modification Vector
 
@@ -92,9 +92,9 @@ func (g *Game) Update() error {
 	boundsHalfHeight := float32(0)
 	switch b := bounds.(type) {
 	case *tetra3d.BoundingSphere:
-		boundsHalfHeight = b.Radius
+		boundsHalfHeight = b.WorldRadius()
 	case *tetra3d.BoundingCapsule:
-		boundsHalfHeight = b.Height / 2
+		boundsHalfHeight = b.WorldHeight() / 2
 	}
 
 	from := g.Controlling.WorldPosition()
@@ -102,7 +102,9 @@ func (g *Game) Update() error {
 	if ray := tetra3d.RayTest(tetra3d.RayTestOptions{
 		Doublesided: true,
 		TestAgainst: solids,
-	}.AddPosition(from, from.SubY(boundsHalfHeight+math32.Abs(g.VerticalSpeed)+0.25))); ray != nil {
+		From:        from,
+		To:          from.SubY(boundsHalfHeight + math32.Abs(g.VerticalSpeed) + 0.25),
+	}); ray != nil {
 		margin := float32(0.1)
 		g.Controlling.SetWorldY(ray.Position.Y + boundsHalfHeight + margin)
 		g.VerticalSpeed = 0
@@ -116,7 +118,7 @@ func (g *Game) Update() error {
 	bounds.CollisionTest(tetra3d.CollisionTestSettings{
 
 		OnCollision: func(col *tetra3d.Collision, index, count int) bool {
-			g.Controlling.MoveVec(col.AverageMTV())
+			g.Controlling.MoveVec(col.MaxMTV())
 			return true
 		},
 

@@ -12,27 +12,7 @@ type Intersection struct {
 	ContactPoint  Vector3   // The contact point for the intersection on the second, collided object in world space (i.e. the point of collision on the triangle in a Sphere>Triangles test).
 	MTV           Vector3   // MTV represents the minimum translation vector to remove the calling object from the intersecting object.
 	Triangle      *Triangle // Triangle represents the triangle that was intersected in intersection tests that involve triangle meshes; if no triangle mesh was tested against, then this will be nil.
-	Normal        Vector3
-}
-
-// Slope returns the slope of the intersection's normal, in radians. This ranges from 0 (straight up) to pi (straight down).
-func (intersection *Intersection) Slope() float32 {
-	return WorldUp.Angle(intersection.Normal)
-}
-
-// SlideAgainstNormal takes an input vector and alters it to slide against the intersection's returned normal.
-func (intersection *Intersection) SlideAgainstNormal(movementVec Vector3) Vector3 {
-
-	temp := intersection.Normal.Cross(movementVec)
-
-	if temp.Magnitude() == 0 {
-		return Vector3{}
-	}
-
-	out := temp.Cross(intersection.Normal)
-
-	return out
-
+	Normal        Vector3   // The colliding normal of the intersection
 }
 
 func (intersection *Intersection) Distance() float32 {
@@ -49,8 +29,12 @@ func (intersection *Intersection) DistanceSquared() float32 {
 // colliding sphere / aabb, the closest point in the capsule, the center of the closest triangle, etc) to the
 // contact point.
 type Collision struct {
-	Object        IBoundingObject // The BoundingObject collided with
-	Intersections []*Intersection // The slice of Intersections, one for each object or triangle intersected with, arranged in order of distance (far to close).
+	Object IBoundingObject // The BoundingObject collided with
+	// The slice of Intersections, one for each object or triangle intersected with.
+	// The slice is sorted in order by overall magnitude of minimum translation vector (e.g. how far
+	// into the intersection the object is), and if those values are similar, then by perpendicularity to
+	// the colliding object
+	Intersections []*Intersection
 }
 
 func newCollision(collidedObject IBoundingObject) *Collision {
@@ -68,9 +52,20 @@ func (col *Collision) add(intersection *Intersection) *Collision {
 // sort the intersections by distance from starting point (which should be the same for all collisions except for triangle-triangle) to contact point.
 func (col *Collision) sortResults() {
 	sort.Slice(col.Intersections, func(i, j int) bool {
-		return col.Intersections[i].MTV.MagnitudeSquared() > col.Intersections[j].MTV.MagnitudeSquared()
-		// return col.Intersections[i].StartingPoint.DistanceSquaredTo(col.Intersections[i].ContactPoint) >
-		// 	col.Intersections[j].StartingPoint.DistanceSquaredTo(col.Intersections[j].ContactPoint)
+
+		// Sort by MTV values if there's a significant difference
+		mi := col.Intersections[i].MTV.MagnitudeSquared()
+		mj := col.Intersections[j].MTV.MagnitudeSquared()
+
+		if math32.Abs(mi-mj) < 0.000001 {
+			// Otherwise sort by perpendicularity (e.g. which intersection is more directly "facing" the colliding object)
+			mvi := col.Intersections[i].ContactPoint.Sub(col.Intersections[i].StartingPoint).Unit()
+			mvj := col.Intersections[j].ContactPoint.Sub(col.Intersections[j].StartingPoint).Unit()
+			return col.Intersections[i].Normal.Dot(mvi) < col.Intersections[j].Normal.Dot(mvj)
+		}
+
+		return mi > mj
+
 	})
 }
 
@@ -92,6 +87,26 @@ func (col *Collision) AverageMTV() Vector3 {
 		mtv = mtv.Add(inter.MTV)
 	}
 	mtv = mtv.Unit().Scale(greatestDist)
+	return mtv
+}
+
+// Returns the maximum MTV to be moved on all axes to escape intersection with all intersection points.
+func (col *Collision) MaxMTV() Vector3 {
+	mtv := Vector3{}
+	for _, inter := range col.Intersections {
+		if inter.MTV.IsInf() || inter.MTV.IsNaN() {
+			continue
+		}
+		if math32.Abs(inter.MTV.X) > math32.Abs(mtv.X) {
+			mtv.X = inter.MTV.X
+		}
+		if math32.Abs(inter.MTV.Y) > math32.Abs(mtv.Y) {
+			mtv.Y = inter.MTV.Y
+		}
+		if math32.Abs(inter.MTV.Z) > math32.Abs(mtv.Z) {
+			mtv.Z = inter.MTV.Z
+		}
+	}
 	return mtv
 }
 
@@ -121,15 +136,15 @@ func (col *Collision) SlideAgainstAverageNormal(movementVec Vector3) Vector3 {
 	return out
 }
 
-// AverageSlope returns the average slope of the Collision (ranging from 0, pointing straight up, to pi pointing straight down).
+// AverageSlope returns the average slope of the Collision (ranging from -1 to 1, with 0 pointing straight up).
 // This average is spread across all intersections contained within the Collision.
 func (result *Collision) AverageSlope() float32 {
-	slope := result.Intersections[0].Slope()
+	slope := result.Intersections[0].Normal.Slope()
 	slopeCount := float32(1.0)
 	for i := 1; i < len(result.Intersections); i++ {
 		inter := result.Intersections[i]
 		if inter.MTV.Magnitude() > 0 {
-			slope += inter.Slope()
+			slope += inter.Normal.Slope()
 			slopeCount++
 		}
 	}
@@ -165,6 +180,7 @@ func (result *Collision) ForEachCollidedMaterial(forEach func(mat *Material) boo
 	})
 }
 
+// Returns if the object in the collision has a parent with a material with the given name.
 func (result *Collision) CollidedWithMaterialByName(matName string) bool {
 	for _, inter := range result.Intersections {
 		if inter.Triangle != nil && inter.Triangle.MeshPart.Material != nil && inter.Triangle.MeshPart.Material.name == matName {
@@ -183,6 +199,7 @@ func (result *Collision) CollidedWithMaterialByName(matName string) bool {
 	return false
 }
 
+// Returns if the object in the collision has a parent with a material with a property with the given name.
 func (result *Collision) CollidedWithMaterialPropName(matHasPropNamed string) bool {
 	for _, inter := range result.Intersections {
 		if inter.Triangle != nil && inter.Triangle.MeshPart.Material != nil {
@@ -205,9 +222,30 @@ func (result *Collision) CollidedWithMaterialPropName(matHasPropNamed string) bo
 	return false
 }
 
+// Returns if the object in the collision has a parent with a property of the given name.
 func (result *Collision) CollidedWithParentPropName(parentHasPropNamed string) bool {
 	if result.Object.Parent() != nil {
 		return result.Object.Parent().Properties().Has(parentHasPropNamed)
+	}
+	return false
+}
+
+// Returns if the object in the collision has a parent with a property of the given name with the given value.
+func (result *Collision) CollidedWithParentPropPair(parentHasPropNamed string, value any) bool {
+	if result.Object.Parent() != nil {
+		prop := result.Object.Parent().Properties().GetByName(parentHasPropNamed)
+		if prop != nil {
+			return prop.Value == value
+		}
+		return false
+	}
+	return false
+}
+
+// Returns if the object in the collision has a parent with a bitfield value property with a bit of the given name flipped.
+func (result *Collision) CollidedWithParentBitfieldValueName(bitValueName string) bool {
+	if result.Object.Parent() != nil {
+		return result.Object.Parent().PropertiesContainsBitByName(bitValueName)
 	}
 	return false
 }
@@ -218,7 +256,7 @@ type CollisionTestSettings struct {
 	// TODO: Add backface culling for collision tests
 
 	// TestAgainst controls what objects to test against.
-	TestAgainst *NodeCollectionSet
+	TestAgainst NodeIterator
 
 	// OnCollision is a callback function that is called when a valid collision test happens between the
 	// calling object and one of the valid INodes contained within the Others slice. The callback should return a boolean
@@ -763,15 +801,15 @@ func btCapsuleCapsule(capsuleA, capsuleB *BoundingCapsule) *Collision {
 
 	// By getting the closest point to the world position (center), and then getting it again, we get closer to the
 	// true closest point for both capsules, which is good enough for now lol
-	caClosest := capsuleA.ClosestPoint(capsuleB.WorldPosition())
-	cbClosest := capsuleB.ClosestPoint(capsuleA.WorldPosition())
+	caClosest := capsuleA.NearestPointOnLine(capsuleB.WorldPosition())
+	cbClosest := capsuleB.NearestPointOnLine(capsuleA.WorldPosition())
 
-	capsuleA.internalSphere.SetLocalPositionVec(capsuleA.ClosestPoint(cbClosest))
-	capsuleA.internalSphere.Radius = capsuleA.Radius
+	capsuleA.internalSphere.SetLocalPositionVec(capsuleA.NearestPointOnLine(cbClosest))
+	capsuleA.internalSphere.radius = capsuleA.radius
 
 	capsuleB.internalSphere.SetLocalScaleVec(capsuleB.LocalScale())
-	capsuleB.internalSphere.SetLocalPositionVec(capsuleB.ClosestPoint(caClosest))
-	capsuleB.internalSphere.Radius = capsuleB.Radius
+	capsuleB.internalSphere.SetLocalPositionVec(capsuleB.NearestPointOnLine(caClosest))
+	capsuleB.internalSphere.radius = capsuleB.radius
 
 	col := btSphereSphere(capsuleA.internalSphere, capsuleB.internalSphere)
 	if col != nil {
@@ -782,8 +820,8 @@ func btCapsuleCapsule(capsuleA, capsuleB *BoundingCapsule) *Collision {
 
 func btSphereCapsule(sphere *BoundingSphere, capsule *BoundingCapsule) *Collision {
 	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
-	capsule.internalSphere.SetLocalPositionVec(capsule.ClosestPoint(sphere.WorldPosition()))
-	capsule.internalSphere.Radius = capsule.Radius
+	capsule.internalSphere.SetLocalPositionVec(capsule.NearestPointOnLine(sphere.WorldPosition()))
+	capsule.internalSphere.radius = capsule.radius
 	col := btSphereSphere(sphere, capsule.internalSphere)
 	if col != nil {
 		col.Object = capsule
@@ -793,16 +831,16 @@ func btSphereCapsule(sphere *BoundingSphere, capsule *BoundingCapsule) *Collisio
 
 func btCapsuleAABB(capsule *BoundingCapsule, aabb *BoundingAABB) *Collision {
 	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
-	capsule.internalSphere.SetLocalPositionVec(capsule.ClosestPoint(aabb.WorldPosition()))
-	capsule.internalSphere.Radius = capsule.Radius
+	capsule.internalSphere.SetLocalPositionVec(capsule.NearestPointOnLine(aabb.WorldPosition()))
+	capsule.internalSphere.radius = capsule.radius
 	return btSphereAABB(capsule.internalSphere, aabb)
 }
 
 func btCapsuleTriangles(capsule *BoundingCapsule, triangles *BoundingTriangles) *Collision {
 
 	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
-	capsule.internalSphere.SetLocalPositionVec(capsule.ClosestPoint(triangles.BoundingAABB.WorldPosition()))
-	capsule.internalSphere.Radius = capsule.Radius
+	capsule.internalSphere.SetLocalPositionVec(capsule.NearestPointOnLine(triangles.BoundingAABB.WorldPosition()))
+	capsule.internalSphere.radius = capsule.radius
 
 	// If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
 	if !capsule.internalSphere.Colliding(triangles.BoundingAABB) {
@@ -926,9 +964,11 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) *Collision 
 
 	internalCollisionList = internalCollisionList[:0]
 
-	settings.TestAgainst.ForEachBoundingObject(func(bounds IBoundingObject) bool {
+	settings.TestAgainst.ForEach(func(n INode, index int) bool {
 
-		if node == bounds || (settings.OnCollision == nil && len(internalCollisionList) > 0) {
+		bounds, _ := n.(IBoundingObject)
+
+		if bounds == nil || node == bounds || (settings.OnCollision == nil && len(internalCollisionList) > 0) {
 			return true
 		}
 
@@ -944,8 +984,8 @@ func commonCollisionTest(node INode, settings CollisionTestSettings) *Collision 
 	// Sort the collisions by distance to the intersection start point (so closer collisions come up sooner).
 	if len(internalCollisionList) > 0 {
 		sort.Slice(internalCollisionList, func(i, j int) bool {
-			return internalCollisionList[i].AverageContactPoint().DistanceSquaredTo(internalCollisionList[i].Intersections[0].StartingPoint) >
-				internalCollisionList[j].AverageContactPoint().DistanceSquaredTo(internalCollisionList[j].Intersections[0].StartingPoint)
+			return internalCollisionList[i].Intersections[0].ContactPoint.DistanceSquaredTo(internalCollisionList[i].Intersections[0].StartingPoint) >
+				internalCollisionList[j].Intersections[0].ContactPoint.DistanceSquaredTo(internalCollisionList[j].Intersections[0].StartingPoint)
 		})
 		result = internalCollisionList[0]
 	}
@@ -1032,7 +1072,7 @@ var sphereTestObject = NewBoundingSphere("sphere check", 1)
 // The function will return the first collision found with the sphere at the settings specified.
 func CollisionTestSphere(x, y, z, radius float32, settings CollisionTestSettings) *Collision {
 	sphereTestObject.SetLocalPosition(x, y, z)
-	sphereTestObject.Radius = radius
+	sphereTestObject.radius = radius
 	return commonCollisionTest(sphereTestObject, settings)
 }
 
@@ -1065,16 +1105,17 @@ func CollisionTestAABBVec(position, size Vector3, settings CollisionTestSettings
 	return CollisionTestAABB(position.X, position.Y, position.Z, size.X, size.Y, size.Z, settings)
 }
 
-var capsuleTestObject = NewBoundingCapsule("capsule check", 2, 1)
+var capsuleTestObject = NewBoundingCapsule("capsule check", 1, 2, 1)
 
 // CollisionTestCapsule performs a quick bounding capsule check at the specified position
 // and size using the collision settings provided.
 // Collisions reported will be sorted in distance from closest to furthest.
 // The function will return the first collision found with the capsule at the settings specified.
-func CollisionTestCapsule(x, y, z, radius, height float32, settings CollisionTestSettings) *Collision {
+func CollisionTestCapsule(x, y, z, radius, height float32, up BoundingCapsuleUpAxis, settings CollisionTestSettings) *Collision {
 	capsuleTestObject.SetLocalPosition(x, y, z)
-	capsuleTestObject.Radius = radius
-	capsuleTestObject.Height = height
+	capsuleTestObject.radius = radius
+	capsuleTestObject.height = height
+	capsuleTestObject.up = up
 	return commonCollisionTest(capsuleTestObject, settings)
 }
 
@@ -1082,6 +1123,6 @@ func CollisionTestCapsule(x, y, z, radius, height float32, settings CollisionTes
 // radius and height to perform a collision test.
 // Collisions reported will be sorted in distance from closest to furthest.
 // The function will return the first collision found with the capsule at the settings specified.
-func CollisionTestCapsuleVec(position Vector3, radius, height float32, settings CollisionTestSettings) *Collision {
-	return CollisionTestCapsule(position.X, position.Y, position.Z, radius, height, settings)
+func CollisionTestCapsuleVec(position Vector3, radius, height float32, up BoundingCapsuleUpAxis, settings CollisionTestSettings) *Collision {
+	return CollisionTestCapsule(position.X, position.Y, position.Z, radius, height, up, settings)
 }

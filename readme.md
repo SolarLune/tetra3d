@@ -323,7 +323,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Linear keyframe interpolation
 - [x] -- Constant keyframe interpolation
 - [ ] -- Bezier keyframe interpolation
-- [ ] -- Morph (mesh-based / shape key) animations (See: https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_017_SimpleMorphTarget.md)
+- [x] -- Morph (mesh-based / shape key) animations (See: https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_017_SimpleMorphTarget.md)
 - [ ] -- Mesh swapping during animations, primarily for 2D skeletal animation? (Can be worked around using bones.)
 - [x] **Scenes**
 - [x] -- Fog
@@ -342,14 +342,16 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Support for multiple scenes in a single Blend file (was broken due to GLTF exporter changes; working again in Blender 3.3)
 - [x] **Blender Add-on**
 - [x] -- Export 3D view camera to Scenes for quick iteration
-- [ ] -- Object-level color option
-- [ ] -- Object-level shadeless checkbox
-- [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices (SolarLune 3/3/24: Doesn't seem to be possible outside of vertex colors)
+- [x] -- Object-level color option
+- [x] -- Object-level shadeless checkbox
+- [ ] -- Custom mesh attribute to assign values to vertices, allowing you to, say, "mark" vertices
 - [x] -- Exporting animations and auto-subdivided mesh data doesn't work properly when the scene is not focused in Blender
 - [x] -- Sharing materials and textures doesn't work properly (3/23/26 SolarLune: Not sure what I meant by this?)
 - [x] -- Export GLTF on save / on command via button
 - [x] -- Bounds node creation
 - [x] -- Game property export (less clunky version of Blender's vanilla custom properties)
+- [x] -- Named bitfield property support
+- [ ] -- -- Global bit names rather than per-scene?
 - [x] -- Collection / group substitution
 - [x] -- -- Overwriting properties through collection instance objects (it would be nice to do this cleanly with a nice UI, but just hamfisting it is fine for now)
 - [x] -- -- Collection instances instantiate their objects in the same location in the tree
@@ -362,7 +364,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [ ] -- -- Adding costs to pathfinding (should be as simple as adding a cost and currentcost to each GridPoint, then sorting the points to check by cost when pathfinding, then reduce all costs greater than 1 by 1 ) (7/5/23, SolarLune: This works currently, but the pathfinding is still a bit wonky, so it should be looked at again)
 - [x] -- Toggleable option for drawing game property status to screen for each object using the gpu and blf modules
 - [ ] -- Game properties should be an ordered slice, rather than a map of property name to property values. (5/22/23, SolarLune: should it be?)
-- [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to not mess with it; maybe the material settings should even be wholly disabled for this purpose? It would be great if the models looked the way you'd expect)
+- [ ] -- Consistency between Tetra3D material settings and Blender viewport (so modifying the options in the Tetra3D material panel alters the relevant options in a default material to visualize it better; maybe the material settings should even be wholly disabled for this purpose? It would be great if the models looked the way you'd expect)
 - [ ] -- Components (This would also require meta-programming; it'd be nice if components could have elements that were adjustable in Blender. Maybe a "game object" can have a dynamically-written "Components" struct, with space for one of each kind of component, for simplicity (i.e. one physics controller, one gameplay controller, one animation component, etc). There doesn't need to be ways to add or remove components from an object, and components can have any of OnInit, OnAdd, OnRemove, or Update functions to be considered components).
 - [ ] -- Navigation Mesh for pathfinding
 - [x] **DAE model loading**
@@ -400,9 +402,8 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Normal reporting
 - [x] -- Slope reporting
 - [x] -- Contact point reporting
-- [x] -- Varying collision shapes
 - [x] -- Checking multiple collisions at the same time
-- [x] -- Composing collision shapes out of multiple sub-shapes (this can be done by simply creating them, parenting them to some node, and then testing against that node)
+- [ ] -- Continuous collision detection for fast-moving objects (capsule is already kind of this for spheres)
 - [x] -- Bounding / Broadphase collision checking
     - [ ] -- Review broadphase collision detection, because it seems slower than culling triangles based off of basic math and axis testing (e.g. `if rayStart.X > v0/v1/v2.X && rayEnd.X > v0/v1/v2.X { continue }`)
 
@@ -465,7 +466,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
 - [x] -- Replace \*Color with just the plain Color struct (this would be a breaking change)
 - [ ] -- Replace color usage with HTML or W3C colors? : https://www.computerhope.com/htmcolor.htm#gray / https://www.computerhope.com/jargon/w/w3c-color-names.htm
 - [ ] -- Update to use Generics where possible; we're already on Go 1.18.
-- [ ] -- Move utility objects (quaternion, vector, color, text, matrix, treewatcher, etc) to utility package.
+- [ ] -- Move utility objects (quaternion, vector, color, text, matrix, etc) to utility package.
 - [ ] -- Optimize getting an object by path; maybe this could be done with some kind of string serialization, rather than text parsing?
 - [ ] -- Replace panics / log.prints with error returns (e.g. gltf.go)
 

@@ -5,14 +5,14 @@ import "github.com/solarlune/tetra3d/math32"
 // BoundingSphere represents a 3D sphere.
 type BoundingSphere struct {
 	*Node
-	Radius float32
+	radius float32
 }
 
 // NewBoundingSphere returns a new BoundingSphere instance.
 func NewBoundingSphere(name string, radius float32) *BoundingSphere {
 	sphere := &BoundingSphere{
 		Node:   NewNode(name),
-		Radius: radius,
+		radius: radius,
 	}
 	sphere.owner = sphere
 	return sphere
@@ -20,7 +20,7 @@ func NewBoundingSphere(name string, radius float32) *BoundingSphere {
 
 // Clone returns a new BoundingSphere instance.
 func (sphere *BoundingSphere) Clone() INode {
-	clone := NewBoundingSphere(sphere.name, sphere.Radius)
+	clone := NewBoundingSphere(sphere.name, sphere.radius)
 	clone.Node = sphere.Node.clone(clone).(*Node)
 	if runCallbacks && clone.Callbacks().OnClone != nil {
 		clone.Callbacks().OnClone(clone)
@@ -28,9 +28,10 @@ func (sphere *BoundingSphere) Clone() INode {
 	return clone
 }
 
+// Returns a Dimensions set that fully contains the BoundingSphere object.
 func (sphere *BoundingSphere) Dimensions() Dimensions {
 	pos := sphere.WorldPosition()
-	r := sphere.Radius / 2
+	r := sphere.radius / 2
 	return Dimensions{
 		Min: NewVector3(
 			pos.X-r,
@@ -46,7 +47,7 @@ func (sphere *BoundingSphere) Dimensions() Dimensions {
 	}
 }
 
-// WorldRadius returns the radius of the BoundingSphere in world units, after taking into account its scale.
+// Returns the radius of the BoundingSphere in world units, after taking into account its scale.
 func (sphere *BoundingSphere) WorldRadius() float32 {
 	var scale Vector3
 	maxScale := float32(1.0)
@@ -55,7 +56,17 @@ func (sphere *BoundingSphere) WorldRadius() float32 {
 
 	maxScale = math32.Max(math32.Max(math32.Abs(scale.X), math32.Abs(scale.Y)), math32.Abs(scale.Z))
 
-	return sphere.Radius * maxScale
+	return sphere.radius * maxScale
+}
+
+// Returns the local radius of the BoundingSphere object.
+func (sphere *BoundingSphere) LocalRadius() float32 {
+	return sphere.radius
+}
+
+// Sets the local radius of the BoundingSphere object.
+func (sphere *BoundingSphere) SetRadius(radius float32) {
+	sphere.radius = radius
 }
 
 // Colliding returns true if the BoundingSphere is intersecting the other BoundingObject.

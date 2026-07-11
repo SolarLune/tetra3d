@@ -92,7 +92,7 @@ func (quat Quaternion) Magnitude() float32 {
 	)
 }
 
-func (quat Quaternion) Normalized() Quaternion {
+func (quat Quaternion) Unit() Quaternion {
 	m := quat.Magnitude()
 	quat.X /= m
 	quat.Y /= m
@@ -101,8 +101,24 @@ func (quat Quaternion) Normalized() Quaternion {
 	return quat
 }
 
+func (quat Quaternion) Conjugate() Quaternion {
+	quat.X = -quat.X
+	quat.Y = -quat.Y
+	quat.Z = -quat.Z
+	return quat
+}
+
 func (quat Quaternion) Inverted() Quaternion {
-	return NewQuaternion(-quat.X, -quat.Y, -quat.Z, -quat.W)
+	n := quat.Magnitude()
+	return quat.Conjugate().Scale(1 / (n * n))
+}
+
+func (quat Quaternion) Scale(factor float32) Quaternion {
+	quat.X *= factor
+	quat.Y *= factor
+	quat.Z *= factor
+	quat.W *= factor
+	return quat
 }
 
 func (q1 Quaternion) Mult(q2 Quaternion) Quaternion {
@@ -210,7 +226,7 @@ func (quat Quaternion) RotateVec(v Vector3) Vector3 {
 func (quat Quaternion) ToAxisAngle() (Vector3, float32) {
 
 	if quat.W > 1 {
-		quat = quat.Normalized()
+		quat = quat.Unit()
 	}
 
 	angle := 2 * math32.Acos(quat.W)

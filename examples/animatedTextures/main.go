@@ -84,7 +84,7 @@ func (g *Game) Update() error {
 	g.AnimatedTexture.Update(1.0 / 60.0)
 
 	if inpututil.IsKeyJustPressed(ebiten.Key1) {
-		g.AnimatedTexture.Playing = !g.AnimatedTexture.Playing
+		g.AnimatedTexture.SetPlaying(!g.AnimatedTexture.IsPlaying())
 	}
 
 	g.Camera.Update()

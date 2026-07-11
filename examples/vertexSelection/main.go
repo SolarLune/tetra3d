@@ -96,7 +96,7 @@ func (g *Game) Update() error {
 	// There are other functions to, for example, move or set the normal of the vertices, but if we wanted to do something else a
 	// bit more special, we could do so manually by looping through the indices in the *VertexSelection instance and modifying the
 	// mesh's vertex properties.
-	g.FlashingVertices.SetColor(g.Cube.Mesh().VertexColorChannelNames["Color"], glow)
+	g.FlashingVertices.SetColor(g.Cube.Mesh().VertexColorChannelByName("Color"), glow)
 
 	g.Camera.Update()
 

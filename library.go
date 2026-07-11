@@ -43,7 +43,7 @@ func (lib *Library) SceneByID(id uint32) *Scene {
 
 func (lib *Library) AnimationByName(name string) *Animation {
 	for _, anim := range lib.Animations {
-		if anim.Name == name {
+		if anim.name == name {
 			return anim
 		}
 	}
@@ -88,7 +88,7 @@ func (lib *Library) AddScene(sceneName string) *Scene {
 func (lib *Library) NodeByID(id uint32) INode {
 	var idNode INode
 	for _, scene := range lib.Scenes {
-		scene.Root.ForEachChild(true, func(child INode, index, size int) bool {
+		scene.Root.ForEachChild(true, func(child INode, index int) bool {
 			if child.ID() == id {
 				idNode = child
 				return false
@@ -107,7 +107,7 @@ func (lib *Library) NodeByID(id uint32) INode {
 func (lib *Library) NodeByName(objectName string) INode {
 	var object INode
 	for _, scene := range lib.Scenes {
-		scene.Root.ForEachChild(true, func(child INode, index, size int) bool {
+		scene.Root.ForEachChild(true, func(child INode, index int) bool {
 			if child.Name() == objectName {
 				object = child
 				return false

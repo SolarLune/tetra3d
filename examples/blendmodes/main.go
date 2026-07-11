@@ -94,7 +94,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.System.DrawDebugText {
 		tetra3d.DrawDebugText(screen,
-			`This demo shows how composite modes work.
+			`This demo shows how blend modes work.
 The blue plane is opaque.
 The red one is additive.
 The green one is transparent.

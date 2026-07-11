@@ -31,7 +31,7 @@ func NewPlayer(model *tetra3d.Model) *Player {
 
 func (p *Player) Update() {
 
-	cam := p.Model.Scene().Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeCamera)).First().(*tetra3d.Camera)
+	cam := p.Model.Scene().Root.Search().ByType(tetra3d.NodeTypeCamera).GetFirst().(*tetra3d.Camera)
 	// cam := p.Model.Scene().Get("Camera").(*tetra3d.Camera)
 
 	camRight := cam.Transform().Right()
@@ -76,12 +76,12 @@ func (p *Player) Update() {
 	p.Model.MoveVec(mv.Unit().Scale(movespd))
 
 	sceneTree := p.Bounds.Scene().Root.Children(true)
-	solids := p.Bounds.Scene().Root.Search(tetra3d.SearchOptions{}.ByPropNamesParent("solid"))
+	solids := p.Bounds.Scene().Root.Search().ByParentPropNames("solid")
 
 	p.Bounds.CollisionTest(tetra3d.CollisionTestSettings{
 		TestAgainst: sceneTree,
 		OnCollision: func(col *tetra3d.Collision, index, count int) bool {
-			mtv := col.AverageMTV()
+			mtv := col.MaxMTV()
 			mtv.Y = 0
 			p.Model.MoveVec(mtv)
 			return true
@@ -207,9 +207,9 @@ func (g *Game) Init() {
 
 	g.Scene = library.SceneByName("Scene")
 
-	g.Player = NewPlayer(g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("player")).First().(*tetra3d.Model))
+	g.Player = NewPlayer(g.Scene.Root.Search().ByPropNames("player").GetFirst().(*tetra3d.Model))
 
-	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("guy")).ForEach(func(node tetra3d.INode) bool {
+	g.Scene.Root.Search().ByPropNames("guy").ForEach(func(node tetra3d.INode, index int) bool {
 		g.Guys = append(g.Guys, NewGuy(node.(*tetra3d.Model)))
 		return true
 	})
@@ -217,14 +217,6 @@ func (g *Game) Init() {
 	g.Camera = examples.NewBasicTargetedCam(g.Player.Model)
 
 	t := time.Now()
-
-	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("solid")).ForEachModel(func(model *tetra3d.Model) bool {
-		model.Mesh().ForEachMaterial(func(mat *tetra3d.Material) bool {
-			mat.LightVolumeShadingMode = tetra3d.LightVolumeShadingModePerVertexWithNormal
-			return true
-		})
-		return true
-	})
 
 	// So we get the LightVolume, which is a blank slate at this point.
 	// Now to populate it with light data!
@@ -234,7 +226,7 @@ func (g *Game) Init() {
 	// and then we shade that cell - anything that passes through the cell is lightened, darkened, or otherwise colored
 	// depending on the color we put in the cell.
 
-	solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNamesParent("solid"))
+	solids := g.Scene.Root.Search().ByParentPropNames("solid")
 
 	lightvolume.LightVolumeResize(lightvolume.Dimensions(), 2, 2, 2)
 

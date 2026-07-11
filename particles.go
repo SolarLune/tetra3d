@@ -373,6 +373,8 @@ func (ps *ParticleSystem) Clone() *ParticleSystem {
 // Update should be called once per tick.
 func (ps *ParticleSystem) Update(dt float32) {
 
+	ps.model.frustumCullingSphere.position = ps.model.WorldPosition()
+
 	if len(ps.BaseParticleModels) == 0 {
 		return
 	}
@@ -383,14 +385,14 @@ func (ps *ParticleSystem) Update(dt float32) {
 	// This could be multithreaded if the particles don't interact at all
 	for _, part := range ps.LivingParticles {
 		part.Update(dt)
+
+		// Make this faster; this is slower than necessary
 		furthestDist = math32.Max(furthestDist, ps.model.DistanceSquaredTo(part.Model))
 		largestParticle = math32.Max(largestParticle, part.Model.mesh.Dimensions.MaxSpan()*part.Model.scale.Magnitude())
 	}
 
-	ps.model.frustumCullingSphere.position = ps.model.WorldPosition()
-	ps.model.frustumCullingSphere.Radius = (math32.Sqrt(furthestDist)) + largestParticle
-	ps.model.frustumCullingSphere.scale = ps.model.WorldScale()
-	// ps.root.FrustumCulling = false
+	ps.model.frustumCullingSphere.radius = (math32.Sqrt(furthestDist)) + largestParticle
+
 	// Rotation doesn't matter
 
 	for _, toRemove := range ps.toRemove {
@@ -423,10 +425,6 @@ func (ps *ParticleSystem) Update(dt float32) {
 
 		ps.spawnTimer -= dt
 	}
-
-	// if len(ps.root.DynamicBatchModels) > 0 {
-	// 	ps.root.SetVisible(true, true)
-	// }
 
 }
 
@@ -520,20 +518,25 @@ func (ps *ParticleSystem) Remove(part *Particle) {
 	ps.toRemove = append(ps.toRemove, part)
 }
 
+// Represents a random value in a range of floats.
 type FloatRange struct {
 	Min, Max   float32
 	CustomFunc func(floatRange *FloatRange) float32
 }
 
+// Returns a new FloatRange object.
 func NewFloatRange() FloatRange {
 	return FloatRange{}
 }
 
+// Sets the minimum and maximum values of the range to the specified values.
 func (ran *FloatRange) Set(min, max float32) {
 	ran.Min = min
 	ran.Max = max
 }
 
+// Sets a custom function to use for retrieving a random value within the range.
+// Note that you can use the range object's Value() function to get its default randomized result.
 func (ran *FloatRange) SetCustomFunc(customFunc func(floatRange *FloatRange) float32) {
 	ran.CustomFunc = customFunc
 }
@@ -545,25 +548,31 @@ func (ran FloatRange) value() float32 {
 	return ran.Value()
 }
 
+// Returns a random value in between the range's minimum and maximum values.
 func (ran FloatRange) Value() float32 {
 	random := rand.Float32()
 	return ran.Min + ((ran.Max - ran.Min) * random)
 }
 
+// Represents a random value in a range of ints.
 type IntRange struct {
 	Min, Max   int
 	CustomFunc func(intRange *IntRange) int
 }
 
+// Returns a new IntRange object.
 func NewIntRange() IntRange {
 	return IntRange{}
 }
 
+// Sets the minimum and maximum values of the range to the specified values.
 func (ran *IntRange) Set(min, max int) {
 	ran.Min = min
 	ran.Max = max
 }
 
+// Sets a custom function to use for retrieving a random value within the range.
+// Note that you can use the range object's Value() function to get its default randomized result.
 func (ran *IntRange) SetCustomFunc(customFunc func(nRange *IntRange) int) {
 	ran.CustomFunc = customFunc
 }
@@ -575,6 +584,7 @@ func (ran IntRange) value() int {
 	return ran.Value()
 }
 
+// Returns a random value in between the range's minimum and maximum values.
 func (ran IntRange) Value() int {
 	if ran.Min >= ran.Max {
 		return ran.Min
@@ -588,7 +598,7 @@ type Vector3Range struct {
 	Uniform    bool    // If the random value returned by the NumberRange should be consistent across all axes or not
 	Min        Vector3 // Min is the set of minimum numbers allowed in the NumberRange
 	Max        Vector3 // Max is the set of maximum numbers allowed in the NumberRange
-	CustomFunc func(vectorRange *Vector3Range) Vector3
+	customFunc func(vectorRange *Vector3Range) Vector3
 }
 
 // NewVectorRange returns a new instance of a 3D NumberRange struct.
@@ -633,6 +643,12 @@ func (ran *Vector3Range) SetRanges(min, max float32) {
 
 }
 
+// Sets a custom function to return a Vector3 for use with the range object.
+// Note that you can use the range object's Value() function to get its default randomized result.
+func (ran *Vector3Range) SetCustomFunc(customFunc func(nRange *Vector3Range) Vector3) {
+	ran.customFunc = customFunc
+}
+
 // SetRangeX sets the minimum and maximum values of the X component of the number range.
 func (ran *Vector3Range) SetRangeX(min, max float32) {
 	ran.Min.X = min
@@ -652,8 +668,8 @@ func (ran *Vector3Range) SetRangeZ(min, max float32) {
 }
 
 func (ran *Vector3Range) value() Vector3 {
-	if ran.CustomFunc != nil {
-		return ran.CustomFunc(ran)
+	if ran.customFunc != nil {
+		return ran.customFunc(ran)
 	}
 	return ran.Value()
 }

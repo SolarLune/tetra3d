@@ -19,8 +19,8 @@ type ILight interface {
 	// It gets called once before lighting all visible triangles of a given Model.
 	beginModel(model *Model)
 
-	VertexLight(vertexIndex int, triangle *Triangle, model *Model, targetColors VertexColorChannel)
-	Light(triangle *Triangle, model *Model, targetColors VertexColorChannel) // Light lights the triangles in the MeshPart, storing the result in the targetColors
+	VertexLight(vertexIndex int, triangle *Triangle, model *Model, targetColors *VertexColorChannel)
+	Light(triangle *Triangle, model *Model, targetColors *VertexColorChannel) // Light lights the triangles in the MeshPart, storing the result in the targetColors
 	// color buffer. If onlyVisible is true, only the visible vertices will be lit; if it's false, they will all be lit.
 
 	Color() Color4
@@ -113,14 +113,14 @@ func (amb *AmbientLight) beginRender() {
 
 func (amb *AmbientLight) beginModel(model *Model) {}
 
-func (amb *AmbientLight) VertexLight(vertexIndex int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
-	targetColors[vertexIndex].R += amb.result[0]
-	targetColors[vertexIndex].G += amb.result[1]
-	targetColors[vertexIndex].B += amb.result[2]
+func (amb *AmbientLight) VertexLight(vertexIndex int, tri *Triangle, model *Model, targetColors *VertexColorChannel) {
+	targetColors.colors[vertexIndex].R += amb.result[0]
+	targetColors.colors[vertexIndex].G += amb.result[1]
+	targetColors.colors[vertexIndex].B += amb.result[2]
 }
 
 // Light returns the light level for the ambient light. It doesn't use the provided Triangle; it takes it as an argument to simply adhere to the Light interface.
-func (amb *AmbientLight) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
+func (amb *AmbientLight) Light(tri *Triangle, model *Model, targetColors *VertexColorChannel) {
 	tri.ForEachVertexIndex(func(vertIndex int) {
 		amb.VertexLight(vertIndex, tri, model, targetColors)
 	})
@@ -188,7 +188,7 @@ func (p *PointLight) beginModel(model *Model) {
 
 }
 
-func (p *PointLight) VertexLight(index int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
+func (p *PointLight) VertexLight(index int, tri *Triangle, model *Model, targetColors *VertexColorChannel) {
 	// TODO: Make lighting faster by returning early if the triangle is too far from the point light position
 
 	vertPos := globalMeshAlteredVertexPositions[index]
@@ -249,16 +249,16 @@ func (p *PointLight) VertexLight(index int, tri *Triangle, model *Model, targetC
 			diffuseFactor *= distClamp
 		}
 
-		targetColors[index].R += p.color.R * float32(diffuseFactor) * p.energy
-		targetColors[index].G += p.color.G * float32(diffuseFactor) * p.energy
-		targetColors[index].B += p.color.B * float32(diffuseFactor) * p.energy
+		targetColors.colors[index].R += p.color.R * float32(diffuseFactor) * p.energy
+		targetColors.colors[index].G += p.color.G * float32(diffuseFactor) * p.energy
+		targetColors.colors[index].B += p.color.B * float32(diffuseFactor) * p.energy
 
 	}
 
 }
 
 // Light returns the R, G, and B values for the PointLight for all vertices of a given Triangle.
-func (p *PointLight) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
+func (p *PointLight) Light(tri *Triangle, model *Model, targetColors *VertexColorChannel) {
 
 	// We calculate both the eye vector as well as the light vector so that if the camera passes behind the
 	// lit face and backface culling is off, the triangle can still be lit or unlit from the other side. Otherwise,
@@ -329,18 +329,18 @@ func (sun *DirectionalLight) beginModel(model *Model) {
 	}
 }
 
-func (sun *DirectionalLight) VertexLight(index int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
+func (sun *DirectionalLight) VertexLight(index int, tri *Triangle, model *Model, targetColors *VertexColorChannel) {
 
 	// If it's skinned, we don't have to calculate the normal, as that's been pre-calc'd for us
 	var normal Vector3
-	if model.skinned {
-		normal = globalMeshAlteredVertexNormals[index]
-	} else {
-		normal = sun.workingModelRotation.MultVec(globalMeshAlteredVertexNormals[index])
-	}
-
 	if mat := tri.MeshPart.Material; mat != nil && mat.LightingMode == LightingModeFixedNormals {
 		normal = sun.workingForward
+	} else {
+		if model.skinned {
+			normal = globalMeshAlteredVertexNormals[index]
+		} else {
+			normal = sun.workingModelRotation.MultVec(globalMeshAlteredVertexNormals[index])
+		}
 	}
 
 	diffuseFactor := normal.Dot(sun.workingForward)
@@ -353,14 +353,14 @@ func (sun *DirectionalLight) VertexLight(index int, tri *Triangle, model *Model,
 		return
 	}
 
-	targetColors[index].R += sun.color.R * float32(diffuseFactor) * sun.energy
-	targetColors[index].G += sun.color.G * float32(diffuseFactor) * sun.energy
-	targetColors[index].B += sun.color.B * float32(diffuseFactor) * sun.energy
+	targetColors.colors[index].R += sun.color.R * float32(diffuseFactor) * sun.energy
+	targetColors.colors[index].G += sun.color.G * float32(diffuseFactor) * sun.energy
+	targetColors.colors[index].B += sun.color.B * float32(diffuseFactor) * sun.energy
 
 }
 
 // Light returns the R, G, and B values for the DirectionalLight for each vertex of the provided Triangle.
-func (sun *DirectionalLight) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
+func (sun *DirectionalLight) Light(tri *Triangle, model *Model, targetColors *VertexColorChannel) {
 
 	tri.ForEachVertexIndex(func(index int) {
 		sun.VertexLight(index, tri, model, targetColors)
@@ -425,6 +425,7 @@ func (l *LightVolume) Clone() INode {
 	newLightmap := NewLightVolume(l.Name(), l.dimensions, l.cellSizeX, l.cellSizeY, l.cellSizeZ)
 	newLightmap.LightBase = l.LightBase.clone()
 	newLightmap.dimensions = l.dimensions
+	newLightmap.owner = newLightmap
 
 	newLightmap.lightValues = make([]*LightVolumeCell, 0, len(l.lightValues))
 	for _, c := range l.lightValues {
@@ -579,7 +580,7 @@ func (l *LightVolume) beginModel(model *Model) {
 
 }
 
-func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, targetColors VertexColorChannel) {
+func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, targetColors *VertexColorChannel) {
 
 	objectShadingMode := 0
 
@@ -593,7 +594,7 @@ func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, ta
 		objectShadingMode = tri.MeshPart.Material.LightVolumeShadingMode
 	}
 
-	if tri.MeshPart.Material.LightVolumeShadingMode == LightVolumeShadingModePerObject {
+	if tri.MeshPart.Material != nil && tri.MeshPart.Material.LightVolumeShadingMode == LightVolumeShadingModePerObject {
 
 		x, y, z := l.convertToXYZIndicesVec(model.WorldPosition())
 
@@ -613,7 +614,7 @@ func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, ta
 		if model.skinned {
 
 			if objectShadingMode == LightVolumeShadingModePerVertexWithNormal {
-				vertPosWithNormal = vertPos.Add(globalMeshAlteredVertexNormals[vertIndex]).Add(l.lightBias)
+				vertPosWithNormal = vertPos.Add(globalMeshAlteredVertexNormals[vertIndex].Mult(cellSize)).Add(l.lightBias)
 			} else {
 				vertPos = globalMeshAlteredVertexPositions[vertIndex].Add(l.lightBias)
 			}
@@ -655,15 +656,15 @@ func (l *LightVolume) VertexLight(vertIndex int, tri *Triangle, model *Model, ta
 
 	}
 
-	targetColors[vertIndex].R += l.color.R * cellColor.R * l.energy
-	targetColors[vertIndex].G += l.color.G * cellColor.G * l.energy
-	targetColors[vertIndex].B += l.color.B * cellColor.B * l.energy
+	targetColors.colors[vertIndex].R += l.color.R * cellColor.R * l.energy
+	targetColors.colors[vertIndex].G += l.color.G * cellColor.G * l.energy
+	targetColors.colors[vertIndex].B += l.color.B * cellColor.B * l.energy
 
 }
 
 // Lights the mesh part of the model being rendered, placing the results into the targeted VertexColorChannel, only doing so
 // for the visible parts of the mesh if onlyVisible is set to true.
-func (l *LightVolume) Light(tri *Triangle, model *Model, targetColors VertexColorChannel) {
+func (l *LightVolume) Light(tri *Triangle, model *Model, targetColors *VertexColorChannel) {
 
 	// TODO: If distance from the mesh mesh part is too big, then we can just forget about it?
 

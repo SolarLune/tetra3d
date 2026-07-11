@@ -22,8 +22,8 @@ const (
 	AnimationLoopModeOneshot                           // Stop on animation completion
 )
 
-// ClosestPointOnLine returns the closest point along a line spanning from start to end.
-func ClosestPointOnLine(start, end, point Vector3) Vector3 {
+// NearestPointOnLine returns the closest point along a line spanning from start to end.
+func NearestPointOnLine(start, end, point Vector3) Vector3 {
 
 	ab := end.Sub(start)
 	t := point.Sub(start).Dot(ab) / ab.Dot(ab)
@@ -183,21 +183,21 @@ func (s Set[E]) ForEach(f func(element E) bool) {
 
 }
 
-type OrderedSet[E comparable] []E
+type orderedSet[E comparable] []E
 
 // newOrderedSet creates a new OrderedSet.
-func newOrderedSet[E comparable]() OrderedSet[E] {
-	return OrderedSet[E]{}
+func newOrderedSet[E comparable]() orderedSet[E] {
+	return orderedSet[E]{}
 }
 
-func (s OrderedSet[E]) Clone() OrderedSet[E] {
+func (s orderedSet[E]) Clone() orderedSet[E] {
 	newOrderedSet := newOrderedSet[E]()
 	newOrderedSet.Combine(s)
 	return newOrderedSet
 }
 
 // Add adds the given elements to a OrderedSet.
-func (s *OrderedSet[E]) Add(elements ...E) {
+func (s *orderedSet[E]) Add(elements ...E) {
 	for _, element := range elements {
 		if !s.Contains(element) {
 			(*s) = append((*s), element)
@@ -206,14 +206,14 @@ func (s *OrderedSet[E]) Add(elements ...E) {
 }
 
 // Combine combines the given other elements to the OrderedSet.
-func (s *OrderedSet[E]) Combine(otherOrderedSet OrderedSet[E]) {
+func (s *orderedSet[E]) Combine(otherOrderedSet orderedSet[E]) {
 	for _, element := range otherOrderedSet {
 		s.Add(element)
 	}
 }
 
 // Contains returns if the OrderedSet contains the given element.
-func (s *OrderedSet[E]) Contains(element E) bool {
+func (s *orderedSet[E]) Contains(element E) bool {
 	for _, e := range *s {
 		if e == element {
 			return true
@@ -223,7 +223,7 @@ func (s *OrderedSet[E]) Contains(element E) bool {
 }
 
 // Remove removes the given element from the OrderedSet.
-func (s *OrderedSet[E]) Remove(element E) {
+func (s *orderedSet[E]) Remove(element E) {
 	for i, e := range *s {
 		if e == element {
 			(*s) = append((*s)[:i], (*s)[i+1:]...)
@@ -232,12 +232,12 @@ func (s *OrderedSet[E]) Remove(element E) {
 }
 
 // Clear clears the OrderedSet.
-func (s *OrderedSet[E]) Clear() {
+func (s *orderedSet[E]) Clear() {
 	(*s) = (*s)[:0]
 }
 
 // ForEach runs the provided function for each element in the OrderedSet.
-func (s OrderedSet[E]) ForEach(f func(element E) bool) {
+func (s orderedSet[E]) ForEach(f func(element E) bool) {
 	for _, element := range s {
 		if !f(element) {
 			return

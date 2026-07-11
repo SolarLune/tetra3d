@@ -18,9 +18,10 @@ import (
 var shapes []byte
 
 type Game struct {
-	Scene  *tetra3d.Scene
-	System examples.BasicSystemHandler
-	Camera *tetra3d.Camera
+	Scene            *tetra3d.Scene
+	System           examples.BasicSystemHandler
+	Camera           *tetra3d.Camera
+	TargetedCamIndex int
 }
 
 func NewGame() *Game {
@@ -50,34 +51,21 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	cameras := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeCamera)).ToCameras()
-
-	n := 0
+	cameras := g.Scene.Root.Search().ByType(tetra3d.NodeTypeCamera)
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
-		n = 1
+		g.TargetedCamIndex++
 	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
-		n = -1
+		g.TargetedCamIndex--
 	}
 
-	if n != 0 {
-
-		for i, c := range cameras {
-			if c == g.Camera {
-				n += i
-				break
-			}
-		}
-
-		if n >= len(cameras) {
-			n = 0
-		} else if n < 0 {
-			n = len(cameras) - 1
-		}
-
-		g.Camera = cameras[n]
-
+	if g.TargetedCamIndex >= cameras.GetCount() {
+		g.TargetedCamIndex = 0
+	} else if g.TargetedCamIndex < 0 {
+		g.TargetedCamIndex = cameras.GetCount() - 1
 	}
+
+	g.Camera = cameras.Get(g.TargetedCamIndex).(*tetra3d.Camera)
 
 	return g.System.Update()
 }

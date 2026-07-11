@@ -107,7 +107,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// Draw the sprite after the rest of the scene.
 	g.Camera.RenderSprite3D(
 		g.Camera.ColorTexture(),
-		tetra3d.DrawSprite3dSettings{
+		tetra3d.RenderSprite3DSettings{
 			Image:         g.HeartSprite,
 			WorldPosition: g.Scene.Root.Get("Heart").WorldPosition(),
 		},

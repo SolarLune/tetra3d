@@ -20,6 +20,11 @@ func ToDegrees(radians float32) float32 {
 	return radians / math.Pi * 180
 }
 
+// Linearly interpolates between from and to given a certain percentage.
+func Lerp(from, to, percentage float32) float32 {
+	return (to - from) * percentage
+}
+
 // Min returns the minimum value out of two provided values.
 func Min(x, y float32) float32 {
 	return float32(math.Min(float64(x), float64(y)))

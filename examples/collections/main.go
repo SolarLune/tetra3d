@@ -32,8 +32,8 @@ func loadAsset(assetName string) *tetra3d.Library {
 	// call the given dependent library resolver function to attempt to retrieve that data as well.
 	// Here, we simply call loadAsset() again, substituting `.blend` in the filename with `.glb`.
 	//
-	// In practice, this should store the result somewhere and then return that
-	// if possible if dependent libraries are used more than once.
+	// In real world usage, this should store the result somewhere (like a global assets map) and
+	// then return that if possible if dependent libraries are used more than once.
 	loadOptions.DependentLibraryResolver = func(blendPath string) *tetra3d.Library {
 		path := "assets/" + strings.Split(blendPath, ".blend")[0] + ".glb"
 		return loadAsset(path)

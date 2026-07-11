@@ -80,6 +80,35 @@ def listSectorTypes(self, context):
         return sectorTypes
     return sectorTypes[::2]
 
+bitfieldNamesUpdate = False
+bitfieldEnumValues = {}
+
+def getBitfieldButtons(self, context):
+
+    global bitfieldNamesUpdate
+    global bitfieldEnumValues
+
+    exists = context.scene.name in bitfieldEnumValues
+
+    if bitfieldNamesUpdate or not exists:
+        for scene in bpy.data.scenes:
+            enums = []
+
+            for i in range(31):
+                stri = str(i)
+
+                name = "Bit " + stri
+                if len(scene.t3dBitfieldNames__) > i:
+                    name = scene.t3dBitfieldNames__[i].name
+
+                enums.append(("BITfield" + stri, name, "Bitfield bit #" + stri, 0, 2**i))
+
+            bitfieldEnumValues[scene.name] = enums
+
+        bitfieldNamesUpdate = False
+
+    return bitfieldEnumValues[context.scene.name]
+
 
 boundsTypes = [
     ("NONE", "No Bounds", "No collision will be created for this object", 0, 0),
@@ -411,17 +440,21 @@ gamePropTypes = [
     ("int", "Int", "Int data type", 0, 1),
     ("float", "Float", "Float data type", 0, 2),
     ("string", "String", "String data type", 0, 3),
-    (
-        "reference",
-        "Object",
-        "Object reference data type; converted to a string composed as follows on export - [SCENE NAME]:[OBJECT NAME]",
-        0,
-        4,
-    ),
-    ("action", "Action", "Action data type", 0, 10),
+    ("bitfield", "Bitfield", "A combination of bits; fast for specifying boolean values for filtering objects", 0, 12),
     ("color", "Color", "Color data type", 0, 5),
     ("vector2d", "2D Vector", "2D vector data type", 0, 9),
     ("vector3d", "3D Vector", "3D vector data type", 0, 6),
+    None,
+    (
+        "object reference",
+        "Object",
+        "Object reference data type; converted to a string composed as follows on export - {Scene name}:{Object name}",
+        0,
+        4,
+    ),
+    ("scene reference", "Scene", "Scene reference data type; converted to a string on export", 0, 11),
+    ("action reference", "Action", "Action refernece data type; converted to a string on export", 0, 10),
+    None,
     ("file", "Filepath", "Filepath as a string", 0, 7),
     ("directory", "Directory Path", "Directory Path as a string", 0, 8),
 ]
@@ -462,6 +495,11 @@ t3dDrawObjectPropertiesModes = [
     ),
 ]
 
+capsuleAlignments = [
+    ("X", "X", "X (Left / Right) dictates height for the capsule", 0, 0),
+    ("Y", "Y", "Y (Up / Down) dictates height for the capsule", 0, 1),
+    ("Z", "Z", "Z (Forward / Back) dictates height for the capsule", 0, 2),
+]
 
 def filepathSet(self, value):
 
@@ -503,7 +541,6 @@ def updateValueReferenceScene(self, context):
         self.valueReference = None
     if not self.valueReferenceScene:
         self.valueReference = None
-
 
 class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name", default="New Property")
@@ -564,6 +601,12 @@ class t3dGamePropertyItem__(bpy.types.PropertyGroup):
     )
     valueDirpath: bpy.props.StringProperty(
         name="", description="The directory path of the property", subtype="DIR_PATH"
+    )
+    valueBitfield: bpy.props.EnumProperty(
+        name="Bitfield",
+        items=getBitfieldButtons,
+        description="The bitfield value of the property",
+        options={"ENUM_FLAG"},
     )
     # valueFilepathAbsolute
     # valueVector4D: bpy.props.FloatVectorProperty(name = "", description="The 4D vector value of the property")
@@ -806,9 +849,11 @@ def valueFromProp(prop):
         value = prop.valueFloat
     elif prop.valueType == "string":
         value = prop.valueString
-    elif prop.valueType == "reference":
+    elif prop.valueType == "object reference":
         value = prop.valueReference
-    elif prop.valueType == "action":
+    elif prop.valueType == "scene reference":
+        value = prop.valueReference
+    elif prop.valueType == "action reference":
         value = prop.valueAction
     elif prop.valueType == "color":
         value = prop.valueColor
@@ -820,6 +865,8 @@ def valueFromProp(prop):
         value = prop.valueFilepath
     elif prop.valueType == "directory":
         value = prop.valueDirpath
+    elif prop.valueType == "bitfield":
+        value = prop.valueBitfield
 
     return value
 
@@ -913,7 +960,7 @@ def copyProp(fromProp, toProp):
     toProp.valueVector3D = fromProp.valueVector3D
     toProp.valueFilepath = fromProp.valueFilepath
     toProp.valueDirpath = fromProp.valueDirpath
-
+    toProp.valueBitfield = fromProp.valueBitfield
 
 class OBJECT_OT_tetra3dOverrideProp(bpy.types.Operator):
     bl_idname = "object.tetra3doverrideprop"
@@ -1396,7 +1443,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
 
         baseBox = self.layout.box()
         row = baseBox.row()
-        row.label(text="Object Properties")
+        row.label(text="Basic Object Properties")
 
         row.prop(
             context.window_manager,
@@ -1414,18 +1461,19 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
         )
 
         if context.window_manager.t3dExpandObjectProps__:
-            row = baseBox.row()
+            box = baseBox.box()
+            row = box.row()
             np = objectNodePath(context.object)
             np = " / ".join(np.split("/"))
             row.label(text="Node Path : " + np)
-            row = baseBox.row()
+            row = box.row()
             row.operator(
                 "object.tetra3dcopynodepath",
                 text="Copy Node Path to Clipboard",
                 icon="COPYDOWN",
             )
 
-            row = baseBox.row()
+            row = box.row()
             row.enabled = (
                 context.object.t3dObjectType__ == "MODEL"
                 or context.object.t3dObjectType__ == "LIGHTVOLUME"
@@ -1440,7 +1488,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             row.prop(context.object, "t3dVisible__", text=visibleLabel)
             row.prop(context.object, "t3dAddToSceneTree__")
 
-            colorRow = baseBox.row()
+            colorRow = box.row()
             colorRow.label(text="Model Color:")
             colorRow.prop(context.object, "t3dObjectColor__")
             colorRow.enabled = context.object.t3dObjectType__ == "MODEL"
@@ -1483,26 +1531,31 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
             row = boundsBox.row()
             row.prop(context.object, "t3dBoundsType__")
 
-            row = boundsBox.row()
-
             if context.object.t3dBoundsType__ == "AABB":
+                row = boundsBox.row()
                 row.prop(context.object, "t3dAABBCustomEnabled__")
                 if context.object.t3dAABBCustomEnabled__:
                     row = boundsBox.row()
                     row.prop(context.object, "t3dAABBCustomSize__")
             elif context.object.t3dBoundsType__ == "CAPSULE":
+                row = boundsBox.row()
+                row.prop(context.object, "t3dCapsuleUp__")
+                row = boundsBox.row()
                 row.prop(context.object, "t3dCapsuleCustomEnabled__")
                 if context.object.t3dCapsuleCustomEnabled__:
                     row = boundsBox.row()
                     row.prop(context.object, "t3dCapsuleCustomRadius__")
                     row.prop(context.object, "t3dCapsuleCustomHeight__")
             elif context.object.t3dBoundsType__ == "SPHERE":
+                row = boundsBox.row()
                 row.prop(context.object, "t3dSphereCustomEnabled__")
                 if context.object.t3dSphereCustomEnabled__:
                     row = boundsBox.row()
                     row.prop(context.object, "t3dSphereCustomRadius__")
             elif context.object.t3dBoundsType__ == "TRIANGLES":
+                row = boundsBox.row()
                 row.prop(context.object, "t3dTrianglesCustomBroadphaseEnabled__")
+                row = boundsBox.row()
                 if context.object.t3dTrianglesCustomBroadphaseEnabled__:
                     row.prop(context.object, "t3dTrianglesCustomBroadphaseGridSize__")
 
@@ -1524,7 +1577,7 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                 col = context.object.instance_collection
 
                 for objectIndex, object in enumerate(col.objects):
-                    if object.parent == None:
+                    if object.parent is None:
                         row = collectionBox.row()
                         collectionObjectBox = row.box()
                         collectionObjectBox.label(text="Object: " + object.name)
@@ -1580,6 +1633,205 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                 self, box, context.active_object.t3dGameProperties__, "object"
             )
 
+def updateBitfieldNames(self, context):
+    global bitfieldNamesUpdate
+    bitfieldNamesUpdate = True
+
+class t3dBitfieldName__(bpy.types.PropertyGroup):
+    name: bpy.props.StringProperty(name="Name", default="New Bit", description="The name of the bit in all bitfields", update=updateBitfieldNames)
+
+class SCENE_UL_BitfieldNames(bpy.types.UI_UL_list):
+
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
+        index = 0
+
+        for i, name in enumerate(data.t3dBitfieldNames__):
+            if name == item:
+                index = i
+                break
+
+        layout.label(text="Bit #" + str(index))
+        layout.prop(item, "name", text="")
+
+class SCENE_PT_AddBitfieldName(bpy.types.Operator):
+    bl_idname = "scene.addbitfieldname"
+    bl_label = "Add Bitfield Name"
+    bl_description = "Defines a name for a bit"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+
+        if len(context.scene.t3dBitfieldNames__) == 31:
+            self.report({"WARNING"}, "Cannot add more bitfield names; the max is 31 (yes, 31)")
+            return {"CANCELLED"}
+
+        global bitfieldNamesUpdate
+        bitfieldNamesUpdate = True
+        context.scene.t3dBitfieldNames__.add()
+        context.scene.t3dActiveBitfieldIndex__ = len(context.scene.t3dBitfieldNames__)-1
+        return {"FINISHED"}
+        
+class SCENE_PT_DuplicateBitfieldName(bpy.types.Operator):
+    bl_idname = "scene.duplicatebitfieldname"
+    bl_label = "Duplicate Bitfield Name"
+    bl_description = "Duplicates a name for a bit"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty()
+
+    def execute(self, context):
+
+        if len(context.scene.t3dBitfieldNames__) == 31:
+            self.report({"WARNING"}, "Cannot add more bitfield names; the max is 31 (yes, 31)")
+            return {"CANCELLED"}
+
+        global bitfieldNamesUpdate
+        bitfieldNamesUpdate = True
+        newName = context.scene.t3dBitfieldNames__.add()
+        context.scene.t3dActiveBitfieldIndex__ = len(context.scene.t3dBitfieldNames__)-1
+        newName.name = context.scene.t3dBitfieldNames__[self.index].name
+        return {"FINISHED"}
+
+class SCENE_PT_CopyBitfieldNamesToAllScenes(bpy.types.Operator):
+    bl_idname = "scene.copybitfieldnamestoallscenes"
+    bl_label = "Copy Bitfield Names to All Scenes"
+    bl_description = "Copies this set of bitfield names to all Scenes"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty()
+
+    def execute(self, context):
+
+        global bitfieldNamesUpdate
+        bitfieldNamesUpdate = True
+
+        for scene in bpy.data.scenes:
+            if context.scene == scene:
+                continue
+
+            scene.t3dBitfieldNames__.clear()
+            for bitfieldName in context.scene.t3dBitfieldNames__:
+                n = scene.t3dBitfieldNames__.add()
+                n.name = bitfieldName.name
+
+        return {"FINISHED"}
+
+class SCENE_PT_SelectAllWithBitfieldName(bpy.types.Operator):
+    bl_idname = "scene.selectallwithbitfieldname"
+    bl_label = "Select All With Bitfield Name"
+    bl_description = "Selects all objects in the scene with properties with the selected bit set"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty()
+
+    def execute(self, context):
+
+        if self.index < len(context.scene.t3dBitfieldNames__):
+
+            propName = context.scene.t3dBitfieldNames__[self.index]
+
+            bpy.ops.object.select_all(action="DESELECT")
+
+            for layer in context.scene.view_layers:
+                for obj in layer.objects:
+                    for prop in obj.t3dGameProperties__:
+                        if "BITfield" + str(self.index) in prop.valueBitfield:
+                            obj.select_set(True)
+                            break
+
+        return {"FINISHED"}
+
+class SCENE_PT_RemoveBitfieldName(bpy.types.Operator):
+    bl_idname = "scene.removebitfieldname"
+    bl_label = "Remove Bitfield Name"
+    bl_description = "Removes a name from use for a bit and rearranges selected bits in relevant objects"
+    bl_options = {"REGISTER", "UNDO"}
+
+    index: bpy.props.IntProperty()
+
+    def execute(self, context):
+        global bitfieldNamesUpdate
+        bitfieldNamesUpdate = True
+        context.scene.t3dBitfieldNames__.remove(self.index)
+        updateBitfieldsInUse(context, context.scene.t3dActiveBitfieldIndex__, -1)
+        if context.scene.t3dActiveBitfieldIndex__ == len(context.scene.t3dBitfieldNames__) and context.scene.t3dActiveBitfieldIndex__ > 0:
+            context.scene.t3dActiveBitfieldIndex__ -= 1
+        return {"FINISHED"}
+
+def updateBitfieldsInUse(context, oldBitfieldIndex, newBitfieldIndex):
+    for obj in context.scene.objects:
+        for prop in obj.t3dGameProperties__:
+            if prop.valueBitfield:
+
+                if newBitfieldIndex == -1: ## A bit field has been deleted, so shift all others forward
+                    
+                    newBitfield = set()
+                    for bit in prop.valueBitfield:
+                        lastNumber = int(bit[-1])
+                        if lastNumber > 0 and lastNumber > oldBitfieldIndex:
+                            newBit = "BITfield" + str(lastNumber-1)
+                            newBitfield.add(newBit)
+                    prop.valueBitfield = newBitfield
+
+                else:
+
+                    oldBit = "BITfield" + str(oldBitfieldIndex)
+                    newBit = "BITfield" + str(newBitfieldIndex)
+
+                    bitfield = prop.valueBitfield
+
+                    if newBit in bitfield and not oldBit in bitfield:
+                        bitfield.remove(newBit)
+                        bitfield.add(oldBit)
+                        prop.valueBitfield = bitfield
+                    elif oldBit in bitfield and not newBit in bitfield:
+                        bitfield.remove(oldBit)
+                        bitfield.add(newBit)
+                        prop.valueBitfield = bitfield
+
+class SCENE_PT_ReorderBitfieldName(bpy.types.Operator):
+    bl_idname = "scene.reorderbitfieldname"
+    bl_label = "Reorder Bitfield Name"
+    bl_description = "Reorders the selected bit name and rearranges selected bits in relevant objects"
+    bl_options = {"REGISTER", "UNDO"}
+
+    moveUp: bpy.props.BoolProperty()
+    index: bpy.props.IntProperty()
+    toEnd: bpy.props.BoolProperty()
+
+    def execute(self, context):
+
+        oldIndex = context.scene.t3dActiveBitfieldIndex__
+
+        if self.moveUp:
+            if self.index > 0:
+                if self.toEnd:
+                    target = 0
+                    context.scene.t3dActiveBitfieldIndex__ = 0
+                else:
+                    target = self.index - 1
+                    context.scene.t3dActiveBitfieldIndex__ -= 1
+
+                context.scene.t3dBitfieldNames__.move(self.index, target)
+        else:
+
+            if self.toEnd:
+                target = len(context.scene.t3dBitfieldNames__) - 1
+                context.scene.t3dActiveBitfieldIndex__ = len(context.scene.t3dBitfieldNames__)-1
+            else:
+                target = self.index + 1
+                if self.index < len(context.scene.t3dBitfieldNames__) - 1:
+                    context.scene.t3dActiveBitfieldIndex__ += 1
+            
+            context.scene.t3dBitfieldNames__.move(self.index, target)
+
+        global bitfieldNamesUpdate
+        bitfieldNamesUpdate = True
+
+        if oldIndex != context.scene.t3dActiveBitfieldIndex__:
+            updateBitfieldsInUse(context, oldIndex, context.scene.t3dActiveBitfieldIndex__)
+
+        return {"FINISHED"}
 
 class SCENE_PT_tetra3d(bpy.types.Panel):
     bl_idname = "SCENE_PT_tetra3d"
@@ -1689,6 +1941,62 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
 
             handleT3DProperties(self, box, context.scene.t3dGameProperties__, "scene")
 
+        box = self.layout.box()
+        row = box.row()
+        row.label(text="Bitfield Names")
+
+        row.prop(
+            context.window_manager,
+            "t3dExpandBitfieldNames__",
+            icon="TRIA_DOWN"
+            if context.window_manager.t3dExpandBitfieldNames__
+            else "TRIA_RIGHT",
+            icon_only=True,
+            emboss=False,
+        )
+
+        if context.window_manager.t3dExpandBitfieldNames__:
+            row = box.row()
+            row.template_list("SCENE_UL_BitfieldNames",  "", context.scene, "t3dBitfieldNames__", context.scene, "t3dActiveBitfieldIndex__")
+            row = box.row(align=True)
+            row.alignment = "CENTER"
+            row.operator("scene.addbitfieldname", icon="PLUS", text="")
+            op = row.operator("scene.removebitfieldname", icon="TRASH", text="")
+            op.index = context.scene.t3dActiveBitfieldIndex__
+
+            row.operator("scene.duplicatebitfieldname", icon="COPYDOWN", text="")
+            op.index = context.scene.t3dActiveBitfieldIndex__
+
+            row.separator()
+
+            op = row.operator("scene.reorderbitfieldname", icon="TRIA_UP", text="")
+            op.index = context.scene.t3dActiveBitfieldIndex__
+            op.moveUp = True
+            op.toEnd = False
+
+            op = row.operator("scene.reorderbitfieldname", icon="TRIA_DOWN", text="")
+            op.index = context.scene.t3dActiveBitfieldIndex__
+            op.moveUp = False
+
+            row.separator()
+
+            op = row.operator("scene.reorderbitfieldname", icon="TRIA_UP_BAR", text="")
+            op.index = context.scene.t3dActiveBitfieldIndex__
+            op.moveUp = True
+            op.toEnd = True
+
+            op = row.operator("scene.reorderbitfieldname", icon="TRIA_DOWN_BAR", text="")
+            op.index = context.scene.t3dActiveBitfieldIndex__
+            op.moveUp = False
+            op.toEnd = True
+
+            row.separator()
+
+            op = row.operator("scene.selectallwithbitfieldname", icon="VIS_SEL_11", text="")
+            op.index = context.scene.t3dActiveBitfieldIndex__
+
+            row = box.row()
+            row.operator("scene.copybitfieldnamestoallscenes", icon="COPYDOWN")
 
 class CAMERA_PT_tetra3d(bpy.types.Panel):
     bl_idname = "CAMERA_PT_tetra3d"
@@ -1736,7 +2044,7 @@ def handleT3DProperties(self, base, props, operatorType, enabled=True, objectInd
 
         row = box.row()
         row.enabled = enabled  # Don't forget to disable the row for all operators if it's an instance property
-        row.prop(prop, "name")
+        row.prop(prop, "name",  text="")
 
         op = row.operator(
             OBJECT_OT_tetra3dSearchStringProperties.bl_idname, text="", icon="VIEWZOOM"
@@ -1797,7 +2105,8 @@ def handleT3DProperties(self, base, props, operatorType, enabled=True, objectInd
             op.index = index
             op.mode = operatorType
             op.search_mode = "string"
-        elif prop.valueType == "reference":
+        elif prop.valueType == "object reference":
+            row = box.row()
             row.prop(prop, "valueReferenceScene")
             if prop.valueReferenceScene != None:
                 row.prop_search(
@@ -1808,7 +2117,9 @@ def handleT3DProperties(self, base, props, operatorType, enabled=True, objectInd
             op = row.operator("object.t3dfocusobject", text="", icon="CAMERA_DATA")
             if prop.valueReference:
                 op.target = prop.valueReference.name
-        elif prop.valueType == "action":
+        elif prop.valueType == "scene reference":
+            row.prop(prop, "valueReferenceScene")
+        elif prop.valueType == "action reference":
             row.prop(prop, "valueAction")
         elif prop.valueType == "color":
             row.prop(prop, "valueColor")
@@ -1863,6 +2174,10 @@ def handleT3DProperties(self, base, props, operatorType, enabled=True, objectInd
             op.index = index
             op.mode = operatorType
             op.search_mode = "directory"
+        elif prop.valueType == "bitfield":
+            row = box.row()
+            row.grid_flow(row_major=True, columns=4).prop(prop, "valueBitfield", toggle=1)
+
 
         # If not enabled, it's because the properties belong to sub-objects in an instance group
         if not enabled:
@@ -2246,13 +2561,16 @@ def export():
     for collection in bpy.data.collections:
         if len(collection.objects) == 0:
             continue
-        c = []
+        objectPaths = []
         for o in collection.objects:
             if o.parent is None:
-                c.append(o.name)
+                objPath = ":" + objectNodePath(o)
+                if len(o.users_scene) > 0:
+                    objPath = o.users_scene[0].name + objPath
+                objectPaths.append(objPath)
 
         cd = {
-            "objects": c,
+            "objects": objectPaths,
             "offset": collection.instance_offset,
         }
 
@@ -2358,6 +2676,13 @@ def export():
                                     ].name,
                                 )
                                 obj.data["t3dVertexColorNames__"] = names
+
+                            if obj.data.shape_keys:
+                                names = []
+                                # Skip the basis target
+                                for keyLayer in obj.data.shape_keys.key_blocks[1:]:
+                                    names.append(keyLayer.name)
+                                obj.data["t3dShapeKeyNames__"] = names
 
                             if obj.t3dObjectType__ == "GRID":
                                 gridConnections = {}
@@ -2486,6 +2811,7 @@ def export():
         export_current_frame=False,
         export_nla_strips=True,
         export_animations=True,
+        # export_animation_mode='BROADCAST',
         export_frame_range=False,
         export_force_sampling=scene.t3dAnimationSampling__,  # When enabled, animations are sampled / baked. This is slow, but accurate. When disabled, only linear and constant keyframes are exported and interpolated for animation.
         export_sampling_interpolation_fallback="LINEAR",
@@ -2622,6 +2948,16 @@ def onLoad(dummy):
         args=tuple(),
         notify=onModeChange,
     )
+
+@persistent
+def onUndo(dummy):
+    global bitfieldNamesUpdate
+    bitfieldNamesUpdate = True
+
+@persistent
+def onRedo(dummy):
+    global bitfieldNamesUpdate
+    bitfieldNamesUpdate = True
 
 
 class MATERIAL_OT_tetra3dAutoUV(bpy.types.Operator):
@@ -3066,6 +3402,12 @@ objectProps = {
         min=0.0,
         default=2,
     ),
+    "t3dCapsuleUp__": bpy.props.EnumProperty(
+        items=capsuleAlignments,
+        name="Capsule Up Axis",
+        description="The local axis that dictates 'up' for the capsule (so which axis is the height; the radius comes from the greater of the remaining two axes)",
+        default="Y",
+    ),
     "t3dSphereCustomEnabled__": bpy.props.BoolProperty(
         name="Custom Sphere Size",
         description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)",
@@ -3194,9 +3536,11 @@ def drawGameProperties(self, context):
                             prop.valueVector3D[2],
                         )
                     elif prop.valueType == "file":
-                        propText += "'" + prop.valueFilepath + '"'
+                        propText += '"' + prop.valueFilepath + '"'
                     elif prop.valueType == "directory":
-                        propText += "'" + prop.valueDirpath + '"'
+                        propText += '"' + prop.valueDirpath + '"'
+                    elif prop.valueType == "bitfield enum":
+                        propText += '"' + prop.valueBitfieldEnum + '"'
 
                     propText += "\n"
 
@@ -3248,6 +3592,7 @@ def drawGameProperties(self, context):
     return
 
 
+
 def register():
 
     bpy.utils.register_class(OBJECT_PT_tetra3d)
@@ -3293,6 +3638,15 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dFocusObject)
     bpy.utils.register_class(OBJECT_OT_tetra3dSelectWithSameProperty)
     bpy.utils.register_class(OBJECT_OT_tetra3dSearchStringProperties)
+
+    bpy.utils.register_class(SCENE_PT_AddBitfieldName)
+    bpy.utils.register_class(SCENE_PT_DuplicateBitfieldName)
+    bpy.utils.register_class(SCENE_PT_CopyBitfieldNamesToAllScenes)
+    bpy.utils.register_class(SCENE_PT_RemoveBitfieldName)
+    bpy.utils.register_class(SCENE_PT_ReorderBitfieldName)
+    bpy.utils.register_class(SCENE_PT_SelectAllWithBitfieldName)
+    bpy.utils.register_class(SCENE_UL_BitfieldNames)
+    bpy.utils.register_class(t3dBitfieldName__)
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
@@ -3485,6 +3839,13 @@ def register():
         set=setAnimationInterpolation,
     )
 
+    bpy.types.Scene.t3dBitfieldNames__ = bpy.props.CollectionProperty(type=t3dBitfieldName__)
+    bpy.types.Scene.t3dActiveBitfieldIndex__ = bpy.props.IntProperty(
+        name="Active bitfield name",
+        description="",
+        min=0,
+    )
+
     bpy.types.WindowManager.t3dExpandExportSettings__ = bpy.props.BoolProperty(
         name="Expand Export Settings", default=True
     )
@@ -3508,6 +3869,9 @@ def register():
     )
     bpy.types.WindowManager.t3dExpandOverrideProps__ = bpy.props.BoolProperty(
         name="Expand Overridden Properties", default=True
+    )
+    bpy.types.WindowManager.t3dExpandBitfieldNames__ = bpy.props.BoolProperty(
+        name="Expand Bitfield Names", default=True
     )
 
     bpy.types.Material.t3dMaterialColor__ = bpy.props.FloatVectorProperty(
@@ -3547,17 +3911,17 @@ def register():
     )
     bpy.types.Material.t3dBillboardLockX__ = bpy.props.BoolProperty(
         name="Lock X Axis Rotation",
-        description="If rotation is locked on the global X axis",
+        description="If rotation is locked on the global X axis (Left / Right)",
         default=False,
     )
     bpy.types.Material.t3dBillboardLockY__ = bpy.props.BoolProperty(
         name="Lock Y Axis Rotation",
-        description="If rotation is locked on the global Y axis",
+        description="If rotation is locked on the global Y axis (Up / Down)",
         default=False,
     )
     bpy.types.Material.t3dBillboardLockZ__ = bpy.props.BoolProperty(
         name="Lock Z Axis Rotation",
-        description="If rotation is locked on the global Z axis",
+        description="If rotation is locked on the global Z axis (Forward / Back)",
         default=False,
     )
     bpy.types.Material.t3dBillboardUpDirection__ = bpy.props.EnumProperty(
@@ -3757,6 +4121,10 @@ def register():
         bpy.app.handlers.save_post.append(exportOnSave)
     if not onLoad in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.append(onLoad)
+    if not onUndo in bpy.app.handlers.undo_post:
+        bpy.app.handlers.undo_post.append(onUndo)
+    if not onRedo in bpy.app.handlers.redo_post:
+        bpy.app.handlers.redo_post.append(onRedo)
 
     keyconfig = bpy.context.window_manager.keyconfigs.addon
 
@@ -3825,6 +4193,18 @@ def unregister():
 
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSearchStringProperties)
 
+    bpy.utils.unregister_class(SCENE_PT_AddBitfieldName)
+    bpy.utils.unregister_class(SCENE_PT_DuplicateBitfieldName)
+    bpy.utils.unregister_class(SCENE_PT_CopyBitfieldNamesToAllScenes)
+    bpy.utils.unregister_class(SCENE_PT_RemoveBitfieldName)
+    bpy.utils.unregister_class(SCENE_PT_ReorderBitfieldName)
+    bpy.utils.unregister_class(SCENE_PT_SelectAllWithBitfieldName)
+    bpy.utils.unregister_class(SCENE_UL_BitfieldNames)
+    bpy.utils.unregister_class(t3dBitfieldName__)
+
+    del bpy.types.Scene.t3dBitfieldNames__
+    del bpy.types.Scene.t3dActiveBitfieldIndex__
+
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
 
@@ -3858,6 +4238,7 @@ def unregister():
     del bpy.types.WindowManager.t3dExpandGameProps__
     del bpy.types.WindowManager.t3dExpandObjectProps__
     del bpy.types.WindowManager.t3dExpandOverrideProps__
+    del bpy.types.WindowManager.t3dExpandBitfieldNames__
 
     del bpy.types.Material.t3dMaterialColor__
     del bpy.types.Material.t3dMaterialShadeless__
@@ -3910,6 +4291,10 @@ def unregister():
         bpy.app.handlers.save_post.remove(exportOnSave)
     if onLoad in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(onLoad)
+    if onUndo in bpy.app.handlers.undo_post:
+        bpy.app.handlers.undo_post.remove(onUndo)
+    if onRedo in bpy.app.handlers.redo_post:
+        bpy.app.handlers.redo_post.remove(onRedo)
 
     global keymaps
 

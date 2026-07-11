@@ -221,7 +221,7 @@ func (g *Game) Update() error {
 			return false // Don't continue stepping through ray hits beyond the first one
 
 		},
-		TestAgainst: g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNamesParent("gridPoint").ByType(tetra3d.NodeTypeBoundingObject)),
+		TestAgainst: g.Scene.Root.Search().ByParentPropNames("gridPoint").ByType(tetra3d.NodeTypeBoundingObject),
 	})
 
 	g.Camera.Update()

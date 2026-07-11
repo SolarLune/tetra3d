@@ -213,7 +213,7 @@ func (path *Path) Length() float32 {
 		return 0
 	}
 
-	start := points.Get(0).WorldPosition()
+	start := points[0].WorldPosition()
 	for i := 1; i < points.Count(); i++ {
 		next := points.Get(i).WorldPosition()
 		dist += next.Sub(start).Magnitude()

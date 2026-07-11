@@ -52,15 +52,15 @@ func (player *Player) Update() {
 
 		tetra3d.CollisionTestSettings{
 
-			TestAgainst: player.node.Root().Search(tetra3d.SearchOptions{}.ByPropNamesParent("solid")),
+			TestAgainst: player.node.Root().Search().ByParentPropHasBitfieldValueByName("Solid"),
 
 			OnCollision: func(col *tetra3d.Collision, index, count int) bool {
 
-				if col.Object.Parent().Properties().Has("death") {
+				if col.Object.Parent().PropertiesContainsBitByName("Death") {
 					player.node.Unparent() // Unparenting is the equivalent of destroying the node
 				}
 
-				player.node.MoveVec(col.AverageMTV())
+				player.node.MoveVec(col.MaxMTV())
 
 				return true
 			},

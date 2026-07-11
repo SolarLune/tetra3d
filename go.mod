@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/hajimehoshi/ebiten/v2 v2.9.7
-	github.com/qmuntal/gltf v0.28.0
+	github.com/qmuntal/gltf v0.28.1-0.20260527150304-a48a560f8f1c
 	github.com/tanema/gween v0.0.0-20250522035225-e874ee3ae01a
 	golang.org/x/image v0.34.0
 )
@@ -21,5 +21,3 @@ require (
 
 // uncomment for local development
 // replace github.com/hajimehoshi/ebiten/v2 => ../../libraries/ebiten
-
-replace github.com/qmuntal/gltf => ../../libraries/gltf

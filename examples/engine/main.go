@@ -24,7 +24,7 @@ type Game struct {
 	System examples.BasicSystemHandler
 }
 
-//go:embed engine.gltf
+//go:embed engine.glb
 var libraryData []byte
 
 func NewGame() *Game {
@@ -57,11 +57,10 @@ func (g *Game) Init() {
 	for _, scene := range library.Scenes {
 
 		// Set up callbacks for each relevant node that creates the necessary game object logic.
-		scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("gameobject")).ForEach(func(node tetra3d.INode) bool {
+		// Do it lazily without allocating memory for a NodeList.
+		scene.Root.Search().ForEach(func(node tetra3d.INode, index int) bool {
 
-			switch node.Properties().Get("gameobject").AsString() {
-
-			case "player":
+			if node.PropertiesContainsBitByName("Player") {
 
 				node.Callbacks().OnClone = func(newNode tetra3d.INode) {
 					// When the Player node is cloned, we create a new Player object for its data holder -
@@ -101,10 +100,14 @@ func (g *Game) Update() error {
 	}
 
 	// Loop through the scene tree and call Update on objects that can be updated.
-	// I could use g.Scene.Root.ForEachChild(), but if objects are removed, that can't work.
-	g.Scene.Root.Search(tetra3d.SearchOptions{}).ForEach(func(node tetra3d.INode) bool {
-		if gameObj, ok := node.Data().(GameObject); ok {
-			gameObj.Update()
+	//
+	// I could use g.Scene.Root.ForEachChild() to iterate over the scene's node hierarchy using a function without allocating memory for a list,
+	// but if objects are removed, that won't work because we'd be iterating over the slice we're modifying.
+	//
+	// Instead, we can use INode.Search().GetNodeList() or INode.Children(true) to make a list to iterate over.
+	g.Scene.Root.Children(true).ForEach(func(node tetra3d.INode, index int) bool {
+		if g, ok := node.Data().(GameObject); ok {
+			g.Update()
 		}
 		return true
 	})

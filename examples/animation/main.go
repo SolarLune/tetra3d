@@ -50,14 +50,18 @@ func (g *Game) Update() error {
 
 	scene := g.Camera.Scene
 
-	armature := scene.Root.Search(tetra3d.SearchOptions{}.ByNames("Armature")).First()
+	armature := scene.Root.Search().ByNames("Armature").GetFirst()
 	armature.Rotate(0, 1, 0, 0.01)
 
 	ap := armature.AnimationPlayer()
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-		if ap.Animation != nil && ap.Animation.Name == "ArmatureAction" {
-			ap.Playing = !ap.Playing
+		if ap.Animation() != nil && ap.Animation().Name() == "ArmatureAction" {
+			if ap.IsPlaying() {
+				ap.Pause()
+			} else {
+				ap.Resume()
+			}
 		} else {
 			ap.PlayByName("ArmatureAction")
 		}
@@ -74,6 +78,43 @@ func (g *Game) Update() error {
 	}
 	if inpututil.IsKeyJustPressed(ebiten.Key2) {
 		ap.PlayByName("StepRoll")
+	}
+
+	// The morphing cube has shape keys that you can use to animate per-vertex animations for the model
+	morpher := scene.Root.Get("MorphingCube").(*tetra3d.Model)
+
+	if ebiten.IsKeyPressed(ebiten.Key3) {
+		target := morpher.Mesh().ShapeKeyByName("Diamond")
+		w := target.Weight() - 0.01
+		if w < 0 {
+			w = 0
+		}
+		target.SetWeight(w)
+	}
+	if ebiten.IsKeyPressed(ebiten.Key4) {
+		target := morpher.Mesh().ShapeKeyByName("Diamond")
+		w := target.Weight() + 0.01
+		if w > 1 {
+			w = 1
+		}
+		target.SetWeight(w)
+	}
+
+	if ebiten.IsKeyPressed(ebiten.Key5) {
+		target := morpher.Mesh().ShapeKeyByName("Shift")
+		w := target.Weight() - 0.01
+		if w < 0 {
+			w = 0
+		}
+		target.SetWeight(w)
+	}
+	if ebiten.IsKeyPressed(ebiten.Key6) {
+		target := morpher.Mesh().ShapeKeyByName("Shift")
+		w := target.Weight() + 0.01
+		if w > 1 {
+			w = 1
+		}
+		target.SetWeight(w)
 	}
 
 	ap.Update(1.0 / 60)
@@ -106,11 +147,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.Camera.DebugInfo.Draw(screen, 1, colors.White())
 		txt := `1 Key: Play [SmoothRoll] Animation On Table
 2 Key: Play [StepRoll] Animation on Table
-Note that models can blend between two different
-animations (as shown on the table).
-F Key: Play Animation on Skinned Mesh
-Note that the nodes move as well (as can be
-seen in the debug mode).`
+(Note that models can blend between two different
+animations (as shown on the table).)
+3 / 4 Key: Morph the Cube into diamond, 5 / 6 : Shift its vertices upwards
+
+F Key: Play Animation on Skinned Mesh - note that the nodes making up its bones 
+move as well (as can be seen in the debug mode).`
 		tetra3d.DrawDebugText(screen, txt, 0, 230, 1, colors.LightGray())
 	}
 

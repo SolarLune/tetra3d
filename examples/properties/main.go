@@ -50,14 +50,14 @@ func (g *Game) Init() {
 
 	g.System = examples.NewBasicSystemHandler(g)
 
-	g.Scene.Root.ForEachChild(false, func(node tetra3d.INode, index, size int) bool {
+	g.Scene.Root.ForEachChild(false, func(node tetra3d.INode, index int) bool {
 
 		// In this example, we use a property named "parented to" to dynamically parent an object to another at run-time.
 		if node.Properties().Has("parented to") {
 
 			// Object reference properties are composed of strings, formatted as: [Scene Name]:[Object Name].
 			// If the scene to search is not set in Blender, that portion will be blank.
-			link := strings.Split(node.Properties().Get("parented to").AsString(), ":")
+			link := strings.Split(node.Properties().GetByName("parented to").AsString(), ":")
 
 			// Store the object's original transform
 			transform := node.Transform()
@@ -81,15 +81,15 @@ func (g *Game) Update() error {
 	// Here we loop through objects as usual, but notice from the blend file that collection instance
 	// objects are replaced in the scene tree by their children.
 
-	g.Scene.Root.ForEachChild(false, func(o tetra3d.INode, index, size int) bool {
+	g.Scene.Root.ForEachChild(false, func(o tetra3d.INode, index int) bool {
 
 		props := o.Properties()
 
 		if props.Has("turn") {
-			o.Rotate(0, 1, 0, 0.02*props.Get("turn").AsFloat32())
+			o.Rotate(0, 1, 0, 0.02*props.GetByName("turn").AsFloat32())
 		}
 
-		if props.Has("wave") && props.Get("wave").AsBool() {
+		if props.Has("wave") && props.GetByName("wave").AsBool() {
 			o.Move(0, math32.Sin(g.Time*math32.Pi)*0.08, 0)
 		}
 
@@ -99,9 +99,9 @@ func (g *Game) Update() error {
 				props.Set("blink-start", time.Now())
 			}
 
-			blinkStart := props.Get("blink-start").Value.(time.Time)
+			blinkStart := props.GetByName("blink-start").Value.(time.Time)
 
-			dur, err := time.ParseDuration(props.Get("blink").AsString())
+			dur, err := time.ParseDuration(props.GetByName("blink").AsString())
 
 			if err != nil {
 				panic(err)

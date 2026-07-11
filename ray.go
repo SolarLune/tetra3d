@@ -57,16 +57,16 @@ func (r RayHit) VertexColor(channelIndex int) (Color4, error) {
 
 	mesh := r.Object.(*BoundingTriangles).Mesh
 
-	if len(mesh.VertexColors[0]) <= channelIndex {
+	if len(mesh.VertexColors[0].colors) <= channelIndex {
 		return NewColor4(0, 0, 0, 0), errors.New(ErrorVertexChannelOutsideRange)
 	}
 
 	tri := r.Triangle
 	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndexA], mesh.VertexPositions[tri.VertexIndexB], mesh.VertexPositions[tri.VertexIndexC])
 
-	vc1 := mesh.VertexColors[channelIndex][tri.VertexIndexA]
-	vc2 := mesh.VertexColors[channelIndex][tri.VertexIndexB]
-	vc3 := mesh.VertexColors[channelIndex][tri.VertexIndexC]
+	vc1 := mesh.VertexColors[channelIndex].colors[tri.VertexIndexA]
+	vc2 := mesh.VertexColors[channelIndex].colors[tri.VertexIndexB]
+	vc3 := mesh.VertexColors[channelIndex].colors[tri.VertexIndexC]
 
 	output := vc1.Mix(vc2, float32(v)).Mix(vc3, float32(u))
 
@@ -387,7 +387,7 @@ type RayTestOptions struct {
 	Doublesided bool
 
 	// TestAgainst is used to specify a selection of BoundingObjects to test against - this can be either a NodeFilter or a NodeCollection (a slice of Nodes).
-	TestAgainst *NodeCollectionSet
+	TestAgainst NodeIterator
 
 	// OnHit is a callback called for each hit a cast Ray returns, sorted by distance from the starting point.
 	// OnHit is called for each object in order of distance to the starting point.
@@ -414,7 +414,7 @@ func (r RayTestOptions) WithDoublesided(doubleSided bool) RayTestOptions {
 	return r
 }
 
-func (r RayTestOptions) WithTestAgainst(iterator *NodeCollectionSet) RayTestOptions {
+func (r RayTestOptions) WithTestAgainst(iterator NodeIterator) RayTestOptions {
 	r.TestAgainst = iterator
 	return r
 }
@@ -427,7 +427,7 @@ func RayTest(options RayTestOptions) *RayHit {
 	// We re-use the internal raytest function to avoid reallocating a slice.
 	internalRayTest = internalRayTest[:0]
 
-	options.TestAgainst.ForEach(func(node INode) bool {
+	options.TestAgainst.ForEach(func(node INode, index int) bool {
 
 		node.Transform() // Make sure the transform is updated before the test
 
@@ -512,7 +512,7 @@ type MouseRayTestOptions struct {
 	// If cast rays can strike both sides of BoundingTriangles triangles or not.
 	Doublesided bool
 	// TestAgainst is used to specify a selection of BoundingObjects to test against - this can be either a NodeFilter or a NodeCollection (a slice of Nodes).
-	TestAgainst *NodeCollectionSet
+	TestAgainst NodeIterator
 	// OnHit is a callback called for each hit a cast Ray returns, sorted by distance from the starting point (the camera's position).
 	// OnHit is called for each object in order of distance to the starting point.
 	// OnHit is only called once for each object, apart from BoundingTriangles, as a single ray can hit multiple triangles of a BoundingTriangles mesh.
@@ -540,7 +540,7 @@ func (r MouseRayTestOptions) WithDoublesided(doubleSided bool) MouseRayTestOptio
 }
 
 // WithTestAgainst sets the test against iterator for the mouse raytest option set.
-func (r MouseRayTestOptions) WithTestAgainst(iterator *NodeCollectionSet) MouseRayTestOptions {
+func (r MouseRayTestOptions) WithTestAgainst(iterator NodeIterator) MouseRayTestOptions {
 	r.TestAgainst = iterator
 	return r
 }

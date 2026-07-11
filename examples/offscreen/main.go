@@ -65,7 +65,7 @@ func (g *Game) Update() error {
 	g.Camera.Update()
 
 	// Spin the tetrahedron in the logo around their local orientation:
-	g.Scene.Root.Search(tetra3d.SearchOptions{}.ByPropNames("spin")).ForEach(func(node tetra3d.INode) bool {
+	g.Scene.Root.Search().ByPropNames("spin").ForEach(func(node tetra3d.INode, index int) bool {
 		node.Rotate(0, 1, 0, 0.05)
 		return true
 	})

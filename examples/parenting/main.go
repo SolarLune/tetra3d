@@ -78,7 +78,7 @@ func (g *Game) Update() error {
 	parent := g.Scene.Root.Get("parent")
 	parent.SetLocalRotation(parent.LocalRotation().Rotated(0, 1, 0, 0.05))
 
-	child := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByNames("child")).First()
+	child := g.Scene.Root.Search().ByNames("child").GetFirst()
 	position := parent.LocalPosition()
 
 	moveSpd := float32(0.1)

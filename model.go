@@ -177,7 +177,7 @@ func (model *Model) onTransformUpdate() {
 	dim.Max.Y *= scale.Y
 	dim.Max.Z *= scale.Z
 
-	model.frustumCullingSphere.Radius = dim.MaxSpan() / 2
+	model.frustumCullingSphere.radius = dim.MaxSpan() / 2
 
 }
 
@@ -392,7 +392,7 @@ func (model *Model) StaticMerge(target *Model, targetMeshPart *MeshPart) {
 
 	// Step 6: Update frustum culling sphere
 	model.frustumCullingSphere.SetLocalPositionVec(model.mesh.Dimensions.Center())
-	model.frustumCullingSphere.Radius = model.mesh.Dimensions.MaxSpan() / 2
+	model.frustumCullingSphere.radius = model.mesh.Dimensions.MaxSpan() / 2
 
 }
 
@@ -535,15 +535,14 @@ func (model *Model) ReassignBones(armatureRoot INode) {
 		panic(`Error: Cannot reassign skinned Model [` + model.Path() + `] to armature bone [` + armatureRoot.Path() + `]. ReassignBones() should be called with the desired armature's root node.`)
 	}
 
-	bones := armatureRoot.Search(SearchOptions{})
-
 	boneMap := map[string]*Node{}
 
-	for _, b := range bones.OrderedSet {
+	armatureRoot.ForEachChild(true, func(b INode, index int) bool {
 		if b.IsBone() {
 			boneMap[b.Name()] = b.(*Node)
 		}
-	}
+		return true
+	})
 
 	model.SkinRoot = armatureRoot
 
@@ -583,14 +582,14 @@ func (model *Model) skinVertex(vertID int) (Vector3, Vector3) {
 
 	}
 
-	vertOut := model.skinMatrix.MultVec(model.mesh.VertexPositions[vertID])
+	vertOut := model.skinMatrix.MultVec(model.mesh.VertexPositionWithShapeKeys(vertID))
 
 	model.skinMatrix[3][0] = 0
 	model.skinMatrix[3][1] = 0
 	model.skinMatrix[3][2] = 0
 	model.skinMatrix[3][3] = 1
 
-	normal := model.skinMatrix.MultVec(model.mesh.VertexNormals[vertID])
+	normal := model.skinMatrix.MultVec(model.mesh.VertexNormalWithShapeKeys(vertID))
 
 	return vertOut, normal
 
@@ -795,13 +794,13 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			} else {
 
 				// It is, of course, faster to set the values in a vertex than to allocate memory for a new one
-				vert.X = mesh.VertexPositions[vertexIndex].X
-				vert.Y = mesh.VertexPositions[vertexIndex].Y
-				vert.Z = mesh.VertexPositions[vertexIndex].Z
+				vert.X = mesh.VertexPositionWithShapeKeys(vertexIndex).X
+				vert.Y = mesh.VertexPositionWithShapeKeys(vertexIndex).Y
+				vert.Z = mesh.VertexPositionWithShapeKeys(vertexIndex).Z
 
-				normal.X = mesh.VertexNormals[vertexIndex].X
-				normal.Y = mesh.VertexNormals[vertexIndex].Y
-				normal.Z = mesh.VertexNormals[vertexIndex].Z
+				normal.X = mesh.VertexNormalWithShapeKeys(vertexIndex).X
+				normal.Y = mesh.VertexNormalWithShapeKeys(vertexIndex).Y
+				normal.Z = mesh.VertexNormalWithShapeKeys(vertexIndex).Z
 
 				if transformFunc != nil {
 					vert, normal = transformFunc(vert, normal, vertexIndex)
@@ -1134,10 +1133,10 @@ func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 				continue
 			}
 
-			model.mesh.VertexColors[bakeOptions.TargetChannel][vertexIndex].R += (bakeOptions.OcclusionColor.R - model.mesh.VertexColors[bakeOptions.TargetChannel][vertexIndex].R) * p
-			model.mesh.VertexColors[bakeOptions.TargetChannel][vertexIndex].G += (bakeOptions.OcclusionColor.G - model.mesh.VertexColors[bakeOptions.TargetChannel][vertexIndex].G) * p
-			model.mesh.VertexColors[bakeOptions.TargetChannel][vertexIndex].B += (bakeOptions.OcclusionColor.B - model.mesh.VertexColors[bakeOptions.TargetChannel][vertexIndex].B) * p
-			model.mesh.VertexColors[bakeOptions.TargetChannel][vertexIndex].A += (bakeOptions.OcclusionColor.A - model.mesh.VertexColors[bakeOptions.TargetChannel][vertexIndex].A) * p
+			model.mesh.VertexColors[bakeOptions.TargetChannel].colors[vertexIndex].R += (bakeOptions.OcclusionColor.R - model.mesh.VertexColors[bakeOptions.TargetChannel].colors[vertexIndex].R) * p
+			model.mesh.VertexColors[bakeOptions.TargetChannel].colors[vertexIndex].G += (bakeOptions.OcclusionColor.G - model.mesh.VertexColors[bakeOptions.TargetChannel].colors[vertexIndex].G) * p
+			model.mesh.VertexColors[bakeOptions.TargetChannel].colors[vertexIndex].B += (bakeOptions.OcclusionColor.B - model.mesh.VertexColors[bakeOptions.TargetChannel].colors[vertexIndex].B) * p
+			model.mesh.VertexColors[bakeOptions.TargetChannel].colors[vertexIndex].A += (bakeOptions.OcclusionColor.A - model.mesh.VertexColors[bakeOptions.TargetChannel].colors[vertexIndex].A) * p
 		}
 
 	}
@@ -1204,8 +1203,8 @@ func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 
 				for i := 0; i < 3; i++ {
 					vertexIndex := tri.VertexIndex(i)
-					color := model.mesh.VertexColors[vertexIndex][bakeOptions.TargetChannel]
-					model.mesh.VertexColors[vertexIndex][bakeOptions.TargetChannel] = color.Mix(bakeOptions.OcclusionColor, ao[i])
+					color := model.mesh.VertexColors[vertexIndex].colors[bakeOptions.TargetChannel]
+					model.mesh.VertexColors[vertexIndex].colors[bakeOptions.TargetChannel] = color.Mix(bakeOptions.OcclusionColor, ao[i])
 				}
 
 			}
@@ -1219,7 +1218,7 @@ func (model *Model) BakeAO(bakeOptions AOBakeOptions) {
 // BakeLighting bakes the colors for the provided lights into a Model's Mesh's vertex colors. Note that the baked lighting overwrites whatever vertex colors
 // previously existed in the target channel (as otherwise, the colors could only get brighter with additive mixing, or only get darker with multiplicative mixing).
 // It will add the Model's scene's ambient lighting in, if it's not there already.
-func (model *Model) BakeLighting(targetChannel int, camera *Camera, lights *NodeCollectionSet) {
+func (model *Model) BakeLighting(targetChannel int, camera *Camera, lights NodeIterator) {
 
 	if model.mesh == nil || targetChannel < 0 {
 		return
@@ -1227,11 +1226,20 @@ func (model *Model) BakeLighting(targetChannel int, camera *Camera, lights *Node
 
 	model.mesh.ensureEnoughVertexColorChannels(targetChannel)
 
+	lightsInput := NodeList{}
+
+	lightsInput.Combine(lights)
+
 	if model.Scene() != nil {
-		lights.Add(model.Scene().World.AmbientLight)
+		lightsInput.Add(model.Scene().World.AmbientLight)
 	}
 
-	lights.ForEachLight(func(light ILight) bool {
+	lightsInput.ForEach(func(node INode, index int) bool {
+
+		light, ok := node.(ILight)
+		if !ok {
+			return true
+		}
 
 		if light.IsVisible() {
 
@@ -1250,20 +1258,24 @@ func (model *Model) BakeLighting(targetChannel int, camera *Camera, lights *Node
 		if mp.Material != nil && mp.Material.Shadeless {
 
 			mp.ForEachVertexIndex(func(vertIndex int) {
-				model.mesh.VertexColors[targetChannel][vertIndex].R = 1
-				model.mesh.VertexColors[targetChannel][vertIndex].G = 1
-				model.mesh.VertexColors[targetChannel][vertIndex].B = 1
+				model.mesh.VertexColors[targetChannel].colors[vertIndex].R = 1
+				model.mesh.VertexColors[targetChannel].colors[vertIndex].G = 1
+				model.mesh.VertexColors[targetChannel].colors[vertIndex].B = 1
 			}, false)
 			continue
 		} else {
 
 			mp.ForEachVertexIndex(func(vertIndex int) {
-				model.mesh.VertexColors[targetChannel][vertIndex].R = 0
-				model.mesh.VertexColors[targetChannel][vertIndex].G = 0
-				model.mesh.VertexColors[targetChannel][vertIndex].B = 0
+				model.mesh.VertexColors[targetChannel].colors[vertIndex].R = 0
+				model.mesh.VertexColors[targetChannel].colors[vertIndex].G = 0
+				model.mesh.VertexColors[targetChannel].colors[vertIndex].B = 0
 			}, false)
 
-			lights.ForEachLight(func(light ILight) bool {
+			lightsInput.ForEach(func(node INode, index int) bool {
+				light, ok := node.(ILight)
+				if !ok {
+					return true
+				}
 				if light.IsVisible() {
 					mp.forEachTri(true, func(tri *Triangle) {
 						light.Light(tri, model, model.mesh.VertexColors[targetChannel])
@@ -1304,7 +1316,7 @@ func (model *Model) setParent(parent INode) {
 
 	if !batched {
 
-		model.ForEachChild(true, func(child INode, index, size int) bool {
+		model.ForEachChild(true, func(child INode, index int) bool {
 
 			if child, ok := child.(*Model); ok && child.AutoBatchMode != AutoBatchNone {
 

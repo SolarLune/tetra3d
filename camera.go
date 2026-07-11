@@ -317,11 +317,11 @@ type Camera struct {
 	DepthMargin float32
 }
 
-// NewCamera creates a new Camera with the specified width and height.
-func NewCamera(w, h int) *Camera {
+// NewCamera creates a new Camera with the specified name, width, and height.
+func NewCamera(name string, w, h int) *Camera {
 
 	cam := &Camera{
-		Node:        NewNode("Camera"),
+		Node:        NewNode(name),
 		RenderDepth: true,
 		near:        0.1,
 		far:         100,
@@ -546,7 +546,7 @@ func NewCamera(w, h int) *Camera {
 // Clone clones the Camera and returns it.
 func (camera *Camera) Clone() INode {
 
-	clone := NewCamera(camera.Size())
+	clone := NewCamera(camera.name, camera.Width(), camera.Height())
 
 	clone.RenderDepth = camera.RenderDepth
 	clone.near = camera.near
@@ -617,6 +617,18 @@ func (camera *Camera) Resize(w, h int) {
 func (camera *Camera) Size() (w, h int) {
 	size := camera.resultColorTexture.Bounds().Size()
 	return size.X, size.Y
+}
+
+// Returns the width of the camera's backing color texture.
+func (camera *Camera) Width() int {
+	size := camera.resultColorTexture.Bounds().Size()
+	return size.X
+}
+
+// Returns the height of the camera's backing color texture.
+func (camera *Camera) Height() int {
+	size := camera.resultColorTexture.Bounds().Size()
+	return size.Y
 }
 
 // ViewMatrix returns the Camera's view matrix.
@@ -970,7 +982,7 @@ func (camera *Camera) SphereInFrustum(position Vector3, radius float32) bool {
 // ModelInFrustum returns if a model is onscreen when viewed through a Camera.
 func (camera *Camera) ModelInFrustum(model *Model) bool {
 	model.Transform() // Make sure to update the transform of the Model as necessary.
-	return camera.boundingSphereInFrustum(model.frustumCullingSphere)
+	return camera.SphereInFrustum(model.frustumCullingSphere.position, model.frustumCullingSphere.radius)
 }
 
 // AspectRatio returns the camera's aspect ratio (width / height).
@@ -1081,8 +1093,8 @@ func (camera *Camera) RenderScene(scene *Scene) {
 	camera.RenderNodes(scene, scene.Root)
 }
 
-var meshes = NewNodeCollection()
-var lights = NewNodeCollection()
+var meshes = NodeList{}
+var lights = NodeList{}
 
 // RenderNodes renders all nodes starting with the provided rootNode using the Scene's properties (fog, for example). Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple RenderScene() calls will be rendered on top of each other in the Camera's texture buffers.
@@ -1090,7 +1102,7 @@ var lights = NewNodeCollection()
 func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	if camera.DebugInfo.On {
-		camera.DebugInfo.nodeCount = rootNode.ChildCount(true)
+		camera.DebugInfo.nodeCount = rootNode.ChildrenCount(true)
 	}
 
 	meshes.Clear()
@@ -1107,7 +1119,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 		var insideSector *Sector
 
-		rootNode.ForEachChild(true, func(child INode, index, size int) bool {
+		rootNode.ForEachChild(true, func(child INode, index int) bool {
 			if model, ok := child.(*Model); ok && model.sector != nil {
 
 				sectorModels = append(sectorModels, model)
@@ -1144,7 +1156,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 		}
 
-		rootNode.ForEachChild(true, func(node INode, index, size int) bool {
+		rootNode.ForEachChild(true, func(node INode, index int) bool {
 
 			if model, ok := node.(*Model); ok {
 
@@ -1182,7 +1194,7 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	} else {
 
-		rootNode.ForEachChild(true, func(node INode, index, size int) bool {
+		rootNode.ForEachChild(true, func(node INode, index int) bool {
 
 			// Avoid allocating new model / lights slices
 			if m, ok := node.(*Model); ok && m.DynamicBatchOwner == nil {
@@ -1251,7 +1263,7 @@ var sceneLights []ILight
 // Render renders all of the models passed using the provided Scene's properties (fog, for example) and lights provided. Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 // Also, the function will automatically include the Scene's world ambient light, if there is a world.
-func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
+func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	scene.HandleAutobatch()
 
@@ -1270,7 +1282,12 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	}
 
-	lights.ForEachLight(func(light ILight) bool {
+	lights.ForEach(func(node INode, index int) bool {
+
+		light, _ := node.(ILight)
+		if light == nil {
+			return true
+		}
 
 		camera.DebugInfo.lightCount++
 
@@ -1320,9 +1337,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 
 	camSpread := camera.far - camera.near + (depthMarginPercentage * 2)
 
-	models.ForEachModel(func(model *Model) bool {
+	models.ForEach(func(node INode, index int) bool {
 
-		if !model.visible || model.DynamicBatchOwner != nil {
+		model, _ := node.(*Model)
+		if model == nil || !model.visible || model.DynamicBatchOwner != nil {
 			return true
 		}
 
@@ -1586,10 +1604,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 			camera.DebugInfo.currentLightTime.StartTimer()
 
 			triangle.ForEachVertexIndex(func(vertexIndex int) {
-				mesh.vertexLights[vertexIndex].R = 0
-				mesh.vertexLights[vertexIndex].G = 0
-				mesh.vertexLights[vertexIndex].B = 0
-				mesh.vertexLights[vertexIndex].A = 1
+				mesh.vertexLights.colors[vertexIndex].R = 0
+				mesh.vertexLights.colors[vertexIndex].G = 0
+				mesh.vertexLights.colors[vertexIndex].B = 0
+				mesh.vertexLights.colors[vertexIndex].A = 1
 			})
 
 			for _, light := range sceneLights {
@@ -1692,10 +1710,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				// Vertex colors
 
 				if activeChannel := mesh.VertexActiveColorChannel; activeChannel >= 0 {
-					colorVertexList[vertexListIndex].ColorR = mesh.VertexColors[activeChannel][vertexIndex].R * mpColor.R
-					colorVertexList[vertexListIndex].ColorG = mesh.VertexColors[activeChannel][vertexIndex].G * mpColor.G
-					colorVertexList[vertexListIndex].ColorB = mesh.VertexColors[activeChannel][vertexIndex].B * mpColor.B
-					colorVertexList[vertexListIndex].ColorA = mesh.VertexColors[activeChannel][vertexIndex].A * mpColor.A
+					colorVertexList[vertexListIndex].ColorR = mesh.VertexColors[activeChannel].colors[vertexIndex].R * mpColor.R
+					colorVertexList[vertexListIndex].ColorG = mesh.VertexColors[activeChannel].colors[vertexIndex].G * mpColor.G
+					colorVertexList[vertexListIndex].ColorB = mesh.VertexColors[activeChannel].colors[vertexIndex].B * mpColor.B
+					colorVertexList[vertexListIndex].ColorA = mesh.VertexColors[activeChannel].colors[vertexIndex].A * mpColor.A
 				} else {
 					colorVertexList[vertexListIndex].ColorR = mpColor.R
 					colorVertexList[vertexListIndex].ColorG = mpColor.G
@@ -1704,9 +1722,9 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 				}
 
 				if lighting {
-					colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights[vertexIndex].R
-					colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights[vertexIndex].G
-					colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights[vertexIndex].B
+					colorVertexList[vertexListIndex].ColorR *= mesh.vertexLights.colors[vertexIndex].R
+					colorVertexList[vertexListIndex].ColorG *= mesh.vertexLights.colors[vertexIndex].G
+					colorVertexList[vertexListIndex].ColorB *= mesh.vertexLights.colors[vertexIndex].B
 				}
 
 				if camera.RenderDepth {
@@ -2016,10 +2034,10 @@ func (camera *Camera) Render(scene *Scene, lights, models *NodeCollectionSet) {
 	}
 
 	sort.SliceStable(transparents, func(i, j int) bool {
-		if transparents[i].order < transparents[j].order {
-			return true
+		if transparents[i].order == transparents[j].order {
+			return transparents[i].depth > transparents[j].depth
 		}
-		return transparents[i].depth > transparents[j].depth
+		return transparents[i].order < transparents[j].order
 	})
 
 	renderPasses := [][]renderPair{
@@ -2088,7 +2106,7 @@ func packFloat(input1, input2, precision float32) float32 {
 	return a + b
 }
 
-type DrawSprite3dSettings struct {
+type RenderSprite3DSettings struct {
 	// The image to render
 	Image *ebiten.Image
 	// How much to offset the depth - useful if you want the object to appear at a position,
@@ -2115,7 +2133,7 @@ var spriteRender3DIndices = []uint16{
 // This allows you to render 2D elements "at" a 3D position, and can be very useful in situations where you want
 // a sprite to render at 100% size and no perspective or skewing, but still look like it's in the 3D space (like in
 // a game with a fixed camera viewpoint).
-func (camera *Camera) RenderSprite3D(screen *ebiten.Image, renderSettings ...DrawSprite3dSettings) {
+func (camera *Camera) RenderSprite3D(screen *ebiten.Image, renderSettings ...RenderSprite3DSettings) {
 
 	// TODO: Replace this with a more performant alternative, where we minimize shader / texture switches.
 	// TODO 2: Add the ability to resize sprites rendered through this function.
@@ -2203,7 +2221,29 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 			return errors.New("no render settings to render")
 		}
 
-		dynamicRenderOwner.mesh.MeshParts[0].Material = settings[0].Model.mesh.MeshParts[0].Material
+		renderable := false
+
+		var mat *Material
+
+		for _, setting := range settings {
+			if setting.Model.mesh != nil {
+				renderable = true
+				if mat == nil {
+					for _, mp := range setting.Model.Mesh().MeshParts {
+						if mp.Material != nil {
+							mat = mp.Material
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if !renderable {
+			return errors.New("no renderable mesh")
+		}
+
+		dynamicRenderOwner.mesh.MeshParts[0].Material = mat
 
 		dynamicRenderOwner.FrustumCulling = false
 
@@ -2233,7 +2273,7 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 
 		}
 
-		camera.Render(scene, scene.Root.Search(SearchOptions{NodeTypes: []NodeType{NodeTypeLight}}), NewNodeCollection(dynamicRenderOwner))
+		camera.Render(scene, scene.Root.Search().ByType(NodeTypeLight), NodeList{dynamicRenderOwner})
 
 	} else {
 		return errors.New("camera is not in a scene; cannot render elements")
@@ -2242,6 +2282,88 @@ func (camera *Camera) DynamicRender(settings ...DynamicRenderSettings) error {
 	return nil
 
 }
+
+// type DynamicRenderTriangle struct {
+// 	Position [3]Vector3
+// 	Normal   [3]Vector3
+// 	Color    [3]Color4
+// }
+
+// type DynamicRenderTrianglesSettings struct {
+// 	Triangles []DynamicRenderTriangle
+// 	Material  *Material
+// }
+
+// var dynamicRenderTrianglesModel = NewModel("dynamic render triangles model", NewMesh("dynamic render triangles mesh"))
+
+// func (camera *Camera) DynamicRenderTriangles(settings DynamicRenderTrianglesSettings) {
+
+// 	centerPoint := Vector3{}
+
+// 	if len(settings.Triangles) > 0 {
+
+// 		for _, p := range settings.Triangles {
+// 			for i := range 3 {
+// 				centerPoint.X += p.Position[i].X
+// 				centerPoint.Y += p.Position[i].Y
+// 				centerPoint.Z += p.Position[i].Z
+// 			}
+// 		}
+
+// 		centerPoint.X /= float32(len(settings.Triangles)) * 3
+// 		centerPoint.Y /= float32(len(settings.Triangles)) * 3
+// 		centerPoint.Z /= float32(len(settings.Triangles)) * 3
+// 	}
+
+// 	mesh := dynamicRenderTrianglesModel.Mesh()
+// 	mesh.ensureEnoughVertexColorChannels(0)
+// 	mesh.allocateVertexBuffers(len(settings.Triangles) * 3)
+// 	mesh.VertexPositions = mesh.VertexPositions[:0]
+
+// 	mesh.Triangles = mesh.Triangles[:0]
+
+// 	if cap(mesh.Triangles) < len(settings.Triangles) {
+// 		mesh.Triangles = slices.Grow(mesh.Triangles, len(settings.Triangles))
+// 	}
+
+// 	if len(mesh.MeshParts) == 0 {
+// 		mesh.AddMeshPart(settings.Material)
+// 	} else {
+// 		mesh.MeshParts[0].Material = settings.Material
+// 	}
+
+// 	mesh.Triangles = mesh.Triangles[:0]
+
+// 	for _, p := range settings.Triangles {
+// 		mesh.Triangles = append(mesh.Triangles, NewTriangle(mesh.MeshParts[0], len(mesh.VertexPositions), len(mesh.VertexPositions)+1, len(mesh.VertexPositions)+2))
+// 		for i := range 3 {
+// 			mesh.VertexPositions = append(mesh.VertexPositions, centerPoint.Sub(p.Position[i]))
+// 		}
+// 	}
+
+// 	mesh.VertexNormals = mesh.VertexNormals[:0]
+// 	for _, p := range settings.Triangles {
+// 		for i := range 3 {
+// 			mesh.VertexNormals = append(mesh.VertexNormals, p.Normal[i])
+// 		}
+// 	}
+
+// 	mesh.VertexColors[0].colors = mesh.VertexColors[0].colors[:0]
+// 	for _, p := range settings.Triangles {
+// 		for i := range 3 {
+// 			mesh.VertexColors[0].colors = append(mesh.VertexColors[0].colors, p.Color[i])
+// 		}
+// 	}
+
+// 	mesh.VertexActiveColorChannel = 0
+
+// 	camera.DynamicRender(DynamicRenderSettings{
+// 		Model:       dynamicRenderTrianglesModel,
+// 		clonedModel: dynamicRenderTrianglesModel,
+// 		Transform:   NewMatrix4Translate(centerPoint.X, centerPoint.Y, centerPoint.Z),
+// 	})
+
+// }
 
 // DrawDebugWireframe draws the wireframe triangles of all visible Models underneath the rootNode in the color provided to the screen
 // image provided.
@@ -2259,7 +2381,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 		autosubLevels = rootNode.Scene().autosubdivisionLevels
 	}
 
-	rootNode.ForEachChild(true, func(node INode, index, size int) bool {
+	rootNode.Search().ForEach(func(node INode, index int) bool {
 
 		if model, isModel := node.(*Model); isModel {
 
@@ -2314,7 +2436,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 		} else if path, isPath := node.(*Path); isPath {
 
-			points := path.Children(false).ToNodes()
+			points := path.Children(false)
 
 			if path.Closed {
 				points = append(points, points[0])
@@ -2359,7 +2481,12 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 		autosubLevels = rootNode.Scene().autosubdivisionLevels
 	}
 
-	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
+	rootNode.Search().ForEach(func(i INode, index int) bool {
+
+		model, ok := i.(*Model)
+		if !ok {
+			return true
+		}
 
 		if model.FrustumCulling {
 
@@ -2407,7 +2534,12 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 		autosubLevels = rootNode.Scene().autosubdivisionLevels
 	}
 
-	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
+	rootNode.Search().ForEach(func(i INode, index int) bool {
+
+		model, ok := i.(*Model)
+		if !ok {
+			return true
+		}
 
 		if model.FrustumCulling {
 
@@ -2446,7 +2578,12 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 // image provided.
 func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INode, textScale float32, color Color4) {
 
-	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
+	rootNode.Search().ForEach(func(i INode, index int) bool {
+
+		model, ok := i.(*Model)
+		if !ok {
+			return true
+		}
 
 		if model.FrustumCulling {
 
@@ -2469,7 +2606,12 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 // in units. Color is the color to draw the normals.
 func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, normalLength float32, color Color4) {
 
-	NewNodeCollection(rootNode).ForEachModel(func(model *Model) bool {
+	rootNode.Search().ForEach(func(i INode, index int) bool {
+
+		model, ok := i.(*Model)
+		if !ok {
+			return true
+		}
 
 		if model.FrustumCulling {
 
@@ -2497,7 +2639,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 // DrawDebugCenters draws the center positions of nodes under the rootNode using the color given to the screen image provided.
 func (camera *Camera) DrawDebugCenters(screen *ebiten.Image, rootNode INode, color Color4) {
 
-	rootNode.Search(SearchOptions{}).ForEach(func(node INode) bool {
+	rootNode.Search().ForEach(func(node INode, index int) bool {
 
 		c := color.ToNRGBA64()
 
@@ -2589,7 +2731,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 		return camera.clipToScreen(v.MultVecW(Vector3{}), nil, float32(width), float32(height), float32(width)/2, float32(height)/2, true).To3D()
 	}
 
-	rootNode.Search(SearchOptions{}).ForEach(func(n INode) bool {
+	rootNode.Search().ForEach(func(n INode, index int) bool {
 
 		p, s, r := n.Transform().Inverted().Decompose()
 		invertedCamPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector3{1 / s.X, 1 / s.Y, 1 / s.Z}))
@@ -2611,11 +2753,26 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 					pos := bounds.WorldPosition()
 					radius := bounds.WorldRadius()
-					height := bounds.Height / 2
+					height := bounds.WorldHeight() / 2
 
-					uv := bounds.WorldRotation().Up()
-					rv := bounds.WorldRotation().Right()
-					fv := bounds.WorldRotation().Forward()
+					var uv Vector3
+					var rv Vector3
+					var fv Vector3
+
+					switch bounds.up {
+					case 0:
+						uv = bounds.WorldRotation().Right()
+						rv = bounds.WorldRotation().Up().Invert()
+						fv = bounds.WorldRotation().Forward()
+					case 1:
+						uv = bounds.WorldRotation().Up()
+						rv = bounds.WorldRotation().Right()
+						fv = bounds.WorldRotation().Forward()
+					case 2:
+						uv = bounds.WorldRotation().Forward()
+						rv = bounds.WorldRotation().Right()
+						fv = bounds.WorldRotation().Up().Invert()
+					}
 
 					u := worldToScreenPixels(pos.Add(uv.Scale(height)))
 
@@ -2805,7 +2962,12 @@ func DefaultDrawDebugBoundsSettings() DrawDebugBoundsColoredSettings {
 // The shapes will be drawn in the color provided to the screen image provided.
 func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, color Color4) {
 
-	rootNode.Search(SearchOptions{}).ForEachModel(func(model *Model) bool {
+	rootNode.Search().ForEach(func(i INode, index int) bool {
+
+		model, ok := i.(*Model)
+		if !ok {
+			return true
+		}
 
 		bounds := model.frustumCullingSphere
 		camera.drawSphere(screen, bounds, color)
@@ -2819,7 +2981,6 @@ var debugIcosphereMesh = NewIcosphereMesh(1)
 var debugIcosphere = NewModel("debug icosphere", debugIcosphereMesh)
 
 func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color Color4) {
-
 	debugIcosphere.SetLocalPositionVec(sphere.WorldPosition())
 	s := sphere.WorldRadius()
 	debugIcosphere.SetLocalScaleVec(Vector3{s, s, s})

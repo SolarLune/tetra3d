@@ -65,7 +65,7 @@ func (g *Game) Update() error {
 
 	g.Camera.MouseRayTest(tetra3d.MouseRayTestOptions{
 		// Depth: g.Camera.Far(),
-		TestAgainst: g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject)),
+		TestAgainst: g.Scene.Root.Search().ByType(tetra3d.NodeTypeBoundingObject),
 
 		OnHit: func(hit tetra3d.RayHit, hitIndex int, hitCount int) bool {
 
@@ -82,7 +82,8 @@ func (g *Game) Update() error {
 				vc = hit.Object.Parent().(*tetra3d.Model).Mesh().MeshParts[0].Material.Color
 			}
 
-			tetra3d.NewVertexSelection(marker.(*tetra3d.Model).Mesh()).SelectMeshPartIndex(1).SetColor(0, vc)
+			markerMesh := marker.(*tetra3d.Model).Mesh()
+			tetra3d.NewVertexSelection(markerMesh).SelectMeshPartIndex(1).SetColor(markerMesh.VertexColors[0], vc)
 
 			marker.SetWorldPositionVec(hit.Position.Add(hit.Normal.Scale(0.5)))
 

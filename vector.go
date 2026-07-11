@@ -582,6 +582,11 @@ func (vec Vector3) Slerp(end Vector3, percentage float32) Vector3 {
 	dot = math32.Clamp(dot, -1, 1)
 
 	theta := math32.Acos(dot) * percentage
+
+	if math32.IsNaN(theta) || math32.IsNaN(percentage) {
+		return vec
+	}
+
 	relative := end.Sub(vec.Scale(dot)).Unit()
 
 	return (vec.Scale(math32.Cos(theta)).Add(relative.Scale(math32.Sin(theta)))).Unit()
@@ -628,19 +633,35 @@ func (vec Vector3) ClampToDimensions(dim Dimensions) Vector3 {
 	return vec
 }
 
-// IsInsideDimensions returns if a position is inside a set of dimensions.
-func (vec Vector3) IsInsideDimensions(dim Dimensions) bool {
+// Returns the maximum of the Vector's X, Y, and Z values.
+func (v Vector3) Max() float32 {
+	return max(v.X, v.Y, v.Z)
+}
 
-	if vec.X < dim.Min.X ||
-		vec.X > dim.Max.X ||
-		vec.Y < dim.Min.Y ||
-		vec.Y > dim.Max.Y ||
-		vec.Z < dim.Min.Z ||
-		vec.Z > dim.Max.Z {
-		return false
+// Returns the minimum of the Vector's X, Y, and Z values.
+func (v Vector3) Min() float32 {
+	return min(v.X, v.Y, v.Z)
+}
+
+// Slope returns the vertical slope of the vector in radians.
+// This ranges from 0 (straight up, [0, 1, 0]) to 1 (straight down, [0, -1, 0]).
+func (v Vector3) Slope() float32 {
+	return WorldUp.Angle(v) / math32.Pi
+}
+
+// Returns the Vector "slid against" the reflecting normal.
+func (v Vector3) SlideAgainst(reflectingNormal Vector3) Vector3 {
+
+	temp := reflectingNormal.Cross(v)
+
+	if temp.Magnitude() == 0 {
+		return Vector3{}
 	}
 
-	return true
+	out := temp.Cross(reflectingNormal)
+
+	return out
+
 }
 
 // ModVector3 represents a reference to a Vector, made to facilitate easy method-chaining and modifications on that Vector3 (as you
@@ -1031,6 +1052,19 @@ func (ip *ModVector3) Clone() *ModVector3 {
 // ToVector3 returns a copy of the Vector3 that the ModVector3 is modifying.
 func (ip *ModVector3) ToVector() Vector3 {
 	return *ip.Vector3
+}
+
+// Slope returns the vertical slope of the vector in radians.
+// This ranges from 0 (straight up, [0, 1, 0]) to 1 (straight down, [0, -1, 0]).
+func (ip *ModVector3) Slope() float32 {
+	return ip.Vector3.Slope()
+}
+
+// Returns the Vector "slid against" the reflecting normal.
+func (ip *ModVector3) SlideAgainst(reflectingNormal Vector3) *ModVector3 {
+	result := ip.Vector3.SlideAgainst(reflectingNormal)
+	ip.Vector3 = &result
+	return ip
 }
 
 // //////

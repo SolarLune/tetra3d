@@ -13,6 +13,11 @@ type AutoSubdivisionLevel struct {
 // There is no zero ID; this is to make it so that systems that reference scenes by id can use 0 as an invalid reference.
 var sceneID uint32 = 1
 
+type bitfieldNamePair struct {
+	Value Bitfield
+	Name  string
+}
+
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
 // graph of parents and children.
 type Scene struct {
@@ -25,7 +30,7 @@ type Scene struct {
 	// See this page for more information on how a scene graph works: https://webglfundamentals.org/webgl/lessons/webgl-scene-graph.html
 	Root          *Node
 	World         *World
-	props         Properties
+	props         *Properties
 	data          any
 	View3DCameras []*Camera // Any 3D view cameras that were exported from Blender
 
@@ -35,6 +40,8 @@ type Scene struct {
 	autosubdivisionLevels []AutoSubdivisionLevel
 
 	callbacks *SceneCallbacks
+
+	bitfieldNames []bitfieldNamePair
 }
 
 // NewScene creates a new Scene by the name given.
@@ -76,6 +83,8 @@ func (scene *Scene) Clone() *Scene {
 
 	scene.Root.scene = scene
 
+	newScene.bitfieldNames = append(newScene.bitfieldNames, scene.bitfieldNames...)
+
 	newScene.Root.scene = newScene
 	newScene.Root.cachedSceneRootNode = newScene.Root
 	newScene.autosubdivisionLevels = append(newScene.autosubdivisionLevels, scene.autosubdivisionLevels...)
@@ -85,18 +94,18 @@ func (scene *Scene) Clone() *Scene {
 	newScene.updateAutobatch = true
 
 	// Update sectors after cloning the scene
-	models := newScene.Root.Search(SearchOptions{
-		NodeTypes: []NodeType{NodeTypeModel},
-	})
+	models := newScene.Root.Search().ByType(NodeTypeModel).GetNodeList()
 
-	models.ForEachModel(func(model *Model) bool {
+	models.ForEach(func(node INode, index int) bool {
+		model := node.(*Model)
 		if model.sector != nil {
 			model.sector.Neighbors.Clear()
 		}
 		return true
 	})
 
-	models.ForEachModel(func(model *Model) bool {
+	models.ForEach(func(node INode, index int) bool {
+		model := node.(*Model)
 		if model.sector != nil {
 			model.sector.UpdateNeighbors(models)
 		}
@@ -123,7 +132,7 @@ func (scene *Scene) Clone() *Scene {
 
 		// Loop through and call OnClone for each Node that has it set in the tree.
 		// This is done through a copy of the children slice because they could
-		newScene.Root.Children(true).ForEach(func(child INode) bool {
+		newScene.Root.Children(true).ForEach(func(child INode, index int) bool {
 			if child.Callbacks().OnClone != nil {
 				child.Callbacks().OnClone(child)
 			}
@@ -176,7 +185,7 @@ func (scene *Scene) Library() *Library {
 	return scene.library
 }
 
-func (scene *Scene) Properties() Properties {
+func (scene *Scene) Properties() *Properties {
 	return scene.props
 }
 
@@ -186,7 +195,7 @@ func (scene *Scene) HandleAutobatch() {
 
 	if scene.updateAutobatch {
 
-		scene.Root.ForEachChild(true, func(node INode, index, size int) bool {
+		scene.Root.ForEachChild(true, func(node INode, index int) bool {
 
 			if model, ok := node.(*Model); ok {
 
@@ -281,6 +290,47 @@ func (scene *Scene) Get(nodePath string) INode {
 	return scene.Root.Get(nodePath)
 }
 
+// Returns the callbacks object associated with the Scene.
 func (scene *Scene) Callbacks() *SceneCallbacks {
 	return scene.callbacks
+}
+
+// Returns the names of bits for the Scene.
+func (scene *Scene) BitfieldNames() []string {
+	out := []string{}
+	for _, n := range scene.bitfieldNames {
+		out = append(out, n.Name)
+	}
+	return out
+}
+
+// Returns the name of the bit mask in the specified index.
+// If it can't be found, a blank string is returned.
+func (scene *Scene) BitfieldNameByIndex(index int) string {
+	if index < len(scene.bitfieldNames) {
+		return scene.bitfieldNames[index].Name
+	}
+	return ""
+}
+
+// Returns the name of the bitfield for the given bit mask value.
+// If it can't be found, a blank string is returned.
+func (scene *Scene) BitfieldNameByValue(value Bitfield) string {
+	for _, b := range scene.bitfieldNames {
+		if b.Value == value {
+			return b.Name
+		}
+	}
+	return ""
+}
+
+// Returns the bitfield value associated with the given name.
+// If it can't be found, a bitfield with the value of 0 is returned.
+func (scene *Scene) BitfieldValueByName(name string) Bitfield {
+	for _, b := range scene.bitfieldNames {
+		if b.Name == name {
+			return b.Value
+		}
+	}
+	return Bitfield(0)
 }

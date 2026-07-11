@@ -81,7 +81,7 @@ func LoadGLTFFileSystem(fileSystem fs.FS, filename string, gltfLoadOptions *GLTF
 // animations) and Cameras (assuming they are exported in the GLTF file) will be parsed properly.
 // LoadGLTFFile will not work by default with external byte information buffers (i.e. .gltf and .glb file pairs)
 // as the buffer is referenced in .gltf as just a filename. To handle this properly, load the .gltf file using LoadGLTFFile().
-// LoadGLTFFile will return a Library, and an error if the process fails.
+// The function will return a Library, and an error if the process fails.
 func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, error) {
 
 	doc := gltf.NewDocument()
@@ -134,7 +134,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 	exportedTextures := false
 
 	type Collection struct {
-		Objects []string
+		Objects []string // Paths to the objects
 		Offset  []float32
 		Path    string
 	}
@@ -224,7 +224,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					locVec := NewVector3(float32(location[0].(float64)), float32(location[1].(float64)), float32(location[2].(float64)))
 
-					newCam := NewCamera(camWidth, camHeight)
+					newCam := NewCamera("Camera", camWidth, camHeight)
 
 					newCam.SetLocalPositionVec(locVec)
 					newCam.SetLocalRotation(rotationMatrix)
@@ -531,8 +531,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 
 				if vcNames, exists := dataMap["t3dVertexColorNames__"]; exists {
-					for index, name := range vcNames.([]any) {
-						newMesh.VertexColorChannelNames[name.(string)] = index
+					for _, name := range vcNames.([]any) {
 						colorChannelNames = append(colorChannelNames, name.(string))
 					}
 				}
@@ -562,10 +561,18 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		}
 
+		posBuffer := [][3]float32{}
+		uvBuffer := [][2]float32{}
+		normalBuffer := [][3]float32{}
+		vcBuffer := [][4]uint8{}
+		weightBuffer := [][4]float32{}
+		boneBuffer := [][4]uint16{}
+		indexBuffer := []uint32{}
+
 		for _, v := range mesh.Primitives {
 
-			posBuffer := [][3]float32{}
 			vertPos, err := modeler.ReadPosition(doc, doc.Accessors[v.Attributes[gltf.POSITION]], posBuffer)
+			clear(posBuffer)
 
 			if err != nil {
 				return nil, err
@@ -573,7 +580,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			vertexData := make([]VertexInfo, len(vertPos))
 
-			for i, v := range vertPos {
+			for i, v := range vertPos[:doc.Accessors[v.Attributes[gltf.POSITION]].Count] {
 
 				vertexData[i] = NewVertex(
 					float32(v[0]),
@@ -586,15 +593,14 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if texCoordAccessor, texCoordExists := v.Attributes[gltf.TEXCOORD_0]; texCoordExists {
 
-				uvBuffer := [][2]float32{}
-
 				texCoords, err := modeler.ReadTextureCoord(doc, doc.Accessors[texCoordAccessor], uvBuffer)
+				clear(uvBuffer)
 
 				if err != nil {
 					return nil, err
 				}
 
-				for i, v := range texCoords {
+				for i, v := range texCoords[:doc.Accessors[texCoordAccessor].Count] {
 					vertexData[i].U = float32(v[0])
 					vertexData[i].V = -(float32(v[1]) - 1)
 				}
@@ -603,15 +609,14 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if normalAccessor, normalExists := v.Attributes[gltf.NORMAL]; normalExists {
 
-				normalBuffer := [][3]float32{}
-
 				normals, err := modeler.ReadNormal(doc, doc.Accessors[normalAccessor], normalBuffer)
+				clear(normalBuffer)
 
 				if err != nil {
 					return nil, err
 				}
 
-				for i, v := range normals {
+				for i, v := range normals[:doc.Accessors[normalAccessor].Count] {
 					vertexData[i].NormalX = float32(v[0])
 					vertexData[i].NormalY = float32(v[1])
 					vertexData[i].NormalZ = float32(v[2])
@@ -623,70 +628,57 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			// is turned to "COLOR_0", while the other channels are turned into attributes
 			// accessible by their names like so: "_CHANNELNAMEINALLCAPS".
 
-			if len(colorChannelNames) > 0 {
+			for index := range colorChannelNames {
 
-				for index, name := range colorChannelNames {
+				vertexColorAccessor, _ := v.Attributes["COLOR_"+strconv.Itoa(index)]
 
-					name = "_" + strings.ToUpper(name)
-
-					vertexColorAccessor, colorChannelExists := v.Attributes[name]
-
-					if !colorChannelExists {
-						vertexColorAccessor, colorChannelExists = v.Attributes["COLOR_"+strconv.Itoa(index)]
-					}
-
-					if colorChannelExists {
-
-						vcBuffer := [][4]uint8{}
-
-						colors, err := modeler.ReadColor(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
-
-						if err != nil {
-							return nil, err
-						}
-
-						for i, colorData := range colors {
-
-							// Vertex colors exported from Blender no longer need to be
-							// converted from linear / to sRGB format; the GLTF addon must
-							// be doing this automatically for us now.
-							color := NewColor4(
-								float32(colorData[0])/math.MaxUint8,
-								float32(colorData[1])/math.MaxUint8,
-								float32(colorData[2])/math.MaxUint8,
-								float32(colorData[3])/math.MaxUint8,
-							)
-
-							vertexData[i].Colors = append(vertexData[i].Colors, color)
-
-						}
-
-					}
-
-				}
-
-				newMesh.VertexActiveColorChannel = 0 // Set it to 0 - the enabled vertex color channel in Blender is exported as the first channel now.
-
-			}
-
-			if weightAccessor, weightExists := v.Attributes[gltf.WEIGHTS_0]; weightExists {
-
-				weightBuffer := [][4]float32{}
-				weights, err := modeler.ReadWeights(doc, doc.Accessors[weightAccessor], weightBuffer)
+				colors, err := modeler.ReadColor(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
+				clear(vcBuffer)
 
 				if err != nil {
 					return nil, err
 				}
 
-				boneBuffer := [][4]uint16{}
+				for i, colorData := range colors[:doc.Accessors[vertexColorAccessor].Count] {
+
+					// Vertex colors exported from Blender no longer need to be
+					// converted from linear / to sRGB format; the GLTF addon must
+					// be doing this automatically for us now.
+					color := NewColor4(
+						float32(colorData[0])/math.MaxUint8,
+						float32(colorData[1])/math.MaxUint8,
+						float32(colorData[2])/math.MaxUint8,
+						float32(colorData[3])/math.MaxUint8,
+					).ConvertTosRGB()
+
+					vertexData[i].Colors = append(vertexData[i].Colors, color)
+
+				}
+
+			}
+
+			if len(colorChannelNames) > 0 {
+				newMesh.VertexActiveColorChannel = 0 // Set it to 0 - the enabled vertex color channel in Blender is exported as the first channel now.
+			}
+
+			if weightAccessor, weightExists := v.Attributes[gltf.WEIGHTS_0]; weightExists {
+
+				weights, err := modeler.ReadWeights(doc, doc.Accessors[weightAccessor], weightBuffer)
+				clear(weightBuffer)
+
+				if err != nil {
+					return nil, err
+				}
+
 				bones, err := modeler.ReadJoints(doc, doc.Accessors[v.Attributes[gltf.JOINTS_0]], boneBuffer)
+				clear(boneBuffer)
 
 				if err != nil {
 					return nil, err
 				}
 
 				// Store weights and bones; we don't want to waste space and speed storing bones if their weights are 0
-				for w := range weights {
+				for w := range weights[:doc.Accessors[weightAccessor].Count] {
 					vWeights := weights[w]
 					for i := range vWeights {
 						if vWeights[i] > 0 {
@@ -698,9 +690,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			}
 
-			indexBuffer := []uint32{}
-
 			indices, err := modeler.ReadIndices(doc, doc.Accessors[*v.Indices], indexBuffer)
+			clear(indexBuffer)
 
 			if err != nil {
 				return nil, err
@@ -713,9 +704,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				mat = library.MaterialByName(gltfMat.Name)
 			}
 
-			newIndices := make([]int, len(indices))
+			newIndices := make([]int, doc.Accessors[*v.Indices].Count)
 
-			for i, j := range indices {
+			for i, j := range indices[:doc.Accessors[*v.Indices].Count] {
 				newIndices[i] = int(j)
 			}
 
@@ -727,10 +718,73 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			newMesh.UpdateBounds()
 
+			shapeTargetNames := []string{}
+
+			if len(colorChannelNames) > 0 {
+				for index := range colorChannelNames {
+					newMesh.VertexColors[index].name = colorChannelNames[index]
+				}
+			}
+
+			if dataMap, isMap := mesh.Extras.(map[string]any); isMap {
+
+				if names, exists := dataMap["t3dShapeKeyNames__"]; exists {
+					for _, name := range names.([]any) {
+						shapeTargetNames = append(shapeTargetNames, name.(string))
+					}
+				}
+
+			}
+
+			for t, attributes := range v.Targets {
+
+				key := MeshShapeKey{
+					name:            shapeTargetNames[t],
+					weight:          float32(mesh.Weights[t]),
+					vertexPositions: make([]Vector3, 0, len(newMesh.VertexPositions)),
+					vertexNormals:   make([]Vector3, 0, len(newMesh.VertexNormals)),
+				}
+
+				for k, accessor := range attributes {
+
+					switch k {
+					case gltf.POSITION:
+						positions, err := modeler.ReadPosition(doc, doc.Accessors[accessor], posBuffer)
+						clear(posBuffer)
+						if err != nil {
+							return nil, err
+						}
+
+						for _, v := range positions[:doc.Accessors[accessor].Count] {
+							key.vertexPositions = append(key.vertexPositions, NewVector3(v[0], v[1], v[2]))
+						}
+
+					case gltf.NORMAL:
+
+						normals, err := modeler.ReadNormal(doc, doc.Accessors[accessor], normalBuffer)
+						clear(normalBuffer)
+
+						if err != nil {
+							return nil, err
+						}
+
+						for _, v := range normals[:doc.Accessors[accessor].Count] {
+							key.vertexNormals = append(key.vertexNormals, NewVector3(v[0], v[1], v[2]))
+						}
+
+					}
+
+				}
+
+				newMesh.shapeKeys = append(newMesh.shapeKeys, &key)
+			}
+
 		}
 
 	}
 
+	// TODO: Investigate the bug where having two objects that have animations in the same scene exports the animations multiple times, with the original
+	// being incorrect.
 	for _, gltfAnim := range doc.Animations {
 		anim := NewAnimation(gltfAnim.Name)
 		anim.library = library
@@ -747,7 +801,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				channelName = doc.Nodes[*channel.Target.Node].Name
 			}
 
-			animChannel := anim.Channels[channelName]
+			animChannel := anim.channels[channelName]
 			if animChannel == nil {
 				animChannel = anim.AddChannel(channelName)
 			}
@@ -860,7 +914,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 
 				if relativeMotion, exists := dataMap["t3dRelativeMotion__"]; exists {
-					anim.RelativeMotion = relativeMotion.(float64) > 0
+					anim.relativeMotion = relativeMotion.(float64) > 0
 				}
 
 				if loopMode, exists := dataMap["t3dLoopMode__"]; exists {
@@ -875,7 +929,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					marker := mData.(map[string]any)
 
-					anim.Markers = append(anim.Markers, Marker{
+					anim.markers = append(anim.markers, Marker{
 						Name: marker["name"].(string),
 						Time: float32(marker["time"].(float64)),
 					})
@@ -883,7 +937,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			}
 		}
 
-		anim.Length = animLength
+		anim.length = animLength
 
 	}
 
@@ -972,7 +1026,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			gltfCam := doc.Cameras[*node.Camera]
 
-			newCam := NewCamera(camWidth, camHeight)
+			newCam := NewCamera(node.Name, camWidth, camHeight)
 			newCam.name = node.Name
 			newCam.RenderDepth = gltfLoadOptions.CameraDepth
 			newCam.updateProjectionMatrix = true
@@ -1030,7 +1084,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			} else if lightData.Type == lightspunctual.TypePoint {
 				pointLight := NewPointLight(node.Name, 1, 1, 1, float32(*lightData.Intensity)/80) // Point lights have wattage energy
 				pointLight.color = NewColor4(float32(color[0]), float32(color[1]), float32(color[2]), 1).ConvertTosRGB()
-				if !math.IsInf(*lightData.Range, 0) {
+				if lightData.Range != nil && !math.IsInf(*lightData.Range, 0) {
 					pointLight.SetRange(float32(*lightData.Range))
 				}
 				obj = pointLight
@@ -1109,10 +1163,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			obj = NewNode(node.Name)
 		}
 
-		objToNode[obj] = node
-
-		obj.setLibrary(library)
-
 		for _, child := range node.Children {
 			if objects[int(child)] == nil {
 				continue
@@ -1126,6 +1176,13 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				getOrDefaultBool := func(path string, defaultValue bool) bool {
 					if value, exists := dataMap[path]; exists {
 						return value.(float64) > 0.5
+					}
+					return defaultValue
+				}
+
+				getOrDefaultInt := func(path string, defaultValue int) int {
+					if value, exists := dataMap[path]; exists {
+						return int(value.(float64))
 					}
 					return defaultValue
 				}
@@ -1187,18 +1244,20 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 						var capsule *BoundingCapsule
 
+						capsuleUp := BoundingCapsuleUpAxis(getOrDefaultInt("t3dCapsuleUp__", 1))
 						if capsuleCustomEnabled := getOrDefaultBool("t3dCapsuleCustomEnabled__", false); capsuleCustomEnabled {
 							height := getOrDefaultFloat("t3dCapsuleCustomHeight__", 2)
 							radius := getOrDefaultFloat("t3dCapsuleCustomRadius__", 0.5)
-							capsule = NewBoundingCapsule("BoundingCapsule", height, radius)
+							capsule = NewBoundingCapsule("BoundingCapsule", radius, height, capsuleUp)
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
-							mesh := obj.(*Model).mesh
-							dim := mesh.Dimensions
-							capsule = NewBoundingCapsule("BoundingCapsule", dim.Height(), math32.Max(dim.Width(), dim.Depth())/2)
+							dim := obj.(*Model).mesh.Dimensions
+							capsule = NewBoundingCapsule("BoundingCapsule", math32.Max(dim.Width(), dim.Depth())/2, dim.Height(), capsuleUp)
 						}
 
 						if capsule != nil {
 
+							// TODO: This works for now, but in truth, it probably is expected that the capsule stays
+							// in the center of the model, not just when the model is spawned (so scaling has the expected result)
 							if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 								capsule.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
@@ -1321,6 +1380,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		objects = append(objects, obj)
 
+		objToNode[obj] = node
+
+		obj.setLibrary(library)
+
 	}
 
 	// We do this again here so we can be sure that all of the nodes can be created first
@@ -1337,28 +1400,27 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			skin := doc.Skins[*node.Skin]
 
-			// Unsure of if this is necessary.
-			// if skin.Skeleton != nil {
-			// 	skeletonRoot := objects[*skin.Skeleton]
-			// 	model.SetWorldPositionVec(skeletonRoot.WorldPosition())
-			// 	model.SetWorldScale(skeletonRoot.WorldScale())
-			// 	model.SetWorldRotation(skeletonRoot.WorldRotation())
-			// }
-
 			model.skinned = true
 
 			// We should keep a local slice of bones because we can't simply loop through all bones with the matrix index, as
 			// the matrix index resets at 0 for each armature, naturally.
 			localBones := []*Node{}
 
+			for _, o := range objects {
+				if o == nil {
+					continue
+				}
+				if o.Name() == skin.Name {
+					model.SkinRoot = o
+					break
+				}
+			}
+
 			for _, b := range skin.Joints {
 				if objects[b] == nil {
 					continue
 				}
 				bone := objects[b].(*Node)
-				// This is incorrect, but it gives us a link to any bone in the armature to establish
-				// the true root after parenting is set below
-				model.SkinRoot = bone
 				localBones = append(localBones, bone)
 			}
 
@@ -1392,21 +1454,12 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		// Set up parenting
 		for _, childIndex := range node.Children {
-			if objects[i] == nil {
+			if objects[i] == nil || objects[int(childIndex)] == nil {
 				continue
 			}
 			objects[i].AddChildren(objects[int(childIndex)])
 		}
 
-	}
-
-	findNode := func(objName string) INode {
-		for _, obj := range objects {
-			if obj.Name() == objName {
-				return obj
-			}
-		}
-		return nil
 	}
 
 	// At this point, parenting should be set up.
@@ -1424,97 +1477,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 						obj.Properties().Add(name).Set(value)
 
 					}
-				}
-
-			}
-
-		}
-	}
-
-	// Set up SkinRoot for skinned Models; this should be the root node of a hierarchy of bone Nodes.
-	for _, n := range objects {
-
-		if model, isModel := n.(*Model); isModel && model.skinned {
-
-			parent := model.SkinRoot
-
-			for parent.IsBone() && parent.Parent() != nil {
-				parent = parent.Parent()
-			}
-
-			model.SkinRoot = parent
-
-		}
-
-	}
-
-	for obj, node := range objToNode {
-
-		if node.Extras != nil {
-			if dataMap, isMap := node.Extras.(map[string]any); isMap {
-
-				if c, exists := dataMap["t3dInstanceCollection__"]; exists {
-
-					n := obj.(*Node)
-					n.collectionObjects = []INode{}
-
-					collection := collections[c.(string)]
-
-					offset := Vector3{-collection.Offset[0], -collection.Offset[2], collection.Offset[1]}
-
-					for _, cloneName := range collection.Objects {
-
-						var clone INode
-
-						path := collection.Path
-
-						if path == "" {
-							clone = findNode(cloneName).Clone()
-						} else {
-							path = convertBlenderPath(path)
-							if gltfLoadOptions.DependentLibraryResolver == nil {
-								log.Printf("Warning: No dependent library resolver defined to resolve dependent library %s for object %s.\n", path, cloneName)
-							} else {
-
-								if library := gltfLoadOptions.DependentLibraryResolver(path); library != nil {
-									if foundNode := library.NodeByName(cloneName); foundNode != nil {
-										clone = foundNode.Clone()
-									} else {
-										panic("Error in instantiating linked element: " + cloneName + " as there is no such object in the returned library.")
-									}
-								} else {
-									log.Printf("Warning: No library returned in resolving dependent library %s for object %s.\n", path, cloneName)
-								}
-
-							}
-
-						}
-
-						if clone != nil {
-
-							clone.MoveVec(offset)
-							obj.AddChildren(clone)
-
-							n.collectionObjects = append(n.collectionObjects, clone)
-
-							// Share properties to top-level clones
-							for k, v := range obj.Properties() {
-								clone.Properties().Add(k).Set(v.Value)
-							}
-
-						} else {
-							log.Println("Error in instantiating linked element:", cloneName, "from:", path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
-						}
-
-					}
-
-					if c, exists := dataMap["t3dSectorTypeOverride__"]; exists && c.(float64) > 0 {
-						n.ForEachChild(true, func(child INode, index, size int) bool {
-							child.SetSectorType(obj.SectorType())
-							return true
-						})
-					}
-
 				}
 
 			}
@@ -1641,6 +1603,19 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 			}
 
+			if bitNames, exists := extras["t3dBitfieldNames__"]; exists {
+
+				for i, n := range bitNames.([]any) {
+
+					scene.bitfieldNames = append(scene.bitfieldNames, bitfieldNamePair{
+						Name:  n.(map[string]any)["name"].(string),
+						Value: Bitfield(math.Pow(2, float64(i))),
+					})
+
+				}
+
+			}
+
 			if value, exists := extras["t3dAutoSubdivisionLevels__"]; exists {
 
 				levels := value.([]any)
@@ -1694,10 +1669,127 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		*/
 
-		models := scene.Root.Search(SearchOptions{NodeTypes: []NodeType{NodeTypeModel}})
+		for _, cam := range exportedCameras {
+			scene.View3DCameras = append(scene.View3DCameras, cam.Clone().(*Camera))
+		}
+
+	}
+
+	findNode := func(library *Library, objPath string) INode {
+
+		pathComponents := strings.Split(objPath, ":")
+
+		sceneName := pathComponents[0]
+		objPath = pathComponents[1]
+
+		var object INode
+
+		if sceneName != "" {
+			object = library.SceneByName(sceneName).Get(objPath)
+		}
+
+		if object == nil {
+			for _, scene := range library.Scenes {
+				if o := scene.Get(objPath); o != nil {
+					object = o
+					break
+				}
+			}
+		}
+
+		return object
+	}
+
+	for _, scene := range library.Scenes {
+
+		models := scene.Root.Search().ByType(NodeTypeModel)
+
+		scene.Root.Children(true).ForEach(func(obj INode, index int) bool {
+
+			node := objToNode[obj]
+
+			if model, ok := obj.(*Model); ok && model.SkinRoot != nil && model.parent != model.SkinRoot {
+				log.Printf("TETRA3D WARNING: Model [ %s ] is skinned and animated, but is not parented to its armature [ %s ]; this may cause visual positioning problems.\n", model.Name(), model.SkinRoot.Name())
+			}
+
+			if node != nil && node.Extras != nil {
+
+				if dataMap, isMap := node.Extras.(map[string]any); isMap {
+
+					if c, exists := dataMap["t3dInstanceCollection__"]; exists {
+
+						n := obj.(*Node)
+						n.collectionObjects = []INode{}
+
+						collection := collections[c.(string)]
+
+						offset := Vector3{-collection.Offset[0], -collection.Offset[2], collection.Offset[1]}
+
+						for _, clonePath := range collection.Objects {
+
+							var clone INode
+
+							path := collection.Path
+
+							if path == "" {
+								clone = findNode(library, clonePath).Clone()
+							} else {
+								path = convertBlenderPath(path)
+								if gltfLoadOptions.DependentLibraryResolver == nil {
+									log.Printf("Warning: No dependent library resolver defined to resolve dependent library %s for object %s.\n", path, clonePath)
+								} else {
+
+									if dependentLib := gltfLoadOptions.DependentLibraryResolver(path); dependentLib != nil {
+										if foundNode := findNode(dependentLib, clonePath); foundNode != nil {
+											clone = foundNode.Clone()
+										} else {
+											log.Printf("Error in instantiating linked element: " + clonePath + " as there is no such object in the returned library.")
+										}
+									} else {
+										log.Printf("Warning: No library returned in resolving dependent library %s for object %s.\n", path, clonePath)
+									}
+
+								}
+
+							}
+
+							if clone != nil {
+
+								clone.MoveVec(offset)
+								obj.AddChildren(clone)
+
+								n.collectionObjects = append(n.collectionObjects, clone)
+
+								// Share properties to top-level clones
+								for _, v := range obj.Properties().data {
+									clone.Properties().Add(v.name).Set(v.Value)
+								}
+
+							} else {
+								log.Println("Error in instantiating linked element:", clonePath, "from:", path, "; did you pass the Library as a dependent Library in the GLTFLoadOptions struct?")
+							}
+
+						}
+
+						if c, exists := dataMap["t3dSectorTypeOverride__"]; exists && c.(float64) > 0 {
+							n.ForEachChild(true, func(child INode, index int) bool {
+								child.SetSectorType(obj.SectorType())
+								return true
+							})
+						}
+
+					}
+
+				}
+
+			}
+
+			return true
+
+		})
 
 		// This has to make a copy of the children because the nodes are reparented
-		scene.Root.Children(true).ForEach(func(node INode) bool {
+		scene.Root.Children(true).ForEach(func(node INode, index int) bool {
 
 			node.setOriginalTransform()
 
@@ -1728,10 +1820,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			return true
 		})
-
-		for _, cam := range exportedCameras {
-			scene.View3DCameras = append(scene.View3DCameras, cam.Clone().(*Camera))
-		}
 
 	}
 
@@ -1869,6 +1957,13 @@ func handleGameProperties(p any) (string, any) {
 		if v, keyExists := property["valueAction"]; keyExists {
 			value = v.(map[string]any)["name"].(string)
 		}
+	} else if propType == 11 {
+		if ref := getIfExistingMap(property, "valueReferenceScene"); ref != nil {
+			value = ref["name"].(string)
+		}
+		// value = getOrDefaultString(property, "valueReferenceScene", "")
+	} else if propType == 12 {
+		value = Bitfield(getOrDefaultInt(property, "valueBitfield", 0))
 	}
 
 	return name, value

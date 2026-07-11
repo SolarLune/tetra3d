@@ -1,5 +1,7 @@
 package tetra3d
 
+import "fmt"
+
 type FogBlendMode int
 
 const (
@@ -81,6 +83,14 @@ func (world *World) Clone() *World {
 
 func (w *World) ID() uint32 {
 	return w.id
+}
+
+func (w *World) String() string {
+	if ReadableReferences {
+		return "< World : " + w.Name + ">"
+	} else {
+		return fmt.Sprintf("%p", w)
+	}
 }
 
 func (world *World) fogAsFloatSlice() []float32 {
