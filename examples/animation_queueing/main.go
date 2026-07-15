@@ -54,7 +54,8 @@ func (g *Game) Update() error {
 	cube := scene.Root.Search().ByNames("Cube").GetFirst()
 	ap := cube.AnimationPlayer()
 
-	// You can also sequence animation playback by calling AnimationPlayer.Play() or PlayByName() with multiple animations.
+	// You can also sequence animation playback by calling AnimationPlayer.Play() or PlayByName() with multiple animations,
+	// or by playing an animation and then using the returned AnimationSequence object to do other things.
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		ap.Pause() // Stops the currently playing animation if there is one to start from the beginning

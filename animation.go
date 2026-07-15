@@ -505,9 +505,9 @@ func (ap *AnimationPlayer) SetRoot(node INode) {
 }
 
 // Plays the specified animations back in sequence, starting with the first one.
-// If the first animation is already playing, the function does nothing.
+// If the first animation is already playing, the function does nothing and doesn't alter any sequenced animation set.
 // Calling this clears any sequenced animations present in the AnimationPlayerCallback.
-// The function returns the AnimationPlayer's AnimationSequence object to allow sequencing an event after the animation plays.
+// The function returns the AnimationPlayer's AnimationSequence object to allow sequencing events after the animations finish playback.
 // If no animations are provided to the function, the AnimationSequence object will hold an error indicating this fact.
 func (ap *AnimationPlayer) Play(animations ...*Animation) *AnimationSequence {
 
@@ -561,9 +561,9 @@ func (ap *AnimationPlayer) Play(animations ...*Animation) *AnimationSequence {
 }
 
 // Plays the specified animations back in sequence, starting with the first one.
-// If the first animation is already playing, the function does nothing.
+// If the first animation is already playing, the function does nothing and doesn't alter any sequenced animation set.
 // Calling this clears any sequenced animations present in the AnimationSequence object.
-// The function returns the AnimationPlayer's AnimationSequence object to allow sequencing events after the animation plays.
+// The function returns the AnimationPlayer's AnimationSequence object to allow sequencing events after the animations finish playback.
 // If any animations aren't found or no animation names are provided, the AnimationSequence object will hold an error.
 func (ap *AnimationPlayer) PlayByName(animationNames ...string) *AnimationSequence {
 	if len(animationNames) == 0 {

@@ -829,7 +829,9 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			}
 
 			if renderNormals {
-				globalVertexTransformedNormals[vertexIndex] = mvJustRForNormals.MultVec(mesh.VertexNormals[vertexIndex])
+				globalVertexTransformedNormals[vertexIndex].X = mvJustRForNormals[0][0]*vert.X + mvJustRForNormals[1][0]*vert.Y + mvJustRForNormals[2][0]*vert.Z + mvJustRForNormals[3][0]
+				globalVertexTransformedNormals[vertexIndex].Y = mvJustRForNormals[0][1]*vert.X + mvJustRForNormals[1][1]*vert.Y + mvJustRForNormals[2][1]*vert.Z + mvJustRForNormals[3][1]
+				globalVertexTransformedNormals[vertexIndex].Z = mvJustRForNormals[0][2]*vert.X + mvJustRForNormals[1][2]*vert.Y + mvJustRForNormals[2][2]*vert.Z + mvJustRForNormals[3][2]
 			}
 
 			vertexListIndex++
@@ -877,7 +879,9 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			// It's faster to store the indices of the triangles in a variable than constantly dereference a pointer
 			if modelSkinned {
-				skinnedTriCenter = skinnedTriCenter.Add(globalMeshAlteredVertexPositions[tri.VertexIndex(i)])
+				skinnedTriCenter.X += globalMeshAlteredVertexPositions[tri.VertexIndex(i)].X
+				skinnedTriCenter.Y += globalMeshAlteredVertexPositions[tri.VertexIndex(i)].Y
+				skinnedTriCenter.Z += globalMeshAlteredVertexPositions[tri.VertexIndex(i)].Z
 			}
 
 			w := globalVertexTransforms[tri.VertexIndex(i)].W

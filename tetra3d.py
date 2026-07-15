@@ -1280,7 +1280,7 @@ class SCENE_OT_tetra3dReorderAutoSubdivisionLevel(bpy.types.Operator):
 class SCENE_OT_tetra3dClearAutoSubdivisionLevels(bpy.types.Operator):
     bl_idname = "scene.tetra3dclearautosubdivisionlevels"
     bl_label = "Clear Levels"
-    bl_description = "Clears auto subdivision levels"
+    bl_description = "Clears auto subdivision levels from this scene."
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -1292,8 +1292,8 @@ class SCENE_OT_tetra3dClearAutoSubdivisionLevels(bpy.types.Operator):
 
 class SCENE_OT_tetra3dCopyAutoSubdivisionLevels(bpy.types.Operator):
     bl_idname = "scene.tetra3dcopyautosubdivisionlevels"
-    bl_label = "Overwrite Levels"
-    bl_description = "Overwrites auto-subdivision levels from the mesh of the last selected object to all meshees for the rest of the currently selected objects"
+    bl_label = "Copy to All Scenes"
+    bl_description = "Copies the specified autosubdivision levels to all other Scenes."
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -1877,7 +1877,7 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
                 box2 = box.box()
 
                 row = box2.row()
-                row.label(text="Subdivision Level #" + str(index))
+                row.label(text="Subdivision Level #" + str(index+1))
 
                 moveUpOptions = row.operator(
                     SCENE_OT_tetra3dReorderAutoSubdivisionLevel.bl_idname,
@@ -1904,7 +1904,6 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
 
                 row = box2.row()
                 row.prop(prop, "distance")
-                row = box2.row()
                 row.prop(prop, "subdivisionLevel")
                 row = box2.row()
                 row.prop(prop, "minimumTriangleSize")

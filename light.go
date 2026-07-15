@@ -740,11 +740,15 @@ func (l *LightVolume) xyzIndicesInsideVolume(x, y, z int) bool {
 	return x >= 0 && y >= 0 && z >= 0 && x < l.cellCountX && y < l.cellCountY && z < l.cellCountZ
 }
 
-func (l *LightVolume) LightVolumeCellAtWorldPosition(position Vector3) *LightVolumeCell {
+func (l *LightVolume) LightVolumeCellAtWorldPosition(px, py, pz float32) *LightVolumeCell {
 
-	x, y, z := l.convertToXYZIndicesVec(position)
+	x, y, z := l.convertToXYZIndices(px, py, pz)
 	return l.getLightCell(x, y, z)
 
+}
+
+func (l *LightVolume) LightVolumeCellAtWorldPositionVec(position Vector3) *LightVolumeCell {
+	return l.LightVolumeCellAtWorldPosition(position.X, position.Y, position.Z)
 }
 
 func (l *LightVolume) LightVolumeCellAtIndices(x, y, z int) *LightVolumeCell {
