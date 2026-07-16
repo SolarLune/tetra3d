@@ -325,7 +325,7 @@ func (mesh *Mesh) String() string {
 	if ReadableReferences {
 		return fmt.Sprintf("< Mesh : %s>", mesh.Name)
 	}
-	return fmt.Sprintf("%v", mesh)
+	return fmt.Sprintf("%v", *mesh)
 }
 
 // Clone clones the Mesh, creating a new Mesh that has cloned MeshParts.

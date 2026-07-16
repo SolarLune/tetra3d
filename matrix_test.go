@@ -1,6 +1,7 @@
 package tetra3d
 
 import (
+	"math/rand"
 	"testing"
 )
 
@@ -14,6 +15,22 @@ func BenchmarkMatrixInversion(b *testing.B) {
 		mat.Inverted()
 	}
 
+}
+
+func BenchmarkMatrixMult(b *testing.B) {
+	var m1, m2 Matrix4
+	for i := range 4 {
+		for j := range 4 {
+			m1[i][j] = rand.Float32() * 100
+			m2[i][j] = rand.Float32() * 100
+		}
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m1.Mult(m2)
+	}
 }
 
 func TestMatrixInversion(t *testing.T) {
