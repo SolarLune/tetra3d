@@ -1743,7 +1743,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 										if foundNode := findNode(dependentLib, clonePath); foundNode != nil {
 											clone = foundNode.Clone()
 										} else {
-											// log.Printf("Error in instantiating linked element: " + clonePath + " as there is no such object in the returned library.")
+											log.Printf("Error in instantiating linked element: %s as there is no such object in the returned library.", clonePath)
 										}
 									} else {
 										log.Printf("Warning: No library returned in resolving dependent library %s for object %s.\n", path, clonePath)
