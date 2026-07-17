@@ -1555,14 +1555,13 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			srcH = float32(mat.Texture.Bounds().Dy())
 		}
 
-		camera.DebugInfo.currentLightTime.StartTimer()
-
 		// We have to set this and then restore it afterwards, because if we use light groups,
 		// then we are altering the sceneLights light slice pointer for all models rendered
 		// moving forward
 		ogSceneLights := sceneLights
 
 		if lighting {
+			camera.DebugInfo.currentLightTime.StartTimer()
 
 			if model.LightGroup != nil && model.LightGroup.Active {
 				sceneLights = model.LightGroup.Lights
@@ -1575,9 +1574,8 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 				light.beginModel(model)
 			}
 
+			camera.DebugInfo.currentLightTime.EndTimer()
 		}
-
-		camera.DebugInfo.currentLightTime.EndTimer()
 
 		mesh := model.mesh
 
@@ -1601,35 +1599,39 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 		globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
-			camera.DebugInfo.currentLightTime.StartTimer()
+			if lighting {
 
-			triangle.ForEachVertexIndex(func(vertexIndex int) {
-				mesh.vertexLights.colors[vertexIndex].R = 0
-				mesh.vertexLights.colors[vertexIndex].G = 0
-				mesh.vertexLights.colors[vertexIndex].B = 0
-				mesh.vertexLights.colors[vertexIndex].A = 1
-			})
+				camera.DebugInfo.currentLightTime.StartTimer()
 
-			for _, light := range sceneLights {
+				triangle.ForEachVertexIndex(func(vertexIndex int) {
+					mesh.vertexLights.colors[vertexIndex].R = 0
+					mesh.vertexLights.colors[vertexIndex].G = 0
+					mesh.vertexLights.colors[vertexIndex].B = 0
+					mesh.vertexLights.colors[vertexIndex].A = 1
+				})
 
-				// Skip calculating lighting for objects that are too far away from light sources.
-				if point, ok := light.(*PointLight); ok && point.Range() > 0 {
-					dist := maxSpan + point.Range()
-					if modelPos.DistanceSquaredTo(point.WorldPosition()) > dist*dist {
-						continue
+				for _, light := range sceneLights {
+
+					// Skip calculating lighting for objects that are too far away from light sources.
+					if point, ok := light.(*PointLight); ok && point.Range() > 0 {
+						dist := maxSpan + point.Range()
+						if modelPos.DistanceSquaredTo(point.WorldPosition()) > dist*dist {
+							continue
+						}
+						// } else if cube, ok := light.(*CubeLight); ok && cube.Range > 0 {
+						// 	dist := maxSpan + cube.Range
+						// 	if modelPos.DistanceSquared(cube.WorldPosition()) > dist*dist {
+						// 		continue
+						// 	}
 					}
-					// } else if cube, ok := light.(*CubeLight); ok && cube.Range > 0 {
-					// 	dist := maxSpan + cube.Range
-					// 	if modelPos.DistanceSquared(cube.WorldPosition()) > dist*dist {
-					// 		continue
-					// 	}
+
+					light.Light(triangle, model, mesh.vertexLights)
+
 				}
 
-				light.Light(triangle, model, mesh.vertexLights)
+				camera.DebugInfo.currentLightTime.EndTimer()
 
 			}
-
-			camera.DebugInfo.currentLightTime.EndTimer()
 
 			for vi := range 3 {
 
