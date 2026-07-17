@@ -16,14 +16,14 @@ type GameObject interface {
 }
 
 type Player struct {
-	node   tetra3d.INode
-	Bounds *tetra3d.BoundingAABB
+	node     tetra3d.INode
+	Collider *tetra3d.ColliderAABB
 }
 
 func NewPlayer(node tetra3d.INode) *Player {
 	return &Player{
-		node:   node,
-		Bounds: node.Get("BoundingAABB").(*tetra3d.BoundingAABB),
+		node:     node,
+		Collider: node.Get("ColliderAABB").(*tetra3d.ColliderAABB),
 	}
 }
 
@@ -48,7 +48,7 @@ func (player *Player) Update() {
 
 	player.node.MoveVec(move)
 
-	player.Bounds.CollisionTest(
+	player.Collider.CollisionTest(
 
 		tetra3d.CollisionTestSettings{
 

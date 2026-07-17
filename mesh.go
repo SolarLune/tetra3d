@@ -108,7 +108,8 @@ func (dim Dimensions) Projection(axis int) Projection {
 	}
 }
 
-// Returns the Dimensions set properly adjusted in case it's malformed (min is greater than max on any axis)
+// Returns the Dimensions set properly adjusted if it's malformed
+// (where min is greater than max on any axis).
 func (dim Dimensions) Canon() Dimensions {
 
 	minX := dim.Min.X
@@ -325,7 +326,8 @@ func (mesh *Mesh) String() string {
 	if ReadableReferences {
 		return fmt.Sprintf("< Mesh : %s>", mesh.Name)
 	}
-	return fmt.Sprintf("%v", mesh)
+	// return fmt.Sprintf("%v", mesh)
+	return ""
 }
 
 // Clone clones the Mesh, creating a new Mesh that has cloned MeshParts.
@@ -650,8 +652,8 @@ func (mesh *Mesh) Library() *Library {
 	return mesh.library
 }
 
-// UpdateBounds updates the mesh's dimensions; call this after manually changing vertex positions.
-func (mesh *Mesh) UpdateBounds() {
+// UpdateDimensions updates the mesh's dimensions; call this after manually changing vertex positions.
+func (mesh *Mesh) UpdateDimensions() {
 
 	mesh.Dimensions = newEmptyDimensions()
 
@@ -1269,7 +1271,7 @@ func NewCubeMesh(w, h, d float32) *Mesh {
 		23, 21, 20,
 	)
 
-	mesh.UpdateBounds()
+	mesh.UpdateDimensions()
 	mesh.AutoNormal()
 
 	return mesh
@@ -1318,7 +1320,7 @@ func NewPrismMesh() *Mesh {
 		4, 5, 1,
 	)
 
-	mesh.UpdateBounds()
+	mesh.UpdateDimensions()
 	mesh.AutoNormal()
 
 	return mesh
@@ -1456,7 +1458,7 @@ func NewIcosphereMesh(detailLevel int) *Mesh {
 
 	mesh.AutoNormal()
 
-	mesh.UpdateBounds()
+	mesh.UpdateDimensions()
 
 	return mesh
 }
@@ -1516,7 +1518,7 @@ func NewPlaneMesh(vertexCountX, vertexCountZ int) *Mesh {
 
 	mp.AddTriangles(indices...)
 
-	mesh.UpdateBounds()
+	mesh.UpdateDimensions()
 	mesh.AutoNormal()
 
 	return mesh
@@ -1588,7 +1590,7 @@ func NewCylinderMesh(sideCount int, radius, height float32, createCaps bool) *Me
 	mesh.AddVertices(verts...)
 	mp.AddTriangles(indices...)
 
-	mesh.UpdateBounds()
+	mesh.UpdateDimensions()
 	mesh.AutoNormal()
 
 	return mesh

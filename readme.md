@@ -200,14 +200,14 @@ func main() {
 
 ```
 
-You can also do collision testing between BoundingObjects, a category of nodes designed for checking against collisions. As a simplified example:
+You can also do collision testing between Colliders, a category of nodes designed for checking against collisions. As a simplified example:
 
 ```go
 
 type Game struct {
 
-	Cube *tetra3d.BoundingAABB
-	Capsule *tetra3d.BoundingCapsule
+	Cube *tetra3d.ColliderAABB
+	Capsule *tetra3d.ColliderCapsule
 
 }
 
@@ -215,13 +215,13 @@ func NewGame() *Game {
 
 	g := &Game{}
 
-	// Create a new BoundingCapsule named "player", 1 unit tall with a
+	// Create a new ColliderCapsule named "player", 1 unit tall with a
 	// 0.25 unit radius for the caps at the ends.
-	g.Capsule = tetra3d.NewBoundingCapsule("player", 1, 0.25)
+	g.Capsule = tetra3d.NewColliderCapsule("player", 1, 0.25)
 
-	// Create a new BoundingAABB named "block", of 0.5 width, height,
+	// Create a new ColliderAABB named "block", of 0.5 width, height,
 	// and depth (in that order).
-	g.Cube = tetra3d.NewBoundingAABB("block", 0.5, 0.5, 0.5)
+	g.Cube = tetra3d.NewColliderAABB("block", 0.5, 0.5, 0.5)
 
 	// Move the cube over on the X axis by 4 units.
 	g.Cube.Move(-4, 0, 0)
@@ -242,7 +242,7 @@ func (g *Game) Update() {
 
 ```
 
-If you wanted a deeper collision test with multiple objects, you can do so using `IBoundingObject.CollisionTest()`. Take a look at the [Wiki](https://github.com/SolarLune/tetra3d/wiki/Collision-Testing) and the `bounds` example for more info.
+If you wanted a deeper collision test with multiple objects, you can do so using `Collider.CollisionTest()`. Take a look at the [Wiki](https://github.com/SolarLune/tetra3d/wiki/Collision-Testing) and the `collider` example for more info.
 
 That's basically it. Feel free to examine all of the examples in the `examples` folder. Calling `go run .` from within their directories will run them - the mouse usually controls the view, and clicking locks and unlocks the view. You can also view the examples online [here](https://solarlune.github.io/tetra3d.site/).
 

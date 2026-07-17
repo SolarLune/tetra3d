@@ -10,14 +10,13 @@ import (
 
 // RayHit represents the result of a raycast test.
 type RayHit struct {
-	Object   INode   // Object is a pointer to the BoundingObject that was struck by the raycast.
+	Object   INode   // Object is a pointer to the Collider that was struck by the raycast.
 	Position Vector3 // Position is the world position that the object was struct.
 	from     Vector3 // The starting position of the Ray
 	Normal   Vector3 // Normal is the normal of the surface the ray struck.
 
-	// What triangle the raycast hit - note that this is only set to a non-nil value for raycasts against BoundingTriangle objects
-	Triangle              *Triangle
-	untransformedPosition Vector3 // untransformed position of the ray test for BoundingTriangles tests
+	Triangle              *Triangle // What triangle the raycast hit for rays that strike ColliderTriangles objects
+	untransformedPosition Vector3   // untransformed position of the ray test for ColliderTriangles tests
 }
 
 // Slope returns the slope of the RayHit's normal, in radians. This ranges from 0 (straight up) to pi (straight down).
@@ -40,22 +39,22 @@ func (r RayHit) HitMaterialByPropName(propName string) bool {
 	return r.Triangle != nil && r.Triangle.MeshPart.Material != nil && r.Triangle.MeshPart.Material.properties.Has(propName)
 }
 
-const ErrorObjectHitNotBoundingTriangles = "error: object hit not a BoundingTriangles instance; no UV or vertex color data can be pulled from RayHit result"
+const ErrorObjectHitNotColliderTriangles = "error: object hit not a ColliderTriangles instance; no UV or vertex color data can be pulled from RayHit result"
 const ErrorObjectHitNotChildOfModel = "error: object hit not a child of a Model"
 const ErrorVertexChannelOutsideRange = "error: vertex color channel not found by given name"
 
 // Returns the vertex color from the given channel in the position struck on the object struck.
-// Only works when testing against BoundingTriangles objects.
+// Only works when testing against ColliderTriangles objects.
 // The returned vertex color is linearly interpolated across the triangle just like it would be when a triangle is rendered.
-// The function will return transparent black and an error if the BoundingObject hit was not a BoundingTriangles object, or if the channel index given
-// is higher than the number of vertex color channels on the BoundingTriangles' mesh.
+// The function will return transparent black and an error if the Collider hit was not a ColliderTriangles object, or if the channel index given
+// is higher than the number of vertex color channels on the ColliderTriangles' mesh.
 func (r RayHit) VertexColor(channelIndex int) (Color4, error) {
 
 	if r.Triangle == nil {
-		return NewColor4(0, 0, 0, 0), errors.New(ErrorObjectHitNotBoundingTriangles)
+		return NewColor4(0, 0, 0, 0), errors.New(ErrorObjectHitNotColliderTriangles)
 	}
 
-	mesh := r.Object.(*BoundingTriangles).Mesh
+	mesh := r.Object.(*ColliderTriangles).Mesh
 
 	if len(mesh.VertexColors[0].colors) <= channelIndex {
 		return NewColor4(0, 0, 0, 0), errors.New(ErrorVertexChannelOutsideRange)
@@ -74,17 +73,17 @@ func (r RayHit) VertexColor(channelIndex int) (Color4, error) {
 
 }
 
-// UV returns the UV value from the position struck on the corresponding triangle for the BoundingObject struck,
-// assuming the object struck was a BoundingTriangles.
+// UV returns the UV value from the position struck on the corresponding triangle for the Collider struck,
+// assuming the object struck was a ColliderTriangles.
 // The returned UV value is linearly interpolated across the triangle just like it would be when a triangle is rendered.
-// UV will return a zero Vector and an error if the BoundingObject hit was not a BoundingTriangles object.
+// UV will return a zero Vector and an error if the Collider hit was not a ColliderTriangles object.
 func (r RayHit) UV() (Vector2, error) {
 
 	if r.Triangle == nil {
-		return Vector2{}, errors.New(ErrorObjectHitNotBoundingTriangles)
+		return Vector2{}, errors.New(ErrorObjectHitNotColliderTriangles)
 	}
 
-	mesh := r.Object.(*BoundingTriangles).Mesh
+	mesh := r.Object.(*ColliderTriangles).Mesh
 
 	tri := r.Triangle
 	u, v := pointInsideTriangle(r.untransformedPosition, mesh.VertexPositions[tri.VertexIndexA], mesh.VertexPositions[tri.VertexIndexB], mesh.VertexPositions[tri.VertexIndexC])
@@ -99,7 +98,7 @@ func (r RayHit) UV() (Vector2, error) {
 
 }
 
-func boundingSphereRayTest(center Vector3, radius float32, from, to Vector3) (RayHit, bool) {
+func capsuleSphereRayTest(center Vector3, radius float32, from, to Vector3) (RayHit, bool) {
 
 	// normal := to.Sub(from)
 	// normalUnit := normal.Unit()
@@ -215,7 +214,7 @@ func boundingSphereRayTest(center Vector3, radius float32, from, to Vector3) (Ra
 
 }
 
-func boundingAABBRayTest(from, to Vector3, test *BoundingAABB) (RayHit, bool) {
+func capsuleAABBRayTest(from, to Vector3, test *ColliderAABB) (RayHit, bool) {
 
 	rayLine := to.Sub(from)
 	rayLineUnit := rayLine.Unit()
@@ -265,19 +264,19 @@ func boundingAABBRayTest(from, to Vector3, test *BoundingAABB) (RayHit, bool) {
 
 }
 
-var boundingTrianglesRayTestResults = []RayHit{}
+var ColliderTrianglesRayTestResults = []RayHit{}
 
-func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doublesided bool) []RayHit {
+func ColliderTrianglesRayTest(from, to Vector3, test *ColliderTriangles, doublesided bool) []RayHit {
 
 	check := false
 
-	if test.BoundingAABB.PointInside(from) || test.BoundingAABB.PointInside(to) {
+	if test.colliderAABB.PointInside(from) || test.colliderAABB.PointInside(to) {
 		check = true
-	} else if _, ok := boundingAABBRayTest(from, to, test.BoundingAABB); ok {
+	} else if _, ok := capsuleAABBRayTest(from, to, test.colliderAABB); ok {
 		check = true
 	}
 
-	boundingTrianglesRayTestResults = boundingTrianglesRayTestResults[:0]
+	ColliderTrianglesRayTestResults = ColliderTrianglesRayTestResults[:0]
 
 	if check {
 
@@ -292,7 +291,7 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 		// TODO: Review this - it seems like it's drastically faster (~4x) to not use the broadphase object for raytests, even for meshes with relatively high triangle counts.
 		// I guess the broadphase checking code is just way too slow? So we're just not going to use it for raycasting, I guess.
 
-		// test.broadphase.ForEachTriangleFromBoundingObject(workingAABB, func(tri *Triangle) bool {
+		// test.broadphase.ForEachTriangleFromCollider(workingAABB, func(tri *Triangle) bool {
 
 		for _, tri := range test.Mesh.Triangles {
 
@@ -346,7 +345,7 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 
 				if isPointInsideTriangle(vec, v0, v1, v2) {
 
-					boundingTrianglesRayTestResults = append(boundingTrianglesRayTestResults, RayHit{
+					ColliderTrianglesRayTestResults = append(ColliderTrianglesRayTestResults, RayHit{
 						Object:                test,
 						Position:              test.Transform().MultVec(vec),
 						untransformedPosition: vec,
@@ -363,7 +362,7 @@ func boundingTrianglesRayTest(from, to Vector3, test *BoundingTriangles, doubles
 
 	}
 
-	return boundingTrianglesRayTestResults
+	return ColliderTrianglesRayTestResults
 
 }
 
@@ -382,16 +381,16 @@ type RayTestOptions struct {
 	// Overrides the options object's From and To properties.
 	Positions []Vector3
 
-	// If cast rays can strike both sides of BoundingTriangles triangles or not.
+	// If cast rays can strike both sides of ColliderTriangles triangles or not.
 	// TODO: Implement this for all collision types, not just triangles.
 	Doublesided bool
 
-	// TestAgainst is used to specify a selection of BoundingObjects to test against - this can be either a NodeFilter or a NodeCollection (a slice of Nodes).
+	// TestAgainst is used to specify a selection of Colliders to test against - this can be either a NodeFilter or a NodeCollection (a slice of Nodes).
 	TestAgainst NodeIterator
 
 	// OnHit is a callback called for each hit a cast Ray returns, sorted by distance from the starting point.
 	// OnHit is called for each object in order of distance to the starting point.
-	// OnHit is only called once for each object, apart from BoundingTriangles, as a single ray can hit multiple triangles of a BoundingTriangles mesh.
+	// OnHit is only called once for each object, apart from ColliderTriangles, as a single ray can hit multiple triangles of a ColliderTriangles mesh.
 	// index is the index of the hit out of the maximum number of hits found by the function (count).
 	// The returned boolean indicates whether to keep iterating through all found rayhits, or to stop after the current one.
 	OnHit func(hit RayHit, index, count int) bool
@@ -420,7 +419,7 @@ func (r RayTestOptions) WithTestAgainst(iterator NodeIterator) RayTestOptions {
 }
 
 // RayTest casts a ray from the "from" world position to the "to" world position for each position pair
-// while testing against the provided IBoundingObjects.
+// while testing against the provided IColliders.
 // The function returns the first struck object; if none were struck, it returns nil.
 func RayTest(options RayTestOptions) *RayHit {
 
@@ -435,32 +434,32 @@ func RayTest(options RayTestOptions) *RayHit {
 
 			switch test := node.(type) {
 
-			case *BoundingSphere:
+			case *ColliderSphere:
 
-				if result, ok := boundingSphereRayTest(test.WorldPosition(), test.WorldRadius(), from, to); ok {
+				if result, ok := capsuleSphereRayTest(test.WorldPosition(), test.WorldRadius(), from, to); ok {
 					result.Object = test
 					internalRayTest = append(internalRayTest, result)
 				}
 
-			case *BoundingCapsule:
+			case *ColliderCapsule:
 
 				closestPoint, _ := test.nearestPointsToLine(from, to)
 
-				if result, ok := boundingSphereRayTest(closestPoint, test.WorldRadius(), from, to); ok {
+				if result, ok := capsuleSphereRayTest(closestPoint, test.WorldRadius(), from, to); ok {
 					result.Object = test
 					internalRayTest = append(internalRayTest, result)
 				}
 
-			case *BoundingAABB:
+			case *ColliderAABB:
 
-				if result, ok := boundingAABBRayTest(from, to, test); ok {
+				if result, ok := capsuleAABBRayTest(from, to, test); ok {
 					internalRayTest = append(internalRayTest, result)
 				}
 
-			case *BoundingTriangles:
+			case *ColliderTriangles:
 
 				// Raycasting against triangles can hit multiple triangles, so we can't bail early and have to return all potential hits
-				internalRayTest = append(internalRayTest, boundingTrianglesRayTest(from, to, test, options.Doublesided)...)
+				internalRayTest = append(internalRayTest, ColliderTrianglesRayTest(from, to, test, options.Doublesided)...)
 
 			}
 
@@ -509,13 +508,13 @@ func RayTest(options RayTestOptions) *RayHit {
 type MouseRayTestOptions struct {
 	// Depth is the distance to extend the ray in world units; defaults to the Camera's far plane.
 	Depth float32
-	// If cast rays can strike both sides of BoundingTriangles triangles or not.
+	// If cast rays can strike both sides of ColliderTriangles triangles or not.
 	Doublesided bool
-	// TestAgainst is used to specify a selection of BoundingObjects to test against - this can be either a NodeFilter or a NodeCollection (a slice of Nodes).
+	// TestAgainst is used to specify a selection of Colliders to test against - this can be either a NodeFilter or a NodeCollection (a slice of Nodes).
 	TestAgainst NodeIterator
 	// OnHit is a callback called for each hit a cast Ray returns, sorted by distance from the starting point (the camera's position).
 	// OnHit is called for each object in order of distance to the starting point.
-	// OnHit is only called once for each object, apart from BoundingTriangles, as a single ray can hit multiple triangles of a BoundingTriangles mesh.
+	// OnHit is only called once for each object, apart from ColliderTriangles, as a single ray can hit multiple triangles of a ColliderTriangles mesh.
 	// hitIndex is the index of the hit out of the maximum number of hits found by the function (hitCount).
 	// The returned boolean indicates whether to keep iterating through all found rayhits, or to stop after the current one.
 	OnHit func(hit RayHit, hitIndex int, hitCount int) bool
@@ -546,10 +545,10 @@ func (r MouseRayTestOptions) WithTestAgainst(iterator NodeIterator) MouseRayTest
 }
 
 // MouseRayTest casts a ray forward from the mouse's position onscreen, testing against the provided
-// IBoundingObjects found in the MouseRayTestOptions struct.
+// IColliders found in the MouseRayTestOptions struct.
 // The function calls the callback found in the MouseRayTestOptions struct for each object struck by the ray.
 // The function returns the first struck object; if none were struck, it returns nil.
-// Note that each object can only be struck once by the raycast, with the exception of BoundingTriangles
+// Note that each object can only be struck once by the raycast, with the exception of ColliderTriangles
 // objects (since a single ray may strike multiple triangles).
 func (camera *Camera) MouseRayTest(options MouseRayTestOptions) *RayHit {
 

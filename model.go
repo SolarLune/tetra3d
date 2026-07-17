@@ -21,7 +21,7 @@ type Model struct {
 	*Node
 	mesh                 *Mesh
 	FrustumCulling       bool            // Whether the Model is culled when it leaves the frustum.
-	frustumCullingSphere *BoundingSphere // Used for frustum culling
+	frustumCullingSphere *ColliderSphere // Used for frustum culling
 	updateFrustumSphere  bool            // True usually, but false for particles because we calculate it ourselves
 	Color                Color4          // The overall multiplicative color of the Model.
 	Shadeless            bool            // Indicates if a Model is shadeless.
@@ -80,7 +80,7 @@ func NewModel(name string, mesh *Mesh) *Model {
 	if mesh != nil {
 		radius = mesh.Dimensions.MaxSpan() / 2
 	}
-	model.frustumCullingSphere = NewBoundingSphere("bounding sphere", radius)
+	model.frustumCullingSphere = NewColliderSphere("collider sphere", radius)
 
 	return model
 
@@ -95,7 +95,7 @@ func (model *Model) Clone() INode {
 	}
 
 	newModel := NewModel(model.name, mesh)
-	newModel.frustumCullingSphere = model.frustumCullingSphere.Clone().(*BoundingSphere)
+	newModel.frustumCullingSphere = model.frustumCullingSphere.Clone().(*ColliderSphere)
 	newModel.FrustumCulling = model.FrustumCulling
 	newModel.updateFrustumSphere = model.updateFrustumSphere
 	newModel.visible = model.visible
@@ -138,7 +138,7 @@ func (model *Model) Clone() INode {
 
 }
 
-// When updating a Model's transform, we have to also update its bounding sphere for frustum culling.
+// When updating a Model's transform, we have to also update its collider sphere for frustum culling.
 func (model *Model) onTransformUpdate() {
 
 	if !model.updateFrustumSphere {
@@ -150,7 +150,7 @@ func (model *Model) onTransformUpdate() {
 	position, scale, rotation := transform.Decompose()
 
 	// Skinned models have their positions at 0, 0, 0, and vertices offset according to wherever they were when exported.
-	// To combat this, we save the original local positions of the mesh on export to position the bounding sphere in the
+	// To combat this, we save the original local positions of the mesh on export to position the collider sphere in the
 	// correct location.
 
 	var center Vector3
@@ -388,7 +388,7 @@ func (model *Model) StaticMerge(target *Model, targetMeshPart *MeshPart) {
 	mp.AddTriangles(indices...)
 
 	// Step 5: Update bounds of the mesh's dimensions
-	model.mesh.UpdateBounds()
+	model.mesh.UpdateDimensions()
 
 	// Step 6: Update frustum culling sphere
 	model.frustumCullingSphere.SetLocalPositionVec(model.mesh.Dimensions.Center())

@@ -23,7 +23,7 @@ type BasicSystemHandler struct {
 	DrawDebugText      bool
 	DrawDebugDepth     bool
 	DrawDebugWireframe bool
-	DrawDebugBounds    bool
+	DrawDebugColliders bool
 	DrawDebugCenters   bool
 
 	Game              GameI
@@ -71,7 +71,7 @@ func (system *BasicSystemHandler) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF7) {
-		system.DrawDebugBounds = !system.DrawDebugBounds
+		system.DrawDebugColliders = !system.DrawDebugColliders
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
@@ -101,8 +101,8 @@ func (system *BasicSystemHandler) Draw(screen *ebiten.Image, camera *tetra3d.Cam
 		camera.DrawDebugWireframe(screen, camera.Scene().Root, colors.White())
 	}
 
-	if system.DrawDebugBounds {
-		camera.DrawDebugBoundsColored(screen, camera.Scene().Root, tetra3d.DefaultDrawDebugBoundsSettings())
+	if system.DrawDebugColliders {
+		camera.DrawDebugColliderColored(screen, camera.Scene().Root, tetra3d.DefaultDrawDebugColliderSettings())
 	}
 
 	if system.DrawDebugCenters {
@@ -124,14 +124,14 @@ Right Click to Lock / Unlock Mouse Cursor
 F1: Toggle help text - F2: Toggle depth debug,
 F3: Wireframe debug - F4: fullscreen - F5: node center debug
 F6: Toggle Perpsective Correction: %s
-F7: Collision bounds debug
+F7: Collision collider debug
 ESC: Quit
 `, pcOn)
 		} else {
 			txt = fmt.Sprintf(`F1: Toggle help text - F2: Toggle depth debug,
 F3: Wireframe debug - F4: fullscreen - F5: node center debug
 F6: Toggle Perpsective Correction: %s
-F7: Collision bounds debug
+F7: Collision collider debug
 ESC: Quit
 `, pcOn)
 		}

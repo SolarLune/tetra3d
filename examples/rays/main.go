@@ -52,7 +52,7 @@ func (g *Game) Update() error {
 
 	// Used to profile ray testing
 	//
-	// solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeBoundingObject))
+	// solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeCollider))
 	// t := time.Now()
 	// for range 1000 {
 	// 	tetra3d.RayTest(tetra3d.RayTestOptions{
@@ -65,7 +65,7 @@ func (g *Game) Update() error {
 
 	g.Camera.MouseRayTest(tetra3d.MouseRayTestOptions{
 		// Depth: g.Camera.Far(),
-		TestAgainst: g.Scene.Root.Search().ByType(tetra3d.NodeTypeBoundingObject),
+		TestAgainst: g.Scene.Root.Search().ByType(tetra3d.NodeTypeCollider),
 
 		OnHit: func(hit tetra3d.RayHit, hitIndex int, hitCount int) bool {
 
@@ -74,11 +74,11 @@ func (g *Game) Update() error {
 			// Here, we'll set the color of the marker.
 			vc, err := hit.VertexColor(0)
 
-			// If there's an error, it's because we're not colliding against a BoundingTriangles,
+			// If there's an error, it's because we're not colliding against a ColliderTriangles,
 			// so there's no triangle to pull UV or vertex color data from.
 
 			// If that's the case, we can just go with the material color instead.
-			if err != nil && err.Error() == tetra3d.ErrorObjectHitNotBoundingTriangles {
+			if err != nil && err.Error() == tetra3d.ErrorObjectHitNotColliderTriangles {
 				vc = hit.Object.Parent().(*tetra3d.Model).Mesh().MeshParts[0].Material.Color
 			}
 

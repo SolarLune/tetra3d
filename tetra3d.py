@@ -111,7 +111,7 @@ def getBitfieldButtons(self, context):
 
 
 boundsTypes = [
-    ("NONE", "No Bounds", "No collision will be created for this object", 0, 0),
+    ("NONE", "No Collider", "No collision collider will be created for this object", 0, 0),
     (
         "AABB",
         "AABB",
@@ -136,7 +136,7 @@ boundsTypes = [
     (
         "TRIANGLES",
         "Triangle Mesh",
-        "A triangle mesh bounds type. Only works on mesh-type objects (i.e. an Empty won't generate a BoundingTriangles). Accurate, but slow. Currently buggy when resolving intersections between AABB or other Triangle Nodes",
+        "A triangle mesh bounds type. Only works on mesh-type objects (i.e. an Empty won't generate a ColliderTriangles). Accurate, but slow. Currently buggy when resolving intersections between AABB or other ColliderTriangle Nodes",
         0,
         4,
     ),
@@ -1552,12 +1552,12 @@ class OBJECT_PT_tetra3d(bpy.types.Panel):
                 if context.object.t3dSphereCustomEnabled__:
                     row = boundsBox.row()
                     row.prop(context.object, "t3dSphereCustomRadius__")
-            elif context.object.t3dBoundsType__ == "TRIANGLES":
-                row = boundsBox.row()
-                row.prop(context.object, "t3dTrianglesCustomBroadphaseEnabled__")
-                row = boundsBox.row()
-                if context.object.t3dTrianglesCustomBroadphaseEnabled__:
-                    row.prop(context.object, "t3dTrianglesCustomBroadphaseGridSize__")
+            # elif context.object.t3dBoundsType__ == "TRIANGLES":
+            #     row = boundsBox.row()
+            #     row.prop(context.object, "t3dTrianglesCustomBroadphaseEnabled__")
+            #     row = boundsBox.row()
+            #     if context.object.t3dTrianglesCustomBroadphaseEnabled__:
+            #         row.prop(context.object, "t3dTrianglesCustomBroadphaseGridSize__")
 
         if isCollection:
             collectionBox = self.layout.box()
@@ -3359,45 +3359,45 @@ objectProps = {
     ),
     "t3dBoundsType__": bpy.props.EnumProperty(
         items=boundsTypes,
-        name="Bounds",
-        description="What Bounding node type to create and parent to this object",
+        name="Collider",
+        description="What Collider type to create and parent to this object",
     ),
     "t3dAABBCustomEnabled__": bpy.props.BoolProperty(
         name="Custom AABB Size",
-        description="If enabled, you can manually set the BoundingAABB node's size. If disabled, the AABB's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingAABB node will be generated)",
+        description="If enabled, you can manually set the ColliderAABB node's size. If disabled, the AABB's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no ColliderAABB node will be generated)",
         default=False,
     ),
     "t3dAABBCustomSize__": bpy.props.FloatVectorProperty(
         name="Size",
-        description="Width (X), height (Y), and depth (Z) of the BoundingAABB node that will be created",
+        description="Width (X), height (Y), and depth (Z) of the ColliderAABB node that will be created",
         min=0.0,
         default=[2, 2, 2],
     ),
-    "t3dTrianglesCustomBroadphaseEnabled__": bpy.props.BoolProperty(
-        name="Custom Broadphase Size",
-        description="If enabled, you can manually set the BoundingTriangle's broadphase settings. If disabled, the BoundingTriangle's broadphase settings will be automatically determined by this object's size",
-        default=False,
-    ),
-    "t3dTrianglesCustomBroadphaseGridSize__": bpy.props.IntProperty(
-        name="Broadphase Cell Size",
-        description="How large the cells are in the broadphase collision grid (a cell size of 0 disables broadphase collision)",
-        min=0,
-        default=20,
-    ),
+    # "t3dTrianglesCustomBroadphaseEnabled__": bpy.props.BoolProperty(
+    #     name="Custom Broadphase Size",
+    #     description="If enabled, you can manually set the ColliderTriangle's broadphase settings. If disabled, the ColliderTriangles's broadphase settings will be automatically determined by this object's size",
+    #     default=False,
+    # ),
+    # "t3dTrianglesCustomBroadphaseGridSize__": bpy.props.IntProperty(
+    #     name="Broadphase Cell Size",
+    #     description="How large the cells are in the broadphase collision grid (a cell size of 0 disables broadphase collision)",
+    #     min=0,
+    #     default=20,
+    # ),
     "t3dCapsuleCustomEnabled__": bpy.props.BoolProperty(
         name="Custom Capsule Size",
-        description="If enabled, you can manually set the BoundingCapsule node's size properties. If disabled, the Capsule's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingCapsule node will be generated)",
+        description="If enabled, you can manually set the ColliderCapsule node's size properties. If disabled, the Capsule's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no ColliderCapsule node will be generated)",
         default=False,
     ),
     "t3dCapsuleCustomRadius__": bpy.props.FloatProperty(
         name="Radius",
-        description="The radius of the BoundingCapsule node",
+        description="The radius of the ColliderCapsule node",
         min=0.0,
         default=0.5,
     ),
     "t3dCapsuleCustomHeight__": bpy.props.FloatProperty(
         name="Height",
-        description="The height of the BoundingCapsule node",
+        description="The height of the ColliderCapsule node",
         min=0.0,
         default=2,
     ),
@@ -3409,12 +3409,12 @@ objectProps = {
     ),
     "t3dSphereCustomEnabled__": bpy.props.BoolProperty(
         name="Custom Sphere Size",
-        description="If enabled, you can manually set the BoundingSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no BoundingSphere node will be generated)",
+        description="If enabled, you can manually set the ColliderSphere node's radius. If disabled, the Sphere's size will be automatically determined by this object's mesh (if it is a mesh; otherwise, no ColliderSphere node will be generated)",
         default=False,
     ),
     "t3dSphereCustomRadius__": bpy.props.FloatProperty(
         name="Radius",
-        description="Radius of the BoundingSphere node that will be created",
+        description="Radius of the ColliderSphere node that will be created",
         min=0.0,
         default=1,
     ),
@@ -3961,12 +3961,12 @@ def register():
     )
     bpy.types.Material.t3dSolidToCollisions__ = bpy.props.BoolProperty(
         name="Report Collisions",
-        description="Whether this material contributes to collision checks for BoundingTriangles meshes",
+        description="Whether this material contributes to collision checks for ColliderTriangles meshes",
         default=True,
     )
     bpy.types.Material.t3dSolidToRays__ = bpy.props.BoolProperty(
         name="Report Raycasts",
-        description="Whether this material contributes to ray checks for BoundingTriangles meshes",
+        description="Whether this material contributes to ray checks for ColliderTriangles meshes",
         default=True,
     )
     bpy.types.Material.t3dLightVolumeShadingMode__ = bpy.props.EnumProperty(
