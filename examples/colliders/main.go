@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"time"
 
 	_ "embed"
 
@@ -116,23 +115,15 @@ func (g *Game) Update() error {
 
 	// Now, check for collisions.
 
-	t := time.Now()
+	collider.CollisionTest(tetra3d.CollisionTestSettings{
 
-	for range 1000 {
+		OnCollision: func(col *tetra3d.Collision, index, count int) bool {
+			g.Controlling.MoveVec(col.MaxMTV())
+			return true
+		},
 
-		collider.CollisionTest(tetra3d.CollisionTestSettings{
-
-			OnCollision: func(col *tetra3d.Collision, index, count int) bool {
-				g.Controlling.MoveVec(col.MaxMTV())
-				return true
-			},
-
-			TestAgainst: solids,
-		})
-
-	}
-
-	fmt.Println(time.Since(t))
+		TestAgainst: solids,
+	})
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) {
 		sphere := g.Scene.Root.Get("Sphere").(*tetra3d.Model)

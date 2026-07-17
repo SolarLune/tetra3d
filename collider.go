@@ -847,14 +847,15 @@ func btCapsuleTriangles(capsule *ColliderCapsule, triangles *ColliderTriangles) 
 
 	capTop := capsule.Top()
 	capBottom := capsule.Bottom()
+	rad := capsule.WorldRadius()
 	aabbDim := triangles.colliderAABB.Dimensions()
 
-	if (capTop.X > aabbDim.Max.X && capBottom.X > aabbDim.Max.X) ||
-		(capTop.X < aabbDim.Min.X && capBottom.X < aabbDim.Min.X) ||
-		(capTop.Y > aabbDim.Max.Y && capBottom.Y > aabbDim.Max.Y) ||
-		(capTop.Y < aabbDim.Min.Y && capBottom.Y < aabbDim.Min.Y) ||
-		(capTop.Z > aabbDim.Max.Z && capBottom.Z > aabbDim.Max.Z) ||
-		(capTop.Z < aabbDim.Min.Z && capBottom.Z < aabbDim.Min.Z) {
+	if (capTop.X-rad > aabbDim.Max.X && capBottom.X-rad > aabbDim.Max.X) ||
+		(capTop.X+rad < aabbDim.Min.X && capBottom.X+rad < aabbDim.Min.X) ||
+		(capTop.Y-rad > aabbDim.Max.Y && capBottom.Y-rad > aabbDim.Max.Y) ||
+		(capTop.Y+rad < aabbDim.Min.Y && capBottom.Y+rad < aabbDim.Min.Y) ||
+		(capTop.Z-rad > aabbDim.Max.Z && capBottom.Z-rad > aabbDim.Max.Z) ||
+		(capTop.Z+rad < aabbDim.Min.Z && capBottom.Z+rad < aabbDim.Min.Z) {
 		return nil
 	}
 
