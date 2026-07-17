@@ -17,8 +17,8 @@ const (
 )
 
 // NodeType represents a Node's type. Node types are categorized, and can be said to extend or "be of" more general types.
-// For example, a BoundingSphere has a type of NodeTypeBoundingSphere. That type can also be said to be NodeTypeBoundingObject
-// (because it is a bounding object). However, it is not of type NodeTypeBoundingTriangles, as that is a different category.
+// For example, a ColliderSphere has a type of NodeTypeColliderSphere. That type can also be said to be NodeTypeCollider
+// (because it is a collider-type object). However, it is not of type NodeTypeColliderTriangles, as that is a different category.
 type NodeType uint32
 
 const (
@@ -29,11 +29,11 @@ const (
 	NodeTypeGrid                                        // NodeTypeGrid represents specifically a Grid
 	NodeTypeGridPoint                                   // NodeTypeGrid represents specifically a GridPoint (note the extra underscore to ensure !NodeTypeGridPoint.Is(NodeTypeGrid))
 
-	NodeTypeBoundingObject    = 1<<iota + NodeTypeNode           // NodeTypeBoundingObject represents any generic bounding object
-	NodeTypeBoundingAABB      = 1<<iota + NodeTypeBoundingObject // NodeTypeBoundingAABB represents specifically a BoundingAABB
-	NodeTypeBoundingCapsule                                      // NodeTypeBoundingCapsule represents specifically a BoundingCapsule
-	NodeTypeBoundingTriangles                                    // NodeTypeBoundingTriangles represents specifically a BoundingTriangles object
-	NodeTypeBoundingSphere                                       // NodeTypeBoundingSphere represents specifically a BoundingSphere BoundingObject
+	NodeTypeCollider          = 1<<iota + NodeTypeNode     // Represents any generic collider object (e.g. anything that can collide)
+	NodeTypeColliderAABB      = 1<<iota + NodeTypeCollider // Represents specifically a ColliderAABB
+	NodeTypeColliderCapsule                                // Represents specifically a ColliderCapsule
+	NodeTypeColliderTriangles                              // Represents specifically a ColliderTriangles object
+	NodeTypeColliderSphere                                 // Represents specifically a ColliderSphere
 
 	NodeTypeLight            = 1<<iota + NodeTypeNode  // NodeTypeLight represents any generic light
 	NodeTypeAmbientLight     = 1<<iota + NodeTypeLight // NodeTypeAmbientLight represents specifically an ambient light
@@ -68,16 +68,16 @@ func (nt NodeType) String() string {
 		return "Grid"
 	case NodeTypeGridPoint:
 		return "GridPoint"
-	case NodeTypeBoundingObject:
-		return "BoundingObject"
-	case NodeTypeBoundingAABB:
-		return "BoundingAABB"
-	case NodeTypeBoundingCapsule:
-		return "BoundingCapsule"
-	case NodeTypeBoundingTriangles:
-		return "BoundingTriangles"
-	case NodeTypeBoundingSphere:
-		return "BoundingSphere"
+	case NodeTypeCollider:
+		return "ColliderObject"
+	case NodeTypeColliderAABB:
+		return "ColliderAABB"
+	case NodeTypeColliderCapsule:
+		return "ColliderCapsule"
+	case NodeTypeColliderTriangles:
+		return "ColliderTriangles"
+	case NodeTypeColliderSphere:
+		return "ColliderSphere"
 	// case NodeTypeLight: // No object has "light" as a type, because it's a generic type
 	// 	return "Light"
 	case NodeTypeAmbientLight:
@@ -586,7 +586,7 @@ func (node *Node) Transform() Matrix4 {
 	}
 
 	// We want to call child.Transform() here to ensure the children also rebuild their transforms as necessary; otherwise,
-	// children (i.e. BoundingAABBs) may not be rotating along with their owning Nodes (as they don't get rendered).
+	// children (i.e. ColliderAABBs) may not be rotating along with their owning Nodes (as they don't get rendered).
 	for _, child := range node.children {
 		child.Transform()
 	}
@@ -1361,13 +1361,13 @@ func (node *Node) HierarchyAsString() string {
 				prefix = "POINT"
 			} else if nodeType.Is(NodeTypeCubeLight) {
 				prefix = "CUBE"
-			} else if nodeType.Is(NodeTypeBoundingSphere) {
+			} else if nodeType.Is(NodeTypeColliderSphere) {
 				prefix = "BS"
-			} else if nodeType.Is(NodeTypeBoundingAABB) {
+			} else if nodeType.Is(NodeTypeColliderAABB) {
 				prefix = "AABB"
-			} else if nodeType.Is(NodeTypeBoundingCapsule) {
+			} else if nodeType.Is(NodeTypeColliderCapsule) {
 				prefix = "CAP"
-			} else if nodeType.Is(NodeTypeBoundingTriangles) {
+			} else if nodeType.Is(NodeTypeColliderTriangles) {
 				prefix = "TRI"
 			} else if nodeType.Is(NodeTypeModel) {
 				prefix = "MODEL"

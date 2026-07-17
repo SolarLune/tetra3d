@@ -232,7 +232,6 @@ func (vec Vector3) MoveTowards(target Vector3, magnitude float32) Vector3 {
 
 // DistanceTo returns the distance from the calling Vector3 to the other Vector3 provided.
 func (vec Vector3) DistanceTo(other Vector3) float32 {
-	// return vec.Sub(other).Magnitude()
 	vec.X -= other.X
 	vec.Y -= other.Y
 	vec.Z -= other.Z

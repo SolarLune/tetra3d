@@ -922,7 +922,7 @@ func (camera *Camera) PointInFrustum(point Vector3) bool {
 
 }
 
-func (camera *Camera) boundingSphereInFrustum(sphere *BoundingSphere) bool {
+func (camera *Camera) colliderSphereInFrustum(sphere *ColliderSphere) bool {
 	return camera.SphereInFrustum(sphere.WorldPosition(), sphere.WorldRadius())
 }
 
@@ -2073,7 +2073,7 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 					if merged.FrustumCulling {
 						merged.Transform()
-						if !camera.boundingSphereInFrustum(merged.frustumCullingSphere) {
+						if !camera.colliderSphereInFrustum(merged.frustumCullingSphere) {
 							continue
 						}
 					}
@@ -2387,7 +2387,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			if model.FrustumCulling {
 				model.Transform()
-				if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+				if !camera.colliderSphereInFrustum(model.frustumCullingSphere) {
 					return true
 				}
 
@@ -2491,7 +2491,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 		if model.FrustumCulling {
 
 			model.Transform()
-			if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+			if !camera.colliderSphereInFrustum(model.frustumCullingSphere) {
 				return true
 			}
 
@@ -2544,7 +2544,7 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 		if model.FrustumCulling {
 
 			model.Transform()
-			if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+			if !camera.colliderSphereInFrustum(model.frustumCullingSphere) {
 				return true
 			}
 
@@ -2588,7 +2588,7 @@ func (camera *Camera) DrawDebugDrawCallCount(screen *ebiten.Image, rootNode INod
 		if model.FrustumCulling {
 
 			model.Transform()
-			if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+			if !camera.colliderSphereInFrustum(model.frustumCullingSphere) {
 				return true
 			}
 
@@ -2616,7 +2616,7 @@ func (camera *Camera) DrawDebugNormals(screen *ebiten.Image, rootNode INode, nor
 		if model.FrustumCulling {
 
 			model.Transform()
-			if !camera.boundingSphereInFrustum(model.frustumCullingSphere) {
+			if !camera.colliderSphereInFrustum(model.frustumCullingSphere) {
 				return true
 			}
 
@@ -2697,32 +2697,32 @@ func (camera *Camera) AccumulationColorTexture() *ebiten.Image {
 	return camera.resultAccumulatedColorTexture
 }
 
-// DrawDebugBoundsColoredSettings is a struct used to define how to draw debug information showing the positions of IBoundingObjects
+// DrawDebugColliderColoredSettings is a struct used to define how to draw debug information showing the positions of Colliders
 // in a node tree.
-type DrawDebugBoundsColoredSettings struct {
-	RenderAABBs bool   // Whether BoundingAABBs should be rendered or not
-	AABBColor   Color4 // The color used to render BoundingAABBs
+type DrawDebugColliderColoredSettings struct {
+	RenderAABBs bool   // Whether ColliderAABBs should be rendered or not
+	AABBColor   Color4 // The color used to render ColliderAABBs
 
-	RenderSpheres bool   // Whether BoundingSpheres should be rendered or not
-	SphereColor   Color4 // The color used to render BoundingSpheres
+	RenderSpheres bool   // Whether ColliderSpheres should be rendered or not
+	SphereColor   Color4 // The color used to render ColliderSpheres
 
-	RenderCapsules bool   // Whether BoundingCapsules should be rendered or not
-	CapsuleColor   Color4 // The color used to render BoundingSpheres
+	RenderCapsules bool   // Whether ColliderCapsules should be rendered or not
+	CapsuleColor   Color4 // The color used to render ColliderSpheres
 
-	RenderTriangles               bool   // Whether BoundingTriangles should be rendered or not
-	TrianglesColor                Color4 // The color used to render BoundingTriangles
+	RenderTriangles               bool   // Whether ColliderTriangles should be rendered or not
+	TrianglesColor                Color4 // The color used to render ColliderTriangles
 	RenderTrianglesBackfaceCulled bool
 
-	RenderTrianglesAABB bool   // Whether the AABB surrounding BoundingTriangles should be rendered not
-	TrianglesAABBColor  Color4 // The color used to render the AABB surrounding BoundingTriangles
+	RenderTrianglesAABB bool   // Whether the AABB surrounding ColliderTriangles should be rendered not
+	TrianglesAABBColor  Color4 // The color used to render the AABB surrounding ColliderTriangles
 
-	RenderBroadphases bool   // Whether the broadphase cells surrounding BoundingTriangles should be rendered or not
-	BroadphaseColor   Color4 // The color used to render broadphase cells
+	// RenderBroadphases bool   // Whether the broadphase cells surrounding ColliderTriangles should be rendered or not
+	// BroadphaseColor   Color4 // The color used to render broadphase cells
 }
 
-// DrawDebugBoundsColored will draw shapes approximating the shapes and positions of BoundingObjects underneath the rootNode. The shapes will
-// be drawn in the color provided for each kind of bounding object to the screen image provided.
-func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INode, options DrawDebugBoundsColoredSettings) {
+// DrawDebugColliderColored will draw shapes approximating the shapes and positions of Colliders underneath the rootNode. The shapes will
+// be drawn in the color provided for each kind of Collider object to the screen image provided.
+func (camera *Camera) DrawDebugColliderColored(screen *ebiten.Image, rootNode INode, options DrawDebugColliderColoredSettings) {
 
 	// Custom WorldToScreenPixels function that limits W
 	worldToScreenPixels := func(vert Vector3) Vector3 {
@@ -2737,41 +2737,41 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 		invertedCamPos := r.MultVec(camera.WorldPosition()).Add(p.Mult(Vector3{1 / s.X, 1 / s.Y, 1 / s.Z}))
 		invertedCamForward := camera.WorldRotation().Forward().Invert()
 
-		if b, isBounds := n.(IBoundingObject); isBounds {
+		if c, isCollider := n.(Collider); isCollider {
 
-			switch bounds := b.(type) {
+			switch collider := c.(type) {
 
-			case *BoundingSphere:
+			case *ColliderSphere:
 
 				if options.RenderSpheres {
-					camera.drawSphere(screen, bounds, options.SphereColor)
+					camera.drawSphere(screen, collider, options.SphereColor)
 				}
 
-			case *BoundingCapsule:
+			case *ColliderCapsule:
 
 				if options.RenderCapsules {
 
-					pos := bounds.WorldPosition()
-					radius := bounds.WorldRadius()
-					height := bounds.WorldHeight() / 2
+					pos := collider.WorldPosition()
+					radius := collider.WorldRadius()
+					height := collider.WorldHeight() / 2
 
 					var uv Vector3
 					var rv Vector3
 					var fv Vector3
 
-					switch bounds.up {
+					switch collider.up {
 					case 0:
-						uv = bounds.WorldRotation().Right()
-						rv = bounds.WorldRotation().Up().Invert()
-						fv = bounds.WorldRotation().Forward()
+						uv = collider.WorldRotation().Right()
+						rv = collider.WorldRotation().Up().Invert()
+						fv = collider.WorldRotation().Forward()
 					case 1:
-						uv = bounds.WorldRotation().Up()
-						rv = bounds.WorldRotation().Right()
-						fv = bounds.WorldRotation().Forward()
+						uv = collider.WorldRotation().Up()
+						rv = collider.WorldRotation().Right()
+						fv = collider.WorldRotation().Forward()
 					case 2:
-						uv = bounds.WorldRotation().Forward()
-						rv = bounds.WorldRotation().Right()
-						fv = bounds.WorldRotation().Up().Invert()
+						uv = collider.WorldRotation().Forward()
+						rv = collider.WorldRotation().Right()
+						fv = collider.WorldRotation().Up().Invert()
 					}
 
 					u := worldToScreenPixels(pos.Add(uv.Scale(height)))
@@ -2810,12 +2810,12 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 				}
 
-			case *BoundingAABB:
+			case *ColliderAABB:
 
 				if options.RenderAABBs {
 
-					pos := bounds.WorldPosition()
-					size := bounds.dimensions.Size().Scale(0.5)
+					pos := collider.WorldPosition()
+					size := collider.dimensions.Size().Scale(0.5)
 
 					ufr := worldToScreenPixels(pos.Add(Vector3{size.X, size.Y, size.Z}))
 					ufl := worldToScreenPixels(pos.Add(Vector3{-size.X, size.Y, size.Z}))
@@ -2852,18 +2852,18 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 				}
 
-			case *BoundingTriangles:
+			case *ColliderTriangles:
 
-				if options.RenderBroadphases {
+				// if options.RenderBroadphases {
 
-					for _, b := range bounds.broadphase.allAABBPositions() {
-						camera.DrawDebugBoundsColored(screen, b, DrawDebugBoundsColoredSettings{
-							RenderAABBs: true,
-							AABBColor:   options.BroadphaseColor,
-						})
-					}
+				// 	for _, b := range bounds.broadphase.allAABBPositions() {
+				// 		camera.DrawDebugColliderColored(screen, b, DrawDebugColliderColoredSettings{
+				// 			RenderAABBs: true,
+				// 			AABBColor:   options.BroadphaseColor,
+				// 		})
+				// 	}
 
-				}
+				// }
 
 				if options.RenderTriangles {
 
@@ -2871,13 +2871,13 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 					lines := []Vector3{}
 
-					mesh := bounds.Mesh
+					mesh := collider.Mesh
 
 					halfCamWidth, halfCamHeight := float32(camWidth)/2, float32(camHeight)/2
 
 					for _, tri := range mesh.Triangles {
 
-						mvpMatrix := bounds.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
+						mvpMatrix := collider.Transform().Mult(camera.ViewMatrix().Mult(camera.Projection()))
 
 						if options.RenderTrianglesBackfaceCulled && ((camera.perspective && tri.Normal.Dot(invertedCamPos.Sub(tri.Center)) < 0) || (!camera.perspective && tri.Normal.Dot(invertedCamForward) > 0)) {
 							continue
@@ -2923,7 +2923,7 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 				}
 
 				if options.RenderTrianglesAABB {
-					camera.DrawDebugBoundsColored(screen, bounds.BoundingAABB, DrawDebugBoundsColoredSettings{
+					camera.DrawDebugColliderColored(screen, collider.colliderAABB, DrawDebugColliderColoredSettings{
 						RenderTrianglesAABB: true,
 						TrianglesAABBColor:  options.TrianglesAABBColor,
 					})
@@ -2939,22 +2939,22 @@ func (camera *Camera) DrawDebugBoundsColored(screen *ebiten.Image, rootNode INod
 
 }
 
-// DefaultDrawDebugBoundsSettings returns the default settings for drawing the debug bounds for a nodegraph.
-func DefaultDrawDebugBoundsSettings() DrawDebugBoundsColoredSettings {
-	return DrawDebugBoundsColoredSettings{
+// DefaultDrawDebugColliderSettings returns the default settings for drawing the debug bounds for a nodegraph.
+func DefaultDrawDebugColliderSettings() DrawDebugColliderColoredSettings {
+	return DrawDebugColliderColoredSettings{
 		RenderAABBs:         true,
 		RenderSpheres:       true,
 		RenderCapsules:      true,
 		RenderTriangles:     true,
 		RenderTrianglesAABB: true,
-		RenderBroadphases:   false,
+		// RenderBroadphases:   false,
 
 		AABBColor:          NewColor4(0, 0.25, 1, 0.5),
 		SphereColor:        NewColor4(0.5, 0.25, 1.0, 0.5),
 		CapsuleColor:       NewColor4(0.25, 1, 0, 0.5),
 		TrianglesColor:     NewColor4(1, 1, 1, 0.5),
 		TrianglesAABBColor: NewColor4(1, 0.5, 0, 0.5),
-		BroadphaseColor:    NewColor4(1, 0, 0, 0.1),
+		// BroadphaseColor:    NewColor4(1, 0, 0, 0.1),
 	}
 }
 
@@ -2980,7 +2980,7 @@ func (camera *Camera) DrawDebugFrustums(screen *ebiten.Image, rootNode INode, co
 var debugIcosphereMesh = NewIcosphereMesh(1)
 var debugIcosphere = NewModel("debug icosphere", debugIcosphereMesh)
 
-func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *BoundingSphere, color Color4) {
+func (camera *Camera) drawSphere(screen *ebiten.Image, sphere *ColliderSphere, color Color4) {
 	debugIcosphere.SetLocalPositionVec(sphere.WorldPosition())
 	s := sphere.WorldRadius()
 	debugIcosphere.SetLocalScaleVec(Vector3{s, s, s})

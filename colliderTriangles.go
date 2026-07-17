@@ -1,0 +1,288 @@
+package tetra3d
+
+// ColliderTriangles is a Node specifically for detecting a collision between any of the triangles from a mesh instance and another Collider.
+type ColliderTriangles struct {
+	*Node
+	colliderAABB *ColliderAABB
+	// broadphase   *Broadphase
+	Mesh *Mesh
+}
+
+// NewColliderTriangles returns a new ColliderTriangles object. name is the name of the ColliderTriangles node, while mesh is a reference
+// to the Mesh that the ColliderTriangles object should use for collision. broadphaseCellSize is how large the ColliderTriangle's broadphase
+// collision cells should be - larger cells means more triangles are checked at a time when doing collision checks, while larger cells also means
+// fewer broadphase cells need to be checked. Striking a balance is a good idea if you're setting this value by hand (by default, the grid size is
+// the maximum dimension size / 20, rounded up (a grid of at least one cell every 20 Blender Units). A size of 0 disables the usage of the broadphase
+// for collision checks.
+func NewColliderTriangles(name string, mesh *Mesh, broadphaseGridSize float32) *ColliderTriangles {
+	margin := float32(0.25) // An additional margin to help ensure the broadphase is crossed before checking for collisions
+	bt := &ColliderTriangles{
+		Node:         NewNode(name),
+		colliderAABB: NewColliderAABB("triangle broadphase aabb", mesh.Dimensions.Width()+margin, mesh.Dimensions.Height()+margin, mesh.Dimensions.Depth()+margin),
+		Mesh:         mesh,
+	}
+	bt.Node.onTransformUpdate = bt.UpdateTransform
+
+	// This initializes the broadphase using a default grid size.
+
+	// If the object is too small (less than 5 units large), it may not be worth doing
+	// maxDim := bt.Mesh.Dimensions.MaxDimension()
+
+	// gridSize := float32(0)
+
+	// if broadphaseGridSize > 0 {
+	// 	gridSize = math32.Ceil(maxDim / broadphaseGridSize)
+	// }
+
+	// bt.broadphase = NewBroadphase(bt, gridSize, gridSize, gridSize)
+
+	bt.owner = bt
+
+	return bt
+}
+
+// DisableBroadphase turns off the broadphase system for collision detection by settings its grid and cell size to 0.
+// To turn broadphase collision back on, simply call Broadphase.Resize(gridSize) with a gridSize value above 0.
+// func (bt *ColliderTriangles) EnableBroadphase(enabled bool) {
+// 	// bt.Broadphase.Resize(0)
+// 	bt.broadphase.enabled = enabled
+// }
+
+// TODO: Review Broadphase, as it's not currently used because it's slower than not using it, haha
+// Returns the Broadphase object for broadphase collision detection.
+// func (bt *ColliderTriangles) Broadphase() *Broadphase {
+// 	return bt.broadphase
+// }
+
+// Transform returns a Matrix4 indicating the global position, rotation, and scale of the object, transforming it by any parents'.
+// If there's no change between the previous Transform() call and this one, Transform() will return a cached version of the
+// transform for efficiency.
+func (bt *ColliderTriangles) UpdateTransform() {
+
+	transform := bt.Node.Transform()
+
+	bt.colliderAABB.SetWorldTransform(transform)
+	rot := bt.WorldRotation().MultVec(bt.Mesh.Dimensions.Center())
+	bt.colliderAABB.MoveVec(rot)
+	bt.colliderAABB.Transform()
+
+}
+
+// Dimensions returns the transformed dimensions of the Model's mesh.
+func (bt *ColliderTriangles) Dimensions() Dimensions {
+	dim := bt.Mesh.Dimensions
+	transform := bt.Transform()
+	dim.Min = transform.MultVec(dim.Min)
+	dim.Max = transform.MultVec(dim.Max)
+	return dim.Canon()
+}
+
+// Clone returns a new ColliderTriangles Node with the same values set as the original.
+func (bt *ColliderTriangles) Clone() INode {
+	clone := NewColliderTriangles(bt.name, bt.Mesh, 0) // Broadphase size is set to 0 so cloning doesn't create the broadphase triangle sets
+	// clone.broadphase = bt.broadphase.Clone(clone)
+	clone.Node = bt.Node.clone(clone).(*Node)
+	clone.Node.onTransformUpdate = clone.UpdateTransform
+	if runCallbacks && clone.Callbacks().OnClone != nil {
+		clone.Callbacks().OnClone(clone)
+	}
+	return clone
+}
+
+// Colliding returns true if the ColliderTriangles object is intersecting the other specified Collider.
+func (bt *ColliderTriangles) Colliding(other Collider) bool {
+	return bt.Collision(other) != nil
+}
+
+// Collision returns a Collision if the ColliderTriangles object is intersecting another Collider. If
+// no intersection is reported, Collision returns nil. (Note that ColliderTriangles > AABB collision is buggy at the moment.)
+func (bt *ColliderTriangles) Collision(other Collider) *Collision {
+
+	if other == bt || other == nil {
+		return nil
+	}
+
+	switch otherCollider := other.(type) {
+
+	case *ColliderAABB:
+		intersection := otherCollider.Collision(bt)
+		if intersection != nil {
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+				inter.Normal = inter.Normal.Invert()
+			}
+			intersection.Object = otherCollider
+		}
+		return intersection
+
+	case *ColliderSphere:
+		intersection := otherCollider.Collision(bt)
+		if intersection != nil {
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+				inter.Normal = inter.Normal.Invert()
+			}
+			intersection.Object = otherCollider
+		}
+		return intersection
+
+	case *ColliderTriangles:
+		return btTrianglesTriangles(bt, otherCollider)
+
+	case *ColliderCapsule:
+		intersection := otherCollider.Collision(bt)
+		if intersection != nil {
+			for _, inter := range intersection.Intersections {
+				inter.MTV = inter.MTV.Invert()
+				inter.Normal = inter.Normal.Invert()
+			}
+			intersection.Object = otherCollider
+		}
+		return intersection
+
+	}
+
+	panic("Unimplemented collider type")
+
+}
+
+// CollisionTest performs a collision test using the provided collision test settings structure.
+// Collisions reported will be sorted in distance from closest to furthest.
+// The function will return the first collision found with the object; if no collision is found, then it returns nil.
+func (bt *ColliderTriangles) CollisionTest(settings CollisionTestSettings) *Collision {
+	return commonCollisionTest(bt, settings)
+}
+
+type collisionPlane struct {
+	Normal   Vector3
+	Distance float32
+}
+
+func newCollisionPlane() collisionPlane {
+	return collisionPlane{}
+}
+
+func (plane *collisionPlane) Set(v0, v1, v2 Vector3) {
+
+	first := v1.Sub(v0)
+	second := v2.Sub(v0)
+	normal := first.Cross(second).Unit()
+	distance := normal.Dot(v0)
+
+	plane.Normal = normal
+	plane.Distance = distance
+
+}
+
+func (plane *collisionPlane) ClosestPoint(point Vector3) Vector3 {
+
+	dist := plane.Normal.Dot(point) - plane.Distance
+	return point.Sub(plane.Normal.Scale(dist))
+
+}
+
+func (plane *collisionPlane) RayAgainstPlane(from, dir Vector3, doublesided bool) (Vector3, bool) {
+
+	// faster to precalculate dir than to do it here all of the time
+	nd := dir.Dot(plane.Normal)
+
+	if !doublesided && nd >= 0 {
+		return Vector3{}, false
+	}
+
+	pn := from.Dot(plane.Normal)
+	t := (plane.Distance - pn) / nd
+
+	if t >= 0 {
+		return from.Add(dir.Scale(t)), true
+	}
+
+	return Vector3{}, false
+
+}
+
+var colPlane = newCollisionPlane()
+
+func closestPointOnTri(point, v0, v1, v2, normal Vector3) Vector3 {
+
+	// colPlane.Set(v0, v1, v2)
+
+	colPlane.Normal = normal
+	colPlane.Distance = normal.Dot(v0)
+
+	if planePoint := colPlane.ClosestPoint(point); isPointInsideTriangle(planePoint, v0, v1, v2) {
+		return planePoint
+	}
+
+	ab := colPlane.closestPointOnLine(point, v0, v1)
+	bc := colPlane.closestPointOnLine(point, v1, v2)
+	ca := colPlane.closestPointOnLine(point, v2, v0)
+
+	closest := ab
+	closestDist := point.DistanceSquaredTo(ab)
+
+	bcDist := point.DistanceSquaredTo(bc)
+	caDist := point.DistanceSquaredTo(ca)
+
+	if bcDist < closestDist {
+		closest = bc
+		closestDist = bcDist
+	}
+
+	if caDist < closestDist {
+		closest = ca
+	}
+
+	return closest
+
+}
+
+func isPointInsideTriangle(point, v0, v1, v2 Vector3) bool {
+	u, v := pointInsideTriangle(point, v0, v1, v2)
+	return (u >= 0) && (v >= 0) && (u+v < 1)
+}
+
+func pointInsideTriangle(point, v0, v1, v2 Vector3) (u, v float32) {
+
+	ca := v2.Sub(v0)
+	ba := v1.Sub(v0)
+	pa := point.Sub(v0)
+
+	dot00 := ca.Dot(ca)
+	dot01 := ca.Dot(ba)
+	dot02 := ca.Dot(pa)
+
+	dot11 := ba.Dot(ba)
+	dot12 := ba.Dot(pa)
+
+	invDenom := 1.0 / ((dot00 * dot11) - (dot01 * dot01))
+	u = ((dot11 * dot02) - (dot01 * dot12)) * invDenom
+	v = ((dot00 * dot12) - (dot01 * dot02)) * invDenom
+
+	// return (u >= 0) && (v >= 0) && (u+v < 1)
+
+	return
+}
+
+func (plane *collisionPlane) closestPointOnLine(point, start, end Vector3) Vector3 {
+
+	diff := end.Sub(start)
+	dotA := point.Sub(start).Dot(diff)
+	dotB := diff.Dot(diff)
+	d := dotA / dotB
+	if d > 1 {
+		d = 1
+	} else if d < 0 {
+		d = 0
+	}
+
+	return start.Add(diff.Scale(d))
+
+}
+
+/////
+
+// Type returns the NodeType for this object.
+func (bt *ColliderTriangles) Type() NodeType {
+	return NodeTypeColliderTriangles
+}

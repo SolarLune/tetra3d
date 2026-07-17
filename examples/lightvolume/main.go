@@ -19,14 +19,13 @@ var assets embed.FS
 
 type Player struct {
 	Model       *tetra3d.Model
-	Bounds      *tetra3d.BoundingCapsule
+	Capsule     *tetra3d.ColliderCapsule
 	VerticalSpd float32
 	Facing      tetra3d.Vector3
 }
 
 func NewPlayer(model *tetra3d.Model) *Player {
-	// model.Get("PlayerModelHead").(*tetra3d.Model).Mesh.MeshParts[0].Material.LightVolumeShadingMode = tetra3d.LightVolumeShadingModePerVertexWithoutNormal
-	return &Player{Model: model, Bounds: model.Get("BoundingCapsule").(*tetra3d.BoundingCapsule)}
+	return &Player{Model: model, Capsule: model.Get("ColliderCapsule").(*tetra3d.ColliderCapsule)}
 }
 
 func (p *Player) Update() {
@@ -75,10 +74,10 @@ func (p *Player) Update() {
 
 	p.Model.MoveVec(mv.Unit().Scale(movespd))
 
-	sceneTree := p.Bounds.Scene().Root.Children(true)
-	solids := p.Bounds.Scene().Root.Search().ByParentPropNames("solid")
+	sceneTree := p.Capsule.Scene().Root.Children(true)
+	solids := p.Capsule.Scene().Root.Search().ByParentPropNames("solid")
 
-	p.Bounds.CollisionTest(tetra3d.CollisionTestSettings{
+	p.Capsule.CollisionTest(tetra3d.CollisionTestSettings{
 		TestAgainst: sceneTree,
 		OnCollision: func(col *tetra3d.Collision, index, count int) bool {
 			mtv := col.MaxMTV()
@@ -120,7 +119,7 @@ func (p *Player) Update() {
 
 type Guy struct {
 	Model       *tetra3d.Model
-	Bounds      *tetra3d.BoundingCapsule
+	Capsule     *tetra3d.ColliderCapsule
 	PathStepper *tetra3d.PathStepper
 }
 
@@ -128,7 +127,7 @@ func NewGuy(node *tetra3d.Model) *Guy {
 	return &Guy{
 		Model:       node,
 		PathStepper: tetra3d.NewPathStepper(nil),
-		Bounds:      node.Get("BoundingCapsule").(*tetra3d.BoundingCapsule),
+		Capsule:     node.Get("ColliderCapsule").(*tetra3d.ColliderCapsule),
 	}
 }
 
@@ -153,20 +152,6 @@ func (g *Guy) Update() {
 		}
 
 	}
-
-	// sceneTree := g.Model.Scene().Root.SearchTree()
-
-	// g.Bounds.CollisionTest(tetra3d.CollisionTestSettings{
-	// 	TestAgainst: sceneTree,
-	// 	OnCollision: func(col *tetra3d.Collision, index, count int) bool {
-	// 		mtv := col.AverageMTV()
-	// 		mtv.Y = 0
-	// 		g.Model.MoveVec(mtv)
-	// 		return true
-	// 	},
-	// })
-
-	// grid := g.Model.Scene().Get("Grid").(*tetra3d.Grid)
 
 }
 

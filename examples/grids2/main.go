@@ -185,7 +185,7 @@ func (g *Game) Update() error {
 		Depth: 100,
 		OnHit: func(hit tetra3d.RayHit, hitIndex int, hitCount int) bool {
 
-			// The bounding objects's parent (model)'s parent is the grid point node
+			// The collider's parent (model)'s parent is the grid point node
 			targetPoint := hit.Object.Get("../../").(*tetra3d.GridPoint)
 
 			cursor.SetLocalPositionVec(targetPoint.LocalPosition())
@@ -221,7 +221,7 @@ func (g *Game) Update() error {
 			return false // Don't continue stepping through ray hits beyond the first one
 
 		},
-		TestAgainst: g.Scene.Root.Search().ByParentPropNames("gridPoint").ByType(tetra3d.NodeTypeBoundingObject),
+		TestAgainst: g.Scene.Root.Search().ByParentPropNames("gridPoint").ByType(tetra3d.NodeTypeCollider),
 	})
 
 	g.Camera.Update()

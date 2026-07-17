@@ -716,7 +716,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			newMesh.AddVertices(vertexData...)
 			mp.AddTriangles(newIndices...)
 
-			newMesh.UpdateBounds()
+			newMesh.UpdateDimensions()
 
 			shapeTargetNames := []string{}
 
@@ -1215,17 +1215,17 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					// case 0: // NONE
 					case 1: // AABB
 
-						var aabb *BoundingAABB
+						var aabb *ColliderAABB
 
 						if aabbCustomEnabled := getOrDefaultBool("t3dAABBCustomEnabled__", false); aabbCustomEnabled {
 
 							boundsSize := getOrDefaultFloatSlice("t3dAABBCustomSize__", []float32{2, 2, 2})
-							aabb = NewBoundingAABB("BoundingAABB", boundsSize[0], boundsSize[1], boundsSize[2])
+							aabb = NewColliderAABB("ColliderAABB", boundsSize[0], boundsSize[1], boundsSize[2])
 
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 							mesh := obj.(*Model).mesh
 							dim := mesh.Dimensions
-							aabb = NewBoundingAABB("BoundingAABB", dim.Width(), dim.Height(), dim.Depth())
+							aabb = NewColliderAABB("ColliderAABB", dim.Width(), dim.Height(), dim.Depth())
 						}
 
 						if aabb != nil {
@@ -1237,21 +1237,21 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							obj.AddChildren(aabb)
 
 						} else {
-							log.Println("Warning: object " + obj.Name() + " has bounds type BoundingAABB with no size and is not a Model")
+							log.Println("Warning: object " + obj.Name() + " has collider type ColliderAABB with no size and is not a Model")
 						}
 
 					case 2: // Capsule
 
-						var capsule *BoundingCapsule
+						var capsule *ColliderCapsule
 
-						capsuleUp := BoundingCapsuleUpAxis(getOrDefaultInt("t3dCapsuleUp__", 1))
+						capsuleUp := ColliderCapsuleUpAxis(getOrDefaultInt("t3dCapsuleUp__", 1))
 						if capsuleCustomEnabled := getOrDefaultBool("t3dCapsuleCustomEnabled__", false); capsuleCustomEnabled {
 							height := getOrDefaultFloat("t3dCapsuleCustomHeight__", 2)
 							radius := getOrDefaultFloat("t3dCapsuleCustomRadius__", 0.5)
-							capsule = NewBoundingCapsule("BoundingCapsule", radius, height, capsuleUp)
+							capsule = NewColliderCapsule("ColliderCapsule", radius, height, capsuleUp)
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 							dim := obj.(*Model).mesh.Dimensions
-							capsule = NewBoundingCapsule("BoundingCapsule", math32.Max(dim.Width(), dim.Depth())/2, dim.Height(), capsuleUp)
+							capsule = NewColliderCapsule("ColliderCapsule", math32.Max(dim.Width(), dim.Depth())/2, dim.Height(), capsuleUp)
 						}
 
 						if capsule != nil {
@@ -1265,16 +1265,16 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							obj.AddChildren(capsule)
 
 						} else {
-							log.Println("Warning: object " + obj.Name() + " has bounds type BoundingCapsule with no size and is not a Model")
+							log.Println("Warning: object " + obj.Name() + " has collider type ColliderCapsule with no size and is not a Model")
 						}
 
 					case 3: // Sphere
 
-						var sphere *BoundingSphere
+						var sphere *ColliderSphere
 
 						if sphereCustomEnabled := getOrDefaultBool("t3dSphereCustomEnabled__", false); sphereCustomEnabled {
 							radius := getOrDefaultFloat("t3dSphereCustomRadius__", 1)
-							sphere = NewBoundingSphere("BoundingSphere", radius)
+							sphere = NewColliderSphere("ColliderSphere", radius)
 						} else if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 
 							model := obj.(*Model)
@@ -1284,7 +1284,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							dim.Min = dim.Min.Mult(scale)
 							dim.Max = dim.Max.Mult(scale)
 
-							sphere = NewBoundingSphere("BoundingSphere", dim.MaxDimension()/2)
+							sphere = NewColliderSphere("ColliderSphere", dim.MaxDimension()/2)
 						}
 
 						if sphere != nil {
@@ -1296,7 +1296,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							obj.AddChildren(sphere)
 
 						} else {
-							log.Println("Warning: object " + obj.Name() + " has bounds type BoundingSphere with no size and is not a Model")
+							log.Println("Warning: object " + obj.Name() + " has collider type ColliderSphere with no size and is not a Model")
 						}
 
 					case 4: // Triangles
@@ -1309,7 +1309,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 								gridSize = getOrDefaultFloat("t3dTrianglesCustomBroadphaseGridSize__", 20)
 							}
 
-							triangles := NewBoundingTriangles("BoundingTriangles", obj.(*Model).mesh, gridSize)
+							triangles := NewColliderTriangles("ColliderTriangles", obj.(*Model).mesh, gridSize)
 
 							obj.AddChildren(triangles)
 						}

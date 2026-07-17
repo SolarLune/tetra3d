@@ -4,13 +4,13 @@ package tetra3d
 // for collision detection or mesh rendering. This works largely automatically; you should generally
 // not have to tweak this too much.
 // The general idea is that the broadphase is composed of rectangles in a grid layout, completely covering
-// the owning mesh. When you, say, check for a collision against a BoundingTriangles object, it first
+// the owning mesh. When you, say, check for a collision against a ColliderTriangles object, it first
 // checks the Broadphase object to determine which set(s) of triangles the colliding
 // object could be colliding with for finer examination.
 type Broadphase struct {
 	triSets [][]int // The sets of triangles
 
-	boundingTriangles *BoundingTriangles
+	colliderTriangles *ColliderTriangles
 	dimensions        Dimensions
 	enabled           bool
 
@@ -24,12 +24,12 @@ type Broadphase struct {
 }
 
 // NewBroadphase returns a new Broadphase object that performs broadphase triangle detection for a Mesh.
-func NewBroadphase(boundingTris *BoundingTriangles, cellSizeX, cellSizeY, cellSizeZ float32) *Broadphase {
+func NewBroadphase(colliderTris *ColliderTriangles, cellSizeX, cellSizeY, cellSizeZ float32) *Broadphase {
 
 	b := &Broadphase{
 
-		boundingTriangles: boundingTris,
-		dimensions:        boundingTris.Mesh.Dimensions, // Specifically the untransformed dimensions
+		colliderTriangles: colliderTris,
+		dimensions:        colliderTris.Mesh.Dimensions, // Specifically the untransformed dimensions
 
 		cellSizeX: cellSizeX,
 		cellSizeY: cellSizeY,
@@ -46,10 +46,10 @@ func NewBroadphase(boundingTris *BoundingTriangles, cellSizeX, cellSizeY, cellSi
 }
 
 // Clone clones the Broadphase.
-func (b *Broadphase) Clone(newBoundingTriangles *BoundingTriangles) *Broadphase {
+func (b *Broadphase) Clone(newColliderTriangles *ColliderTriangles) *Broadphase {
 
 	// Create a new broadphase with a cell size of 0 so it specifically does NOT resize again
-	newBroadphase := NewBroadphase(newBoundingTriangles, 0, 0, 0)
+	newBroadphase := NewBroadphase(newColliderTriangles, 0, 0, 0)
 
 	ts := make([][]int, 0, len(b.triSets))
 
@@ -96,7 +96,7 @@ func (b *Broadphase) Resize(cellSizeX, cellSizeY, cellSizeZ float32) {
 	cellCountY := 0
 	cellCountZ := 0
 
-	mesh := b.boundingTriangles.Mesh
+	mesh := b.colliderTriangles.Mesh
 
 	cellCountZ = 0
 
@@ -136,7 +136,7 @@ func (b *Broadphase) Resize(cellSizeX, cellSizeY, cellSizeZ float32) {
 
 				set := []int{}
 
-				for triIndex, tri := range b.boundingTriangles.Mesh.Triangles {
+				for triIndex, tri := range b.colliderTriangles.Mesh.Triangles {
 
 					point := closestPointOnTri(
 						NewVector3(x, y, z),
@@ -199,7 +199,7 @@ func (b *Broadphase) convertToWorldPosition(x, y, z int) Vector3 {
 
 // Mesh returns the mesh that is associated with the Broadphase object.
 func (b *Broadphase) Mesh() *Mesh {
-	return b.boundingTriangles.Mesh
+	return b.colliderTriangles.Mesh
 }
 
 type BroadphaseTestFunction func(tri *Triangle) bool
@@ -232,7 +232,7 @@ func (b *Broadphase) ForEachTriangleInDimensions(dim Dimensions, forEach Broadph
 		return false
 	}
 
-	tris := b.boundingTriangles.Mesh.Triangles
+	tris := b.colliderTriangles.Mesh.Triangles
 
 	if !b.enabled || len(b.triSets) == 0 {
 		foundResult := false
@@ -249,7 +249,7 @@ func (b *Broadphase) ForEachTriangleInDimensions(dim Dimensions, forEach Broadph
 
 	margin := float32(max(b.cellSizeX, b.cellSizeY, b.cellSizeZ))
 
-	invertedTransform := b.boundingTriangles.Transform().Inverted()
+	invertedTransform := b.colliderTriangles.Transform().Inverted()
 
 	center := dim.Center()
 
@@ -325,10 +325,10 @@ earlyExit:
 
 }
 
-// Performs a function on each triangle within the bounds of the given BoundingObject.
+// Performs a function on each triangle within the bounds of the given Collider.
 // The function returns a boolean indicating if any triangle was found in the given bounds.
-func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingObject, forEach func(tri *Triangle) bool) bool {
-	return b.ForEachTriangleInDimensions(boundingObject.Dimensions(), forEach)
+func (b *Broadphase) ForEachTriangleFromCollider(collider Collider, forEach func(tri *Triangle) bool) bool {
+	return b.ForEachTriangleInDimensions(collider.Dimensions(), forEach)
 }
 
 // func (b *Broadphase) ForEachTriangleInRange(pos Vector3, checkRadius float32, forEach func(triID int) bool) {
@@ -336,7 +336,7 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 // 	// Previously, this used sets; this no longer does for optimization's sake.
 // 	// This works because triangles used to be able to be in multiple sets; this should no longer be the case.
 // 	if !b.enabled {
-// 		for t := range b.boundingTriangles.Mesh.Triangles {
+// 		for t := range b.ColliderTriangles.Mesh.Triangles {
 // 			if !forEach(t) {
 // 				return
 // 			}
@@ -355,7 +355,7 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 // 				// 	continue
 // 				// }
 
-// 				// cellPos := b.boundingTriangles.Transform().MultVec(b.convertToWorldPosition(x, y, z))
+// 				// cellPos := b.ColliderTriangles.Transform().MultVec(b.convertToWorldPosition(x, y, z))
 
 // 				// if cellPos.DistanceSquaredTo(pos) > checkRadius {
 // 				// 	continue
@@ -375,10 +375,10 @@ func (b *Broadphase) ForEachTriangleFromBoundingObject(boundingObject IBoundingO
 
 // }
 
-func (b *Broadphase) allAABBPositions() []*BoundingAABB {
+func (b *Broadphase) allAABBPositions() []*ColliderAABB {
 	// TODO: Remove this, it's not necessary.
 
-	aabbs := []*BoundingAABB{}
+	aabbs := []*ColliderAABB{}
 
 	dimMin := b.dimensions.Min
 	dimMax := b.dimensions.Max
@@ -400,7 +400,7 @@ func (b *Broadphase) allAABBPositions() []*BoundingAABB {
 		for y := dimMin.Y; y < dimMax.Y; y += b.cellSizeY {
 
 			for x := dimMin.X; x < dimMax.X; x += b.cellSizeX {
-				aabb := NewBoundingAABB("", b.cellSizeX, b.cellSizeY, b.cellSizeZ)
+				aabb := NewColliderAABB("", b.cellSizeX, b.cellSizeY, b.cellSizeZ)
 				aabb.SetWorldPosition(x, y, z)
 				aabbs = append(aabbs, aabb)
 			}

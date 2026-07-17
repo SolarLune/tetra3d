@@ -94,8 +94,8 @@ type Material struct {
 	BillboardUpDirection int
 
 	Visible          bool // Whether the material is visible or not
-	ReportCollisions bool // Whether the material is collideable or not when performing collision checks against a BoundingTriangle with this Material
-	ReportRays       bool // Whether the material is collideable or not when performing ray checks against a BoundingTriangle with this Material
+	ReportCollisions bool // Whether the material is collideable or not when performing collision checks against a ColliderTriangles with this Material
+	ReportRays       bool // Whether the material is collideable or not when performing ray checks against a ColliderTriangles with this Material
 
 	// fragmentShader represents a shader used to render the material with. This shader is activated after rendering
 	// to the depth texture, but before compositing the finished render to the screen after fog.
