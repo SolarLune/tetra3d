@@ -504,6 +504,11 @@ func (ap *AnimationPlayer) SetRoot(node INode) {
 	ap.ChannelsUpdated = false
 }
 
+// Clears the currently played animation from the AnimationPlayer.
+func (ap *AnimationPlayer) Clear() {
+	ap.animation = nil
+}
+
 // Plays the specified animations back in sequence, starting with the first one.
 // If the first animation is already playing, the function does nothing and doesn't alter any sequenced animation set.
 // Calling this clears any sequenced animations present in the AnimationPlayerCallback.

@@ -274,6 +274,7 @@ type Mesh struct {
 	VertexPositions              []Vector3
 	VertexPositionsOriginal      []Vector3
 	VertexNormals                []Vector3
+	VertexNormalsOriginal        []Vector3 // The original normal values for the vertices
 	allocatedForAutoSubdivisions bool
 
 	// vertexTransformedNormals []Vector3
@@ -445,6 +446,7 @@ func (mesh *Mesh) allocateVertexBuffers(addedVertexCount int) {
 		mesh.VertexPositions = make([]Vector3, 0, addedVertexCount)
 		mesh.VertexPositionsOriginal = make([]Vector3, 0, addedVertexCount)
 		mesh.VertexNormals = make([]Vector3, 0, addedVertexCount)
+		mesh.VertexNormalsOriginal = make([]Vector3, 0, addedVertexCount)
 		mesh.VertexUVs = make([]Vector2, 0, addedVertexCount)
 		mesh.VertexUVsOriginal = make([]Vector2, 0, addedVertexCount)
 		for ci := range mesh.VertexColors {
@@ -460,6 +462,7 @@ func (mesh *Mesh) allocateVertexBuffers(addedVertexCount int) {
 		mesh.VertexPositions = slices.Grow(mesh.VertexPositions, addedVertexCount)
 		mesh.VertexPositionsOriginal = slices.Grow(mesh.VertexPositionsOriginal, addedVertexCount)
 		mesh.VertexNormals = slices.Grow(mesh.VertexNormals, addedVertexCount)
+		mesh.VertexNormalsOriginal = slices.Grow(mesh.VertexNormalsOriginal, addedVertexCount)
 		mesh.VertexUVs = slices.Grow(mesh.VertexUVs, addedVertexCount)
 		mesh.VertexUVsOriginal = slices.Grow(mesh.VertexUVsOriginal, addedVertexCount)
 		for ci := range mesh.VertexColors {
@@ -628,6 +631,7 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 		mesh.VertexPositions = append(mesh.VertexPositions, Vector3{vertInfo.X, vertInfo.Y, vertInfo.Z})
 		mesh.VertexPositionsOriginal = append(mesh.VertexPositionsOriginal, Vector3{vertInfo.X, vertInfo.Y, vertInfo.Z})
 		mesh.VertexNormals = append(mesh.VertexNormals, Vector3{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ})
+		mesh.VertexNormalsOriginal = append(mesh.VertexNormals, Vector3{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ})
 		mesh.VertexUVs = append(mesh.VertexUVs, Vector2{vertInfo.U, vertInfo.V})
 		mesh.VertexUVsOriginal = append(mesh.VertexUVsOriginal, Vector2{vertInfo.U, vertInfo.V})
 

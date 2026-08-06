@@ -52,6 +52,11 @@ func (capsule *ColliderCapsule) Clone() INode {
 	return clone
 }
 
+// Returns the up axis for the capsule.
+func (capsule *ColliderCapsule) UpAxis() ColliderCapsuleUpAxis {
+	return capsule.up
+}
+
 func (capsule *ColliderCapsule) updateTransform() {
 	var up Vector3
 	switch capsule.up {

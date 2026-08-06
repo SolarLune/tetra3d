@@ -440,7 +440,7 @@ The following is a rough to-do list (tasks with checks have been implemented):
       -- [x] -- Optimize NodeFilters to avoid creating slices unnecessarily by avoiding using Node.Children() and instead use callbacks
       -- [ ] -- Allow NodeFilters to append filtered nodes to a shared slice to have sorting available while still not allocating new memory unless the internal slice grows
 - [x] -- Reusing vertex indices for adjacent triangles
-- [ ] -- Multithreading (particularly for vertex transformations)
+- [ ] -- Multithreading (particularly for vertex transformations; maybe even other things can be done during the update call itself?)
 - [x] -- Armature animation improvements?
 - [x] -- Custom Vectors
 - [ ] -- -- Move Vector and Matrix to external package for simplicity / resuability / create separate Vector types for 2D / 4D (?) Vectors. Maybe Colors as well?

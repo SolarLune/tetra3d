@@ -114,7 +114,9 @@ func (props *Properties) HasNameAndBitfieldValue(propName string, value Bitfield
 // Returns if the Properties object has a property of the given name with the given value.
 func (props *Properties) HasBitfieldValue(value Bitfield) bool {
 	for _, p := range props.data {
-		return p.IsBitfield() && p.AsBitfield().Contains(value)
+		if p.IsBitfield() && p.AsBitfield().Contains(value) {
+			return true
+		}
 	}
 	return false
 }
