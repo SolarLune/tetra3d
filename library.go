@@ -8,6 +8,10 @@ type Library struct {
 	Meshes        []*Mesh      // A selection of Meshes (because they can be cloned while having the same names)
 	Materials     []*Material  // A selection of Materials (because they can be cloned while having the same names)
 	Worlds        []*World     // A Map of Worlds to their names
+
+	autosubdivisionLevels   []AutoSubdivisionLevel
+	maxAutoSubdivisionCount int
+	bitfieldNames           []bitfieldNamePair
 }
 
 // NewLibrary creates a new Library.
@@ -18,6 +22,8 @@ func NewLibrary() *Library {
 		Animations: []*Animation{},
 		Materials:  []*Material{},
 		Worlds:     []*World{},
+
+		maxAutoSubdivisionCount: 3,
 	}
 }
 
@@ -155,4 +161,54 @@ func (lib *Library) MaterialByName(name string) *Material {
 		}
 	}
 	return nil
+}
+
+// Returns the names of bits for the library.
+func (lib *Library) BitfieldNames() []string {
+	out := []string{}
+	for _, n := range lib.bitfieldNames {
+		out = append(out, n.Name)
+	}
+	return out
+}
+
+// Returns the name of the bit mask in the specified index.
+// If it can't be found, a blank string is returned.
+func (lib *Library) BitfieldNameByIndex(index int) string {
+	if index < len(lib.bitfieldNames) {
+		return lib.bitfieldNames[index].Name
+	}
+	return ""
+}
+
+// Returns the name of the bitfield for the given bit mask value.
+// If it can't be found, a blank string is returned.
+func (lib *Library) BitfieldNameByValue(value Bitfield) string {
+	for _, b := range lib.bitfieldNames {
+		if b.Value == value {
+			return b.Name
+		}
+	}
+	return ""
+}
+
+// Returns the bitfield value associated with the given name.
+// If it can't be found, a bitfield with the value of 0 is returned.
+func (lib *Library) BitfieldValueByName(name string) Bitfield {
+	for _, b := range lib.bitfieldNames {
+		if b.Name == name {
+			return b.Value
+		}
+	}
+	return Bitfield(0)
+}
+
+type AutoSubdivisionLevel struct {
+	DistanceSquared     float32
+	MaximumTriangleSize float32
+}
+
+type bitfieldNamePair struct {
+	Value Bitfield
+	Name  string
 }

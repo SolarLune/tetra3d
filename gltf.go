@@ -150,18 +150,20 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 	sectorDetection := SectorDetectionTypeVertices
 
 	if gltfLoadOptions.CameraWidth <= 0 && gltfLoadOptions.CameraHeight <= 0 {
-		camWidth = 640
-		camHeight = 360
+		camWidth = 1920
+		camHeight = 1080
 		camDefaultSize = true
 	}
 
+	var extraData = map[string]any{}
 	var globalExporterSettings = map[string]any{}
 
 	if len(doc.Scenes) > 0 {
 
 		if doc.Scenes[0].Extras != nil {
 
-			globalExporterSettings = doc.Scenes[0].Extras.(map[string]any)
+			extraData = doc.Scenes[0].Extras.(map[string]any)
+			globalExporterSettings = extraData["t3dGlobals__"].(map[string]any)
 
 			if camDefaultSize {
 
@@ -184,7 +186,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				exportedTextures = et.(bool)
 			}
 
-			if col, exists := globalExporterSettings["t3dCollections__"]; exists {
+			if col, exists := extraData["t3dCollections__"]; exists {
 				t3dExport = true
 				data := col.(map[string]any)
 
@@ -201,7 +203,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			}
 
-			if cameras, exists := globalExporterSettings["t3dView3DCameraData__"]; exists {
+			if cameras, exists := extraData["t3dView3DCameraData__"]; exists {
 
 				t3dExport = true
 
@@ -250,6 +252,48 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 			}
 
+			if bitNames, exists := globalExporterSettings["t3dBitfieldNames__"]; exists {
+
+				for i, n := range bitNames.([]any) {
+
+					library.bitfieldNames = append(library.bitfieldNames, bitfieldNamePair{
+						Name:  n.(string),
+						Value: Bitfield(math.Pow(2, float64(i))),
+					})
+
+				}
+
+			}
+
+			if value, exists := globalExporterSettings["t3dAutoSubdivisionLevels__"]; exists {
+
+				levels := value.([]any)
+				for _, level := range levels {
+
+					data := level.(map[string]any)
+
+					getOrDefaultFloat := func(propMap map[string]any, key string, defaultValue float32) float32 {
+						if value, keyExists := propMap[key]; keyExists {
+							return float32(value.(float64))
+						}
+						return defaultValue
+					}
+
+					d := getOrDefaultFloat(data, "distance", 40)
+					library.autosubdivisionLevels = append(library.autosubdivisionLevels, AutoSubdivisionLevel{
+						DistanceSquared:     d * d,
+						MaximumTriangleSize: getOrDefaultFloat(data, "maximumTriangleSize", 0),
+					})
+
+				}
+
+			}
+
+			// Default's 3
+			if value, exists := globalExporterSettings["t3dMaxAutoSubdivisionCount__"]; exists {
+				library.maxAutoSubdivisionCount = int(value.(float64))
+			}
+
 		}
 
 	}
@@ -296,7 +340,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 						if texture, ok := externalTextures[newMat.TexturePath]; ok {
 							newMat.Texture = texture
 						} else {
-							texture, _, err := ebitenutil.NewImageFromFileSystem(gltfLoadOptions.externalBufferFileSystem, baseDir+newMat.TexturePath)
+							texture, _, err := ebitenutil.NewImageFromFileSystem(gltfLoadOptions.externalBufferFileSystem, path.Clean(path.Join(baseDir, newMat.TexturePath)))
 							if err != nil {
 								log.Println(err)
 							} else {
@@ -502,6 +546,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 	for _, mesh := range doc.Meshes {
 
+		autoSubdivide := false
+
 		// If t3dGrid__ is set on a mesh, then it can be skipped for loading
 		if mesh.Extras != nil {
 
@@ -509,6 +555,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				if _, exists := dataMap["t3dGrid__"]; exists {
 					continue
+				}
+
+				if as, exists := dataMap["t3dAutoSubdivide__"]; exists {
+					autoSubdivide = as.(float64) > 0
 				}
 
 			}
@@ -521,45 +571,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		newMesh.library = library
 
 		colorChannelNames := []string{}
-
-		if mesh.Extras != nil {
-
-			if dataMap, isMap := mesh.Extras.(map[string]any); isMap {
-
-				if autoSubdivide, exists := dataMap["t3dAutoSubdivide__"]; exists {
-					newMesh.AutoSubdivide = autoSubdivide.(float64) > 0
-				}
-
-				if vcNames, exists := dataMap["t3dVertexColorNames__"]; exists {
-					for _, name := range vcNames.([]any) {
-						colorChannelNames = append(colorChannelNames, name.(string))
-					}
-				}
-
-				if groupNames, exists := dataMap["t3dVertexGroupNames__"]; exists {
-					for _, name := range groupNames.([]any) {
-						newMesh.VertexGroupNames = append(newMesh.VertexGroupNames, name.(string))
-					}
-				}
-
-				if unique, exists := dataMap["t3dUniqueMesh__"]; exists && unique.(float64) > 0 {
-					if uniqueMats, exists := dataMap["t3dUniqueMaterials__"]; exists && uniqueMats.(float64) > 0 {
-						newMesh.Unique = MeshUniqueMeshAndMaterials
-					} else {
-						newMesh.Unique = MeshUniqueMesh
-					}
-				}
-
-				// Non-Tetra3D custom data
-				for tagName, data := range dataMap {
-					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
-						newMesh.properties.Add(tagName).Set(data)
-					}
-				}
-
-			}
-
-		}
 
 		posBuffer := [][3]float32{}
 		uvBuffer := [][2]float32{}
@@ -628,9 +639,13 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			// is turned to "COLOR_0", while the other channels are turned into attributes
 			// accessible by their names like so: "_CHANNELNAMEINALLCAPS".
 
-			for index := range colorChannelNames {
+			for index := range 16 {
 
-				vertexColorAccessor, _ := v.Attributes["COLOR_"+strconv.Itoa(index)]
+				vertexColorAccessor, exists := v.Attributes["COLOR_"+strconv.Itoa(index)]
+
+				if !exists {
+					continue // Shouldn't be possible to have COLOR_0 and COLOR_2 but not COLOR_1?
+				}
 
 				colors, err := modeler.ReadColor(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
 				clear(vcBuffer)
@@ -655,10 +670,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 				}
 
-			}
-
-			if len(colorChannelNames) > 0 {
-				newMesh.VertexActiveColorChannel = 0 // Set it to 0 - the enabled vertex color channel in Blender is exported as the first channel now.
 			}
 
 			if weightAccessor, weightExists := v.Attributes[gltf.WEIGHTS_0]; weightExists {
@@ -710,7 +721,12 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				newIndices[i] = int(j)
 			}
 
-			newMesh.allocateVertexBuffers(len(vertexData))
+			if autoSubdivide {
+				triCount := int(math32.Pow(4, float32(library.maxAutoSubdivisionCount)))
+				newMesh.allocateVertexBuffers(len(vertexData) * triCount * 3)
+			} else {
+				newMesh.allocateVertexBuffers(len(vertexData))
+			}
 
 			mp := newMesh.AddMeshPart(mat)
 			newMesh.AddVertices(vertexData...)
@@ -719,12 +735,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			newMesh.UpdateDimensions()
 
 			shapeTargetNames := []string{}
-
-			if len(colorChannelNames) > 0 {
-				for index := range colorChannelNames {
-					newMesh.VertexColors[index].name = colorChannelNames[index]
-				}
-			}
 
 			if dataMap, isMap := mesh.Extras.(map[string]any); isMap {
 
@@ -781,6 +791,52 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		}
 
+		// Do this after allocating vertex buffer and adding tris and stuff
+		if autoSubdivide {
+			newMesh.SetAutoSubdivide(true)
+		}
+
+		if mesh.Extras != nil {
+
+			if dataMap, isMap := mesh.Extras.(map[string]any); isMap {
+
+				if vcNames, exists := dataMap["t3dVertexColorNames__"]; exists {
+					for _, name := range vcNames.([]any) {
+						colorChannelNames = append(colorChannelNames, name.(string))
+					}
+				}
+
+				if groupNames, exists := dataMap["t3dVertexGroupNames__"]; exists {
+					for _, name := range groupNames.([]any) {
+						newMesh.VertexGroupNames = append(newMesh.VertexGroupNames, name.(string))
+					}
+				}
+
+				if unique, exists := dataMap["t3dUniqueMesh__"]; exists && unique.(float64) > 0 {
+					if uniqueMats, exists := dataMap["t3dUniqueMaterials__"]; exists && uniqueMats.(float64) > 0 {
+						newMesh.Unique = MeshUniqueMeshAndMaterials
+					} else {
+						newMesh.Unique = MeshUniqueMesh
+					}
+				}
+
+				// Non-Tetra3D custom data
+				for tagName, data := range dataMap {
+					if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
+						newMesh.properties.Add(tagName).Set(data)
+					}
+				}
+
+			}
+
+		}
+
+		if len(colorChannelNames) > 0 {
+			newMesh.VertexActiveColorChannel = 0 // Set it to 0 - the enabled vertex color channel in Blender is exported as the first channel now.
+			for index := range colorChannelNames {
+				newMesh.VertexColors[index].name = colorChannelNames[index]
+			}
+		}
 	}
 
 	// TODO: Investigate the bug where having two objects that have animations in the same scene exports the animations multiple times, with the original
@@ -1234,6 +1290,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 								aabb.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
 
+							aabb.library = library
 							obj.AddChildren(aabb)
 
 						} else {
@@ -1262,6 +1319,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 								capsule.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
 
+							capsule.library = library
 							obj.AddChildren(capsule)
 
 						} else {
@@ -1292,6 +1350,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							if obj.Type().Is(NodeTypeModel) && obj.(*Model).mesh != nil {
 								sphere.SetLocalPositionVec(obj.(*Model).mesh.Dimensions.Center())
 							}
+							sphere.library = library
 
 							obj.AddChildren(sphere)
 
@@ -1310,6 +1369,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 							}
 
 							triangles := NewColliderTriangles("ColliderTriangles", obj.(*Model).mesh, gridSize)
+							triangles.library = library
 
 							obj.AddChildren(triangles)
 						}
@@ -1382,7 +1442,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		objToNode[obj] = node
 
-		obj.setLibrary(library)
+		obj.SetLibrary(library)
 
 	}
 
@@ -1603,43 +1663,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				}
 			}
 
-			if bitNames, exists := extras["t3dBitfieldNames__"]; exists {
-
-				for i, n := range bitNames.([]any) {
-
-					scene.bitfieldNames = append(scene.bitfieldNames, bitfieldNamePair{
-						Name:  n.(map[string]any)["name"].(string),
-						Value: Bitfield(math.Pow(2, float64(i))),
-					})
-
-				}
-
-			}
-
-			if value, exists := extras["t3dAutoSubdivisionLevels__"]; exists {
-
-				levels := value.([]any)
-				for _, level := range levels {
-
-					data := level.(map[string]any)
-
-					getOrDefaultFloat := func(propMap map[string]any, key string, defaultValue float32) float32 {
-						if value, keyExists := propMap[key]; keyExists {
-							return float32(value.(float64))
-						}
-						return defaultValue
-					}
-
-					d := getOrDefaultFloat(data, "distance", 40)
-					scene.autosubdivisionLevels = append(scene.autosubdivisionLevels, AutoSubdivisionLevel{
-						DistanceSquared:     d * d,
-						SubdivisionLevel:    int(getOrDefaultFloat(data, "subdivisionLevel", 1)),
-						MinimumTriangleSize: getOrDefaultFloat(data, "minimumTriangleSize", 0),
-					})
-
-				}
-
-			}
 			// Non-Tetra3D custom data
 			for tagName, data := range extras {
 				if !strings.HasPrefix(tagName, "t3d") || !strings.HasSuffix(tagName, "__") {
@@ -1796,6 +1819,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			if node, ok := node.(*Node); ok && len(node.collectionObjects) > 0 {
 
 				for _, child := range node.collectionObjects {
+
 					transform := child.Transform()
 					node.parent.AddChildren(child)
 					if value, exists := globalExporterSettings["t3dRenameInstancedObjects__"]; exists && value.(bool) {

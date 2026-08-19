@@ -399,8 +399,8 @@ func (s SearchOptions) ByPropHasBitfieldValueByName(bitfieldValueName string) Se
 	s.filterStack = func(node INode) bool {
 
 		if bitfieldValue == 0 {
-			if scene := node.Scene(); scene != nil {
-				bitfieldValue = scene.BitfieldValueByName(bitfieldValueName)
+			if lib := node.Library(); lib != nil {
+				bitfieldValue = lib.BitfieldValueByName(bitfieldValueName)
 			}
 		}
 
@@ -420,30 +420,50 @@ func (s SearchOptions) ByPropHasBitfieldValueByName(bitfieldValueName string) Se
 	return s
 }
 
-func (s SearchOptions) ByParentPropHasBitfieldValueByName(bitfieldValueName string) SearchOptions {
+func (s SearchOptions) ByParentPropHasBitfieldValueByNames(bitfieldValueNames ...string) SearchOptions {
+
 	last := s.filterStack
 
-	bitfieldValue := Bitfield(0)
+	lib := s.Start.Library()
+
+	if lib == nil {
+		return s
+	}
+
+	bitfieldNamesToValues := []Bitfield{}
+
+	for _, n := range bitfieldValueNames {
+		if v := lib.BitfieldValueByName(n); v > 0 {
+			bitfieldNamesToValues = append(bitfieldNamesToValues, v)
+		}
+	}
+
+	if len(bitfieldNamesToValues) == 0 {
+		// No applicable bitfield names found in the library,
+		// so no Node passes
+		s.filterStack = func(node INode) bool {
+			return false
+		}
+	}
 
 	s.filterStack = func(node INode) bool {
 
-		if bitfieldValue == 0 {
-			if scene := node.Scene(); scene != nil {
-				bitfieldValue = scene.BitfieldValueByName(bitfieldValueName)
-			}
-		}
-
 		if parent := node.Parent(); parent != nil {
+
 			for _, prop := range parent.Properties().data {
-				if prop.IsBitfield() {
-					if scene := node.Scene(); scene != nil && prop.AsBitfield().Contains(bitfieldValue) {
+
+				for _, bf := range bitfieldNamesToValues {
+
+					if prop.IsBitfield() && prop.AsBitfield().Contains(bf) {
 						if last != nil {
 							return last(node)
 						} else {
 							return true
 						}
 					}
+
 				}
+
 			}
 		}
 		return false

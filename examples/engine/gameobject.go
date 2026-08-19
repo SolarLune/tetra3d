@@ -52,7 +52,7 @@ func (player *Player) Update() {
 
 		tetra3d.CollisionTestSettings{
 
-			TestAgainst: player.node.Root().Search().ByParentPropHasBitfieldValueByName("Solid"),
+			TestAgainst: player.node.Root().Search().ByParentPropHasBitfieldValueByNames("Solid"),
 
 			OnCollision: func(col *tetra3d.Collision, index, count int) bool {
 

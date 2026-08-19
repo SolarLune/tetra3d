@@ -292,7 +292,7 @@ type Mesh struct {
 	Dimensions Dimensions
 	properties *Properties
 
-	AutoSubdivide bool
+	autoSubdivide bool
 
 	// If Unique is set to a value other than MeshUniqueNone, whenever a Mesh is used for a Model and the Model is cloned,
 	// the Mesh or Mesh and Materials are cloned with it. Useful for things like sprites.
@@ -425,13 +425,73 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	newMesh.VertexGroupNames = append(newMesh.VertexGroupNames, mesh.VertexGroupNames...)
 
-	newMesh.AutoSubdivide = mesh.AutoSubdivide
+	newMesh.autoSubdivide = mesh.autoSubdivide
 
 	for _, key := range mesh.shapeKeys {
 		newMesh.shapeKeys = append(newMesh.shapeKeys, key)
 	}
 
 	return newMesh
+}
+
+// Returns if the Mesh is set to render with auto-subdivision or not.
+func (mesh *Mesh) AutoSubdivide() bool {
+	return mesh.autoSubdivide
+}
+
+// Enables or disables automatic rendering subdivision of triangles.
+// Doing this will also perform subdivision if the Mesh has not been subdivided yet.
+// The subdivision levels are set in the Mesh's Library from Blender.
+// After subdividing a mesh, the subdivisions are stored for rendering - there's
+// no way yet to recalculate mesh subdivisions.
+func (mesh *Mesh) SetAutoSubdivide(autoSubdivide bool) {
+	mesh.autoSubdivide = autoSubdivide
+
+	if autoSubdivide && !mesh.allocatedForAutoSubdivisions {
+
+		triCount := len(mesh.Triangles)
+
+		for _, mp := range mesh.MeshParts {
+
+			mp.forEachTri(false, func(tri *Triangle) {
+
+				// fmt.Println("subdivide", tri.id)
+
+				smallestMaxTriSize := math32.MaxFloat32
+
+				for _, sub := range mesh.Library().autosubdivisionLevels {
+					if sub.MaximumTriangleSize < smallestMaxTriSize {
+						smallestMaxTriSize = sub.MaximumTriangleSize
+					}
+				}
+
+				if tri.MaxSpan <= smallestMaxTriSize {
+					return
+				}
+
+				for i := 0; i < mesh.library.maxAutoSubdivisionCount; i++ {
+					triCount := math32.Pow(4, float32(i+1))
+					tri.subdivisionLevels = append(tri.subdivisionLevels, make([]*Triangle, 0, int(triCount)))
+				}
+
+				tri.performSubdivision(0, tri, smallestMaxTriSize, mesh.library.maxAutoSubdivisionCount)
+
+				triCount += len(tri.subdivisionLevels[len(tri.subdivisionLevels)-1])
+
+			})
+
+		}
+
+		mesh.allocatedForAutoSubdivisions = true
+
+		// If there's more subdivided triangles than the transform list, we'll need to grow the list just in case
+		// they're all rendered at the same time.
+		for triCount > len(globalVertexTransforms)/3 {
+			growDisplayLists()
+		}
+
+	}
+
 }
 
 // allocateVertexBuffers allows us to allocate the slices for vertex properties all at once rather than resizing multiple times as
@@ -1642,8 +1702,8 @@ type Triangle struct {
 	Normal       Vector3   // The physical normal of the triangle (i.e. the direction the triangle is facing). This is different from the visual normals of a triangle's vertices (i.e. a selection of vertices can have inverted normals to be see through, for example).
 	MeshPart     *MeshPart // The specific MeshPart this Triangle belongs to.
 
-	visible           bool
-	wouldRender       bool
+	visible bool
+	// wouldRender       bool
 	subdivisionParent *Triangle
 	subdivisionLevels [][]*Triangle
 
@@ -1695,9 +1755,9 @@ func (t *Triangle) VertexIndex(index int) int {
 
 const subdividedTriangleID = 999999
 
-func (t *Triangle) performSubdivision(subdivisionLevel, maxSubdivisionLevel int, base *Triangle, model *Model) {
+func (t *Triangle) performSubdivision(subdivisionLevel int, base *Triangle, intendedMaxSize float32, maxSubdivisionCount int) {
 
-	if subdivisionLevel == maxSubdivisionLevel {
+	if subdivisionLevel == maxSubdivisionCount || t.MaxSpan <= intendedMaxSize {
 		return
 	}
 
@@ -1796,10 +1856,10 @@ func (t *Triangle) performSubdivision(subdivisionLevel, maxSubdivisionLevel int,
 		subTriD,
 	)
 
-	subTriA.performSubdivision(subdivisionLevel+1, maxSubdivisionLevel, base, model)
-	subTriB.performSubdivision(subdivisionLevel+1, maxSubdivisionLevel, base, model)
-	subTriC.performSubdivision(subdivisionLevel+1, maxSubdivisionLevel, base, model)
-	subTriD.performSubdivision(subdivisionLevel+1, maxSubdivisionLevel, base, model)
+	subTriA.performSubdivision(subdivisionLevel+1, base, intendedMaxSize, maxSubdivisionCount)
+	subTriB.performSubdivision(subdivisionLevel+1, base, intendedMaxSize, maxSubdivisionCount)
+	subTriC.performSubdivision(subdivisionLevel+1, base, intendedMaxSize, maxSubdivisionCount)
+	subTriD.performSubdivision(subdivisionLevel+1, base, intendedMaxSize, maxSubdivisionCount)
 
 }
 
@@ -1816,8 +1876,13 @@ func (t *Triangle) disableSubdivision() {
 
 func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model, autoSubdivisionLevels []AutoSubdivisionLevel) {
 
-	t.wouldRender = false
+	// t.wouldRender = false
 	t.visible = false
+
+	if len(t.subdivisionLevels) == 0 {
+		t.visible = true
+		return
+	}
 
 	for _, level := range t.subdivisionLevels {
 		for _, subDividedTriangle := range level {
@@ -1825,24 +1890,7 @@ func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model, autoSubdiv
 		}
 	}
 
-	if len(t.subdivisionLevels) == 0 {
-
-		maxLevel := 0
-		for _, level := range autoSubdivisionLevels {
-			maxLevel = max(maxLevel, level.SubdivisionLevel)
-		}
-
-		subCount := (math32.Pow(2, float32(maxLevel)) + 1) * (math32.Pow(2, float32(maxLevel-1)+1))
-
-		for i := 0; i < maxLevel; i++ {
-			t.subdivisionLevels = append(t.subdivisionLevels, make([]*Triangle, 0, int(subCount)))
-		}
-
-		t.performSubdivision(0, maxLevel, t, model)
-
-	}
-
-	closestLevel := -1
+	activeSubdivisionLevel := -1
 	closestDistance := math32.MaxFloat32
 
 	dist := cameraPos.DistanceSquaredTo(closestPointOnTri(
@@ -1855,19 +1903,42 @@ func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model, autoSubdiv
 
 	// dist := cameraPos.DistanceSquaredTo(t.Center)
 
-	for _, l := range autoSubdivisionLevels {
-		if dist < l.DistanceSquared && l.DistanceSquared < closestDistance && t.MaxSpan >= l.MinimumTriangleSize {
+	for i, l := range autoSubdivisionLevels {
+		if dist < l.DistanceSquared && l.DistanceSquared < closestDistance {
 			closestDistance = l.DistanceSquared
-			closestLevel = l.SubdivisionLevel - 1
+			activeSubdivisionLevel = i
 		}
 	}
 
-	if closestLevel == -1 {
+	if activeSubdivisionLevel == -1 {
 		t.visible = true
 	} else {
-		for _, subDiv := range t.subdivisionLevels[closestLevel] {
-			subDiv.visible = true
+
+		ms := t.MaxSpan
+		subIndex := -1
+
+		for ms > autoSubdivisionLevels[activeSubdivisionLevel].MaximumTriangleSize {
+			ms /= 2
+			subIndex++
 		}
+
+		if subIndex >= len(t.subdivisionLevels) {
+			subIndex = len(t.subdivisionLevels) - 1
+		}
+
+		if subIndex >= 0 {
+			for _, subDiv := range t.subdivisionLevels[subIndex] {
+				subDiv.visible = true
+			}
+		} else {
+			t.visible = true
+		}
+
+		// sub := t.subdivisionLevels[min(int(t.MaxSpan/maxSize), len(t.subdivisionLevels)-1)]
+
+		// for _, subDiv := range t.subdivisionLevels[closestLevel] {
+		// 	subDiv.visible = true
+		// }
 	}
 	// t.subdivisionLevels[closestLevel]
 
@@ -1945,7 +2016,12 @@ func (tri *Triangle) RecalculateCenter() {
 
 	}
 
-	tri.MaxSpan = dim.MaxSpan()
+	// tri.MaxSpan = dim.MaxSpan()
+	tri.MaxSpan = max(
+		verts[tri.VertexIndexA].Sub(verts[tri.VertexIndexB]).Magnitude(),
+		verts[tri.VertexIndexB].Sub(verts[tri.VertexIndexC]).Magnitude(),
+		verts[tri.VertexIndexC].Sub(verts[tri.VertexIndexA]).Magnitude(),
+	)
 
 }
 

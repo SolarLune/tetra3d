@@ -1,6 +1,10 @@
 package tetra3d
 
-import "strings"
+import (
+	"math/rand/v2"
+	"strconv"
+	"strings"
+)
 
 // Properties is an ordered set of property names to values, representing a means of identifying or carrying data on resources.
 type Properties struct {
@@ -69,6 +73,15 @@ func (props *Properties) Add(propName string) *Property {
 	}
 	props.data = append(props.data, newProp)
 	return newProp
+}
+
+func (props *Properties) Append(value any) *Property {
+	prop := &Property{
+		name:  strconv.Itoa(rand.Int()),
+		Value: value,
+	}
+	props.data = append(props.data, prop)
+	return prop
 }
 
 // Returns the value associated with the specified property name. If a property with the

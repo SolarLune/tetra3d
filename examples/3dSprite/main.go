@@ -117,7 +117,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.Camera.ColorTexture(), nil)
 
 	if g.System.DrawDebugText {
-		tetra3d.DrawDebugText(screen, "This is an example showing\nhow you can render a 2D sprite in 3D space and\nmaintain its ability to render over or under\nother 3D objects.\n\nArrow Keys: Move heart\nA: Toggle wireframe view of heart position", 0, 220, 1, colors.LightGray())
+		tetra3d.DrawDebugText(screen, "This is an example showing\nhow you can render a 2D sprite in 3D space and\nmaintain its ability to render over or under\nother 3D objects.\n\nArrow Keys: Move heart", 0, 220, 1, colors.LightGray())
 	}
 
 	if g.WireframeDrawHeart {

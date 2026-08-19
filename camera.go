@@ -39,13 +39,13 @@ const debugInfoPrevFrametimeCap = 20
 
 // DebugInfo is a struct that holds debugging information for a Camera's render pass. These values are reset when Camera.Clear() is called.
 type DebugInfo struct {
-	On                   bool          // If not on, debug info is not filled out
-	totalFrameTime       time.Duration // Amount of CPU frame time spent transforming vertices and calling Image.DrawTriangles. Doesn't include time ebitengine spends flushing the command queue.
-	totalAnimationTime   time.Duration // Amount of CPU frame time spent animating vertices.
-	totalLightTime       time.Duration // Amount of CPU frame time spent lighting vertices.
-	currentAnimationTime DebugInfoDuration
-	currentLightTime     DebugInfoDuration
-	currentFrameTime     DebugInfoDuration
+	On                   bool              // If not on, debug info is not filled out
+	totalFrameTime       time.Duration     // Amount of CPU frame time spent transforming vertices and calling Image.DrawTriangles. Doesn't include time ebitengine spends flushing the command queue.
+	totalAnimationTime   time.Duration     // Amount of CPU frame time spent animating vertices.
+	totalLightTime       time.Duration     // Amount of CPU frame time spent lighting vertices.
+	currentAnimationTime DebugInfoDuration // Amount of CPU frame time spent skinning animated meshes.
+	currentLightTime     DebugInfoDuration // Amount of CPU frame time spent lighting models.
+	currentFrameTime     DebugInfoDuration // Current CPU frame time spent.
 	frameCount           int
 	nodeCount            int
 	drawnParts           int // Number of draw calls, excluding those invisible or culled based on distance
@@ -77,6 +77,8 @@ func (d *DebugInfo) FrameTime() time.Duration {
 	return metric
 }
 
+// Amount of CPU frame time spent applying animation to and skinning animated meshes.
+// Note that this is not the amount of time spent actually animating nodes; that isn't measured.
 func (d *DebugInfo) AnimationTime() time.Duration {
 	metric := d.totalAnimationTime
 	for _, other := range d.combineWith {
@@ -85,6 +87,7 @@ func (d *DebugInfo) AnimationTime() time.Duration {
 	return metric
 }
 
+// Amount of CPU frame time spent lighting vertices.
 func (d *DebugInfo) LightTime() time.Duration {
 	metric := d.totalLightTime
 	for _, other := range d.combineWith {
@@ -1540,7 +1543,14 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 		}
 
 		startingVertexListIndex := vertexListIndex
-		model.ProcessVertices(vpMatrix, camera, meshPart, true, scene.autosubdivisionLevels)
+
+		var autosubdivisionLevels []AutoSubdivisionLevel
+
+		if scene.library != nil {
+			autosubdivisionLevels = scene.library.autosubdivisionLevels
+		}
+
+		model.ProcessVertices(vpMatrix, camera, meshPart, true, autosubdivisionLevels)
 		// lastVertexListIndex := vertexListIndex
 
 		if vertexListIndex == 0 {
@@ -1597,11 +1607,10 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 		vertexListIndex = startingVertexListIndex
 
-		globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
+		if lighting {
+			camera.DebugInfo.currentLightTime.StartTimer()
 
-			if lighting {
-
-				camera.DebugInfo.currentLightTime.StartTimer()
+			globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
 				triangle.ForEachVertexIndex(func(vertexIndex int) {
 					mesh.vertexLights.colors[vertexIndex].R = 0
@@ -1629,9 +1638,12 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 				}
 
-				camera.DebugInfo.currentLightTime.EndTimer()
+			})
 
-			}
+			camera.DebugInfo.currentLightTime.EndTimer()
+		}
+
+		globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
 
 			for vi := range 3 {
 
@@ -2380,7 +2392,14 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 	autosubLevels := []AutoSubdivisionLevel{}
 
 	if rootNode.Scene() != nil {
-		autosubLevels = rootNode.Scene().autosubdivisionLevels
+		autosubLevels = rootNode.Library().autosubdivisionLevels
+	}
+
+	// Custom WorldToScreenPixels function that limits W
+	worldToScreenPixels := func(vert Vector3) Vector3 {
+		v := NewMatrix4Translate(vert.X, vert.Y, vert.Z).Mult(camera.ViewMatrix().Mult(camera.Projection()))
+		width, height := camera.Size()
+		return camera.clipToScreen(v.MultVecW(Vector3{}), nil, float32(width), float32(height), float32(width)/2, float32(height)/2, true).To3D()
 	}
 
 	rootNode.Search().ForEach(func(node INode, index int) bool {
@@ -2444,8 +2463,8 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 				points = append(points, points[0])
 			}
 			for i := 0; i < len(points)-1; i++ {
-				p1 := camera.WorldToScreenPixels(points[i].WorldPosition())
-				p2 := camera.WorldToScreenPixels(points[i+1].WorldPosition())
+				p1 := worldToScreenPixels(points[i].WorldPosition())
+				p2 := worldToScreenPixels(points[i+1].WorldPosition())
 				vector.StrokeLine(screen, p1.X, p1.Y, p2.X, p2.Y, 1, color.ToNRGBA64(), false)
 			}
 
@@ -2453,10 +2472,10 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 
 			for _, point := range grid.Points() {
 
-				p1 := camera.WorldToScreenPixels(point.WorldPosition())
+				p1 := worldToScreenPixels(point.WorldPosition())
 				vector.StrokeCircle(screen, p1.X, p1.Y, 8, 1, image.White, false)
 				for _, connection := range point.Connections {
-					p2 := camera.WorldToScreenPixels(connection.To.WorldPosition())
+					p2 := worldToScreenPixels(connection.To.WorldPosition())
 					vector.StrokeLine(screen, p1.X, p1.Y, p2.X, p2.Y, 1, color.ToNRGBA64(), false)
 				}
 
@@ -2480,7 +2499,7 @@ func (camera *Camera) DrawDebugDrawOrder(screen *ebiten.Image, rootNode INode, t
 	autosubLevels := []AutoSubdivisionLevel{}
 
 	if rootNode.Scene() != nil {
-		autosubLevels = rootNode.Scene().autosubdivisionLevels
+		autosubLevels = rootNode.Library().autosubdivisionLevels
 	}
 
 	rootNode.Search().ForEach(func(i INode, index int) bool {
@@ -2533,7 +2552,7 @@ func (camera *Camera) DrawDebugTriangleIDs(screen *ebiten.Image, rootNode INode,
 	autosubLevels := []AutoSubdivisionLevel{}
 
 	if rootNode.Scene() != nil {
-		autosubLevels = rootNode.Scene().autosubdivisionLevels
+		autosubLevels = rootNode.Library().autosubdivisionLevels
 	}
 
 	rootNode.Search().ForEach(func(i INode, index int) bool {

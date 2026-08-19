@@ -46,6 +46,8 @@ func growDisplayLists() {
 	globalVertexTransforms = slices.Grow(globalVertexTransforms, cap(globalVertexTransforms)*2)
 	globalVertexTransformedNormals = slices.Grow(globalVertexTransformedNormals, cap(globalVertexTransformedNormals)*2)
 	globalVertexDepthUnbillboarded = slices.Grow(globalVertexDepthUnbillboarded, cap(globalVertexDepthUnbillboarded)*2)
+	globalMeshAlteredVertexPositions = slices.Grow(globalMeshAlteredVertexPositions, cap(globalMeshAlteredVertexPositions)*2)
+	globalMeshAlteredVertexNormals = slices.Grow(globalMeshAlteredVertexNormals, cap(globalMeshAlteredVertexNormals)*2)
 
 	for i := len(colorVertexList); i < cap(colorVertexList); i++ {
 		colorVertexList = append(colorVertexList, ebiten.Vertex{})
@@ -73,6 +75,14 @@ func growDisplayLists() {
 
 	for i := len(globalVertexDepthUnbillboarded); i < cap(globalVertexDepthUnbillboarded); i++ {
 		globalVertexDepthUnbillboarded = append(globalVertexDepthUnbillboarded, 0)
+	}
+
+	for i := len(globalMeshAlteredVertexPositions); i < cap(globalMeshAlteredVertexPositions); i++ {
+		globalMeshAlteredVertexPositions = append(globalMeshAlteredVertexPositions, Vector3{})
+	}
+
+	for i := len(globalMeshAlteredVertexNormals); i < cap(globalMeshAlteredVertexNormals); i++ {
+		globalMeshAlteredVertexNormals = append(globalMeshAlteredVertexNormals, Vector3{})
 	}
 
 	globalSortingTriangleBucket.resizeTriangleCount(len(globalSortingTriangleBucket.unsetTris) * 2)

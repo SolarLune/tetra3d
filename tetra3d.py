@@ -70,6 +70,12 @@ sectorTypes = [
     ),
 ]
 
+def getSettings():
+    if "t3dSettingsFile" not in bpy.data.texts:
+        txt = bpy.data.texts.new("t3dSettingsFile")
+        txt.write("This document internally holds global settings for Tetra3D for this blend file.\nIf you remove the Tetra3D addon, feel free to delete this file.\nOtherwise, feel free to just leave this file alone.")
+        txt.cursor_set(0,character=0)
+    return bpy.data.texts["t3dSettingsFile"]
 
 def listSectorTypes(self, context):
 
@@ -80,34 +86,33 @@ def listSectorTypes(self, context):
         return sectorTypes
     return sectorTypes[::2]
 
-bitfieldNamesUpdate = False
-bitfieldEnumValues = {}
+bitfieldNamesUpdate = True
+bitfieldEnumValues = []
 
 def getBitfieldButtons(self, context):
 
     global bitfieldNamesUpdate
     global bitfieldEnumValues
 
-    exists = context.scene.name in bitfieldEnumValues
+    settings = getSettings()
 
-    if bitfieldNamesUpdate or not exists:
-        for scene in bpy.data.scenes:
-            enums = []
+    if bitfieldNamesUpdate:
 
-            for i in range(31):
-                stri = str(i)
+        enums = []
 
-                name = "Bit " + stri
-                if len(scene.t3dBitfieldNames__) > i:
-                    name = scene.t3dBitfieldNames__[i].name
+        for i in range(31):
+            stri = str(i)
 
-                enums.append(("BITfield" + stri, name, "Bitfield bit #" + stri, 0, 2**i))
+            name = "Bit " + stri
+            if len(settings.t3dBitfieldNames__) > i:
+                name = settings.t3dBitfieldNames__[i].name
 
-            bitfieldEnumValues[scene.name] = enums
+            enums.append((stri, name, "Bitfield bit #" + stri, 0, 2**i))
 
+        bitfieldEnumValues = enums
         bitfieldNamesUpdate = False
 
-    return bitfieldEnumValues[context.scene.name]
+    return bitfieldEnumValues
 
 
 boundsTypes = [
@@ -1205,47 +1210,63 @@ class RENDER_OT_tetra3dQuickSetRenderResolution(bpy.types.Operator):
     def execute(self, context):
 
         asr = 16 / 9
-        context.scene.t3dRenderResolutionW__ = int(self.resolutionHeight * asr)
-        context.scene.t3dRenderResolutionH__ = int(self.resolutionHeight)
+        settings = getSettings()
+        settings.t3dRenderResolutionW__ = int(self.resolutionHeight * asr)
+        settings.t3dRenderResolutionH__ = int(self.resolutionHeight)
         return {"FINISHED"}
-
 
 class t3dAutoSubdivisionLevel__(bpy.types.PropertyGroup):
     distance: bpy.props.FloatProperty(
         name="Max Distance",
         default=40,
         min=0,
-        description="How far away from the camera a triangle can be before being subdivided at this level",
+        description="How far away from the camera a triangle can be before being subdivided",
     )
-    subdivisionLevel: bpy.props.IntProperty(
-        name="Subdivision Level",
-        default=1,
-        min=1,
-        description="How many subdivision iterations to perform on triangles",
-    )
-    minimumTriangleSize: bpy.props.FloatProperty(
-        name="Minimum Triangle Size",
-        default=0,
+    maximumTriangleSize: bpy.props.FloatProperty(
+        name="Maximum Triangle Size",
+        default=4,
         min=0,
-        description="The minimum span (distance across its maximum dimensions) a triangle has to be in order to be subdivided",
+        description="The target triangle span size (distance across its maximum dimension) - if a triangle is bigger than this, it's subdivided repeatedly until it's smaller than this value",
     )
 
+# class t3dAutoSubdivisionLevel__(bpy.types.PropertyGroup):
+#     distance: bpy.props.FloatProperty(
+#         name="Max Distance",
+#         default=40,
+#         min=0,
+#         description="How far away from the camera a triangle can be before being subdivided at this level",
+#     )
+#     subdivisionLevel: bpy.props.IntProperty(
+#         name="Subdivision Level",
+#         default=1,
+#         min=1,
+#         description="How many subdivision iterations to perform on triangles",
+#     )
+#     minimumTriangleSize: bpy.props.FloatProperty(
+#         name="Minimum Triangle Size",
+#         default=0,
+#         min=0,
+#         description="The minimum span (distance across its maximum dimensions) a triangle has to be in order to be subdivided",
+#     )
 
-class SCENE_OT_tetra3dAddAutoSubdivisionLevel(bpy.types.Operator):
-    bl_idname = "scene.tetra3daddautosubdivisionlevel"
+
+class TEXT_OT_tetra3dAddAutoSubdivisionLevel(bpy.types.Operator):
+    bl_idname = "text.tetra3daddautosubdivisionlevel"
     bl_label = "Add Level"
     bl_description = "Adds a level of auto subdivision"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
 
-        context.scene.t3dAutoSubdivisionLevels__.add()
+        settings = getSettings()
+
+        settings.t3dAutoSubdivisionLevels__.add()
 
         return {"FINISHED"}
 
 
-class SCENE_OT_tetra3dDeleteAutoSubdivisionLevel(bpy.types.Operator):
-    bl_idname = "scene.tetra3ddeleteautosubdivisionlevel"
+class TEXT_OT_tetra3dDeleteAutoSubdivisionLevel(bpy.types.Operator):
+    bl_idname = "text.tetra3ddeleteautosubdivisionlevel"
     bl_label = "Delete Level"
     bl_description = "Deletes a level of auto subdivision"
     bl_options = {"REGISTER", "UNDO"}
@@ -1253,13 +1274,14 @@ class SCENE_OT_tetra3dDeleteAutoSubdivisionLevel(bpy.types.Operator):
     index: bpy.props.IntProperty()
 
     def execute(self, context):
+        settings = getSettings()
 
-        context.scene.t3dAutoSubdivisionLevels__.remove(self.index)
+        settings.t3dAutoSubdivisionLevels__.remove(self.index)
         return {"FINISHED"}
 
 
-class SCENE_OT_tetra3dReorderAutoSubdivisionLevel(bpy.types.Operator):
-    bl_idname = "scene.tetra3dreorderautosubdivisionlevel"
+class TEXT_OT_tetra3dReorderAutoSubdivisionLevel(bpy.types.Operator):
+    bl_idname = "text.tetra3dreorderautosubdivisionlevel"
     bl_label = "Re-order Level"
     bl_description = "Moves a subdivision level up or down in the list"
     bl_options = {"REGISTER", "UNDO"}
@@ -1268,71 +1290,25 @@ class SCENE_OT_tetra3dReorderAutoSubdivisionLevel(bpy.types.Operator):
     moveUp: bpy.props.BoolProperty()
 
     def execute(self, context):
+        settings = getSettings()
 
         if self.moveUp:
-            context.scene.t3dAutoSubdivisionLevels__.move(self.index, self.index - 1)
+            settings.t3dAutoSubdivisionLevels__.move(self.index, self.index - 1)
         else:
-            context.scene.t3dAutoSubdivisionLevels__.move(self.index, self.index + 1)
+            settings.t3dAutoSubdivisionLevels__.move(self.index, self.index + 1)
 
         return {"FINISHED"}
 
 
-class SCENE_OT_tetra3dClearAutoSubdivisionLevels(bpy.types.Operator):
-    bl_idname = "scene.tetra3dclearautosubdivisionlevels"
+class TEXT_OT_tetra3dClearAutoSubdivisionLevels(bpy.types.Operator):
+    bl_idname = "text.tetra3dclearautosubdivisionlevels"
     bl_label = "Clear Levels"
-    bl_description = "Clears auto subdivision levels from this scene."
+    bl_description = "Clears auto subdivision levels."
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-
-        context.scene.t3dAutoSubdivisionLevels__.clear()
-
-        return {"FINISHED"}
-
-
-class SCENE_OT_tetra3dCopyAutoSubdivisionLevels(bpy.types.Operator):
-    bl_idname = "scene.tetra3dcopyautosubdivisionlevels"
-    bl_label = "Copy to All Scenes"
-    bl_description = "Copies the specified autosubdivision levels to all other Scenes."
-    bl_options = {"REGISTER", "UNDO"}
-
-    def execute(self, context):
-
-        scene = context.scene
-
-        for s in bpy.data.scenes:
-            if s == scene:
-                continue
-            s.t3dAutoSubdivide__ = scene.t3dAutoSubdivide__
-            s.t3dAutoSubdivisionLevels__.clear()
-            for prop in scene.t3dAutoSubdivisionLevels__:
-                newProp = s.t3dAutoSubdivisionLevels__.add()
-                newProp.distance = prop.distance
-                newProp.subdivisionLevel = prop.subdivisionLevel
-                newProp.minimumTriangleSize = prop.minimumTriangleSize
-
-        return {"FINISHED"}
-
-
-class SCENE_OT_tetra3dClearAllAutoSubdivisionLevels(bpy.types.Operator):
-    bl_idname = "scene.tetra3dclearallautosubdivisionlevels"
-    bl_label = "Clear All Levels"
-    bl_description = "Clears all auto subdivision levels from all selected mesh objects"
-    bl_options = {"REGISTER", "UNDO"}
-
-    def execute(self, context):
-
-        selected = context.object
-
-        for o in context.selected_objects:
-            if o == selected:
-                continue
-            o.t3dAutoSubdivisionLevels__.clear()
-            for prop in selected.t3dAutoSubdivisionLevels__:
-                newProp = o.t3dAutoSubdivisionLevels__.add()
-                newProp.distance = prop.distance
-                newProp.subdivisionLevel = prop.subdivisionLevel
-                newProp.minimumTriangleSize = prop.minimumTriangleSize
+        settings = getSettings()
+        settings.t3dAutoSubdivisionLevels__.clear()
 
         return {"FINISHED"}
 
@@ -1640,6 +1616,7 @@ def updateBitfieldNames(self, context):
 class t3dBitfieldName__(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="Name", default="New Bit", description="The name of the bit in all bitfields", update=updateBitfieldNames)
 
+# The UI definition for the scrollable list of bitfield names
 class SCENE_UL_BitfieldNames(bpy.types.UI_UL_list):
 
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
@@ -1653,26 +1630,27 @@ class SCENE_UL_BitfieldNames(bpy.types.UI_UL_list):
         layout.label(text="Bit #" + str(index))
         layout.prop(item, "name", text="")
 
-class SCENE_PT_AddBitfieldName(bpy.types.Operator):
-    bl_idname = "scene.addbitfieldname"
+class TEXT_PT_AddBitfieldName(bpy.types.Operator):
+    bl_idname = "text.addbitfieldname"
     bl_label = "Add Bitfield Name"
     bl_description = "Defines a name for a bit"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        global bitfieldNamesUpdate
+        settings = getSettings()
 
-        if len(context.scene.t3dBitfieldNames__) == 31:
+        if len(settings.t3dBitfieldNames__) == 31:
             self.report({"WARNING"}, "Cannot add more bitfield names; the max is 31 (yes, 31)")
             return {"CANCELLED"}
 
-        global bitfieldNamesUpdate
         bitfieldNamesUpdate = True
-        context.scene.t3dBitfieldNames__.add()
-        context.scene.t3dActiveBitfieldIndex__ = len(context.scene.t3dBitfieldNames__)-1
+        settings.t3dBitfieldNames__.add()
+        settings.t3dActiveBitfieldIndex__ = len(settings.t3dBitfieldNames__)-1
         return {"FINISHED"}
-        
-class SCENE_PT_DuplicateBitfieldName(bpy.types.Operator):
-    bl_idname = "scene.duplicatebitfieldname"
+
+class TEXT_PT_DuplicateBitfieldName(bpy.types.Operator):
+    bl_idname = "text.duplicatebitfieldname"
     bl_label = "Duplicate Bitfield Name"
     bl_description = "Duplicates a name for a bit"
     bl_options = {"REGISTER", "UNDO"}
@@ -1680,40 +1658,17 @@ class SCENE_PT_DuplicateBitfieldName(bpy.types.Operator):
     index: bpy.props.IntProperty()
 
     def execute(self, context):
+        global bitfieldNamesUpdate
+        settings = getSettings()
 
-        if len(context.scene.t3dBitfieldNames__) == 31:
+        if len(settings.t3dBitfieldNames__) == 31:
             self.report({"WARNING"}, "Cannot add more bitfield names; the max is 31 (yes, 31)")
             return {"CANCELLED"}
 
-        global bitfieldNamesUpdate
         bitfieldNamesUpdate = True
-        newName = context.scene.t3dBitfieldNames__.add()
-        context.scene.t3dActiveBitfieldIndex__ = len(context.scene.t3dBitfieldNames__)-1
-        newName.name = context.scene.t3dBitfieldNames__[self.index].name
-        return {"FINISHED"}
-
-class SCENE_PT_CopyBitfieldNamesToAllScenes(bpy.types.Operator):
-    bl_idname = "scene.copybitfieldnamestoallscenes"
-    bl_label = "Copy Bitfield Names to All Scenes"
-    bl_description = "Copies this set of bitfield names to all Scenes"
-    bl_options = {"REGISTER", "UNDO"}
-
-    index: bpy.props.IntProperty()
-
-    def execute(self, context):
-
-        global bitfieldNamesUpdate
-        bitfieldNamesUpdate = True
-
-        for scene in bpy.data.scenes:
-            if context.scene == scene:
-                continue
-
-            scene.t3dBitfieldNames__.clear()
-            for bitfieldName in context.scene.t3dBitfieldNames__:
-                n = scene.t3dBitfieldNames__.add()
-                n.name = bitfieldName.name
-
+        newName = settings.t3dBitfieldNames__.add()
+        settings.t3dActiveBitfieldIndex__ = len(settings.t3dBitfieldNames__)-1
+        newName.name = settings.t3dBitfieldNames__[self.index].name
         return {"FINISHED"}
 
 class SCENE_PT_SelectAllWithBitfieldName(bpy.types.Operator):
@@ -1725,24 +1680,25 @@ class SCENE_PT_SelectAllWithBitfieldName(bpy.types.Operator):
     index: bpy.props.IntProperty()
 
     def execute(self, context):
+        settings = getSettings()
 
-        if self.index < len(context.scene.t3dBitfieldNames__):
+        if self.index < len(settings.t3dBitfieldNames__):
 
-            propName = context.scene.t3dBitfieldNames__[self.index]
+            propName = settings.t3dBitfieldNames__[self.index]
 
             bpy.ops.object.select_all(action="DESELECT")
 
             for layer in context.scene.view_layers:
                 for obj in layer.objects:
                     for prop in obj.t3dGameProperties__:
-                        if "BITfield" + str(self.index) in prop.valueBitfield:
+                        if str(self.index) in prop.valueBitfield:
                             obj.select_set(True)
                             break
 
         return {"FINISHED"}
 
-class SCENE_PT_RemoveBitfieldName(bpy.types.Operator):
-    bl_idname = "scene.removebitfieldname"
+class TEXT_PT_RemoveBitfieldName(bpy.types.Operator):
+    bl_idname = "text.removebitfieldname"
     bl_label = "Remove Bitfield Name"
     bl_description = "Removes a name from use for a bit and rearranges selected bits in relevant objects"
     bl_options = {"REGISTER", "UNDO"}
@@ -1750,47 +1706,43 @@ class SCENE_PT_RemoveBitfieldName(bpy.types.Operator):
     index: bpy.props.IntProperty()
 
     def execute(self, context):
+        settings = getSettings()
+
         global bitfieldNamesUpdate
         bitfieldNamesUpdate = True
-        context.scene.t3dBitfieldNames__.remove(self.index)
-        updateBitfieldsInUse(context, context.scene.t3dActiveBitfieldIndex__, -1)
-        if context.scene.t3dActiveBitfieldIndex__ == len(context.scene.t3dBitfieldNames__) and context.scene.t3dActiveBitfieldIndex__ > 0:
-            context.scene.t3dActiveBitfieldIndex__ -= 1
+
+        oldNames = list(settings.t3dBitfieldNames__.keys())
+
+        settings.t3dBitfieldNames__.remove(self.index)
+        updateBitfieldsInUse(context, oldNames)
+        if settings.t3dActiveBitfieldIndex__ == len(settings.t3dBitfieldNames__) and settings.t3dActiveBitfieldIndex__ > 0:
+            settings.t3dActiveBitfieldIndex__ -= 1
         return {"FINISHED"}
 
-def updateBitfieldsInUse(context, oldBitfieldIndex, newBitfieldIndex):
+def updateBitfieldsInUse(context, oldNameSequence):
+
+    settings = getSettings()
+
+    if not settings.t3dReorderBitfieldsOnModify__:
+        return
+
+    newNameSequence = list(settings.t3dBitfieldNames__.keys())
+
     for obj in context.scene.objects:
         for prop in obj.t3dGameProperties__:
             if prop.valueBitfield:
 
-                if newBitfieldIndex == -1: ## A bit field has been deleted, so shift all others forward
-                    
-                    newBitfield = set()
-                    for bit in prop.valueBitfield:
-                        lastNumber = int(bit[-1])
-                        if lastNumber > 0 and lastNumber > oldBitfieldIndex:
-                            newBit = "BITfield" + str(lastNumber-1)
-                            newBitfield.add(newBit)
-                    prop.valueBitfield = newBitfield
+                newBitfieldSet = set()
 
-                else:
+                for value in prop.valueBitfield:
+                    oldName = oldNameSequence[int(value)]
+                    if oldName in newNameSequence:
+                        newBitfieldSet.add(str(newNameSequence.index(oldName)))
 
-                    oldBit = "BITfield" + str(oldBitfieldIndex)
-                    newBit = "BITfield" + str(newBitfieldIndex)
+                prop.valueBitfield = newBitfieldSet
 
-                    bitfield = prop.valueBitfield
-
-                    if newBit in bitfield and not oldBit in bitfield:
-                        bitfield.remove(newBit)
-                        bitfield.add(oldBit)
-                        prop.valueBitfield = bitfield
-                    elif oldBit in bitfield and not newBit in bitfield:
-                        bitfield.remove(oldBit)
-                        bitfield.add(newBit)
-                        prop.valueBitfield = bitfield
-
-class SCENE_PT_ReorderBitfieldName(bpy.types.Operator):
-    bl_idname = "scene.reorderbitfieldname"
+class TEXT_PT_ReorderBitfieldName(bpy.types.Operator):
+    bl_idname = "text.reorderbitfieldname"
     bl_label = "Reorder Bitfield Name"
     bl_description = "Reorders the selected bit name and rearranges selected bits in relevant objects"
     bl_options = {"REGISTER", "UNDO"}
@@ -1800,36 +1752,38 @@ class SCENE_PT_ReorderBitfieldName(bpy.types.Operator):
     toEnd: bpy.props.BoolProperty()
 
     def execute(self, context):
+        settings = getSettings()
+        oldIndex = settings.t3dActiveBitfieldIndex__
 
-        oldIndex = context.scene.t3dActiveBitfieldIndex__
+        oldNames = list(settings.t3dBitfieldNames__.keys())
 
         if self.moveUp:
             if self.index > 0:
                 if self.toEnd:
                     target = 0
-                    context.scene.t3dActiveBitfieldIndex__ = 0
+                    settings.t3dActiveBitfieldIndex__ = 0
                 else:
                     target = self.index - 1
-                    context.scene.t3dActiveBitfieldIndex__ -= 1
+                    settings.t3dActiveBitfieldIndex__ -= 1
 
-                context.scene.t3dBitfieldNames__.move(self.index, target)
+                settings.t3dBitfieldNames__.move(self.index, target)
         else:
 
             if self.toEnd:
-                target = len(context.scene.t3dBitfieldNames__) - 1
-                context.scene.t3dActiveBitfieldIndex__ = len(context.scene.t3dBitfieldNames__)-1
+                target = len(settings.t3dBitfieldNames__) - 1
+                settings.t3dActiveBitfieldIndex__ = len(settings.t3dBitfieldNames__)-1
             else:
                 target = self.index + 1
-                if self.index < len(context.scene.t3dBitfieldNames__) - 1:
-                    context.scene.t3dActiveBitfieldIndex__ += 1
-            
-            context.scene.t3dBitfieldNames__.move(self.index, target)
+                if self.index < len(settings.t3dBitfieldNames__) - 1:
+                    settings.t3dActiveBitfieldIndex__ += 1
+
+            settings.t3dBitfieldNames__.move(self.index, target)
 
         global bitfieldNamesUpdate
         bitfieldNamesUpdate = True
 
-        if oldIndex != context.scene.t3dActiveBitfieldIndex__:
-            updateBitfieldsInUse(context, oldIndex, context.scene.t3dActiveBitfieldIndex__)
+        if oldIndex != settings.t3dActiveBitfieldIndex__:
+            updateBitfieldsInUse(context, oldNames)
 
         return {"FINISHED"}
 
@@ -1845,68 +1799,6 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
         return context.scene is not None
 
     def draw(self, context):
-
-        box = self.layout.box()
-        row = box.row()
-        row.label(text="Auto Subdivision Options")
-
-        row.prop(
-            context.window_manager,
-            "t3dExpandAutoSubdivisionSettings__",
-            icon="TRIA_DOWN"
-            if context.window_manager.t3dExpandAutoSubdivisionSettings__
-            else "TRIA_RIGHT",
-            icon_only=True,
-            emboss=False,
-        )
-
-        if context.window_manager.t3dExpandAutoSubdivisionSettings__:
-            row = box.row()
-            row.operator(SCENE_OT_tetra3dAddAutoSubdivisionLevel.bl_idname, icon="PLUS")
-
-            row.operator(
-                SCENE_OT_tetra3dCopyAutoSubdivisionLevels.bl_idname, icon="COPYDOWN"
-            )
-
-            row = box.row()
-            row.operator(
-                SCENE_OT_tetra3dClearAutoSubdivisionLevels.bl_idname, icon="CANCEL"
-            )
-
-            for index, prop in enumerate(context.scene.t3dAutoSubdivisionLevels__):
-                box2 = box.box()
-
-                row = box2.row()
-                row.label(text="Subdivision Level #" + str(index+1))
-
-                moveUpOptions = row.operator(
-                    SCENE_OT_tetra3dReorderAutoSubdivisionLevel.bl_idname,
-                    text="",
-                    icon="TRIA_UP",
-                )
-                moveUpOptions.index = index
-                moveUpOptions.moveUp = True
-
-                moveDownOptions = row.operator(
-                    SCENE_OT_tetra3dReorderAutoSubdivisionLevel.bl_idname,
-                    text="",
-                    icon="TRIA_DOWN",
-                )
-                moveDownOptions.index = index
-                moveDownOptions.moveUp = False
-
-                deleteOptions = row.operator(
-                    SCENE_OT_tetra3dDeleteAutoSubdivisionLevel.bl_idname,
-                    text="",
-                    icon="TRASH",
-                )
-                deleteOptions.index = index
-
-                row = box2.row()
-                row.prop(prop, "distance")
-                row.prop(prop, "subdivisionLevel")
-                row = box2.row()
-                row.prop(prop, "minimumTriangleSize")
 
         box = self.layout.box()
 
@@ -1939,63 +1831,6 @@ class SCENE_PT_tetra3d(bpy.types.Panel):
             clear.mode = "scene"
 
             handleT3DProperties(self, box, context.scene.t3dGameProperties__, "scene")
-
-        box = self.layout.box()
-        row = box.row()
-        row.label(text="Bitfield Names")
-
-        row.prop(
-            context.window_manager,
-            "t3dExpandBitfieldNames__",
-            icon="TRIA_DOWN"
-            if context.window_manager.t3dExpandBitfieldNames__
-            else "TRIA_RIGHT",
-            icon_only=True,
-            emboss=False,
-        )
-
-        if context.window_manager.t3dExpandBitfieldNames__:
-            row = box.row()
-            row.template_list("SCENE_UL_BitfieldNames",  "", context.scene, "t3dBitfieldNames__", context.scene, "t3dActiveBitfieldIndex__")
-            row = box.row(align=True)
-            row.alignment = "CENTER"
-            row.operator("scene.addbitfieldname", icon="PLUS", text="")
-            op = row.operator("scene.removebitfieldname", icon="TRASH", text="")
-            op.index = context.scene.t3dActiveBitfieldIndex__
-
-            row.operator("scene.duplicatebitfieldname", icon="COPYDOWN", text="")
-            op.index = context.scene.t3dActiveBitfieldIndex__
-
-            row.separator()
-
-            op = row.operator("scene.reorderbitfieldname", icon="TRIA_UP", text="")
-            op.index = context.scene.t3dActiveBitfieldIndex__
-            op.moveUp = True
-            op.toEnd = False
-
-            op = row.operator("scene.reorderbitfieldname", icon="TRIA_DOWN", text="")
-            op.index = context.scene.t3dActiveBitfieldIndex__
-            op.moveUp = False
-
-            row.separator()
-
-            op = row.operator("scene.reorderbitfieldname", icon="TRIA_UP_BAR", text="")
-            op.index = context.scene.t3dActiveBitfieldIndex__
-            op.moveUp = True
-            op.toEnd = True
-
-            op = row.operator("scene.reorderbitfieldname", icon="TRIA_DOWN_BAR", text="")
-            op.index = context.scene.t3dActiveBitfieldIndex__
-            op.moveUp = False
-            op.toEnd = True
-
-            row.separator()
-
-            op = row.operator("scene.selectallwithbitfieldname", icon="VIS_SEL_11", text="")
-            op.index = context.scene.t3dActiveBitfieldIndex__
-
-            row = box.row()
-            row.operator("scene.copybitfieldnamestoallscenes", icon="COPYDOWN")
 
 class CAMERA_PT_tetra3d(bpy.types.Panel):
     bl_idname = "CAMERA_PT_tetra3d"
@@ -2359,19 +2194,6 @@ class WORLD_PT_tetra3d(bpy.types.Panel):
             box.prop(context.world, "t3dFogRangeEnd__", slider=True)
 
 
-# The idea behind "globalget and set" is that we're setting properties on the first scene (which must exist), and getting any property just returns the first one from that scene
-def globalGet(propName, default=None):
-    # if propName not in bpy.data.scenes[0] and default is not None:
-    #     bpy.data.scenes[0][propName] = default
-
-    # return bpy.data.scenes[0][propName]
-
-    if propName in bpy.data.scenes[0]:
-        return bpy.data.scenes[0][propName]
-
-    return default
-
-
 def globalSet(propName, value):
     bpy.data.scenes[0][propName] = value
 
@@ -2388,6 +2210,7 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
     bl_context = "render"
 
     def draw(self, context):
+        settings = getSettings()
 
         box = self.layout.box()
 
@@ -2408,13 +2231,13 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
             row = box.row()
             row.operator(EXPORT_OT_tetra3d.bl_idname)
             row = box.row()
-            row.prop(context.scene, "t3dExportOnSave__")
+            row.prop(settings, "t3dExportOnSave__")
 
             row = box.row()
-            row.prop(context.scene, "t3dExportFilepath__")
+            row.prop(settings, "t3dExportFilepath__")
 
             row = box.row()
-            row.prop(context.scene, "t3dExportFormat__")
+            row.prop(settings, "t3dExportFormat__")
 
             box2 = box.box()
 
@@ -2422,12 +2245,16 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
             row.label(text="Export File Options")
 
             row = box2.row()
-            row.active = context.scene.t3dExportFormat__ == "GLB"
-            row.prop(context.scene, "t3dPackTextures__")
+            row.active = settings.t3dExportFormat__ == "GLB"
+            row.prop(settings, "t3dPackTextures__")
 
-            box2.prop(context.scene, "t3dExportCameras__")
-            box2.prop(context.scene, "t3dExportLights__")
-            box2.prop(context.scene, "t3dRenameInstancedObjects__")
+            box2.prop(settings, "t3dExportCameras__")
+            box2.prop(settings, "t3dExportLights__")
+            box2.prop(settings, "t3dRenameInstancedObjects__")
+
+            row = box2.row()
+            row.label(text="Export Node Paths:")
+            row.prop(settings, "t3dExportNodePathsFilepath__", text="")
 
         box = self.layout.box()
 
@@ -2446,8 +2273,8 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
 
         if context.window_manager.t3dExpandResolutionSettings__:
             row = box.row()
-            row.prop(context.scene, "t3dRenderResolutionW__")
-            row.prop(context.scene, "t3dRenderResolutionH__")
+            row.prop(settings, "t3dRenderResolutionW__")
+            row.prop(settings, "t3dRenderResolutionH__")
 
             row = box.row()
             row.label(text="PS1-like:")
@@ -2490,7 +2317,67 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         if context.window_manager.t3dExpandSectorSettings__:
             row = box.row()
             row.label(text="Detection type:")
-            row.prop(context.scene, "t3dSectorDetectionType__", expand=True)
+            row.prop(settings, "t3dSectorDetectionType__", expand=True)
+
+        box = self.layout.box()
+        row = box.row()
+        row.label(text="Auto Subdivision Options")
+
+        row.prop(
+            context.window_manager,
+            "t3dExpandAutoSubdivisionSettings__",
+            icon="TRIA_DOWN"
+            if context.window_manager.t3dExpandAutoSubdivisionSettings__
+            else "TRIA_RIGHT",
+            icon_only=True,
+            emboss=False,
+        )
+
+        if context.window_manager.t3dExpandAutoSubdivisionSettings__:
+
+            row = box.row()
+            row.prop(settings, "t3dMaxAutoSubdivisionCount__", expand=True)
+
+            row = box.row()
+            row.operator(TEXT_OT_tetra3dAddAutoSubdivisionLevel.bl_idname, icon="PLUS")
+
+            row = box.row()
+            row.operator(
+                TEXT_OT_tetra3dClearAutoSubdivisionLevels.bl_idname, icon="CANCEL"
+            )
+
+            for index, prop in enumerate(settings.t3dAutoSubdivisionLevels__):
+                box2 = box.box()
+
+                row = box2.row()
+                row.label(text="Subdivision Level #" + str(index+1))
+
+                moveUpOptions = row.operator(
+                    TEXT_OT_tetra3dReorderAutoSubdivisionLevel.bl_idname,
+                    text="",
+                    icon="TRIA_UP",
+                )
+                moveUpOptions.index = index
+                moveUpOptions.moveUp = True
+
+                moveDownOptions = row.operator(
+                    TEXT_OT_tetra3dReorderAutoSubdivisionLevel.bl_idname,
+                    text="",
+                    icon="TRIA_DOWN",
+                )
+                moveDownOptions.index = index
+                moveDownOptions.moveUp = False
+
+                deleteOptions = row.operator(
+                    TEXT_OT_tetra3dDeleteAutoSubdivisionLevel.bl_idname,
+                    text="",
+                    icon="TRASH",
+                )
+                deleteOptions.index = index
+
+                row = box2.row()
+                row.prop(prop, "distance")
+                row.prop(prop, "maximumTriangleSize")
 
         box = self.layout.box()
 
@@ -2509,25 +2396,77 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
 
         if context.window_manager.t3dExpandAnimationSettings__:
             row = box.row()
-            row.label(text="Animation Playback Framerate (in Blender):")
-            row = box.row()
-            row.prop(context.scene, "t3dPlaybackFPS__")
-            row = box.row().separator()
-            row = box.row()
-            row.prop(context.scene, "t3dAnimationSampling__")
+            row.prop(settings, "t3dAnimationSampling__")
+            row.prop(settings, "t3dAnimationFPS__")
             row = box.row()
             row.label(text="Set interpolation for animations:")
             row = box.row()
-            row.prop(context.scene, "t3dAnimationInterpolation__")
+            row.prop(settings, "t3dAnimationInterpolation__")
             row = box.row()
             op = row.operator(OBJECT_OT_tetra3dSetAnimationInterpolationAll.bl_idname)
-            op.interpolationType = context.scene.t3dAnimationInterpolation__
+            op.interpolationType = settings.t3dAnimationInterpolation__
             op = row.operator(OBJECT_OT_tetra3dSetAnimationInterpolation.bl_idname)
-            op.interpolationType = context.scene.t3dAnimationInterpolation__
+            op.interpolationType = settings.t3dAnimationInterpolation__
 
+        box = self.layout.box()
+        row = box.row()
+        row.label(text="Bitfield Names")
+
+        row.prop(
+            context.window_manager,
+            "t3dExpandBitfieldNames__",
+            icon="TRIA_DOWN"
+            if context.window_manager.t3dExpandBitfieldNames__
+            else "TRIA_RIGHT",
+            icon_only=True,
+            emboss=False,
+        )
+
+        if context.window_manager.t3dExpandBitfieldNames__:
+            row = box.row()
+            row.prop(settings, "t3dReorderBitfieldsOnModify__")
+            row = box.row()
+            row.template_list("SCENE_UL_BitfieldNames",  "", settings, "t3dBitfieldNames__", settings, "t3dActiveBitfieldIndex__")
+            row = box.row(align=True)
+            row.alignment = "CENTER"
+            row.operator("text.addbitfieldname", icon="PLUS", text="")
+            op = row.operator("text.removebitfieldname", icon="TRASH", text="")
+            op.index = settings.t3dActiveBitfieldIndex__
+
+            row.operator("text.duplicatebitfieldname", icon="COPYDOWN", text="")
+            op.index = settings.t3dActiveBitfieldIndex__
+
+            row.separator()
+
+            op = row.operator("text.reorderbitfieldname", icon="TRIA_UP", text="")
+            op.index = settings.t3dActiveBitfieldIndex__
+            op.moveUp = True
+            op.toEnd = False
+
+            op = row.operator("text.reorderbitfieldname", icon="TRIA_DOWN", text="")
+            op.index = settings.t3dActiveBitfieldIndex__
+            op.moveUp = False
+
+            row.separator()
+
+            op = row.operator("text.reorderbitfieldname", icon="TRIA_UP_BAR", text="")
+            op.index = settings.t3dActiveBitfieldIndex__
+            op.moveUp = True
+            op.toEnd = True
+
+            op = row.operator("text.reorderbitfieldname", icon="TRIA_DOWN_BAR", text="")
+            op.index = settings.t3dActiveBitfieldIndex__
+            op.moveUp = False
+            op.toEnd = True
+
+            row.separator()
+
+            op = row.operator("scene.selectallwithbitfieldname", icon="VIS_SEL_11", text="")
+            op.index = settings.t3dActiveBitfieldIndex__
 
 def export():
     scene = bpy.context.scene
+    settings = getSettings()
 
     was_edit_mode = False
     old_active = bpy.context.active_object
@@ -2537,8 +2476,8 @@ def export():
         was_edit_mode = True
 
     blendPath = bpy.context.blend_data.filepath
-    if scene.t3dExportFilepath__ != "":
-        blendPath = scene.t3dExportFilepath__
+    if settings.t3dExportFilepath__ != "":
+        blendPath = settings.t3dExportFilepath__
 
     if blendPath == "":
         return False
@@ -2547,7 +2486,7 @@ def export():
 
     ending = ".glb"
 
-    if scene.t3dExportFormat__ == "GLTF_SEPARATE":
+    if settings.t3dExportFormat__ == "GLTF_SEPARATE":
         ending = ".gltf"
 
     newPath = os.path.splitext(blendPath)[0] + ending
@@ -2618,6 +2557,98 @@ def export():
 
         worlds[world.name] = worldData
 
+    settings = getSettings()
+
+    # Delete no longer used Scene global properties
+
+    # for scene in bpy.data.scenes:
+    #     props = [
+    #         "t3dExportOnSave__",
+    #         "t3dExportFilepath__",
+    #         "t3dExportCameras__",
+    #         "t3dExportLights__",
+    #         "t3dRenameInstancedObjects__",
+    #         "t3dPackTextures__",
+    #         "t3dRenderResolutionW__",
+    #         "t3dRenderResolutionH__",
+    #         "t3dSectorDetection__",
+    #         "t3dPlaybackFPS__",
+    #         "t3dAnimationSampling__",
+    #         "t3dExportFormat__",
+    #         "t3d__brandnewscene__",
+    #         "t3dAutoSubdivisionLevels__",
+    #         "t3dExportNodePathsFilepath__",
+    #         "t3dBitfieldNames__",
+    #         "t3dActiveBitfieldIndex__"
+    #     ]
+
+    #     if hasattr(bpy.types.Scene, "t3dAutoSubdivisionLevels__"):
+    #         del bpy.types.Scene.t3dAutoSubdivisionLevels__
+    #     if hasattr(bpy.types.Scene, "t3dBitfieldNames__"):
+    #         del bpy.types.Scene.t3dBitfieldNames__
+    #     if hasattr(bpy.types.Scene, "t3dActiveBitfieldIndex__"):
+    #         del bpy.types.Scene.t3dActiveBitfieldIndex__
+    #     if hasattr(bpy.types.Scene, "t3dSectorDetectionType__"):
+    #         del bpy.types.Scene.t3dSectorDetectionType__
+    #     if hasattr(bpy.types.Scene, "t3dExportOnSave__"):
+    #         del bpy.types.Scene.t3dExportOnSave__
+    #     if hasattr(bpy.types.Scene, "t3dExportFilepath__"):
+    #         del bpy.types.Scene.t3dExportFilepath__
+    #     if hasattr(bpy.types.Scene, "t3dExportNodePathsFilepath__"):
+    #         del bpy.types.Scene.t3dExportNodePathsFilepath__
+    #     if hasattr(bpy.types.Scene, "t3dExportFormat__"):
+    #         del bpy.types.Scene.t3dExportFormat__
+    #     if hasattr(bpy.types.Scene, "t3dExportCameras__"):
+    #         del bpy.types.Scene.t3dExportCameras__
+    #     if hasattr(bpy.types.Scene, "t3dExportLights__"):
+    #         del bpy.types.Scene.t3dExportLights__
+    #     if hasattr(bpy.types.Scene, "t3dRenameInstancedObjects__"):
+    #         del bpy.types.Scene.t3dRenameInstancedObjects__
+    #     if hasattr(bpy.types.Scene, "t3dPackTextures__"):
+    #         del bpy.types.Scene.t3dPackTextures__
+    #     if hasattr(bpy.types.Scene, "t3dAnimationSampling__"):
+    #         del bpy.types.Scene.t3dAnimationSampling__
+    #     if hasattr(bpy.types.Scene, "t3dAnimationInterpolation__"):
+    #         del bpy.types.Scene.t3dAnimationInterpolation__
+    #     if hasattr(bpy.types.Scene, "t3dRenderResolutionW__"):
+    #         del bpy.types.Scene.t3dRenderResolutionW__
+    #     if hasattr(bpy.types.Scene, "t3dRenderResolutionH__"):
+    #         del bpy.types.Scene.t3dRenderResolutionH__
+    #     if hasattr(bpy.types.Scene, "t3dPlaybackFPS__"):
+    #         del bpy.types.Scene.t3dPlaybackFPS__
+
+    #     for p in props:
+    #         if p in scene:
+    #             del scene[p]
+
+    globalSettings = {}
+
+    for k in dir(settings):
+        if k == "t3dAutoSubdivisionLevels__":
+
+            subdivs = []
+
+            for level in settings.t3dAutoSubdivisionLevels__:
+                subdivs.append({
+                    "distance":level.distance,
+                    "maximumTriangleSize":level.maximumTriangleSize,
+                })
+
+            globalSettings["t3dAutoSubdivisionLevels__"] = subdivs
+
+        elif k == "t3dBitfieldNames__":
+            names = []
+
+            for bfnameEntry in settings.t3dBitfieldNames__:
+                names.append(bfnameEntry.name)
+
+            globalSettings["t3dBitfieldNames__"] = names
+
+        elif k.startswith("t3d"):
+            globalSettings[k] = getattr(settings, k)
+
+    globalSet("t3dGlobals__", globalSettings)
+
     globalSet("t3dWorlds__", worlds)
 
     currentFrame = {}
@@ -2632,6 +2663,11 @@ def export():
                 referencedActions[action.name] = set()
             referencedActions[action.name].add(obj.data.name)
 
+    nodepaths = None
+
+    if settings.t3dExportNodePathsFilepath__ != "":
+        nodepaths = []
+
     for scene in bpy.data.scenes:
         currentFrame[scene] = scene.frame_current
 
@@ -2641,6 +2677,37 @@ def export():
 
             for layer in scene.view_layers:
                 for obj in layer.objects:
+
+                    if nodepaths is not None:
+                        # objType = obj.type
+
+                        # if objType == "MESH":
+                        #     objType = "MODEL"
+                        # elif objType == "ARMATURE":
+                        #     objType = "ARM"
+                        # elif objType == "CAMERA":
+                        #     objType = "CAM"
+                        # elif obj.instance_type == "COLLECTION":
+                        #     objType = "GROUP"
+
+                        # npName = objType.capitalize() + "_" + obj.name
+                        baseNodePath = objectNodePath(obj)
+
+                        objName = obj.name.replace("/", "_").replace(".", "_")
+
+                        nodepaths.append([objName, baseNodePath])
+                        if obj.type == "ARMATURE":
+                            for bone in obj.data.bones:
+                                bonePath = bone.name
+                                targetBone = bone
+                                while True:
+                                    if targetBone.parent:
+                                        bonePath = targetBone.parent.name + "/" + bonePath
+                                        targetBone = targetBone.parent
+                                    else:
+                                        break
+                                nodepaths.append([objName + "_" + bone.name.replace("/", "_").replace(".", "_"), baseNodePath + "/" + bonePath])
+
                     if obj.animation_data:
                         if obj.animation_data.action:
                             checkAction(obj.animation_data.action)
@@ -2744,24 +2811,75 @@ def export():
                         # 2) will apply the collection's offset to the object's position for some reason (which is annoying because we use OpenGL's axes for positioning compared to Blender)
                         obj.instance_collection = None
 
+
+
+    if nodepaths is not None:
+        abspath = bpy.path.abspath(settings.t3dExportNodePathsFilepath__)
+        if os.path.exists(abspath):
+            directoryName = os.path.dirname(abspath).split(os.sep)[-1]
+            blendfileName = blendPath.split(os.sep)[-1]
+            with open(os.path.join(abspath, blendfileName + ".go"), "w") as filePtr:
+
+                structName = blendfileName.replace(".blend","").replace(".", "_").replace("/", "_").capitalize()
+
+                filePtr.write("// This file was auto-generated by Tetra3d; you can edit it if you like,\n// but re-exporting it will overwrite your changes.\n")
+                filePtr.write("package {}\n\n".format(directoryName))
+                filePtr.write("type _{} struct {{\n".format(structName))
+
+                for path in nodepaths:
+                    filePtr.write("\t// The node path for the object: {}\n".format(path[1]))
+                    filePtr.write("\t{} string\n".format(path[0]))
+
+                filePtr.write("}\n\n")
+
+                filePtr.write("// Nodepaths as exported from {}.\n".format(blendfileName))
+                filePtr.write("var {} = _{}{{}}\n\n".format(structName, structName))
+
+                filePtr.write("func init() {\n")
+
+                for path in nodepaths:
+                    # varName = path[1].replace(".", "_").replace("/", "_")
+                    filePtr.write("""\t{}.{} = "{}"\n""".format(structName, path[0], path[1]))
+
+                filePtr.write("}")
+
+
+# type _{} struct {
+# """.format(directoryName, blendfileName))
+
+#                 ###
+
+#                 ###
+
+# filePtr.write("""
+# }
+
+# var {} = _{}
+
+# """.format(blendfileName, blendfileName))
+
+                # for path in nodepaths:
+                #     varName = path[1].replace(".", "_").replace("/", "_")
+                #     filePtr.write(f'// The absolute node path to the object "{path[0]}" as exported from Blender.\nconst {varName} = "{path[2]}"\n')
+                #     filePtr.write(f'// The name of the object "{path[0]}" as exported from Blender.\nconst {varName}_Name = "{path[0]}"\n')
+
     # Gather marker information and put them into the actions.
+    settings = getSettings()
+
+    fps = bpy.context.scene.render.fps
+
     for action in bpy.data.actions:
         markers = []
         for marker in action.pose_markers:
             markerInfo = {
                 "name": marker.name,
-                "time": marker.frame
-                / globalGet(
-                    "t3dPlaybackFPS__", 60
-                ),  # If the playback FPS isn't specifically set, default to 60
+                "time": marker.frame / fps,  # If the playback FPS isn't specifically set, default to 60
             }
             markers.append(markerInfo)
         if len(markers) > 0:
             action["t3dMarkers__"] = markers
 
     view3DCameraData = []
-
-    renderResolutionH = getRenderResolutionH(None)
 
     bpy.context.evaluated_depsgraph_get()
 
@@ -2799,10 +2917,10 @@ def export():
     bpy.ops.export_scene.gltf(
         filepath=newPath,
         # use_active_scene=True, # Blender's GLTF exporter's kinda thrashed when it comes to multiple scenes, so it might be better to export each scene as its own GLTF file...?
-        export_format=scene.t3dExportFormat__,
-        export_cameras=scene.t3dExportCameras__,
-        export_lights=scene.t3dExportLights__,
-        export_keep_originals=not scene.t3dPackTextures__,
+        export_format=settings.t3dExportFormat__,
+        export_cameras=settings.t3dExportCameras__,
+        export_lights=settings.t3dExportLights__,
+        export_keep_originals=not settings.t3dPackTextures__,
         export_vertex_color="ACTIVE",
         export_all_vertex_colors=True,
         export_active_vertex_color_when_no_material=True,
@@ -2812,7 +2930,7 @@ def export():
         export_animations=True,
         # export_animation_mode='BROADCAST',
         export_frame_range=False,
-        export_force_sampling=scene.t3dAnimationSampling__,  # When enabled, animations are sampled / baked. This is slow, but accurate. When disabled, only linear and constant keyframes are exported and interpolated for animation.
+        export_force_sampling=settings.t3dAnimationSampling__,  # When enabled, animations are sampled / baked. This is slow, but accurate. When disabled, only linear and constant keyframes are exported and interpolated for animation.
         export_sampling_interpolation_fallback="LINEAR",
         export_extras=True,
         export_yup=True,
@@ -2926,12 +3044,17 @@ def export():
 @persistent
 def exportOnSave(dummy):
 
-    if globalGet("t3dExportOnSave__", False):
+    settings = getSettings()
+
+    if settings.t3dExportOnSave__:
         export()
 
 
 @persistent
 def onLoad(dummy):
+
+    global bitfieldNamesUpdate
+    bitfieldNamesUpdate = True
 
     global currentlyPlayingAudioHandle, currentlyPlayingAudioName, audioPaused
 
@@ -3161,129 +3284,41 @@ class EXPORT_OT_tetra3d(bpy.types.Operator):
         return {"FINISHED"}
 
 
-def getSectorDetectionType(self):
-    return globalGet("t3dSectorDetection__", 0)
+#####
 
 
-def setSectorDetectionType(self, value):
-    globalSet("t3dSectorDetection__", value)
+def getAnimationFPS(self):
+    return bpy.context.scene.render.fps
 
+
+def setAnimationFPS(self, value):
+    for scene in bpy.data.scenes:
+        scene.render.fps = value
 
 #####
 
 
 def getRenderResolutionW(self):
-    return globalGet("t3dRenderResolutionW__", 640)
+    return bpy.context.scene.render.resolution_x
 
 
 def setRenderResolutionW(self, value):
-    globalSet("t3dRenderResolutionW__", value)
-    bpy.context.scene.render.resolution_x = value
+    for scene in bpy.data.scenes:
+        scene.render.resolution_x = value
 
 
 #####
 
 
 def getRenderResolutionH(self):
-    return globalGet("t3dRenderResolutionH__", 360)
-
+    return bpy.context.scene.render.resolution_y
 
 def setRenderResolutionH(self, value):
-    globalSet("t3dRenderResolutionH__", value)
-    bpy.context.scene.render.resolution_y = value
+    for scene in bpy.data.scenes:
+        scene.render.resolution_y = value
 
 
 ######
-
-
-def getPlaybackFPS(self):
-    return globalGet("t3dPlaybackFPS__", 60)
-
-
-def setPlaybackFPS(self, value):
-    globalSet("t3dPlaybackFPS__", value)
-    bpy.context.scene.render.fps = value
-
-
-# row = self.layout.row()
-# row.prop(context.scene.render, "resolution_x")
-# row.prop(context.scene.render, "resolution_y")
-# row = self.layout.row()
-# row.label(text="Animation Playback Framerate (in Blender):")
-# row = self.layout.row()
-# row.prop(context.scene.render, "fps")
-
-
-def getExportOnSave(self):
-    return globalGet("t3dExportOnSave__", False)
-
-
-def setExportOnSave(self, value):
-    globalSet("t3dExportOnSave__", value)
-
-
-def getExportFilepath(self):
-    return globalGet("t3dExportFilepath__", "")
-
-
-def setExportFilepath(self, value):
-    globalSet("t3dExportFilepath__", value)
-
-
-def getExportFormat(self):
-    return globalGet("t3dExportFormat__", 0)
-
-
-def setExportFormat(self, value):
-    globalSet("t3dExportFormat__", value)
-
-
-def getExportCameras(self):
-    return globalGet("t3dExportCameras__", True)
-
-
-def setExportCameras(self, value):
-    globalSet("t3dExportCameras__", value)
-
-
-def getExportLights(self):
-    return globalGet("t3dExportLights__", True)
-
-
-def setExportLights(self, value):
-    globalSet("t3dExportLights__", value)
-
-
-def getPackTextures(self):
-    return globalGet("t3dPackTextures__", False)
-
-
-def setPackTextures(self, value):
-    globalSet("t3dPackTextures__", value)
-
-
-def getRenameInstancedObjects(self):
-    return globalGet("t3dRenameInstancedObjects__", True)
-
-
-def setRenameInstancedObjects(self, value):
-    globalSet("t3dRenameInstancedObjects__", value)
-
-
-def getAnimationSampling(self):
-    return globalGet("t3dAnimationSampling__", True)
-
-
-def setAnimationSampling(self, value):
-    globalSet("t3dAnimationSampling__", value)
-
-
-def getAnimationInterpolation(self):
-    return globalGet("t3dAnimationInterpolation__", True)
-
-
-def setAnimationInterpolation(self, value):
-    globalSet("t3dAnimationInterpolation__", value)
 
 
 def fogRangeStartSet(self, value):
@@ -3318,8 +3353,10 @@ def getFOV(self):
 
     # Huge thanks to this blender.stackexchange post: https://blender.stackexchange.com/questions/23431/how-to-set-camera-horizontal-and-vertical-fov
 
-    w = getRenderResolutionW(None)
-    h = getRenderResolutionH(None)
+    settings = getSettings()
+
+    w = settings.t3dRenderResolutionW__
+    h = settings.t3dRenderResolutionH__
     aspect = w / h
 
     if aspect > 1:
@@ -3334,8 +3371,11 @@ def getFOV(self):
 
 def setFOV(self, value):
 
-    w = getRenderResolutionW(None)
-    h = getRenderResolutionH(None)
+    settings = getSettings()
+
+    w = settings.t3dRenderResolutionW__
+    h = settings.t3dRenderResolutionH__
+
     aspect = w / h
 
     if aspect > 1:
@@ -3590,8 +3630,6 @@ def drawGameProperties(self, context):
 
     return
 
-
-
 def register():
 
     bpy.utils.register_class(OBJECT_PT_tetra3d)
@@ -3622,11 +3660,10 @@ def register():
     bpy.utils.register_class(RENDER_OT_tetra3dQuickSetRenderResolution)
 
     bpy.utils.register_class(t3dAutoSubdivisionLevel__)
-    bpy.utils.register_class(SCENE_OT_tetra3dAddAutoSubdivisionLevel)
-    bpy.utils.register_class(SCENE_OT_tetra3dClearAutoSubdivisionLevels)
-    bpy.utils.register_class(SCENE_OT_tetra3dCopyAutoSubdivisionLevels)
-    bpy.utils.register_class(SCENE_OT_tetra3dDeleteAutoSubdivisionLevel)
-    bpy.utils.register_class(SCENE_OT_tetra3dReorderAutoSubdivisionLevel)
+    bpy.utils.register_class(TEXT_OT_tetra3dAddAutoSubdivisionLevel)
+    bpy.utils.register_class(TEXT_OT_tetra3dDeleteAutoSubdivisionLevel)
+    bpy.utils.register_class(TEXT_OT_tetra3dReorderAutoSubdivisionLevel)
+    bpy.utils.register_class(TEXT_OT_tetra3dClearAutoSubdivisionLevels)
 
     bpy.utils.register_class(OBJECT_OT_tetra3dPlaySample)
     bpy.utils.register_class(OBJECT_OT_tetra3dStopSample)
@@ -3638,21 +3675,16 @@ def register():
     bpy.utils.register_class(OBJECT_OT_tetra3dSelectWithSameProperty)
     bpy.utils.register_class(OBJECT_OT_tetra3dSearchStringProperties)
 
-    bpy.utils.register_class(SCENE_PT_AddBitfieldName)
-    bpy.utils.register_class(SCENE_PT_DuplicateBitfieldName)
-    bpy.utils.register_class(SCENE_PT_CopyBitfieldNamesToAllScenes)
-    bpy.utils.register_class(SCENE_PT_RemoveBitfieldName)
-    bpy.utils.register_class(SCENE_PT_ReorderBitfieldName)
+    bpy.utils.register_class(TEXT_PT_AddBitfieldName)
+    bpy.utils.register_class(TEXT_PT_DuplicateBitfieldName)
     bpy.utils.register_class(SCENE_PT_SelectAllWithBitfieldName)
+    bpy.utils.register_class(TEXT_PT_RemoveBitfieldName)
+    bpy.utils.register_class(TEXT_PT_ReorderBitfieldName)
     bpy.utils.register_class(SCENE_UL_BitfieldNames)
     bpy.utils.register_class(t3dBitfieldName__)
 
     for propName, prop in objectProps.items():
         setattr(bpy.types.Object, propName, prop)
-
-    bpy.types.Scene.t3dAutoSubdivisionLevels__ = bpy.props.CollectionProperty(
-        type=t3dAutoSubdivisionLevel__
-    )
 
     # We don't actually need to store or export the FOV; we just modify the camera's actual field of view (angle) property
     bpy.types.Camera.t3dFOV__ = bpy.props.IntProperty(
@@ -3676,15 +3708,6 @@ def register():
         description="How many sector neighbors are rendered at a time",
         default=1,
         min=0,
-    )
-
-    bpy.types.Scene.t3dSectorDetectionType__ = bpy.props.EnumProperty(
-        items=sectorDetectionType,
-        name="Sector Detection Type",
-        description="How sector neighbors should be determined",
-        default="VERTICES",
-        get=getSectorDetectionType,
-        set=setSectorDetectionType,
     )
 
     bpy.types.Scene.t3dGameProperties__ = objectProps["t3dGameProperties__"]
@@ -3722,65 +3745,68 @@ def register():
         min=0,
     )
 
-    bpy.types.Scene.t3dExportOnSave__ = bpy.props.BoolProperty(
+    bpy.types.Text.t3dAutoSubdivisionLevels__ = bpy.props.CollectionProperty(
+        type=t3dAutoSubdivisionLevel__
+    )
+
+    bpy.types.Text.t3dMaxAutoSubdivisionCount__ = bpy.props.IntProperty(
+        name="Max Autosubdivision Level",
+        description="How many times maximum a triangle can be auto-subdivided",
+        default=3,
+        min=1
+    )
+
+    bpy.types.Text.t3dSectorDetectionType__ = bpy.props.EnumProperty(
+        items=sectorDetectionType,
+        name="Sector Detection Type",
+        description="How sector neighbors should be determined",
+        default="VERTICES",
+    )
+
+    bpy.types.Text.t3dExportOnSave__ = bpy.props.BoolProperty(
         name="Export on Save",
         description="Whether the current file should export to GLTF on save or not",
         default=False,
-        get=getExportOnSave,
-        set=setExportOnSave,
     )
 
-    bpy.types.Scene.t3dExportFilepath__ = bpy.props.StringProperty(
+    bpy.types.Text.t3dExportFilepath__ = bpy.props.StringProperty(
         name="Export Filepath",
         description="Filepath to export GLTF file. If left blank, it will export to the same directory as the blend file and will have the same filename; in this case, if the blend file has not been saved, nothing will happen",
         default="",
         subtype="FILE_PATH",
-        get=getExportFilepath,
-        set=setExportFilepath,
     )
 
-    bpy.types.Scene.t3dExportFormat__ = bpy.props.EnumProperty(
+    bpy.types.Text.t3dExportFormat__ = bpy.props.EnumProperty(
         items=gltfExportTypes,
         name="Export Format",
         description="What format to export the file in",
         default="GLB",
-        get=getExportFormat,
-        set=setExportFormat,
     )
 
-    bpy.types.Scene.t3dExportCameras__ = bpy.props.BoolProperty(
+    bpy.types.Text.t3dExportCameras__ = bpy.props.BoolProperty(
         name="Export Cameras",
         description="Whether Blender should export cameras to the GLTF file",
         default=True,
-        get=getExportCameras,
-        set=setExportCameras,
     )
 
-    bpy.types.Scene.t3dExportLights__ = bpy.props.BoolProperty(
+    bpy.types.Text.t3dExportLights__ = bpy.props.BoolProperty(
         name="Export Lights",
         description="Whether Blender should export lights to the GLTF file",
         default=True,
-        get=getExportLights,
-        set=setExportLights,
     )
 
-    bpy.types.Scene.t3dRenameInstancedObjects__ = bpy.props.BoolProperty(
+    bpy.types.Text.t3dRenameInstancedObjects__ = bpy.props.BoolProperty(
         name="Rename Collection-Instanced Objects",
         description="Whether collection instances' names should be used for their instanced top-level objects",
-        default=True,
-        get=getRenameInstancedObjects,
-        set=setRenameInstancedObjects,
     )
 
-    bpy.types.Scene.t3dPackTextures__ = bpy.props.BoolProperty(
+    bpy.types.Text.t3dPackTextures__ = bpy.props.BoolProperty(
         name="Pack Textures",
         description="Whether Blender should pack textures into the GLTF file on export",
         default=False,
-        get=getPackTextures,
-        set=setPackTextures,
     )
 
-    bpy.types.Scene.t3dRenderResolutionW__ = bpy.props.IntProperty(
+    bpy.types.Text.t3dRenderResolutionW__ = bpy.props.IntProperty(
         name="Render Width",
         description="How wide to render the game scene in pixels",
         default=640,
@@ -3789,7 +3815,7 @@ def register():
         set=setRenderResolutionW,
     )
 
-    bpy.types.Scene.t3dRenderResolutionH__ = bpy.props.IntProperty(
+    bpy.types.Text.t3dRenderResolutionH__ = bpy.props.IntProperty(
         name="Render Height",
         description="How tall to render the game scene in pixels",
         default=360,
@@ -3798,24 +3824,22 @@ def register():
         set=setRenderResolutionH,
     )
 
-    bpy.types.Scene.t3dPlaybackFPS__ = bpy.props.IntProperty(
-        name="Playback FPS",
-        description="Animation Playback Framerate (in Blender)",
+    bpy.types.Text.t3dAnimationFPS__ = bpy.props.IntProperty(
+        name="Animation FPS",
+        description="At what framerate to animate things in Blender",
         default=60,
-        min=0,
-        get=getPlaybackFPS,
-        set=setPlaybackFPS,
+        min=1,
+        get=getAnimationFPS,
+        set=setAnimationFPS,
     )
 
-    bpy.types.Scene.t3dAnimationSampling__ = bpy.props.BoolProperty(
+    bpy.types.Text.t3dAnimationSampling__ = bpy.props.BoolProperty(
         name="Sampled Animations",
         description="When enabled, animations are sampled (so you can use advanced techniques in your animations and then Blender will bake the results into your GLTF file). When disabled, only plain constant and linear animation keyframes (not cubic spline) will export. However, non-sampled animations export much more quickly than sampled animations, which means this option is useful when developing",
         default=True,
-        get=getAnimationSampling,
-        set=setAnimationSampling,
     )
 
-    bpy.types.Scene.t3dAnimationInterpolation__ = bpy.props.EnumProperty(
+    bpy.types.Text.t3dAnimationInterpolation__ = bpy.props.EnumProperty(
         items=[
             ("CONSTANT", "Constant", "Constant interpolation", 0, 0),
             ("LINEAR", "Linear", "Linear interpolation", 0, 1),
@@ -3834,15 +3858,30 @@ def register():
         name="Type",
         description="What type to use for applying interpolation",
         default="BEZIER",
-        get=getAnimationInterpolation,
-        set=setAnimationInterpolation,
     )
 
-    bpy.types.Scene.t3dBitfieldNames__ = bpy.props.CollectionProperty(type=t3dBitfieldName__)
-    bpy.types.Scene.t3dActiveBitfieldIndex__ = bpy.props.IntProperty(
+    bpy.types.Text.t3dBitfieldNames__ = bpy.props.CollectionProperty(type=t3dBitfieldName__)
+    bpy.types.Text.t3dReorderBitfieldsOnModify__ = bpy.props.BoolProperty(
+        name="Auto-adjust Bitfields on Modify",
+        description="When enabled, reordering or deleting bitfield names also reorders or unsets the corresponding bitfield values for all game properties for all objects in the blend file",
+        default=True,
+    )
+    bpy.types.Text.t3dActiveBitfieldIndex__ = bpy.props.IntProperty(
         name="Active bitfield name",
         description="",
         min=0,
+    )
+
+    bpy.types.Text.t3dExportNodePathsFilepath__ = bpy.props.StringProperty(
+        name="Export Node Path Constants Filepath",
+        description="When set, exports object node paths in the blend file to the given folder as a file containing Go constants",
+        subtype="DIR_PATH",
+    )
+
+    bpy.types.Text.t3dExportNodeNamesFilepath__ = bpy.props.StringProperty(
+        name="Export Node Name Constants Filepath",
+        description="When set, exports object names in the blend file to the given folder as a file containing Go constants",
+        subtype="DIR_PATH",
     )
 
     bpy.types.WindowManager.t3dExpandExportSettings__ = bpy.props.BoolProperty(
@@ -4171,11 +4210,6 @@ def unregister():
     bpy.utils.unregister_class(RENDER_OT_tetra3dQuickSetRenderResolution)
 
     bpy.utils.unregister_class(t3dAutoSubdivisionLevel__)
-    bpy.utils.unregister_class(SCENE_OT_tetra3dAddAutoSubdivisionLevel)
-    bpy.utils.unregister_class(SCENE_OT_tetra3dClearAutoSubdivisionLevels)
-    bpy.utils.unregister_class(SCENE_OT_tetra3dCopyAutoSubdivisionLevels)
-    bpy.utils.unregister_class(SCENE_OT_tetra3dDeleteAutoSubdivisionLevel)
-    bpy.utils.unregister_class(SCENE_OT_tetra3dReorderAutoSubdivisionLevel)
 
     bpy.utils.unregister_class(t3dGamePropertyItem__)
 
@@ -4192,42 +4226,47 @@ def unregister():
 
     bpy.utils.unregister_class(OBJECT_OT_tetra3dSearchStringProperties)
 
-    bpy.utils.unregister_class(SCENE_PT_AddBitfieldName)
-    bpy.utils.unregister_class(SCENE_PT_DuplicateBitfieldName)
-    bpy.utils.unregister_class(SCENE_PT_CopyBitfieldNamesToAllScenes)
-    bpy.utils.unregister_class(SCENE_PT_RemoveBitfieldName)
-    bpy.utils.unregister_class(SCENE_PT_ReorderBitfieldName)
+    bpy.utils.unregister_class(TEXT_OT_tetra3dAddAutoSubdivisionLevel)
+    bpy.utils.unregister_class(TEXT_OT_tetra3dClearAutoSubdivisionLevels)
+    bpy.utils.unregister_class(TEXT_OT_tetra3dDeleteAutoSubdivisionLevel)
+    bpy.utils.unregister_class(TEXT_OT_tetra3dReorderAutoSubdivisionLevel)
+    bpy.utils.unregister_class(TEXT_PT_AddBitfieldName)
+    bpy.utils.unregister_class(TEXT_PT_DuplicateBitfieldName)
+    bpy.utils.unregister_class(TEXT_PT_RemoveBitfieldName)
+    bpy.utils.unregister_class(TEXT_PT_ReorderBitfieldName)
     bpy.utils.unregister_class(SCENE_PT_SelectAllWithBitfieldName)
     bpy.utils.unregister_class(SCENE_UL_BitfieldNames)
     bpy.utils.unregister_class(t3dBitfieldName__)
 
-    del bpy.types.Scene.t3dBitfieldNames__
-    del bpy.types.Scene.t3dActiveBitfieldIndex__
 
     for propName in objectProps.keys():
         delattr(bpy.types.Object, propName)
 
-    del bpy.types.Scene.t3dAutoSubdivisionLevels__
-
-    del bpy.types.Scene.t3dGameProperties__
     del bpy.types.Action.t3dGameProperties__
     del bpy.types.Action.t3dRelativeMotion__
     del bpy.types.Action.t3dLoopMode__
 
-    del bpy.types.Scene.t3dSectorDetectionType__
-    del bpy.types.Scene.t3dExportOnSave__
-    del bpy.types.Scene.t3dExportFilepath__
-    del bpy.types.Scene.t3dExportFormat__
-    del bpy.types.Scene.t3dExportCameras__
-    del bpy.types.Scene.t3dExportLights__
-    del bpy.types.Scene.t3dRenameInstancedObjects__
-    del bpy.types.Scene.t3dPackTextures__
-    del bpy.types.Scene.t3dAnimationSampling__
-    del bpy.types.Scene.t3dAnimationInterpolation__
+    del bpy.types.Scene.t3dGameProperties__
 
-    del bpy.types.Scene.t3dRenderResolutionW__
-    del bpy.types.Scene.t3dRenderResolutionH__
-    del bpy.types.Scene.t3dPlaybackFPS__
+    del bpy.types.Text.t3dAutoSubdivisionLevels__
+    del bpy.types.Text.t3dMaxAutoSubdivisionCount__
+    del bpy.types.Text.t3dBitfieldNames__
+    del bpy.types.Text.t3dReorderBitfieldsOnModify__
+    del bpy.types.Text.t3dActiveBitfieldIndex__
+    del bpy.types.Text.t3dSectorDetectionType__
+    del bpy.types.Text.t3dExportOnSave__
+    del bpy.types.Text.t3dExportFilepath__
+    del bpy.types.Text.t3dExportNodePathsFilepath__
+    del bpy.types.Text.t3dExportFormat__
+    del bpy.types.Text.t3dExportCameras__
+    del bpy.types.Text.t3dExportLights__
+    del bpy.types.Text.t3dRenameInstancedObjects__
+    del bpy.types.Text.t3dPackTextures__
+    del bpy.types.Text.t3dAnimationSampling__
+    del bpy.types.Text.t3dAnimationInterpolation__
+    del bpy.types.Text.t3dRenderResolutionW__
+    del bpy.types.Text.t3dRenderResolutionH__
+    del bpy.types.Text.t3dAnimationFPS__
 
     del bpy.types.WindowManager.t3dExpandExportSettings__
     del bpy.types.WindowManager.t3dExpandAutoSubdivisionSettings__

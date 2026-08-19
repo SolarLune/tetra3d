@@ -4,19 +4,8 @@ import (
 	"fmt"
 )
 
-type AutoSubdivisionLevel struct {
-	DistanceSquared     float32
-	SubdivisionLevel    int
-	MinimumTriangleSize float32
-}
-
 // There is no zero ID; this is to make it so that systems that reference scenes by id can use 0 as an invalid reference.
 var sceneID uint32 = 1
-
-type bitfieldNamePair struct {
-	Value Bitfield
-	Name  string
-}
 
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
 // graph of parents and children.
@@ -34,14 +23,11 @@ type Scene struct {
 	data          any
 	View3DCameras []*Camera // Any 3D view cameras that were exported from Blender
 
-	updateAutobatch       bool
-	autobatchDynamicMap   map[*Material]*Model
-	autobatchStaticMap    map[*Material]*Model
-	autosubdivisionLevels []AutoSubdivisionLevel
+	updateAutobatch     bool
+	autobatchDynamicMap map[*Material]*Model
+	autobatchStaticMap  map[*Material]*Model
 
 	callbacks *SceneCallbacks
-
-	bitfieldNames []bitfieldNamePair
 }
 
 // NewScene creates a new Scene by the name given.
@@ -83,11 +69,8 @@ func (scene *Scene) Clone() *Scene {
 
 	scene.Root.scene = scene
 
-	newScene.bitfieldNames = append(newScene.bitfieldNames, scene.bitfieldNames...)
-
 	newScene.Root.scene = newScene
 	newScene.Root.cachedSceneRootNode = newScene.Root
-	newScene.autosubdivisionLevels = append(newScene.autosubdivisionLevels, scene.autosubdivisionLevels...)
 
 	newScene.World = scene.World // Here, we simply reference the same world; we don't clone it, since a single world can be shared across multiple Scenes
 	newScene.props = scene.props.Clone()
@@ -293,44 +276,4 @@ func (scene *Scene) Get(nodePath string) INode {
 // Returns the callbacks object associated with the Scene.
 func (scene *Scene) Callbacks() *SceneCallbacks {
 	return scene.callbacks
-}
-
-// Returns the names of bits for the Scene.
-func (scene *Scene) BitfieldNames() []string {
-	out := []string{}
-	for _, n := range scene.bitfieldNames {
-		out = append(out, n.Name)
-	}
-	return out
-}
-
-// Returns the name of the bit mask in the specified index.
-// If it can't be found, a blank string is returned.
-func (scene *Scene) BitfieldNameByIndex(index int) string {
-	if index < len(scene.bitfieldNames) {
-		return scene.bitfieldNames[index].Name
-	}
-	return ""
-}
-
-// Returns the name of the bitfield for the given bit mask value.
-// If it can't be found, a blank string is returned.
-func (scene *Scene) BitfieldNameByValue(value Bitfield) string {
-	for _, b := range scene.bitfieldNames {
-		if b.Value == value {
-			return b.Name
-		}
-	}
-	return ""
-}
-
-// Returns the bitfield value associated with the given name.
-// If it can't be found, a bitfield with the value of 0 is returned.
-func (scene *Scene) BitfieldValueByName(name string) Bitfield {
-	for _, b := range scene.bitfieldNames {
-		if b.Name == name {
-			return b.Value
-		}
-	}
-	return Bitfield(0)
 }

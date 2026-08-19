@@ -158,7 +158,7 @@ type INode interface {
 	Data() any
 	// Type returns the NodeType for this object.
 	Type() NodeType
-	setLibrary(lib *Library)
+	SetLibrary(lib *Library)
 	// Library returns the source Library from which this Node was instantiated. If it was created through code, this will be nil.
 	Library() *Library
 
@@ -339,6 +339,17 @@ type INode interface {
 	// trims the extra spaces from the beginning and end of Node Names, so avoid using spaces at the beginning or end of your Nodes' names.
 	Get(path string) INode
 
+	// Gets a node relative to the starting node assuming it is an ancestor in the target path.
+	//
+	// For example, say you had the following nodes, parented in order: Room/Desk/Cup/Water
+	//
+	// If you had a reference to `Desk` and called desk.GetRelative("Room/Desk/Cup/Water"),
+	// this would be like calling desk.Get("Cup/Water").
+	//
+	// If the node could not be found or the calling node shares no path with the given path,
+	// the function returns nil.
+	GetRelative(path string) INode
+
 	// Search searches a node's hierarchy using a string to find the specified Node.
 	Search() SearchOptions
 
@@ -475,12 +486,13 @@ func (node *Node) Type() NodeType {
 	return NodeTypeNode
 }
 
-// Library returns the Library from which this Node was instantiated. If it was created through code, this will be nil.
+// Library returns the Library from which this Node was instantiated.
 func (node *Node) Library() *Library {
 	return node.library
 }
 
-func (node *Node) setLibrary(library *Library) {
+// Sets the library associated with this Node.
+func (node *Node) SetLibrary(library *Library) {
 	node.library = library
 }
 
@@ -1315,9 +1327,12 @@ func (node *Node) Properties() *Properties {
 
 // Returns if the Node contains a property that has a bit flipped that is named in the Node's Scene by the given name.
 func (node *Node) PropertiesContainsBitByName(bitfieldBitName string) bool {
-	bv := node.Scene().BitfieldValueByName(bitfieldBitName)
-	for _, p := range node.props.data {
-		return p.IsBitfield() && p.AsBitfield().Contains(bv)
+	if node.library != nil {
+		if bv := node.library.BitfieldValueByName(bitfieldBitName); bv > 0 {
+			for _, p := range node.props.data {
+				return p.IsBitfield() && p.AsBitfield().Contains(bv)
+			}
+		}
 	}
 	return false
 }
@@ -1428,13 +1443,27 @@ func (node *Node) String() string {
 	}
 }
 
+// TODO: Modify this to handle "../" in paths properly, rather than leaving that to `Node.Get()`.
+// This way, Node.GetRelative("A/B/../C") is equivalent to Node.GetRelative("A/C"); currently it's not
+// because "../" isn't resolved there.
+func (node *Node) resolveNodePath(path string) string {
+	return strings.Trim(strings.TrimSpace(path), "/")
+}
+
 // Get searches a node's hierarchy using a string to find a specified node. The path is in the format of names of nodes, separated by forward
 // slashes ('/'), and is relative to the node you use to call Get. As an example of Get, if you had a cup parented to a desk, which was
 // parented to a room, that was finally parented to the root of the scene, it would be found at "Room/Desk/Cup". Note also that you can use "../" to
-// "go up one" in the hierarchy (so cup.Get("../") would return the Desk node).
+// "go up one" in the hierarchy (so cup.Get("..") would return the Desk node).
 // Since Get uses forward slashes as path separation, it would be good to avoid using forward slashes in your Node names. Also note that Get()
 // trims the extra spaces from the beginning and end of Node Names, so avoid using spaces at the beginning or end of your Nodes' names.
 func (node *Node) Get(path string) INode {
+
+	path = node.resolveNodePath(path)
+
+	// Path is empty, so return the node itself
+	if path == "" {
+		return node
+	}
 
 	var search func(node INode) INode
 
@@ -1485,6 +1514,45 @@ func (node *Node) Get(path string) INode {
 
 	return search(node)
 
+}
+
+// Gets a node relative to the starting node assuming it is an ancestor in the target path.
+//
+// For example, say you had the following nodes, parented in order: Room/Desk/Cup/Water
+//
+// If you had a reference to `Desk` and called desk.GetRelative("Room/Desk/Cup/Water"),
+// this would be like calling desk.Get("Cup/Water").
+//
+// If the node could not be found or the calling node shares no path with the given path,
+// the function returns nil.
+func (node *Node) GetRelative(path string) INode {
+
+	path = node.resolveNodePath(path)
+
+	// Path is empty, so return the node itself
+	if path == "" {
+		return node
+	}
+
+	// You're the root, so just call t.Get(path)
+	if node.Root() == node {
+		return node.Get(path)
+	}
+
+	nodePath := node.Path()
+
+	// You have the same path as the target path, so just return yourself
+	if path == nodePath {
+		return node
+	}
+
+	// Return Get from a portion of the path
+	if tIndex := strings.Index(path, nodePath); tIndex >= 0 {
+		return node.Get(path[tIndex+len(nodePath):])
+	}
+
+	// No node found
+	return nil
 }
 
 // Path returns a string indicating the hierarchical path to get this Node from the root. The path returned will be absolute, such that

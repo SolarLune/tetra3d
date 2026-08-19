@@ -336,8 +336,8 @@ func (model *Model) StaticMerge(target *Model, targetMeshPart *MeshPart) {
 
 	inverted = inverted.Mult(NewMatrix4Translate(op.X-p.X, op.Y-p.Y, op.Z-p.Z))
 
-	if target.mesh.AutoSubdivide {
-		model.mesh.AutoSubdivide = true
+	if target.mesh.autoSubdivide {
+		model.mesh.autoSubdivide = true
 	}
 
 	verts = verts[:0]
@@ -726,30 +726,11 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	if !modelSkinned {
 
-		if mesh.AutoSubdivide {
+		if mesh.autoSubdivide && len(autoSubdivisionLevels) > 0 {
 
-			if len(autoSubdivisionLevels) > 0 {
-
-				if !mesh.allocatedForAutoSubdivisions {
-
-					maxLevel := float32(0)
-					for _, level := range autoSubdivisionLevels {
-						maxLevel = max(maxLevel, float32(level.SubdivisionLevel))
-					}
-
-					subCount := (math32.Pow(2, maxLevel) + 1) * (math32.Pow(2, maxLevel-1) + 1)
-
-					mesh.allocateVertexBuffers(len(mesh.Triangles) * int(subCount) * 3)
-
-					mesh.allocatedForAutoSubdivisions = true
-
-				}
-
-				meshPart.forEachTri(false, func(tri *Triangle) {
-					tri.handleSubdivision(invertedCamPos, model, autoSubdivisionLevels)
-				})
-
-			}
+			meshPart.forEachTri(false, func(tri *Triangle) {
+				tri.handleSubdivision(invertedCamPos, model, autoSubdivisionLevels)
+			})
 
 		} else {
 			meshPart.forEachTri(false, func(tri *Triangle) {
@@ -763,9 +744,13 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		growDisplayLists()
 	}
 
-	meshPart.forEachTri(mesh.AutoSubdivide, func(tri *Triangle) {
+	if model.skinned {
+		camera.DebugInfo.currentAnimationTime.StartTimer()
+	}
 
-		if mesh.AutoSubdivide && tri.subdivisionParent != nil && (!tri.subdivisionParent.wouldRender || !tri.visible) {
+	meshPart.forEachTri(mesh.autoSubdivide, func(tri *Triangle) {
+
+		if mesh.autoSubdivide && !tri.visible {
 			return
 		}
 
@@ -773,8 +758,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			vertexIndex := tri.VertexIndex(vi)
 
 			if modelSkinned {
-
-				camera.DebugInfo.currentAnimationTime.StartTimer()
 
 				vert, normal = model.skinVertex(vertexIndex)
 
@@ -836,10 +819,6 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			vertexListIndex++
 
-		}
-
-		if modelSkinned {
-			camera.DebugInfo.currentAnimationTime.EndTimer()
 		}
 
 		// Backface culling
@@ -906,56 +885,46 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			return
 		}
 
-		// This is the subdivided triangle parent, or it's not subdivided
-		if tri.subdivisionParent == nil {
-
-			// If all transformed vertices are wholly out of bounds to the right, left, top, or bottom of the screen, then we can assume
-			// the triangle does not need to be rendered
-			if processOnlyVisible {
-				if (transformedVertexPositions[0].X < -0.5 && transformedVertexPositions[1].X < -0.5 && transformedVertexPositions[2].X < -0.5) ||
-					(transformedVertexPositions[0].X > 0.5 && transformedVertexPositions[1].X > 0.5 && transformedVertexPositions[2].X > 0.5) ||
-					(transformedVertexPositions[0].Y < -0.5 && transformedVertexPositions[1].Y < -0.5 && transformedVertexPositions[2].Y < -0.5) ||
-					(transformedVertexPositions[0].Y > 0.5 && transformedVertexPositions[1].Y > 0.5 && transformedVertexPositions[2].Y > 0.5) {
-					vertexListIndex -= 3
-					return
-				}
+		// If all transformed vertices are wholly out of bounds to the right, left, top, or bottom of the screen, then we can assume
+		// the triangle does not need to be rendered
+		if processOnlyVisible {
+			if (transformedVertexPositions[0].X < -0.5 && transformedVertexPositions[1].X < -0.5 && transformedVertexPositions[2].X < -0.5) ||
+				(transformedVertexPositions[0].X > 0.5 && transformedVertexPositions[1].X > 0.5 && transformedVertexPositions[2].X > 0.5) ||
+				(transformedVertexPositions[0].Y < -0.5 && transformedVertexPositions[1].Y < -0.5 && transformedVertexPositions[2].Y < -0.5) ||
+				(transformedVertexPositions[0].Y > 0.5 && transformedVertexPositions[1].Y > 0.5 && transformedVertexPositions[2].Y > 0.5) {
+				vertexListIndex -= 3
+				return
 			}
+		}
 
-			// Going back to using the transformed vertex positions for backface culling as it works better when the camera is super close to the
-			// triangles.
-			if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
+		// Going back to using the transformed vertex positions for backface culling as it works better when the camera is super close to the
+		// triangles.
+		if meshPart.Material != nil && meshPart.Material.BackfaceCulling {
 
-				v0 := transformedVertexPositions[0]
-				v1 := transformedVertexPositions[1]
-				v2 := transformedVertexPositions[2]
+			v0 := transformedVertexPositions[0]
+			v1 := transformedVertexPositions[1]
+			v2 := transformedVertexPositions[2]
 
-				n0x := v0.X - v1.X
-				n0y := v0.Y - v1.Y
+			n0x := v0.X - v1.X
+			n0y := v0.Y - v1.Y
 
-				n1x := v1.X - v2.X
-				n1y := v1.Y - v2.Y
+			n1x := v1.X - v2.X
+			n1y := v1.Y - v2.Y
 
-				// Essentially calculating the cross product, but only for the important dimension (Z, which is "in / out" in this context)
-				nor := (n0x * n1y) - (n1x * n0y)
+			// Essentially calculating the cross product, but only for the important dimension (Z, which is "in / out" in this context)
+			nor := (n0x * n1y) - (n1x * n0y)
 
-				// We use this method of backface culling because it helps to ensure
-				// there's fewer graphical glitches when looking from very near a surface outwards; this
-				// doesn't help if a surface does not have backface culling, of course...
-				if processOnlyVisible && nor < 0 {
-					vertexListIndex -= 3
-					return
-				}
-
-			}
-
-			tri.wouldRender = true
-
-			if processOnlyVisible && !tri.visible {
+			// We use this method of backface culling because it helps to ensure
+			// there's fewer graphical glitches when looking from very near a surface outwards; this
+			// doesn't help if a surface does not have backface culling, of course...
+			if processOnlyVisible && nor < 0 {
 				vertexListIndex -= 3
 				return
 			}
 
 		}
+
+		// tri.wouldRender = true
 
 		// Previously, depth was compared using the lowest W value of all vertices in the triangle; after that, I tried
 		// averaging them out. Neither of these was completely satisfactory, and in addition, there was no depth sorting
@@ -1018,6 +987,10 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 	}
 
 	globalSortingTriangleBucket.Sort(minDepth, maxDepth)
+
+	if model.skinned {
+		camera.DebugInfo.currentAnimationTime.EndTimer()
+	}
 
 }
 

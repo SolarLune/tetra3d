@@ -14,7 +14,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-//go:embed *.glb
+//go:embed *.glb assets/*.png
 var assets embed.FS
 
 type Player struct {
@@ -206,89 +206,90 @@ func (g *Game) Init() {
 	// So we get the LightVolume, which is a blank slate at this point.
 	// Now to populate it with light data!
 	lightvolume := g.Scene.Root.Get("LightVolume").(*tetra3d.LightVolume)
+	lightvolume.LightVolumeSetOffset(1.5, 1.5, 1.5)
 
 	// For each grid cell in the LightVolume, we take in the position of the grid cell and the current color,
 	// and then we shade that cell - anything that passes through the cell is lightened, darkened, or otherwise colored
 	// depending on the color we put in the cell.
 
-	solids := g.Scene.Root.Search().ByParentPropNames("solid")
+	allObjects := g.Scene.Root.Search().ByType(tetra3d.NodeTypeCollider)
 
 	lightvolume.LightVolumeResize(lightvolume.Dimensions(), 2, 2, 2)
 
-	// Let's define some tags; tags are just numbers indicating information in a cell.
-	const TAG_LIGHT_FROM_ABOVE = 0
-	const TAG_LIGHT_FROM_BELOW = 1
+	underLight := g.Scene.Get("Underlight").(tetra3d.ILight)
+
+	const TAG_BLOCKED = 1
 
 	// Loop through each cell and do something with it.
 	lightvolume.LightVolumeForEachCell(func(cell *tetra3d.LightVolumeCell) bool {
 
-		// Check for collision; if the cell collides with a wall, then we know it's against a ceiling, wall, floor, etc.
-		tetra3d.CollisionTestSphereVec(cell.WorldPosition(), 0.5, tetra3d.CollisionTestSettings{
+		pos := cell.WorldPosition()
 
-			TestAgainst: solids,
-
-			OnCollision: func(col *tetra3d.Collision, index, count int) bool {
-
-				// Loop through each collided material and see what we get.
-				col.ForEachCollidedMaterial(func(mat *tetra3d.Material) bool {
-					if mat.Name() == "Sky" {
-						// Touching the sky, so we can make the cell bright.
-						cell.SetTag(TAG_LIGHT_FROM_ABOVE)
-						cell.SetColorMonochrome(2)
-					} else if mat.Name() == "LightFloor" {
-						// Touching the LightFloor material, so it deals with light coming up from below.
-						cell.SetTag(TAG_LIGHT_FROM_BELOW)
-					} else if mat.Name() == "LightCeiling" {
-						cell.SetTag(TAG_LIGHT_FROM_ABOVE)
-						cell.SetColorMonochrome(3)
-					} else {
-						cell.SetBlockedAll(true)
-					}
-					return true
-				})
-
-				return true
+		hitCount := 0
+		tetra3d.RayTest(tetra3d.RayTestOptions{
+			From:        pos,
+			To:          pos.AddY(1000),
+			Doublesided: true,
+			TestAgainst: allObjects,
+			OnHit: func(hit tetra3d.RayHit, index, count int) bool {
+				hitCount = count
+				return false
 			},
 		})
 
+		// Outside
+		if hitCount%2 == 0 {
+			cell.SetBlockedAll(true)
+			cell.SetTag(TAG_BLOCKED)
+		} else {
+
+			tetra3d.RayTest(tetra3d.RayTestOptions{
+				From:        pos,
+				To:          pos.AddY(1000),
+				Doublesided: false,
+				TestAgainst: allObjects,
+				OnHit: func(hit tetra3d.RayHit, index, count int) bool {
+					if hit.HitMaterialByName("Sky") {
+						cell.SetColorMonochrome(1.5)
+					} else if hit.HitMaterialByName("LightCeiling") {
+						cell.SetColorMonochrome(3)
+					} else {
+						cell.SetColorMonochrome(-0.25)
+					}
+					return false
+				},
+			})
+
+			tetra3d.RayTest(tetra3d.RayTestOptions{
+				From:        pos,
+				To:          pos.SubY(1000),
+				Doublesided: false,
+				TestAgainst: allObjects,
+				OnHit: func(hit tetra3d.RayHit, index, count int) bool {
+					if hit.HitMaterialByName("LightFloor") {
+						cell.SetColorMonochrome(0)
+						cell.SetUseLights(underLight)
+					}
+					return false
+				},
+			})
+
+		}
+
 		return true
 
 	})
 
-	underLight := g.Scene.Get("Underlight").(tetra3d.ILight)
-
-	// Propagate the light downwards for the sky or ceiling
 	lightvolume.LightVolumeForEachCell(func(cell *tetra3d.LightVolumeCell) bool {
-
-		if cell.HasTag(TAG_LIGHT_FROM_ABOVE) {
-			cell.ForEachNeighborInDirection(tetra3d.LightVolumeDirectionDown, func(neighbor *tetra3d.LightVolumeCell) bool {
-				if neighbor.Blocked(tetra3d.LightVolumeDirectionNone) {
-					return false
-				}
-				neighbor.SetColor(cell.Color())
-				return true
-			})
+		if cell.HasTag(TAG_BLOCKED) {
+			cell.SetColorMonochrome(0)
 		}
-
-		// Light floor
-
-		if cell.HasTag(TAG_LIGHT_FROM_BELOW) {
-
-			// We can call `cell.UseLights()` to simply light an object with another actual Light if it's within a Cell.
-			cell.SetUseLights(underLight)
-			cell.ForEachNeighborInDirection(tetra3d.LightVolumeDirectionUp, func(neighbor *tetra3d.LightVolumeCell) bool {
-				if neighbor.Blocked(0) {
-					return false
-				}
-				neighbor.SetUseLights(underLight)
-				return true
-			})
-		}
-
 		return true
 	})
 
-	lightvolume.LightVolumeBlur(1, 1, 1)
+	// lightvolume.LightVolumePropagateAllDirections(1, 1, 1, true)
+	//
+	lightvolume.LightVolumeBlur(1, 2, 1)
 
 	fmt.Println("time to check light cells:", time.Since(t))
 
@@ -317,7 +318,7 @@ func (g *Game) Update() error {
 
 	if inpututil.IsKeyJustPressed(ebiten.Key3) {
 		m := g.Scene.Get("Map").(*tetra3d.Model)
-		m.Mesh().AutoSubdivide = !m.Mesh().AutoSubdivide
+		m.Mesh().SetAutoSubdivide(!m.Mesh().AutoSubdivide())
 	}
 
 	return g.System.Update()

@@ -77,7 +77,7 @@ type Game struct {
 	System examples.BasicSystemHandler
 }
 
-//go:embed grids.gltf
+//go:embed grids.glb
 var grids []byte
 
 func NewGame() *Game {
