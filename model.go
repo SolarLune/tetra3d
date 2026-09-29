@@ -778,14 +778,8 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 			} else {
 
-				// It is, of course, faster to set the values in a vertex than to allocate memory for a new one
-				vert.X = mesh.VertexPositionWithShapeKeys(vertexIndex).X
-				vert.Y = mesh.VertexPositionWithShapeKeys(vertexIndex).Y
-				vert.Z = mesh.VertexPositionWithShapeKeys(vertexIndex).Z
-
-				normal.X = mesh.VertexNormalWithShapeKeys(vertexIndex).X
-				normal.Y = mesh.VertexNormalWithShapeKeys(vertexIndex).Y
-				normal.Z = mesh.VertexNormalWithShapeKeys(vertexIndex).Z
+				vert = mesh.VertexPositionWithShapeKeys(vertexIndex)
+				normal = mesh.VertexNormalWithShapeKeys(vertexIndex)
 
 				if transformFunc != nil {
 					vert, normal = transformFunc(vert, normal, vertexIndex)
