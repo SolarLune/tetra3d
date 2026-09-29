@@ -731,11 +731,13 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			meshPart.forEachTri(false, func(tri *Triangle) {
 				tri.handleSubdivision(invertedCamPos, model, autoSubdivisionLevels)
 			})
+			meshPart.subdivisionsHidden = false
 
-		} else {
+		} else if !meshPart.subdivisionsHidden {
 			meshPart.forEachTri(false, func(tri *Triangle) {
 				tri.disableSubdivision()
 			})
+			meshPart.subdivisionsHidden = true
 		}
 
 	}
