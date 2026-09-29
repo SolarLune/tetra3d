@@ -1550,7 +1550,7 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			autosubdivisionLevels = scene.library.autosubdivisionLevels
 		}
 
-		model.ProcessVertices(vpMatrix, camera, meshPart, true, autosubdivisionLevels)
+		model.processVertices(vpMatrix, camera, meshPart, true, autosubdivisionLevels, lighting)
 		// lastVertexListIndex := vertexListIndex
 
 		if vertexListIndex == 0 {

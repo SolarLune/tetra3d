@@ -598,6 +598,13 @@ func (model *Model) skinVertex(vertID int) (Vector3, Vector3) {
 // ProcessVertices processes the vertices a Model has in preparation for rendering, given a view-projection
 // matrix, a camera, and the MeshPart being rendered.
 func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, processOnlyVisible bool, autoSubdivisionLevels []AutoSubdivisionLevel) {
+	model.processVertices(vpMatrix, camera, meshPart, processOnlyVisible, autoSubdivisionLevels, true)
+}
+
+// processVertices is ProcessVertices. When storeAltered is false, an unskinned
+// model does not store its vertex positions and normals for the lights, so
+// pass false only when no light reads them for this render.
+func (model *Model) processVertices(vpMatrix Matrix4, camera *Camera, meshPart *MeshPart, processOnlyVisible bool, autoSubdivisionLevels []AutoSubdivisionLevel, storeAltered bool) {
 
 	globalSortingTriangleBucket.Clear()
 
@@ -779,14 +786,19 @@ func (model *Model) ProcessVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 			} else {
 
 				vert = mesh.VertexPositionWithShapeKeys(vertexIndex)
-				normal = mesh.VertexNormalWithShapeKeys(vertexIndex)
+
+				if transformFunc != nil || storeAltered {
+					normal = mesh.VertexNormalWithShapeKeys(vertexIndex)
+				}
 
 				if transformFunc != nil {
 					vert, normal = transformFunc(vert, normal, vertexIndex)
 				}
 
-				globalMeshAlteredVertexPositions[vertexIndex] = vert
-				globalMeshAlteredVertexNormals[vertexIndex] = normal
+				if storeAltered {
+					globalMeshAlteredVertexPositions[vertexIndex] = vert
+					globalMeshAlteredVertexNormals[vertexIndex] = normal
+				}
 
 				globalVertexTransforms[vertexIndex].X = mvp[0][0]*vert.X + mvp[1][0]*vert.Y + mvp[2][0]*vert.Z + mvp[3][0]
 				globalVertexTransforms[vertexIndex].Y = mvp[0][1]*vert.X + mvp[1][1]*vert.Y + mvp[2][1]*vert.Z + mvp[3][1]
