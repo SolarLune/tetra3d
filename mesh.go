@@ -691,7 +691,7 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 		mesh.VertexPositions = append(mesh.VertexPositions, Vector3{vertInfo.X, vertInfo.Y, vertInfo.Z})
 		mesh.VertexPositionsOriginal = append(mesh.VertexPositionsOriginal, Vector3{vertInfo.X, vertInfo.Y, vertInfo.Z})
 		mesh.VertexNormals = append(mesh.VertexNormals, Vector3{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ})
-		mesh.VertexNormalsOriginal = append(mesh.VertexNormals, Vector3{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ})
+		mesh.VertexNormalsOriginal = append(mesh.VertexNormalsOriginal, Vector3{vertInfo.NormalX, vertInfo.NormalY, vertInfo.NormalZ})
 		mesh.VertexUVs = append(mesh.VertexUVs, Vector2{vertInfo.U, vertInfo.V})
 		mesh.VertexUVsOriginal = append(mesh.VertexUVsOriginal, Vector2{vertInfo.U, vertInfo.V})
 
