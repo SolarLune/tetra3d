@@ -271,6 +271,7 @@ type Camera struct {
 	resultColorTexture  *ebiten.Image // ColorTexture holds the color results of rendering any models.
 	resultDepthTexture  *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
 	resultNormalTexture *ebiten.Image // NormalTexture holds a texture indicating the normal render
+	clearColor          color.NRGBA64 // The colour of ClearWithColor, passed to Fill by pointer so that it does not allocate.
 	depthIntermediate   *ebiten.Image
 
 	resultAccumulatedColorTexture *ebiten.Image // ResultAccumulatedColorTexture holds the previous frame's render result of rendering any models.
@@ -1021,7 +1022,7 @@ func (camera *Camera) Clear() {
 // It also resets the debug values.
 func (camera *Camera) ClearWithColor(clear Color4) {
 
-	rgba := clear.ToNRGBA64()
+	camera.clearColor = clear.ToNRGBA64()
 
 	if camera.AccumulationColorMode != AccumulationColorModeNone {
 		camera.accumulatedBackBuffer.Clear()
@@ -1039,7 +1040,7 @@ func (camera *Camera) ClearWithColor(clear Color4) {
 		}
 	}
 
-	camera.resultColorTexture.Fill(rgba)
+	camera.resultColorTexture.Fill(&camera.clearColor)
 
 	if camera.RenderDepth {
 		camera.resultDepthTexture.Clear()
@@ -1215,7 +1216,8 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	}
 
-	camera.Render(scene, lights, meshes)
+	// The pointers put the lists in the interfaces without a copy on the heap.
+	camera.Render(scene, &lights, &meshes)
 
 }
 
@@ -2118,8 +2120,18 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			if pair.Model.DynamicBatcher() {
 				modelSlice := pair.Model.DynamicBatchModels[pair.MeshPart]
 
-				sort.Slice(modelSlice, func(i, j int) bool {
-					return camera.DistanceSquaredTo(modelSlice[i]) > camera.DistanceSquaredTo(modelSlice[j])
+				// slices.SortFunc runs the same pattern-defeating quicksort as
+				// sort.Slice, so the order stays the same, without its
+				// allocations.
+				slices.SortFunc(modelSlice, func(a, b *Model) int {
+					da, db := camera.DistanceSquaredTo(a), camera.DistanceSquaredTo(b)
+					if da > db {
+						return -1
+					}
+					if db > da {
+						return 1
+					}
+					return 0
 				})
 
 				for _, merged := range modelSlice {
