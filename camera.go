@@ -1345,22 +1345,17 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	}
 
-	lights.ForEach(func(node INode, index int) bool {
-
-		light, _ := node.(ILight)
-		if light == nil {
-			return true
+	// A NodeList runs without a closure, which would escape through the
+	// interface and allocate in each frame.
+	if list, ok := lights.(*NodeList); ok {
+		for _, node := range *list {
+			camera.addLight(scene, node)
 		}
-
-		camera.DebugInfo.lightCount++
-
-		if (scene.World == nil || scene.World.LightingOn) && light.IsVisible() {
-			light.beginRender()
-			sceneLights = append(sceneLights, light)
-		}
-
-		return true
-	})
+	} else {
+		lights.ForEach(func(node INode, index int) bool {
+			return camera.addLight(scene, node)
+		})
+	}
 
 	// if scene.World == nil || scene.World.LightingOn {
 
@@ -1406,121 +1401,15 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	camSpread := camera.far - camera.near + (depthMarginPercentage * 2)
 
-	models.ForEach(func(node INode, index int) bool {
-
-		model, _ := node.(*Model)
-		if model == nil || !model.visible || model.DynamicBatchOwner != nil {
-			return true
+	if list, ok := models.(*NodeList); ok {
+		for _, node := range *list {
+			camera.addModel(scene, draw, cameraPos, node)
 		}
-
-		if camera.DebugInfo.On && !model.DynamicBatcher() {
-
-			if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
-				for range model.mesh.MeshParts {
-					camera.DebugInfo.totalParts++
-				}
-			}
-
-		}
-
-		if !model.DynamicBatcher() {
-
-			if model.FrustumCulling {
-
-				if !camera.ModelInFrustum(model) {
-					return true
-				}
-
-			}
-
-			if model.mesh != nil {
-
-				for _, mp := range model.mesh.MeshParts {
-
-					if !mp.isVisible() {
-						continue
-					}
-
-					rp := renderPair{Model: model, MeshPart: mp, depth: cameraPos.DistanceSquaredTo(model.WorldPosition()), order: 0}
-
-					if model.isTransparent(mp) || !camera.RenderDepth {
-						rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
-					}
-
-					if mp.Material != nil {
-						rp.order = mp.Material.RenderOrder
-					}
-
-					if model.isTransparent(mp) {
-						draw.transparents = append(draw.transparents, rp)
-					} else {
-						draw.solids = append(draw.solids, rp)
-					}
-
-				}
-
-			}
-
-		} else {
-
-			transparent := false
-
-			// TODO: Review depth sorting for dynamic batchers
-
-			for meshPart, modelSlice := range model.DynamicBatchModels {
-
-				if !meshPart.isVisible() {
-					continue
-				}
-
-				for _, child := range modelSlice {
-
-					if !child.visible {
-						continue
-					}
-
-					if !transparent {
-
-						for _, mp := range child.mesh.MeshParts {
-
-							if mp.isVisible() && child.isTransparent(mp) {
-								transparent = true
-								break
-							}
-
-						}
-
-					}
-
-				}
-
-				rp := renderPair{Model: model, MeshPart: meshPart, depth: 0, order: 0}
-
-				if transparent || !camera.RenderDepth {
-					rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
-				}
-
-				if meshPart.Material != nil {
-					rp.order = meshPart.Material.RenderOrder
-				}
-
-				if transparent {
-					draw.transparents = append(draw.transparents, rp)
-				} else {
-					draw.solids = append(draw.solids, rp)
-				}
-
-				if camera.DebugInfo.On {
-					camera.DebugInfo.totalParts += len(modelSlice)
-				}
-
-			}
-
-		}
-
-		return true
-
-	})
+	} else {
+		models.ForEach(func(node INode, index int) bool {
+			return camera.addModel(scene, draw, cameraPos, node)
+		})
+	}
 
 	solids, transparents := draw.solids, draw.transparents
 
@@ -1586,14 +1475,7 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 		meshPart := rp.MeshPart
 		mat := meshPart.Material
 
-		lighting := false
-		if scene.World != nil {
-			if mat != nil {
-				lighting = scene.World.LightingOn && !mat.Shadeless && !model.Shadeless
-			} else {
-				lighting = scene.World.LightingOn && !model.Shadeless
-			}
-		}
+		lighting := partLighting(scene, model, mat)
 
 		if camera.DebugInfo.On {
 
@@ -2170,6 +2052,154 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 	camera.DebugInfo.currentFrameTime.EndTimer()
 	camera.DebugInfo.frameCount++
 
+}
+
+// addLight adds node to sceneLights when it is a visible light, for Render.
+func (camera *Camera) addLight(scene *Scene, node INode) bool {
+
+	light, _ := node.(ILight)
+	if light == nil {
+		return true
+	}
+
+	camera.DebugInfo.lightCount++
+
+	if (scene.World == nil || scene.World.LightingOn) && light.IsVisible() {
+		light.beginRender()
+		sceneLights = append(sceneLights, light)
+	}
+
+	return true
+}
+
+// addModel adds the parts of node to the render lists of draw when it is a
+// visible model, for Render.
+func (camera *Camera) addModel(scene *Scene, draw *drawScratch, cameraPos Vector3, node INode) bool {
+
+	model, _ := node.(*Model)
+	if model == nil || !model.visible || model.DynamicBatchOwner != nil {
+		return true
+	}
+
+	if camera.DebugInfo.On && !model.DynamicBatcher() {
+
+		if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
+			for range model.mesh.MeshParts {
+				camera.DebugInfo.totalParts++
+			}
+		}
+
+	}
+
+	if !model.DynamicBatcher() {
+
+		if model.FrustumCulling {
+
+			if !camera.ModelInFrustum(model) {
+				return true
+			}
+
+		}
+
+		if model.mesh != nil {
+
+			for _, mp := range model.mesh.MeshParts {
+
+				if !mp.isVisible() {
+					continue
+				}
+
+				rp := renderPair{Model: model, MeshPart: mp, depth: cameraPos.DistanceSquaredTo(model.WorldPosition()), order: 0}
+
+				if model.isTransparent(mp) || !camera.RenderDepth {
+					rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
+				}
+
+				if mp.Material != nil {
+					rp.order = mp.Material.RenderOrder
+				}
+
+				if model.isTransparent(mp) {
+					draw.transparents = append(draw.transparents, rp)
+				} else {
+					draw.solids = append(draw.solids, rp)
+				}
+
+			}
+
+		}
+
+	} else {
+
+		transparent := false
+
+		// TODO: Review depth sorting for dynamic batchers
+
+		for meshPart, modelSlice := range model.DynamicBatchModels {
+
+			if !meshPart.isVisible() {
+				continue
+			}
+
+			for _, child := range modelSlice {
+
+				if !child.visible {
+					continue
+				}
+
+				if !transparent {
+
+					for _, mp := range child.mesh.MeshParts {
+
+						if mp.isVisible() && child.isTransparent(mp) {
+							transparent = true
+							break
+						}
+
+					}
+
+				}
+
+			}
+
+			rp := renderPair{Model: model, MeshPart: meshPart, depth: 0, order: 0}
+
+			if transparent || !camera.RenderDepth {
+				rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
+			}
+
+			if meshPart.Material != nil {
+				rp.order = meshPart.Material.RenderOrder
+			}
+
+			if transparent {
+				draw.transparents = append(draw.transparents, rp)
+			} else {
+				draw.solids = append(draw.solids, rp)
+			}
+
+			if camera.DebugInfo.On {
+				camera.DebugInfo.totalParts += len(modelSlice)
+			}
+
+		}
+
+	}
+
+	return true
+
+}
+
+// partLighting reports whether a part of model with the material mat takes
+// the lights of scene.
+func partLighting(scene *Scene, model *Model, mat *Material) bool {
+	if scene.World == nil {
+		return false
+	}
+	if mat != nil {
+		return scene.World.LightingOn && !mat.Shadeless && !model.Shadeless
+	}
+	return scene.World.LightingOn && !model.Shadeless
 }
 
 // compareTransparents orders transparent parts by render order, and parts of
