@@ -1263,6 +1263,60 @@ var bayerMatrix = []float32{
 
 var sceneLights []ILight
 
+var depthRectVertices [4]ebiten.Vertex
+var depthRectIndices = [6]uint16{0, 1, 2, 1, 3, 2}
+var depthRectClearOptions = ebiten.DrawTrianglesOptions{Blend: ebiten.BlendClear}
+var depthRectCopyOptions = ebiten.DrawTrianglesOptions{}
+
+// depthPassRect returns the pixels that the triangles of verts can cover, plus a
+// margin of one pixel, clipped to a w by h target. partial is false when the
+// rectangle is the full target, or when a vertex position is not a number.
+func depthPassRect(verts []ebiten.Vertex, w, h int) (rect image.Rectangle, partial bool) {
+	if len(verts) == 0 {
+		return image.Rectangle{}, false
+	}
+	minX, minY := verts[0].DstX, verts[0].DstY
+	maxX, maxY := minX, minY
+	for i := range verts {
+		x, y := verts[i].DstX, verts[i].DstY
+		if x != x || y != y {
+			return image.Rectangle{}, false
+		}
+		minX = min(minX, x)
+		maxX = max(maxX, x)
+		minY = min(minY, y)
+		maxY = max(maxY, y)
+	}
+	rect = image.Rect(clampPixel(minX-1, w), clampPixel(minY-1, h), clampPixel(maxX+2, w), clampPixel(maxY+2, h))
+	return rect, rect != image.Rect(0, 0, w, h)
+}
+
+func clampPixel(v float32, limit int) int {
+	if v <= 0 {
+		return 0
+	}
+	if v >= float32(limit) {
+		return limit
+	}
+	return int(v)
+}
+
+// setDepthRectQuad sets depthRectVertices to a quad over rect, with source
+// coordinates equal to the destination coordinates.
+func setDepthRectQuad(rect image.Rectangle) {
+	x0, y0, x1, y1 := float32(rect.Min.X), float32(rect.Min.Y), float32(rect.Max.X), float32(rect.Max.Y)
+	for i := range depthRectVertices {
+		x, y := x0, y0
+		if i&1 != 0 {
+			x = x1
+		}
+		if i&2 != 0 {
+			y = y1
+		}
+		depthRectVertices[i] = ebiten.Vertex{DstX: x, DstY: y, SrcX: x, SrcY: y, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1}
+	}
+}
+
 // Render renders all of the models passed using the provided Scene's properties (fog, for example) and lights provided. Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 // Also, the function will automatically include the Scene's world ambient light, if there is a world.
@@ -1903,7 +1957,16 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 				transparencyMode = mat.TransparencyMode
 			}
 
-			camera.depthIntermediate.Clear()
+			// The depth and colour draws of this part touch only the pixels inside the
+			// bounds of its vertices, so the clear and the copy can stay inside them too.
+			rect, partial := depthPassRect(depthVertexList[:vertexListIndex], camWidth, camHeight)
+
+			if !partial {
+				camera.depthIntermediate.Clear()
+			} else if !rect.Empty() {
+				setDepthRectQuad(rect)
+				camera.depthIntermediate.DrawTriangles(depthRectVertices[:], depthRectIndices[:], defaultImg, &depthRectClearOptions)
+			}
 
 			if transparencyMode == TransparencyModeAlphaClip {
 
@@ -1928,7 +1991,12 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			}
 
 			if !model.isTransparent(meshPart) {
-				camera.resultDepthTexture.DrawImage(camera.depthIntermediate, nil)
+				if !partial {
+					camera.resultDepthTexture.DrawImage(camera.depthIntermediate, nil)
+				} else if !rect.Empty() {
+					setDepthRectQuad(rect)
+					camera.resultDepthTexture.DrawTriangles(depthRectVertices[:], depthRectIndices[:], camera.depthIntermediate, &depthRectCopyOptions)
+				}
 			}
 
 		}
