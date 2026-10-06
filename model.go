@@ -1002,6 +1002,13 @@ func (model *Model) processVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		vertStart, vertEnd := meshPart.vertexRange()
 
+		// The common path has no per-vertex options, so one plain loop does
+		// all of its vertices and the general loop below has none left.
+		if !modelSkinned && transformFunc == nil && !storeAltered && !vertexSnappingOn && !renderNormals && !unbillboarded && len(mesh.shapeKeys) == 0 {
+			transformVertices(&mvp, camNear, camFar, mesh.VertexPositions[vertStart:vertEnd], globalVertexTransforms[vertStart:vertEnd], globalVertexScreen[vertStart:vertEnd], globalVertexClipCodes[vertStart:vertEnd])
+			vertStart = vertEnd
+		}
+
 		for vertexIndex := vertStart; vertexIndex < vertEnd; vertexIndex++ {
 
 			if modelSkinned {
