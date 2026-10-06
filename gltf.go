@@ -3,6 +3,7 @@ package tetra3d
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"image"
 	"io"
 	"io/fs"
@@ -611,6 +612,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					return nil, err
 				}
 
+				if err := checkVertexAccessorCount("TEXCOORD_0", doc.Accessors[texCoordAccessor].Count, len(vertexData)); err != nil {
+					return nil, err
+				}
+
 				for i, v := range texCoords[:doc.Accessors[texCoordAccessor].Count] {
 					vertexData[i].U = float32(v[0])
 					vertexData[i].V = -(float32(v[1]) - 1)
@@ -624,6 +629,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				clear(normalBuffer)
 
 				if err != nil {
+					return nil, err
+				}
+
+				if err := checkVertexAccessorCount("NORMAL", doc.Accessors[normalAccessor].Count, len(vertexData)); err != nil {
 					return nil, err
 				}
 
@@ -651,6 +660,10 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 				clear(vcBuffer)
 
 				if err != nil {
+					return nil, err
+				}
+
+				if err := checkVertexAccessorCount("COLOR_"+strconv.Itoa(index), doc.Accessors[vertexColorAccessor].Count, len(vertexData)); err != nil {
 					return nil, err
 				}
 
@@ -688,6 +701,14 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					return nil, err
 				}
 
+				if err := checkVertexAccessorCount("WEIGHTS_0", doc.Accessors[weightAccessor].Count, len(vertexData)); err != nil {
+					return nil, err
+				}
+
+				if len(bones) < doc.Accessors[weightAccessor].Count {
+					return nil, fmt.Errorf("invalid gltf: JOINTS_0 count %d is less than WEIGHTS_0 count %d", len(bones), doc.Accessors[weightAccessor].Count)
+				}
+
 				// Store weights and bones; we don't want to waste space and speed storing bones if their weights are 0
 				for w := range weights[:doc.Accessors[weightAccessor].Count] {
 					vWeights := weights[w]
@@ -718,6 +739,9 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			newIndices := make([]int, doc.Accessors[*v.Indices].Count)
 
 			for i, j := range indices[:doc.Accessors[*v.Indices].Count] {
+				if int(j) >= len(vertexData) {
+					return nil, fmt.Errorf("invalid gltf: index %d out of bounds for vertex data length %d", j, len(vertexData))
+				}
 				newIndices[i] = int(j)
 			}
 
@@ -1997,4 +2021,12 @@ func handleGameProperties(p any) (string, any) {
 func convertBlenderPath(path string) string {
 	path = strings.ReplaceAll(path, "//", "") // Blender relative paths have double-slashes; we don't need them to
 	return path
+}
+
+// checkVertexAccessorCount returns an error when a per-vertex accessor holds more elements than the vertex data.
+func checkVertexAccessorCount(attribute string, count, vertexCount int) error {
+	if count > vertexCount {
+		return fmt.Errorf("invalid gltf: %s count %d out of bounds for vertex data length %d", attribute, count, vertexCount)
+	}
+	return nil
 }
