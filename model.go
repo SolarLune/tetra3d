@@ -749,7 +749,7 @@ func (model *Model) processVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 	}
 
-	if len(model.mesh.VertexPositions) >= len(colorVertexList) {
+	for len(model.mesh.VertexPositions) >= len(colorVertexList) {
 		growDisplayLists()
 	}
 
@@ -757,7 +757,7 @@ func (model *Model) processVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 		camera.DebugInfo.currentAnimationTime.StartTimer()
 	}
 
-	meshPart.forEachTri(mesh.autoSubdivide, func(tri *Triangle) {
+	processTri := func(tri *Triangle) {
 
 		if mesh.autoSubdivide && !tri.visible {
 			return
@@ -988,7 +988,198 @@ func (model *Model) processVertices(vpMatrix Matrix4, camera *Camera, meshPart *
 
 		sortingTriIndex++
 
-	})
+	}
+
+	globalVertexScreenValid = !mesh.autoSubdivide
+
+	if mesh.autoSubdivide {
+		meshPart.forEachTri(true, processTri)
+	} else {
+
+		// The vertex pass: transform each vertex of the part once, divide it
+		// by w once, and give it a clip code. Auto-subdivided triangles have
+		// vertices outside the range of the part, so they use processTri.
+
+		vertStart, vertEnd := meshPart.vertexRange()
+
+		for vertexIndex := vertStart; vertexIndex < vertEnd; vertexIndex++ {
+
+			if modelSkinned {
+
+				vert, normal = model.skinVertex(vertexIndex)
+
+				if transformFuncExists {
+					vert, normal = transformFunc(vert, normal, vertexIndex)
+				}
+
+				globalMeshAlteredVertexPositions[vertexIndex] = vert
+				globalMeshAlteredVertexNormals[vertexIndex] = normal
+
+				globalVertexTransforms[vertexIndex].X = vpMatrix[0][0]*vert.X + vpMatrix[1][0]*vert.Y + vpMatrix[2][0]*vert.Z + vpMatrix[3][0]
+				globalVertexTransforms[vertexIndex].Y = vpMatrix[0][1]*vert.X + vpMatrix[1][1]*vert.Y + vpMatrix[2][1]*vert.Z + vpMatrix[3][1]
+				globalVertexTransforms[vertexIndex].Z = vpMatrix[0][2]*vert.X + vpMatrix[1][2]*vert.Y + vpMatrix[2][2]*vert.Z + vpMatrix[3][2]
+				globalVertexTransforms[vertexIndex].W = vpMatrix[0][3]*vert.X + vpMatrix[1][3]*vert.Y + vpMatrix[2][3]*vert.Z + vpMatrix[3][3]
+
+			} else {
+
+				vert = mesh.VertexPositionWithShapeKeys(vertexIndex)
+
+				if transformFunc != nil || storeAltered {
+					normal = mesh.VertexNormalWithShapeKeys(vertexIndex)
+				}
+
+				if transformFunc != nil {
+					vert, normal = transformFunc(vert, normal, vertexIndex)
+				}
+
+				if storeAltered {
+					globalMeshAlteredVertexPositions[vertexIndex] = vert
+					globalMeshAlteredVertexNormals[vertexIndex] = normal
+				}
+
+				globalVertexTransforms[vertexIndex].X = mvp[0][0]*vert.X + mvp[1][0]*vert.Y + mvp[2][0]*vert.Z + mvp[3][0]
+				globalVertexTransforms[vertexIndex].Y = mvp[0][1]*vert.X + mvp[1][1]*vert.Y + mvp[2][1]*vert.Z + mvp[3][1]
+				globalVertexTransforms[vertexIndex].Z = mvp[0][2]*vert.X + mvp[1][2]*vert.Y + mvp[2][2]*vert.Z + mvp[3][2]
+				globalVertexTransforms[vertexIndex].W = mvp[0][3]*vert.X + mvp[1][3]*vert.Y + mvp[2][3]*vert.Z + mvp[3][3]
+
+				if unbillboarded {
+					globalVertexDepthUnbillboarded[vertexIndex] = unalteredMVP[0][2]*vert.X + unalteredMVP[1][2]*vert.Y + unalteredMVP[2][2]*vert.Z + unalteredMVP[3][2]
+				}
+
+			}
+
+			if vertexSnappingOn {
+				globalVertexTransforms[vertexIndex].X = math32.Round(globalVertexTransforms[vertexIndex].X*camera.VertexSnapping) / camera.VertexSnapping
+				globalVertexTransforms[vertexIndex].Y = math32.Round(globalVertexTransforms[vertexIndex].Y*camera.VertexSnapping) / camera.VertexSnapping
+				globalVertexTransforms[vertexIndex].Z = math32.Round(globalVertexTransforms[vertexIndex].Z*camera.VertexSnapping) / camera.VertexSnapping
+			}
+
+			if renderNormals {
+				globalVertexTransformedNormals[vertexIndex].X = mvJustRForNormals[0][0]*vert.X + mvJustRForNormals[1][0]*vert.Y + mvJustRForNormals[2][0]*vert.Z + mvJustRForNormals[3][0]
+				globalVertexTransformedNormals[vertexIndex].Y = mvJustRForNormals[0][1]*vert.X + mvJustRForNormals[1][1]*vert.Y + mvJustRForNormals[2][1]*vert.Z + mvJustRForNormals[3][1]
+				globalVertexTransformedNormals[vertexIndex].Z = mvJustRForNormals[0][2]*vert.X + mvJustRForNormals[1][2]*vert.Y + mvJustRForNormals[2][2]*vert.Z + mvJustRForNormals[3][2]
+			}
+
+			t := globalVertexTransforms[vertexIndex]
+
+			w := t.W
+			if w < 0 {
+				w = 0.000001
+			}
+
+			sx := t.X / w
+			sy := t.Y / w
+			globalVertexScreen[vertexIndex].X = sx
+			globalVertexScreen[vertexIndex].Y = sy
+
+			code := uint8(0)
+			if sx < -0.5 {
+				code |= clipLeft
+			}
+			if sx > 0.5 {
+				code |= clipRight
+			}
+			if sy < -0.5 {
+				code |= clipBottom
+			}
+			if sy > 0.5 {
+				code |= clipTop
+			}
+			if !(t.Z+1 >= camNear && t.Z < camFar) {
+				code |= clipDepth
+			}
+			globalVertexClipCodes[vertexIndex] = code
+
+		}
+
+		// The triangle pass: cull on the clip codes and the facing, and
+		// queue the triangles that remain for the sort.
+
+		backfaceCulling := mat != nil && mat.BackfaceCulling
+
+		for triIndex := meshPart.TriangleStart; triIndex <= meshPart.TriangleEnd; triIndex++ {
+
+			tri := mesh.Triangles[triIndex]
+			a, b, c := tri.VertexIndexA, tri.VertexIndexB, tri.VertexIndexC
+
+			if processOnlyVisible {
+
+				// A triangle wholly outside one plane does not show.
+				if globalVertexClipCodes[a]&globalVertexClipCodes[b]&globalVertexClipCodes[c] != 0 {
+					continue
+				}
+
+				if backfaceCulling {
+
+					v0 := globalVertexScreen[a]
+					v1 := globalVertexScreen[b]
+					v2 := globalVertexScreen[c]
+
+					n0x := v0.X - v1.X
+					n0y := v0.Y - v1.Y
+
+					n1x := v1.X - v2.X
+					n1y := v1.Y - v2.Y
+
+					if (n0x*n1y)-(n1x*n0y) < 0 {
+						continue
+					}
+
+				}
+
+			}
+
+			var depth float32
+
+			if modelSkinned {
+
+				pa := globalMeshAlteredVertexPositions[a]
+				pb := globalMeshAlteredVertexPositions[b]
+				pc := globalMeshAlteredVertexPositions[c]
+
+				var center Vector3
+				center.X += pa.X
+				center.Y += pa.Y
+				center.Z += pa.Z
+				center.X += pb.X
+				center.Y += pb.Y
+				center.Z += pb.Z
+				center.X += pc.X
+				center.Y += pc.Y
+				center.Z += pc.Z
+
+				dx := camPos.X - (center.X / 3)
+				dy := camPos.Y - (center.Y / 3)
+				dz := camPos.Z - (center.Z / 3)
+				depth = float32(dx*dx + dy*dy + dz*dz)
+
+			} else {
+
+				dx := invertedCamPos.X - tri.Center.X
+				dy := invertedCamPos.Y - tri.Center.Y
+				dz := invertedCamPos.Z - tri.Center.Z
+				depth = float32(dx*dx + dy*dy + dz*dz)
+
+			}
+
+			if processOnlyVisible && (math32.IsNaN(depth) || math32.IsInf(depth, -1) || math32.IsInf(depth, 1)) {
+				continue
+			}
+
+			if depth < minDepth {
+				minDepth = depth
+			}
+			if depth > maxDepth {
+				maxDepth = depth
+			}
+
+			globalSortingTriangleBucket.AddTriangle(tri, depth)
+
+			vertexListIndex += 3
+
+		}
+
+	}
 
 	if vertexListIndex >= len(colorVertexList) {
 		growDisplayLists()

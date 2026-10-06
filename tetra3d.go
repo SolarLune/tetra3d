@@ -34,6 +34,23 @@ var globalVertexDepthUnbillboarded = make([]float32, startingDisplayListSize)
 var globalMeshAlteredVertexPositions = make([]Vector3, startingDisplayListSize)
 var globalMeshAlteredVertexNormals = make([]Vector3, startingDisplayListSize)
 
+// globalVertexScreen holds the clip position of each vertex divided by w,
+// and globalVertexClipCodes holds the planes that the vertex is outside of.
+// The vertex pass of Model.processVertices writes both. They are valid for
+// the latest mesh part when globalVertexScreenValid is true.
+var globalVertexScreen = make([]Vector2, startingDisplayListSize)
+var globalVertexClipCodes = make([]uint8, startingDisplayListSize)
+var globalVertexScreenValid bool
+
+// The bits of a clip code.
+const (
+	clipLeft uint8 = 1 << iota
+	clipRight
+	clipBottom
+	clipTop
+	clipDepth // Outside the near and far range.
+)
+
 func init() {
 	defaultImg.Fill(color.White)
 }
@@ -48,6 +65,8 @@ func growDisplayLists() {
 	globalVertexDepthUnbillboarded = slices.Grow(globalVertexDepthUnbillboarded, cap(globalVertexDepthUnbillboarded)*2)
 	globalMeshAlteredVertexPositions = slices.Grow(globalMeshAlteredVertexPositions, cap(globalMeshAlteredVertexPositions)*2)
 	globalMeshAlteredVertexNormals = slices.Grow(globalMeshAlteredVertexNormals, cap(globalMeshAlteredVertexNormals)*2)
+	globalVertexScreen = slices.Grow(globalVertexScreen, cap(globalVertexScreen)*2)
+	globalVertexClipCodes = slices.Grow(globalVertexClipCodes, cap(globalVertexClipCodes)*2)
 
 	for i := len(colorVertexList); i < cap(colorVertexList); i++ {
 		colorVertexList = append(colorVertexList, ebiten.Vertex{})
@@ -84,6 +103,9 @@ func growDisplayLists() {
 	for i := len(globalMeshAlteredVertexNormals); i < cap(globalMeshAlteredVertexNormals); i++ {
 		globalMeshAlteredVertexNormals = append(globalMeshAlteredVertexNormals, Vector3{})
 	}
+
+	globalVertexScreen = globalVertexScreen[:cap(globalVertexScreen)]
+	globalVertexClipCodes = globalVertexClipCodes[:cap(globalVertexClipCodes)]
 
 	globalSortingTriangleBucket.resizeTriangleCount(len(globalSortingTriangleBucket.unsetTris) * 2)
 
