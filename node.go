@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 type SectorType int
@@ -399,7 +400,7 @@ type INode interface {
 }
 
 // There is no zero ID; this is to make it so that systems that reference nodes by id can use 0 as an invalid reference.
-var nodeID uint32 = 1
+var nodeID atomic.Uint32 // The latest ID; Add gives the next, from 1, on any goroutine.
 
 // Node represents a minimal struct that fully implements the Node interface. Model and Camera embed Node
 // into their structs to automatically easily implement Node.
@@ -439,7 +440,7 @@ type Node struct {
 func NewNode(name string) *Node {
 
 	nb := &Node{
-		id:   nodeID,
+		id:   nodeID.Add(1),
 		name: name,
 		// position:         NewVectorZero(),
 		scale:            Vector3{1, 1, 1},
@@ -453,8 +454,6 @@ func NewNode(name string) *Node {
 		callbacks:       &NodeCallbacks{},
 		// originalLocalPosition: NewVectorZero(),
 	}
-
-	nodeID++
 
 	nb.animationPlayer = NewAnimationPlayer(nb)
 

@@ -1,6 +1,9 @@
 package tetra3d
 
-import "fmt"
+import (
+	"fmt"
+	"sync/atomic"
+)
 
 type FogBlendMode int
 
@@ -41,7 +44,7 @@ type World struct {
 	AmbientLight    *AmbientLight // Ambient lighting for this world
 }
 
-var worldID uint32 = 1
+var worldID atomic.Uint32
 
 // NewWorld creates a new World with the specified name and default values for fog, lighting, etc).
 func NewWorld(name string) *World {
@@ -57,7 +60,7 @@ func NewWorld(name string) *World {
 		AmbientLight:    NewAmbientLight("ambient light", 1, 1, 1, 0),
 	}
 
-	worldID++
+	worldID.Add(1)
 	return w
 
 }

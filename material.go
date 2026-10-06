@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -142,12 +143,12 @@ func NewCustomMaterialDepthFunctionSet(setTo float32) CustomMaterialDepthFunctio
 	}
 }
 
-var materialID uint32 = 1
+var materialID atomic.Uint32 // The latest ID; Add gives the next, from 1, on any goroutine.
 
 // NewMaterial creates a new Material with the name given.
 func NewMaterial(name string) *Material {
 	mat := &Material{
-		id:                              materialID,
+		id:                              materialID.Add(1),
 		name:                            name,
 		Color:                           NewColor4(1, 1, 1, 1),
 		properties:                      NewProperties(),
@@ -165,8 +166,6 @@ func NewMaterial(name string) *Material {
 		TextureMapScreenSizeMultiplierW: 1,
 		TextureMapScreenSizeMultiplierH: 1,
 	}
-
-	materialID++
 
 	return mat
 }
