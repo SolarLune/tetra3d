@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"slices"
 	"sort"
 	"time"
 
@@ -318,6 +319,9 @@ type Camera struct {
 	// This ensures that objects that are, for example, close to or far from the camera
 	// don't begin Z-fighting unnecessarily. It defaults to 4% (on both ends).
 	DepthMargin float32
+
+	// draw holds the uniforms, options, and render lists that Render reuses.
+	draw *drawScratch
 }
 
 // NewCamera creates a new Camera with the specified name, width, and height.
@@ -1382,11 +1386,17 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	colorPassShaderOptions := &ebiten.DrawTrianglesShaderOptions{}
+	if camera.draw == nil {
+		camera.draw = newDrawScratch()
+	}
+	draw := camera.draw
+
+	colorPassShaderOptions := &draw.colorShaderOptions
+	*colorPassShaderOptions = ebiten.DrawTrianglesShaderOptions{}
 
 	// Reusing vectors rather than reallocating for all triangles for all models
-	solids := []renderPair{}
-	transparents := []renderPair{}
+	draw.solids = draw.solids[:0]
+	draw.transparents = draw.transparents[:0]
 
 	cameraPos := camera.WorldPosition()
 
@@ -1440,9 +1450,9 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 					}
 
 					if model.isTransparent(mp) {
-						transparents = append(transparents, rp)
+						draw.transparents = append(draw.transparents, rp)
 					} else {
-						solids = append(solids, rp)
+						draw.solids = append(draw.solids, rp)
 					}
 
 				}
@@ -1493,9 +1503,9 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 				}
 
 				if transparent {
-					transparents = append(transparents, rp)
+					draw.transparents = append(draw.transparents, rp)
 				} else {
-					solids = append(solids, rp)
+					draw.solids = append(draw.solids, rp)
 				}
 
 				if camera.DebugInfo.On {
@@ -1509,6 +1519,8 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 		return true
 
 	})
+
+	solids, transparents := draw.solids, draw.transparents
 
 	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
 	if !camera.RenderDepth {
@@ -1906,7 +1918,8 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			perspectiveCorrection = 1
 		}
 
-		colorPassOptions := &ebiten.DrawTrianglesOptions{}
+		colorPassOptions := &draw.colorOptions
+		*colorPassOptions = ebiten.DrawTrianglesOptions{}
 
 		textureFilterMode := 0
 		textureMapMode := 0
@@ -1929,6 +1942,8 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			textureFilterMode = int(mat.TextureFilterMode)
 
 		}
+
+		draw.setPartUniforms(perspectiveCorrection, textureFilterMode, textureMapMode, textureMapScreenSizeW, textureMapScreenSizeH)
 
 		// Render the depth map here
 		if camera.RenderDepth {
@@ -1970,22 +1985,13 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 			if transparencyMode == TransparencyModeAlphaClip {
 
-				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
-					Images: [4]*ebiten.Image{camera.resultDepthTexture, img},
-					Uniforms: map[string]any{
-						"PerspectiveCorrection":           perspectiveCorrection,
-						"TextureMapMode":                  textureMapMode,
-						"TextureMapScreenSizeMultiplierW": textureMapScreenSizeW,
-						"TextureMapScreenSizeMultiplierH": textureMapScreenSizeH,
-						"TextureFilterMode":               textureFilterMode,
-					},
-				}
+				shaderOpt := &draw.clipOptions
+				shaderOpt.Images = [4]*ebiten.Image{camera.resultDepthTexture, img}
 				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.clipAlphaShader, shaderOpt)
 
 			} else {
-				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
-					Images: [4]*ebiten.Image{camera.resultDepthTexture},
-				}
+				shaderOpt := &draw.depthOptions
+				shaderOpt.Images = [4]*ebiten.Image{camera.resultDepthTexture}
 
 				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.depthShader, shaderOpt)
 			}
@@ -2021,29 +2027,9 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			colorPassShaderOptions.Blend = mat.Blend
 		}
 
-		if scene != nil && scene.World != nil {
-
-			colorPassShaderOptions.Uniforms = map[string]any{
-				"Fog":                             scene.World.fogAsFloatSlice(),
-				"FogRange":                        scene.World.FogRange,
-				"DitherSize":                      scene.World.DitheredFogSize,
-				"FogCurve":                        float32(scene.World.FogCurve),
-				"BayerMatrix":                     bayerMatrix,
-				"PerspectiveCorrection":           perspectiveCorrection,
-				"TextureFilterMode":               textureFilterMode,
-				"TextureMapMode":                  textureMapMode,
-				"TextureMapScreenSizeMultiplierW": textureMapScreenSizeW,
-				"TextureMapScreenSizeMultiplierH": textureMapScreenSizeH,
-			}
-
-		} else {
-
-			colorPassShaderOptions.Uniforms = map[string]any{
-				"Fog":                   []float32{0, 0, 0, 0},
-				"FogRange":              []float32{0, 1},
-				"PerspectiveCorrection": perspectiveCorrection,
-			}
-
+		var world *World
+		if scene != nil {
+			world = scene.World
 		}
 
 		colorPassShaderOptions.Images[0] = img
@@ -2054,13 +2040,13 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			fogless = 1
 		}
 
+		// In a normal render, Fogless is 1: no fog.
+		colorPassShaderOptions.Uniforms = draw.colorUniforms(world, fogless, camera.RenderNormals)
+
 		if camera.RenderNormals {
 			colorPassShaderOptions.Images[0] = defaultImg
-			colorPassShaderOptions.Uniforms["Fogless"] = 1 // No fog in a normal render
 			camera.resultNormalTexture.DrawTrianglesShader(normalVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.colorShader, colorPassShaderOptions)
 			// camera.resultNormalTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], camera.colorShader, colorPassShaderOptions)
-		} else {
-			colorPassShaderOptions.Uniforms["Fogless"] = fogless
 		}
 
 		if camera.RenderDepth {
@@ -2072,9 +2058,7 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 					colorPassShaderOptions.AntiAlias = mat.FragmentShaderOptions.AntiAlias
 					colorPassShaderOptions.FillRule = mat.FragmentShaderOptions.FillRule
 					colorPassShaderOptions.Blend = mat.FragmentShaderOptions.Blend
-					for k, v := range mat.FragmentShaderOptions.Uniforms {
-						colorPassShaderOptions.Uniforms[k] = v
-					}
+					colorPassShaderOptions.Uniforms = draw.withFragmentUniforms(colorPassShaderOptions.Uniforms, mat.FragmentShaderOptions.Uniforms)
 					if len(mat.FragmentShaderOptions.Images) > 0 && mat.FragmentShaderOptions.Images[0] != nil {
 						colorPassShaderOptions.Images[0] = mat.FragmentShaderOptions.Images[0]
 					}
@@ -2115,18 +2099,9 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	}
 
-	sort.SliceStable(transparents, func(i, j int) bool {
-		if transparents[i].order == transparents[j].order {
-			return transparents[i].depth > transparents[j].depth
-		}
-		return transparents[i].order < transparents[j].order
-	})
+	slices.SortStableFunc(transparents, compareTransparents)
 
-	renderPasses := [][]renderPair{
-		solids, transparents,
-	}
-
-	for _, pass := range renderPasses {
+	for _, pass := range [2][]renderPair{solids, transparents} {
 
 		for _, pair := range pass {
 
@@ -2176,9 +2151,32 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	}
 
+	clear(solids)
+	clear(transparents)
+	clear(draw.fragmentUniforms)
+
 	camera.DebugInfo.currentFrameTime.EndTimer()
 	camera.DebugInfo.frameCount++
 
+}
+
+// compareTransparents orders transparent parts by render order, and parts of
+// the same order from far to near, as the less function of sort.SliceStable
+// did before: two parts that neither function puts first compare equal.
+func compareTransparents(a, b renderPair) int {
+	if a.order == b.order {
+		if a.depth > b.depth {
+			return -1
+		}
+		if b.depth > a.depth {
+			return 1
+		}
+		return 0
+	}
+	if a.order < b.order {
+		return -1
+	}
+	return 1
 }
 
 // packFloat packs two numbers into a single float32 with a given precision. 128 is a good number.
