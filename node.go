@@ -1297,11 +1297,13 @@ func (node *Node) ForEachChild(recursive bool, forEach func(node INode, index in
 // When recursive, it traverses the entire tree underneath the Node;
 // otherwise, it just returns the number of the Node's direct descendants.
 func (node *Node) ChildrenCount(recursive bool) int {
-	count := 0
-	node.ForEachChild(recursive, func(child INode, index int) bool {
-		count++
-		return true
-	})
+	// A loop, not ForEachChild: the closure would escape through the interface call and allocate.
+	count := len(node.children)
+	if recursive {
+		for _, child := range node.children {
+			count += child.ChildrenCount(true)
+		}
+	}
 	return count
 }
 
