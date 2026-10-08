@@ -1952,8 +1952,6 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 				if mat.FragmentShaderOptions != nil {
 					colorPassShaderOptions.Blend = mat.FragmentShaderOptions.Blend
-					colorPassShaderOptions.AntiAlias = mat.FragmentShaderOptions.AntiAlias
-					colorPassShaderOptions.FillRule = mat.FragmentShaderOptions.FillRule
 					colorPassShaderOptions.Blend = mat.FragmentShaderOptions.Blend
 					colorPassShaderOptions.Uniforms = draw.withFragmentUniforms(colorPassShaderOptions.Uniforms, mat.FragmentShaderOptions.Uniforms)
 					if len(mat.FragmentShaderOptions.Images) > 0 && mat.FragmentShaderOptions.Images[0] != nil {
