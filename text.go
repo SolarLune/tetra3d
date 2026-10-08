@@ -2,12 +2,10 @@ package tetra3d
 
 import (
 	"fmt"
-	"image/color"
 	"math"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/solarlune/tetra3d/math32"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
@@ -402,7 +400,7 @@ func (textObj *Text) updateTexture() {
 			line += textObj.style.Cursor
 		}
 
-		text.Draw(textObj.Texture, line, textObj.style.Font, x, y+int(textObj.style.Font.Metrics().Ascent.Floor()), color.RGBA{255, 255, 255, 255})
+		drawText(textObj.Texture, line, textObj.style.Font, float64(x), float64(y+int(textObj.style.Font.Metrics().Ascent.Floor())))
 		// text.Draw(textObj.Texture, line, textObj.style.Font, x, y, textObj.style.FGColor.ToRGBA64())
 
 	}

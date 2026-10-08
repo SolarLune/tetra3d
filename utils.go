@@ -8,7 +8,7 @@ import (
 	_ "embed"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/solarlune/tetra3d/math32"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
@@ -52,6 +52,23 @@ func measureText(text string, fontFace font.Face) image.Rectangle {
 	}
 
 	return newBounds
+}
+
+// goXFaces keeps one text/v2 face for each font.Face, so that each face keeps its glyph cache between draws.
+var goXFaces = map[font.Face]*text.GoXFace{}
+
+// drawText draws txt with the baseline of its first line at (x, y), and the next lines one face height apart.
+func drawText(dst *ebiten.Image, txt string, face font.Face, x, y float64) {
+	goXFace, ok := goXFaces[face]
+	if !ok {
+		goXFace = text.NewGoXFace(face)
+		goXFaces[face] = goXFace
+	}
+	opt := &text.DrawOptions{}
+	// text/v2 puts the first baseline at the ascent below the origin, rounded down to a whole pixel.
+	opt.GeoM.Translate(x, y-float64(face.Metrics().Ascent.Floor()))
+	opt.LineSpacing = float64(face.Metrics().Height) / 64
+	text.Draw(dst, txt, goXFace, opt)
 }
 
 //go:embed shaders/base3d.kage
@@ -367,9 +384,7 @@ func DrawDebugText(screen *ebiten.Image, txtStr string, posX, posY, textScale fl
 
 	debugTextTexture.Clear()
 
-	opt := &ebiten.DrawImageOptions{}
-	opt.GeoM.Translate(0, 13)
-	text.DrawWithOptions(debugTextTexture, txtStr, basicfont.Face7x13, opt)
+	drawText(debugTextTexture, txtStr, basicfont.Face7x13, 0, 13)
 
 	// TODO: This is slow, this could be way faster by drawing once to an image and then drawing that result
 
