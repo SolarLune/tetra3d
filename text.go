@@ -532,7 +532,7 @@ func (text *Text) TypewriterOn() bool {
 // This also will set the texture of the MeshPart this Text object is tied to, to nil.
 func (text *Text) Dispose() {
 	if text.Texture != nil {
-		text.Texture.Dispose()
+		text.Texture.Deallocate()
 		text.Texture = nil
 		text.meshPart.Material.Texture = nil
 	}

@@ -608,12 +608,12 @@ func (camera *Camera) Resize(w, h int) {
 			return
 		}
 
-		camera.resultColorTexture.Dispose()
-		camera.resultAccumulatedColorTexture.Dispose()
-		camera.resultNormalTexture.Dispose()
-		camera.accumulatedBackBuffer.Dispose()
-		camera.resultDepthTexture.Dispose()
-		camera.depthIntermediate.Dispose()
+		camera.resultColorTexture.Deallocate()
+		camera.resultAccumulatedColorTexture.Deallocate()
+		camera.resultNormalTexture.Deallocate()
+		camera.accumulatedBackBuffer.Deallocate()
+		camera.resultDepthTexture.Deallocate()
+		camera.depthIntermediate.Deallocate()
 	}
 
 	bounds := image.Rect(0, 0, w, h)
@@ -684,7 +684,7 @@ func (camera *Camera) Projection() Matrix4 {
 		camera.cachedProjectionMatrix = NewProjectionMatrix4Perspective(camera.fieldOfView, camera.near, camera.far, float32(camera.resultColorTexture.Bounds().Dx()), float32(camera.resultColorTexture.Bounds().Dy()))
 	} else {
 
-		w, h := camera.resultColorTexture.Size()
+		w, h := camera.resultColorTexture.Bounds().Dx(), camera.resultColorTexture.Bounds().Dy()
 		asr := float32(h) / float32(w)
 
 		camera.cachedProjectionMatrix = NewProjectionMatrix4Orthographic(camera.near, camera.far, 1*camera.orthoScale, -1*camera.orthoScale, asr*camera.orthoScale, -asr*camera.orthoScale)
