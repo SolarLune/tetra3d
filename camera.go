@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"slices"
 	"sort"
 	"time"
 
@@ -270,6 +271,7 @@ type Camera struct {
 	resultColorTexture  *ebiten.Image // ColorTexture holds the color results of rendering any models.
 	resultDepthTexture  *ebiten.Image // DepthTexture holds the depth results of rendering any models, if Camera.RenderDepth is on.
 	resultNormalTexture *ebiten.Image // NormalTexture holds a texture indicating the normal render
+	clearColor          color.NRGBA64 // The colour of ClearWithColor, passed to Fill by pointer so that it does not allocate.
 	depthIntermediate   *ebiten.Image
 
 	resultAccumulatedColorTexture *ebiten.Image // ResultAccumulatedColorTexture holds the previous frame's render result of rendering any models.
@@ -318,6 +320,9 @@ type Camera struct {
 	// This ensures that objects that are, for example, close to or far from the camera
 	// don't begin Z-fighting unnecessarily. It defaults to 4% (on both ends).
 	DepthMargin float32
+
+	// draw holds the uniforms, options, and render lists that Render reuses.
+	draw *drawScratch
 }
 
 // NewCamera creates a new Camera with the specified name, width, and height.
@@ -1028,7 +1033,7 @@ func (camera *Camera) Clear() {
 // It also resets the debug values.
 func (camera *Camera) ClearWithColor(clear Color4) {
 
-	rgba := clear.ToNRGBA64()
+	camera.clearColor = clear.ToNRGBA64()
 
 	if camera.AccumulationColorMode != AccumulationColorModeNone {
 		camera.accumulatedBackBuffer.Clear()
@@ -1046,7 +1051,7 @@ func (camera *Camera) ClearWithColor(clear Color4) {
 		}
 	}
 
-	camera.resultColorTexture.Fill(rgba)
+	camera.resultColorTexture.Fill(&camera.clearColor)
 
 	if camera.RenderDepth {
 		camera.resultDepthTexture.Clear()
@@ -1222,7 +1227,8 @@ func (camera *Camera) RenderNodes(scene *Scene, rootNode INode) {
 
 	}
 
-	camera.Render(scene, lights, meshes)
+	// The pointers put the lists in the interfaces without a copy on the heap.
+	camera.Render(scene, &lights, &meshes)
 
 }
 
@@ -1274,6 +1280,60 @@ var bayerMatrix = []float32{
 
 var sceneLights []ILight
 
+var depthRectVertices [4]ebiten.Vertex
+var depthRectIndices = [6]uint16{0, 1, 2, 1, 3, 2}
+var depthRectClearOptions = ebiten.DrawTrianglesOptions{Blend: ebiten.BlendClear}
+var depthRectCopyOptions = ebiten.DrawTrianglesOptions{}
+
+// depthPassRect returns the pixels that the triangles of verts can cover, plus a
+// margin of one pixel, clipped to a w by h target. partial is false when the
+// rectangle is the full target, or when a vertex position is not a number.
+func depthPassRect(verts []ebiten.Vertex, w, h int) (rect image.Rectangle, partial bool) {
+	if len(verts) == 0 {
+		return image.Rectangle{}, false
+	}
+	minX, minY := verts[0].DstX, verts[0].DstY
+	maxX, maxY := minX, minY
+	for i := range verts {
+		x, y := verts[i].DstX, verts[i].DstY
+		if x != x || y != y {
+			return image.Rectangle{}, false
+		}
+		minX = min(minX, x)
+		maxX = max(maxX, x)
+		minY = min(minY, y)
+		maxY = max(maxY, y)
+	}
+	rect = image.Rect(clampPixel(minX-1, w), clampPixel(minY-1, h), clampPixel(maxX+2, w), clampPixel(maxY+2, h))
+	return rect, rect != image.Rect(0, 0, w, h)
+}
+
+func clampPixel(v float32, limit int) int {
+	if v <= 0 {
+		return 0
+	}
+	if v >= float32(limit) {
+		return limit
+	}
+	return int(v)
+}
+
+// setDepthRectQuad sets depthRectVertices to a quad over rect, with source
+// coordinates equal to the destination coordinates.
+func setDepthRectQuad(rect image.Rectangle) {
+	x0, y0, x1, y1 := float32(rect.Min.X), float32(rect.Min.Y), float32(rect.Max.X), float32(rect.Max.Y)
+	for i := range depthRectVertices {
+		x, y := x0, y0
+		if i&1 != 0 {
+			x = x1
+		}
+		if i&2 != 0 {
+			y = y1
+		}
+		depthRectVertices[i] = ebiten.Vertex{DstX: x, DstY: y, SrcX: x, SrcY: y, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1}
+	}
+}
+
 // Render renders all of the models passed using the provided Scene's properties (fog, for example) and lights provided. Note that if Camera.RenderDepth
 // is false, scenes rendered one after another in multiple Render() calls will be rendered on top of each other in the Camera's texture buffers.
 // Also, the function will automatically include the Scene's world ambient light, if there is a world.
@@ -1296,22 +1356,17 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	}
 
-	lights.ForEach(func(node INode, index int) bool {
-
-		light, _ := node.(ILight)
-		if light == nil {
-			return true
+	// A NodeList runs without a closure, which would escape through the
+	// interface and allocate in each frame.
+	if list, ok := lights.(*NodeList); ok {
+		for _, node := range *list {
+			camera.addLight(scene, node)
 		}
-
-		camera.DebugInfo.lightCount++
-
-		if (scene.World == nil || scene.World.LightingOn) && light.IsVisible() {
-			light.beginRender()
-			sceneLights = append(sceneLights, light)
-		}
-
-		return true
-	})
+	} else {
+		lights.ForEach(func(node INode, index int) bool {
+			return camera.addLight(scene, node)
+		})
+	}
 
 	// if scene.World == nil || scene.World.LightingOn {
 
@@ -1339,11 +1394,17 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 	// matrix, which we feed into model.TransformedVertices() to draw vertices in order of distance.
 	vpMatrix := camera.ViewMatrix().Mult(camera.Projection())
 
-	colorPassShaderOptions := &ebiten.DrawTrianglesShaderOptions{}
+	if camera.draw == nil {
+		camera.draw = newDrawScratch()
+	}
+	draw := camera.draw
+
+	colorPassShaderOptions := &draw.colorShaderOptions
+	*colorPassShaderOptions = ebiten.DrawTrianglesShaderOptions{}
 
 	// Reusing vectors rather than reallocating for all triangles for all models
-	solids := []renderPair{}
-	transparents := []renderPair{}
+	draw.solids = draw.solids[:0]
+	draw.transparents = draw.transparents[:0]
 
 	cameraPos := camera.WorldPosition()
 
@@ -1351,121 +1412,17 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	camSpread := camera.far - camera.near + (depthMarginPercentage * 2)
 
-	models.ForEach(func(node INode, index int) bool {
-
-		model, _ := node.(*Model)
-		if model == nil || !model.visible || model.DynamicBatchOwner != nil {
-			return true
+	if list, ok := models.(*NodeList); ok {
+		for _, node := range *list {
+			camera.addModel(scene, draw, cameraPos, node)
 		}
+	} else {
+		models.ForEach(func(node INode, index int) bool {
+			return camera.addModel(scene, draw, cameraPos, node)
+		})
+	}
 
-		if camera.DebugInfo.On && !model.DynamicBatcher() {
-
-			if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
-				for range model.mesh.MeshParts {
-					camera.DebugInfo.totalParts++
-				}
-			}
-
-		}
-
-		if !model.DynamicBatcher() {
-
-			if model.FrustumCulling {
-
-				if !camera.ModelInFrustum(model) {
-					return true
-				}
-
-			}
-
-			if model.mesh != nil {
-
-				for _, mp := range model.mesh.MeshParts {
-
-					if !mp.isVisible() {
-						continue
-					}
-
-					rp := renderPair{Model: model, MeshPart: mp, depth: cameraPos.DistanceSquaredTo(model.WorldPosition()), order: 0}
-
-					if model.isTransparent(mp) || !camera.RenderDepth {
-						rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
-					}
-
-					if mp.Material != nil {
-						rp.order = mp.Material.RenderOrder
-					}
-
-					if model.isTransparent(mp) {
-						transparents = append(transparents, rp)
-					} else {
-						solids = append(solids, rp)
-					}
-
-				}
-
-			}
-
-		} else {
-
-			transparent := false
-
-			// TODO: Review depth sorting for dynamic batchers
-
-			for meshPart, modelSlice := range model.DynamicBatchModels {
-
-				if !meshPart.isVisible() {
-					continue
-				}
-
-				for _, child := range modelSlice {
-
-					if !child.visible {
-						continue
-					}
-
-					if !transparent {
-
-						for _, mp := range child.mesh.MeshParts {
-
-							if mp.isVisible() && child.isTransparent(mp) {
-								transparent = true
-								break
-							}
-
-						}
-
-					}
-
-				}
-
-				rp := renderPair{Model: model, MeshPart: meshPart, depth: 0, order: 0}
-
-				if transparent || !camera.RenderDepth {
-					rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
-				}
-
-				if meshPart.Material != nil {
-					rp.order = meshPart.Material.RenderOrder
-				}
-
-				if transparent {
-					transparents = append(transparents, rp)
-				} else {
-					solids = append(solids, rp)
-				}
-
-				if camera.DebugInfo.On {
-					camera.DebugInfo.totalParts += len(modelSlice)
-				}
-
-			}
-
-		}
-
-		return true
-
-	})
+	solids, transparents := draw.solids, draw.transparents
 
 	// If the camera isn't rendering depth, then we should sort models by distance to ensure things draw in something like the correct order
 	if !camera.RenderDepth {
@@ -1529,14 +1486,7 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 		meshPart := rp.MeshPart
 		mat := meshPart.Material
 
-		lighting := false
-		if scene.World != nil {
-			if mat != nil {
-				lighting = scene.World.LightingOn && !mat.Shadeless && !model.Shadeless
-			} else {
-				lighting = scene.World.LightingOn && !model.Shadeless
-			}
-		}
+		lighting := partLighting(scene, model, mat)
 
 		if camera.DebugInfo.On {
 
@@ -1865,7 +1815,8 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			perspectiveCorrection = 1
 		}
 
-		colorPassOptions := &ebiten.DrawTrianglesOptions{}
+		colorPassOptions := &draw.colorOptions
+		*colorPassOptions = ebiten.DrawTrianglesOptions{}
 
 		textureFilterMode := 0
 		textureMapMode := 0
@@ -1888,6 +1839,8 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			textureFilterMode = int(mat.TextureFilterMode)
 
 		}
+
+		draw.setPartUniforms(perspectiveCorrection, textureFilterMode, textureMapMode, textureMapScreenSizeW, textureMapScreenSizeH)
 
 		// Render the depth map here
 		if camera.RenderDepth {
@@ -1916,32 +1869,37 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 				transparencyMode = mat.TransparencyMode
 			}
 
-			camera.depthIntermediate.Clear()
+			// The depth and colour draws of this part touch only the pixels inside the
+			// bounds of its vertices, so the clear and the copy can stay inside them too.
+			rect, partial := depthPassRect(depthVertexList[:vertexListIndex], camWidth, camHeight)
+
+			if !partial {
+				camera.depthIntermediate.Clear()
+			} else if !rect.Empty() {
+				setDepthRectQuad(rect)
+				camera.depthIntermediate.DrawTriangles(depthRectVertices[:], depthRectIndices[:], defaultImg, &depthRectClearOptions)
+			}
 
 			if transparencyMode == TransparencyModeAlphaClip {
 
-				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
-					Images: [4]*ebiten.Image{camera.resultDepthTexture, img},
-					Uniforms: map[string]any{
-						"PerspectiveCorrection":           perspectiveCorrection,
-						"TextureMapMode":                  textureMapMode,
-						"TextureMapScreenSizeMultiplierW": textureMapScreenSizeW,
-						"TextureMapScreenSizeMultiplierH": textureMapScreenSizeH,
-						"TextureFilterMode":               textureFilterMode,
-					},
-				}
+				shaderOpt := &draw.clipOptions
+				shaderOpt.Images = [4]*ebiten.Image{camera.resultDepthTexture, img}
 				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.clipAlphaShader, shaderOpt)
 
 			} else {
-				shaderOpt := &ebiten.DrawTrianglesShaderOptions{
-					Images: [4]*ebiten.Image{camera.resultDepthTexture},
-				}
+				shaderOpt := &draw.depthOptions
+				shaderOpt.Images = [4]*ebiten.Image{camera.resultDepthTexture}
 
 				camera.depthIntermediate.DrawTrianglesShader(depthVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.depthShader, shaderOpt)
 			}
 
 			if !model.isTransparent(meshPart) {
-				camera.resultDepthTexture.DrawImage(camera.depthIntermediate, nil)
+				if !partial {
+					camera.resultDepthTexture.DrawImage(camera.depthIntermediate, nil)
+				} else if !rect.Empty() {
+					setDepthRectQuad(rect)
+					camera.resultDepthTexture.DrawTriangles(depthRectVertices[:], depthRectIndices[:], camera.depthIntermediate, &depthRectCopyOptions)
+				}
 			}
 
 		}
@@ -1966,29 +1924,9 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			colorPassShaderOptions.Blend = mat.Blend
 		}
 
-		if scene != nil && scene.World != nil {
-
-			colorPassShaderOptions.Uniforms = map[string]any{
-				"Fog":                             scene.World.fogAsFloatSlice(),
-				"FogRange":                        scene.World.FogRange,
-				"DitherSize":                      scene.World.DitheredFogSize,
-				"FogCurve":                        float32(scene.World.FogCurve),
-				"BayerMatrix":                     bayerMatrix,
-				"PerspectiveCorrection":           perspectiveCorrection,
-				"TextureFilterMode":               textureFilterMode,
-				"TextureMapMode":                  textureMapMode,
-				"TextureMapScreenSizeMultiplierW": textureMapScreenSizeW,
-				"TextureMapScreenSizeMultiplierH": textureMapScreenSizeH,
-			}
-
-		} else {
-
-			colorPassShaderOptions.Uniforms = map[string]any{
-				"Fog":                   []float32{0, 0, 0, 0},
-				"FogRange":              []float32{0, 1},
-				"PerspectiveCorrection": perspectiveCorrection,
-			}
-
+		var world *World
+		if scene != nil {
+			world = scene.World
 		}
 
 		colorPassShaderOptions.Images[0] = img
@@ -1999,13 +1937,13 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			fogless = 1
 		}
 
+		// In a normal render, Fogless is 1: no fog.
+		colorPassShaderOptions.Uniforms = draw.colorUniforms(world, fogless, camera.RenderNormals)
+
 		if camera.RenderNormals {
 			colorPassShaderOptions.Images[0] = defaultImg
-			colorPassShaderOptions.Uniforms["Fogless"] = 1 // No fog in a normal render
 			camera.resultNormalTexture.DrawTrianglesShader(normalVertexList[:vertexListIndex], indexList[:vertexListIndex], camera.colorShader, colorPassShaderOptions)
 			// camera.resultNormalTexture.DrawTrianglesShader(colorVertexList[:vertexListIndex], indexList[:indexListIndex], camera.colorShader, colorPassShaderOptions)
-		} else {
-			colorPassShaderOptions.Uniforms["Fogless"] = fogless
 		}
 
 		if camera.RenderDepth {
@@ -2017,9 +1955,7 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 					colorPassShaderOptions.AntiAlias = mat.FragmentShaderOptions.AntiAlias
 					colorPassShaderOptions.FillRule = mat.FragmentShaderOptions.FillRule
 					colorPassShaderOptions.Blend = mat.FragmentShaderOptions.Blend
-					for k, v := range mat.FragmentShaderOptions.Uniforms {
-						colorPassShaderOptions.Uniforms[k] = v
-					}
+					colorPassShaderOptions.Uniforms = draw.withFragmentUniforms(colorPassShaderOptions.Uniforms, mat.FragmentShaderOptions.Uniforms)
 					if len(mat.FragmentShaderOptions.Images) > 0 && mat.FragmentShaderOptions.Images[0] != nil {
 						colorPassShaderOptions.Images[0] = mat.FragmentShaderOptions.Images[0]
 					}
@@ -2060,18 +1996,9 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	}
 
-	sort.SliceStable(transparents, func(i, j int) bool {
-		if transparents[i].order == transparents[j].order {
-			return transparents[i].depth > transparents[j].depth
-		}
-		return transparents[i].order < transparents[j].order
-	})
+	slices.SortStableFunc(transparents, compareTransparents)
 
-	renderPasses := [][]renderPair{
-		solids, transparents,
-	}
-
-	for _, pass := range renderPasses {
+	for _, pass := range [2][]renderPair{solids, transparents} {
 
 		for _, pair := range pass {
 
@@ -2088,8 +2015,18 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			if pair.Model.DynamicBatcher() {
 				modelSlice := pair.Model.DynamicBatchModels[pair.MeshPart]
 
-				sort.Slice(modelSlice, func(i, j int) bool {
-					return camera.DistanceSquaredTo(modelSlice[i]) > camera.DistanceSquaredTo(modelSlice[j])
+				// slices.SortFunc runs the same pattern-defeating quicksort as
+				// sort.Slice, so the order stays the same, without its
+				// allocations.
+				slices.SortFunc(modelSlice, func(a, b *Model) int {
+					da, db := camera.DistanceSquaredTo(a), camera.DistanceSquaredTo(b)
+					if da > db {
+						return -1
+					}
+					if db > da {
+						return 1
+					}
+					return 0
 				})
 
 				for _, merged := range modelSlice {
@@ -2121,9 +2058,180 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 	}
 
+	clear(solids)
+	clear(transparents)
+	clear(draw.fragmentUniforms)
+
 	camera.DebugInfo.currentFrameTime.EndTimer()
 	camera.DebugInfo.frameCount++
 
+}
+
+// addLight adds node to sceneLights when it is a visible light, for Render.
+func (camera *Camera) addLight(scene *Scene, node INode) bool {
+
+	light, _ := node.(ILight)
+	if light == nil {
+		return true
+	}
+
+	camera.DebugInfo.lightCount++
+
+	if (scene.World == nil || scene.World.LightingOn) && light.IsVisible() {
+		light.beginRender()
+		sceneLights = append(sceneLights, light)
+	}
+
+	return true
+}
+
+// addModel adds the parts of node to the render lists of draw when it is a
+// visible model, for Render.
+func (camera *Camera) addModel(scene *Scene, draw *drawScratch, cameraPos Vector3, node INode) bool {
+
+	model, _ := node.(*Model)
+	if model == nil || !model.visible || model.DynamicBatchOwner != nil {
+		return true
+	}
+
+	if camera.DebugInfo.On && !model.DynamicBatcher() {
+
+		if !model.autoBatched || model.AutoBatchMode != AutoBatchStatic {
+			for range model.mesh.MeshParts {
+				camera.DebugInfo.totalParts++
+			}
+		}
+
+	}
+
+	if !model.DynamicBatcher() {
+
+		if model.FrustumCulling {
+
+			if !camera.ModelInFrustum(model) {
+				return true
+			}
+
+		}
+
+		if model.mesh != nil {
+
+			for _, mp := range model.mesh.MeshParts {
+
+				if !mp.isVisible() {
+					continue
+				}
+
+				rp := renderPair{Model: model, MeshPart: mp, depth: cameraPos.DistanceSquaredTo(model.WorldPosition()), order: 0}
+
+				if model.isTransparent(mp) || !camera.RenderDepth {
+					rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
+				}
+
+				if mp.Material != nil {
+					rp.order = mp.Material.RenderOrder
+				}
+
+				if model.isTransparent(mp) {
+					draw.transparents = append(draw.transparents, rp)
+				} else {
+					draw.solids = append(draw.solids, rp)
+				}
+
+			}
+
+		}
+
+	} else {
+
+		transparent := false
+
+		// TODO: Review depth sorting for dynamic batchers
+
+		for meshPart, modelSlice := range model.DynamicBatchModels {
+
+			if !meshPart.isVisible() {
+				continue
+			}
+
+			for _, child := range modelSlice {
+
+				if !child.visible {
+					continue
+				}
+
+				if !transparent {
+
+					for _, mp := range child.mesh.MeshParts {
+
+						if mp.isVisible() && child.isTransparent(mp) {
+							transparent = true
+							break
+						}
+
+					}
+
+				}
+
+			}
+
+			rp := renderPair{Model: model, MeshPart: meshPart, depth: 0, order: 0}
+
+			if transparent || !camera.RenderDepth {
+				rp.depth = cameraPos.DistanceSquaredTo(model.WorldPosition())
+			}
+
+			if meshPart.Material != nil {
+				rp.order = meshPart.Material.RenderOrder
+			}
+
+			if transparent {
+				draw.transparents = append(draw.transparents, rp)
+			} else {
+				draw.solids = append(draw.solids, rp)
+			}
+
+			if camera.DebugInfo.On {
+				camera.DebugInfo.totalParts += len(modelSlice)
+			}
+
+		}
+
+	}
+
+	return true
+
+}
+
+// partLighting reports whether a part of model with the material mat takes
+// the lights of scene.
+func partLighting(scene *Scene, model *Model, mat *Material) bool {
+	if scene.World == nil {
+		return false
+	}
+	if mat != nil {
+		return scene.World.LightingOn && !mat.Shadeless && !model.Shadeless
+	}
+	return scene.World.LightingOn && !model.Shadeless
+}
+
+// compareTransparents orders transparent parts by render order, and parts of
+// the same order from far to near, as the less function of sort.SliceStable
+// did before: two parts that neither function puts first compare equal.
+func compareTransparents(a, b renderPair) int {
+	if a.order == b.order {
+		if a.depth > b.depth {
+			return -1
+		}
+		if b.depth > a.depth {
+			return 1
+		}
+		return 0
+	}
+	if a.order < b.order {
+		return -1
+	}
+	return 1
 }
 
 // packFloat packs two numbers into a single float32 with a given precision. 128 is a good number.
