@@ -32,10 +32,19 @@ func dstPosToSrcPos(dstPos vec2) vec2 {
 	return dstPos.xy - imageDstOrigin() + imageSrc0Origin()
 }
 
+// wrap wraps a texture position into [0, size). mod alone can round a
+// position a little below 0 up to size, which reads the texel past the
+// texture on the atlas, often a transparent one. Perspective-correct
+// interpolation gives such a position for a constant texture position, as
+// on an untextured part, on some GPUs.
+func wrap(pos, size vec2) vec2 {
+	return min(mod(pos, size), size - 1.0/64)
+}
+
 func bilinearFilter(srcPos vec2) vec4 {
 	
-	p0 := mod(srcPos - 1/2.0, imageSrc0Size()) + imageSrc0Origin()
-	p1 := mod(srcPos + 1/2.0, imageSrc0Size()) + imageSrc0Origin()
+	p0 := wrap(srcPos - 1/2.0, imageSrc0Size()) + imageSrc0Origin()
+	p1 := wrap(srcPos + 1/2.0, imageSrc0Size()) + imageSrc0Origin()
 
 	c0 := imageSrc0UnsafeAt(p0)
 	c1 := imageSrc0UnsafeAt(vec2(p1.x, p0.y))
@@ -80,7 +89,7 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 			tx *= 1.0 / custom.x // depth is stored in ebiten.Vertex.Custom0
 		}
 
-		tx = mod(tx, srcSize) // Wrap the texture to the source texture's size
+		tx = wrap(tx, srcSize) // Wrap the texture to the source texture's size
 		
 		var colorTex vec4
 		if TextureFilterMode == 0 {
