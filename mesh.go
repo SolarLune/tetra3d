@@ -2187,6 +2187,11 @@ type MeshPart struct {
 	VertexIndexEnd   int
 	TriangleStart    int
 	TriangleEnd      int
+
+	// subdivisionsHidden is true when every triangle of the part is visible and
+	// no subdivided triangle shows, so Model.ProcessVertices can skip the
+	// disableSubdivision pass.
+	subdivisionsHidden bool
 }
 
 // NewMeshPart creates a new MeshPart that renders using the specified Material.
