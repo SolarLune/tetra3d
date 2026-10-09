@@ -2,10 +2,11 @@ package tetra3d
 
 import (
 	"fmt"
+	"sync/atomic"
 )
 
 // There is no zero ID; this is to make it so that systems that reference scenes by id can use 0 as an invalid reference.
-var sceneID uint32 = 1
+var sceneID atomic.Uint32 // The latest ID; Add gives the next, from 1, on any goroutine.
 
 // Scene represents a world of sorts, and can contain a variety of Meshes and Nodes, which organize the scene into a
 // graph of parents and children.
@@ -34,7 +35,7 @@ type Scene struct {
 func NewScene(name string) *Scene {
 
 	scene := &Scene{
-		id:                  sceneID,
+		id:                  sceneID.Add(1),
 		name:                name,
 		Root:                NewNode("Root"),
 		World:               NewWorld("World"),
@@ -43,8 +44,6 @@ func NewScene(name string) *Scene {
 		autobatchStaticMap:  map[*Material]*Model{},
 		callbacks:           &SceneCallbacks{},
 	}
-
-	sceneID++
 
 	scene.Root.scene = scene
 	scene.Root.cachedSceneRootNode = scene.Root

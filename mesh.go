@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"slices"
+	"sync/atomic"
 
 	"github.com/solarlune/tetra3d/math32"
 )
@@ -301,14 +302,14 @@ type Mesh struct {
 	shapeKeys []*MeshShapeKey
 }
 
-var meshID uint32 = 1
+var meshID atomic.Uint32 // The latest ID; Add gives the next, from 1, on any goroutine.
 
 // NewMesh takes a name and a slice of VertexInfo instances, and returns a new Mesh.
 func NewMesh(name string) *Mesh {
 
 	mesh := &Mesh{
 		Name:                     name,
-		ID:                       meshID,
+		ID:                       meshID.Add(1),
 		MeshParts:                []*MeshPart{},
 		Dimensions:               Dimensions{Vector3{0, 0, 0}, Vector3{0, 0, 0}},
 		properties:               NewProperties(),
@@ -316,8 +317,6 @@ func NewMesh(name string) *Mesh {
 		shapeKeys:                []*MeshShapeKey{},
 		vertexLights:             &VertexColorChannel{},
 	}
-
-	meshID++
 
 	return mesh
 

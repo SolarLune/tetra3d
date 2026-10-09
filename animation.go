@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sync/atomic"
 	"time"
 )
 
@@ -219,18 +220,17 @@ type Animation struct {
 	relativeMotion bool
 }
 
-var animationID uint32 = 1
+var animationID atomic.Uint32 // The latest ID; Add gives the next, from 1, on any goroutine.
 
 // NewAnimation creates a new Animation of the name specified.
 func NewAnimation(name string) *Animation {
 	anim := &Animation{
 		name:       name,
-		id:         animationID,
+		id:         animationID.Add(1),
 		channels:   map[string]*AnimationChannel{},
 		markers:    []Marker{},
 		properties: NewProperties(),
 	}
-	animationID++
 	return anim
 }
 
