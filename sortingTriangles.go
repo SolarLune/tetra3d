@@ -11,16 +11,20 @@ type sortingTriangle struct {
 	depth    float32
 }
 
-type sortingTriangleBin struct {
-	triangleIndex int
-	triangles     []sortingTriangle
-}
-
+// sortingTriangleBucket sorts the triangles of a mesh part into depth bins
+// with a stable counting sort, so that the triangles of one bin keep the order
+// in which they were added.
 type sortingTriangleBucket struct {
 	unsetTriIndex int
 	sortMode      int
-	bins          []sortingTriangleBin
-	unsetTris     []sortingTriangle
+	binCount      int
+	unsetTris     []sortingTriangle // The triangles in the order of AddTriangle.
+	binOf         []int32           // The bin of each triangle in unsetTris.
+	binStarts     []int             // The count, then the next place, of each bin.
+	sortedTris    []sortingTriangle // The buffer for sorted.
+
+	// sorted holds the triangles in draw order after Sort.
+	sorted []sortingTriangle
 }
 
 func newSortingTriangleBucket() *sortingTriangleBucket {
@@ -30,6 +34,10 @@ func newSortingTriangleBucket() *sortingTriangleBucket {
 }
 
 func (s *sortingTriangleBucket) AddTriangle(tri *Triangle, depth float32) {
+	if s.unsetTriIndex >= len(s.unsetTris) {
+		s.unsetTris = append(s.unsetTris, sortingTriangle{})
+		s.unsetTris = s.unsetTris[:cap(s.unsetTris)]
+	}
 	s.unsetTris[s.unsetTriIndex].Triangle = tri
 	s.unsetTris[s.unsetTriIndex].depth = depth
 	s.unsetTriIndex++
@@ -37,7 +45,14 @@ func (s *sortingTriangleBucket) AddTriangle(tri *Triangle, depth float32) {
 
 func (s *sortingTriangleBucket) Sort(minRange, maxRange float32) {
 
-	binCount := len(s.bins)
+	count := s.unsetTriIndex
+	binCount := s.binCount
+
+	if s.sortMode == TriangleSortModeNone || binCount <= 1 {
+		s.sorted = s.unsetTris[:count]
+		return
+	}
+
 	rangeDiff := maxRange - minRange
 
 	if rangeDiff == 0 {
@@ -45,29 +60,52 @@ func (s *sortingTriangleBucket) Sort(minRange, maxRange float32) {
 		rangeDiff += 0.001
 	}
 
-	for i := 0; i < s.unsetTriIndex; i++ {
-
-		targetBin := 0
-
-		if s.sortMode != TriangleSortModeNone && binCount > 1 {
-			depth := (s.unsetTris[i].depth - minRange) / rangeDiff * float32(binCount)
-			t := math32.Clamp(depth, 0, float32(binCount-1))
-			targetBin = int(t)
-		}
-
-		s.bins[targetBin].triangles[s.bins[targetBin].triangleIndex].depth = s.unsetTris[i].depth
-		s.bins[targetBin].triangles[s.bins[targetBin].triangleIndex].Triangle = s.unsetTris[i].Triangle
-		s.bins[targetBin].triangleIndex++
-
+	if len(s.binOf) < count {
+		s.binOf = make([]int32, len(s.unsetTris))
+		s.sortedTris = make([]sortingTriangle, len(s.unsetTris))
 	}
+
+	starts := s.binStarts
+	clear(starts)
+
+	for i := 0; i < count; i++ {
+		depth := (s.unsetTris[i].depth - minRange) / rangeDiff * float32(binCount)
+		t := math32.Clamp(depth, 0, float32(binCount-1))
+		targetBin := int32(t)
+		s.binOf[i] = targetBin
+		starts[targetBin]++
+	}
+
+	// Turn the counts into the first place of each bin, in draw order.
+	place := 0
+	if s.sortMode == TriangleSortModeBackToFront {
+		for bin := binCount - 1; bin >= 0; bin-- {
+			n := starts[bin]
+			starts[bin] = place
+			place += n
+		}
+	} else {
+		for bin := 0; bin < binCount; bin++ {
+			n := starts[bin]
+			starts[bin] = place
+			place += n
+		}
+	}
+
+	for i := 0; i < count; i++ {
+		bin := s.binOf[i]
+		s.sortedTris[starts[bin]] = s.unsetTris[i]
+		starts[bin]++
+	}
+
+	s.sorted = s.sortedTris[:count]
 
 }
 
+// Resize sets the number of depth bins.
 func (s *sortingTriangleBucket) Resize(binCount int) {
-	s.bins = make([]sortingTriangleBin, binCount)
-	for i := range s.bins {
-		s.bins[i].triangles = make([]sortingTriangle, startingDisplayListSize)
-	}
+	s.binCount = binCount
+	s.binStarts = make([]int, binCount)
 	s.Clear()
 }
 
@@ -75,53 +113,18 @@ func (s *sortingTriangleBucket) resizeTriangleCount(triCount int) {
 	for range triCount - len(s.unsetTris) {
 		s.unsetTris = append(s.unsetTris, sortingTriangle{})
 	}
-
-	for _, bin := range s.bins {
-		for range triCount - len(bin.triangles) {
-			bin.triangles = append(bin.triangles, sortingTriangle{})
-		}
-	}
 }
 
 func (s *sortingTriangleBucket) Clear() {
-	for i := 0; i < len(s.bins); i++ {
-		s.bins[i].triangleIndex = 0
-	}
 	s.unsetTriIndex = 0
+	s.sorted = s.sorted[:0]
 }
 
+// ForEach calls forEach for each triangle in draw order, after Sort.
 func (s *sortingTriangleBucket) ForEach(forEach func(triIndex int, triangle *Triangle)) {
-
-	if s.IsEmpty() {
-		return
+	for triIndex, tri := range s.sorted {
+		forEach(triIndex, tri.Triangle)
 	}
-
-	triIndex := 0
-
-	if s.sortMode == TriangleSortModeBackToFront {
-		for binIndex := len(s.bins) - 1; binIndex >= 0; binIndex-- {
-			bin := s.bins[binIndex]
-			for ti := range bin.triangles {
-				if ti >= bin.triangleIndex {
-					break
-				}
-				forEach(triIndex, bin.triangles[ti].Triangle)
-				triIndex++
-			}
-		}
-	} else {
-		for binIndex := 0; binIndex < len(s.bins); binIndex++ {
-			bin := s.bins[binIndex]
-			for ti := range bin.triangles {
-				if ti >= bin.triangleIndex {
-					break
-				}
-				forEach(triIndex, bin.triangles[ti].Triangle)
-				triIndex++
-			}
-		}
-	}
-
 }
 
 // func (s *sortingTriangleBucket) ForEach(forEach func(triIndex, triID int)) {

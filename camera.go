@@ -1643,7 +1643,9 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 			camera.DebugInfo.currentLightTime.EndTimer()
 		}
 
-		globalSortingTriangleBucket.ForEach(func(triIndex int, triangle *Triangle) {
+		for _, sortingTri := range globalSortingTriangleBucket.sorted {
+
+			triangle := sortingTri.Triangle
 
 			for vi := range 3 {
 
@@ -1817,7 +1819,7 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 				vertexListIndex++
 			}
 
-		})
+		}
 
 		// for i := 0; i < vertexListIndex; i++ {
 		// 	indexList[i] = uint16(i)
