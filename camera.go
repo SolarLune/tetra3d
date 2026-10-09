@@ -352,15 +352,19 @@ func NewCamera(name string, w, h int) *Camera {
 
 		//kage:unit pixels
 
+		// encodeDepth takes the blue byte from the same product as the green
+		// byte, so that the two always carry together.
 		func encodeDepth(depth float) vec4 {
 			r := floor(depth * 255) / 255
-			g := floor(fract(depth * 255) * 255) / 255
-			b := fract(depth * 255*255)
-			return vec4(r, g, b, 1);
+			g := fract(depth * 255) * 255
+			return vec4(r, floor(g) / 255, fract(g), 1);
 		}
 
+		// decodeDepth rounds each channel to its byte first, so that an
+		// inexact conversion of the bytes to floats cannot move the depth.
 		func decodeDepth(rgba vec4) float {
-			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+			c := floor(rgba.rgb * 255 + 0.5)
+			return (c.r * 65025 + c.g * 255 + c.b) / 16581375
 		}
 
 		func dstPosToSrcPos(dstPos vec2) vec2 {
@@ -400,15 +404,19 @@ func NewCamera(name string, w, h int) *Camera {
 		var TextureMapScreenSizeMultiplierH float
 		var TextureFilterMode int
 
+		// encodeDepth takes the blue byte from the same product as the green
+		// byte, so that the two always carry together.
 		func encodeDepth(depth float) vec4 {
 			r := floor(depth * 255) / 255
-			g := floor(fract(depth * 255) * 255) / 255
-			b := fract(depth * 255*255)
-			return vec4(r, g, b, 1);
+			g := fract(depth * 255) * 255
+			return vec4(r, floor(g) / 255, fract(g), 1);
 		}
 
+		// decodeDepth rounds each channel to its byte first, so that an
+		// inexact conversion of the bytes to floats cannot move the depth.
 		func decodeDepth(rgba vec4) float {
-			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+			c := floor(rgba.rgb * 255 + 0.5)
+			return (c.r * 65025 + c.g * 255 + c.b) / 16581375
 		}
 
 		func dstPosToSrcPos(dstPos vec2) vec2 {
@@ -507,8 +515,11 @@ func NewCamera(name string, w, h int) *Camera {
 
 		var SpriteDepth float
 
+		// decodeDepth rounds each channel to its byte first, so that an
+		// inexact conversion of the bytes to floats cannot move the depth.
 		func decodeDepth(rgba vec4) float {
-			return rgba.r + (rgba.g / 255) + (rgba.b / 65025)
+			c := floor(rgba.rgb * 255 + 0.5)
+			return (c.r * 65025 + c.g * 255 + c.b) / 16581375
 		}
 
 		func dstPosToSrcPos(dstPos vec2) vec2 {
