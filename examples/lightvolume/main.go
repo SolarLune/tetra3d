@@ -308,15 +308,15 @@ func (g *Game) Update() error {
 
 	g.Camera.Update()
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		g.LightVolume.SetVisible(!g.LightVolume.IsVisible(), false)
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit2) {
 		g.DebugDrawingLightVolume = !g.DebugDrawingLightVolume
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key3) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit3) {
 		m := g.Scene.Get("Map").(*tetra3d.Model)
 		m.Mesh().SetAutoSubdivide(!m.Mesh().AutoSubdivide())
 	}

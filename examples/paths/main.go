@@ -68,9 +68,9 @@ func (g *Game) Update() error {
 	}
 
 	// ... Or if you press right or left.
-	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyArrowRight) {
 		g.PathStepper.GotoNext()
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
+	} else if inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft) {
 		g.PathStepper.GotoPrev()
 	}
 

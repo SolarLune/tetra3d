@@ -63,11 +63,11 @@ func (g *Game) Update() error {
 	}
 
 	// Append an animation to the existing sequence
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		ap.Trigger().ThenPlayByName("Slam")
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit2) {
 		ap.Trigger().ThenPlayByName("Spin")
 	}
 

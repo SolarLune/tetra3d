@@ -73,17 +73,17 @@ func (g *Game) Update() error {
 
 	ap = table.AnimationPlayer()
 	ap.BlendTime = 0.1
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		ap.PlayByName("SmoothRoll")
 	}
-	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit2) {
 		ap.PlayByName("StepRoll")
 	}
 
 	// The morphing cube has shape keys that you can use to animate per-vertex animations for the model
 	morpher := scene.Root.Get("MorphingCube").(*tetra3d.Model)
 
-	if ebiten.IsKeyPressed(ebiten.Key3) {
+	if ebiten.IsKeyPressed(ebiten.KeyDigit3) {
 		target := morpher.Mesh().ShapeKeyByName("Diamond")
 		w := target.Weight() - 0.01
 		if w < 0 {
@@ -91,7 +91,7 @@ func (g *Game) Update() error {
 		}
 		target.SetWeight(w)
 	}
-	if ebiten.IsKeyPressed(ebiten.Key4) {
+	if ebiten.IsKeyPressed(ebiten.KeyDigit4) {
 		target := morpher.Mesh().ShapeKeyByName("Diamond")
 		w := target.Weight() + 0.01
 		if w > 1 {
@@ -100,7 +100,7 @@ func (g *Game) Update() error {
 		target.SetWeight(w)
 	}
 
-	if ebiten.IsKeyPressed(ebiten.Key5) {
+	if ebiten.IsKeyPressed(ebiten.KeyDigit5) {
 		target := morpher.Mesh().ShapeKeyByName("Shift")
 		w := target.Weight() - 0.01
 		if w < 0 {
@@ -108,7 +108,7 @@ func (g *Game) Update() error {
 		}
 		target.SetWeight(w)
 	}
-	if ebiten.IsKeyPressed(ebiten.Key6) {
+	if ebiten.IsKeyPressed(ebiten.KeyDigit6) {
 		target := morpher.Mesh().ShapeKeyByName("Shift")
 		w := target.Weight() + 0.01
 		if w > 1 {

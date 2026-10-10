@@ -83,7 +83,7 @@ func (g *Game) Update() error {
 	// Update the TexturePlayer with the time that's passed since the previous frame.
 	g.AnimatedTexture.Update(1.0 / 60.0)
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		g.AnimatedTexture.SetPlaying(!g.AnimatedTexture.IsPlaying())
 	}
 

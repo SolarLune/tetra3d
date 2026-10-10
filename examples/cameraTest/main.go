@@ -53,9 +53,9 @@ func (g *Game) Update() error {
 
 	cameras := g.Scene.Root.Search().ByType(tetra3d.NodeTypeCamera)
 
-	if inpututil.IsKeyJustPressed(ebiten.KeyRight) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyArrowRight) {
 		g.TargetedCamIndex++
-	} else if inpututil.IsKeyJustPressed(ebiten.KeyLeft) {
+	} else if inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft) {
 		g.TargetedCamIndex--
 	}
 
