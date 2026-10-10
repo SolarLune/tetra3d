@@ -333,6 +333,12 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 		if gltfMat.PBRMetallicRoughness != nil {
 
 			if texture := gltfMat.PBRMetallicRoughness.BaseColorTexture; texture != nil {
+				if texture.Index < 0 || texture.Index >= len(doc.Textures) {
+					return nil, fmt.Errorf("invalid gltf: texture index %d out of bounds for textures length %d", texture.Index, len(doc.Textures))
+				}
+				if source := doc.Textures[texture.Index].Source; source == nil || *source < 0 || *source >= len(doc.Images) {
+					return nil, fmt.Errorf("invalid gltf: texture %d has no image source within images length %d", texture.Index, len(doc.Images))
+				}
 				if exportedTextures {
 					newMat.Texture = images[*doc.Textures[texture.Index].Source]
 				} else {
