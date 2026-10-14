@@ -63,6 +63,9 @@ func literalColorUniforms(world *World, perspectiveCorrection, textureFilterMode
 			"PerspectiveCorrection": perspectiveCorrection,
 		}
 	}
+	if world == nil || !world.FogOn {
+		fogless = 1
+	}
 	if normals {
 		m["Fogless"] = 1
 	} else {
@@ -144,6 +147,54 @@ func TestReusedUniformsDoNotAllocate(t *testing.T) {
 	})
 	if allocs != 0 {
 		t.Fatalf("%v allocations for each part, want 0", allocs)
+	}
+}
+
+// TestFogOffSkipsFog checks that a World with its fog off sets Fogless, and
+// gives the pixels of the fog work that it skips: with the fog on and a fog
+// mode that no branch of the shader matches, which is the state that fog off
+// gave before.
+func TestFogOffSkipsFog(t *testing.T) {
+	scene := NewScene("fog")
+	scene.World.LightingOn = false
+	scene.World.FogColor = NewColor4(0.3, 0.55, 0.9, 1)
+	scene.World.DitheredFogSize = 0.5
+	mesh := NewCubeMesh(2, 2, 2)
+	mesh.MeshParts[0].Material.Color = NewColor4(0.8, 0.4, 0.2, 1)
+	mesh.MeshParts[0].Material.Shadeless = true
+	model := NewModel("cube", mesh)
+	model.SetLocalPosition(0, 0, -6)
+	cam := NewCamera("camera", 64, 64)
+	scene.Root.AddChildren(cam, model)
+	read := func(fogOn bool, mode FogBlendMode) []byte {
+		scene.World.FogOn, scene.World.FogMode = fogOn, mode
+		pix := make([]byte, 4*64*64)
+		inFrame(t, func() {
+			cam.Clear()
+			cam.RenderScene(scene)
+			cam.ColorTexture().ReadPixels(pix)
+		})
+		return pix
+	}
+	before := read(true, -1)
+	if cam.draw.fogless[0] != 0 {
+		t.Fatalf("fog on: Fogless %v, want 0", cam.draw.fogless[0])
+	}
+	after := read(false, FogAdd)
+	if cam.draw.fogless[0] != 1 {
+		t.Fatalf("fog off: Fogless %v, want 1", cam.draw.fogless[0])
+	}
+	if !slices.Equal(after, before) {
+		t.Error("fog off changes the pixels")
+	}
+	covered := 0
+	for i := 0; i < len(after); i += 4 {
+		if !slices.Equal(after[i:i+4], after[:4]) {
+			covered++
+		}
+	}
+	if covered < 300 {
+		t.Fatalf("the cube covers %d pixels, want at least 300", covered)
 	}
 }
 

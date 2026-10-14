@@ -97,7 +97,12 @@ func (s *drawScratch) setPartUniforms(perspectiveCorrection, textureFilterMode, 
 
 // colorUniforms returns the uniform map of the colour pass for world, which
 // can be nil, with Fogless set to fogless, or to the int 1 in a normal render.
+// Fogless is 1 when world is nil or its fog is off, so that the shader skips
+// the fog work, which leaves the colour unchanged in either case.
 func (s *drawScratch) colorUniforms(world *World, fogless float32, normals bool) map[string]any {
+	if world == nil || !world.FogOn {
+		fogless = 1
+	}
 	m := s.plainUniforms
 	if world != nil {
 		m = s.worldUniforms
