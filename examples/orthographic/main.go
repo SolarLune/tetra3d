@@ -59,17 +59,17 @@ func (g *Game) Update() error {
 	forward := g.CamHandle.WorldRotation().Forward().Scale(-moveSpd)
 	right := g.CamHandle.WorldRotation().Right().Scale(moveSpd)
 
-	if ebiten.IsKeyPressed(ebiten.KeyUp) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
 		g.CamHandle.MoveVec(forward)
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
 		g.CamHandle.MoveVec(right)
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
 		g.CamHandle.MoveVec(forward.Invert())
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
 		g.CamHandle.MoveVec(right.Invert())
 	}
 

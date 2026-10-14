@@ -68,19 +68,19 @@ func (g *Game) Update() error {
 	dx := float32(0)
 	dz := float32(0)
 
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
 		dx -= moveSpd
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
 		dx += moveSpd
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyUp) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
 		dz -= moveSpd
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
 		dz += moveSpd
 	}
 

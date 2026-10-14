@@ -9,10 +9,10 @@ import (
 	"github.com/solarlune/tetra3d/examples"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+	"golang.org/x/image/math/fixed"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 //go:embed text.glb
@@ -20,6 +20,18 @@ var sceneData []byte
 
 //go:embed excel.ttf
 var excelTTF []byte
+
+// faceWithLineHeight is a font.Face with a set line height.
+type faceWithLineHeight struct {
+	font.Face
+	lineHeight fixed.Int26_6
+}
+
+func (f faceWithLineHeight) Metrics() font.Metrics {
+	m := f.Face.Metrics()
+	m.Height = f.lineHeight
+	return m
+}
 
 type Game struct {
 	Scene *tetra3d.Scene
@@ -71,7 +83,7 @@ func (g *Game) Init() {
 		panic(err)
 	}
 
-	font := text.FaceWithLineHeight(newFace, float64(targetSize))
+	font := faceWithLineHeight{Face: newFace, lineHeight: fixed.I(targetSize)}
 
 	textPlane := g.Scene.Root.Get("Screen").(*tetra3d.Model)
 

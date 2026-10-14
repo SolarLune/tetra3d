@@ -69,11 +69,11 @@ func (g *Game) Update() error {
 	player.PlayByName("ArmatureAction")
 	player.Update(1.0 / 60.0)
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		g.Scene.World.LightingOn = !g.Scene.World.LightingOn
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit2) {
 		pointLight := g.Camera.Get("camera light").(*tetra3d.PointLight)
 		pointLight.SetVisible(!pointLight.IsVisible(), false)
 	}
@@ -108,8 +108,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) Layout(w, h int) (int, int) {
-	nw, nh := g.Camera.ColorTexture().Size()
-	return nw, nh
+	b := g.Camera.ColorTexture().Bounds()
+	return b.Dx(), b.Dy()
 }
 
 func main() {

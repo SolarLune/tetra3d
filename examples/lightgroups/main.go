@@ -57,7 +57,7 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		green := g.Scene.Root.Get("OnlyGreen").(*tetra3d.Model)
 		green.LightGroup.Active = !green.LightGroup.Active
 
@@ -65,7 +65,7 @@ func (g *Game) Update() error {
 		red.LightGroup.Active = !red.LightGroup.Active
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit2) {
 		g.Scene.World.LightingOn = !g.Scene.World.LightingOn
 	}
 

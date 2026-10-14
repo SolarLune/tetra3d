@@ -155,7 +155,7 @@ func (g *Game) Update() error {
 		cube.Color.G = float32(cubeIndex) / 10
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		dyn := g.Scene.Root.Get("DynamicBatching").(*tetra3d.Model)
 
 		if len(dyn.DynamicBatchModels) == 0 {

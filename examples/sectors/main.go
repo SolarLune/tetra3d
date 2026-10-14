@@ -54,7 +54,7 @@ func (g *Game) Update() error {
 
 	g.Camera.Update()
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		g.Camera.SectorRendering = !g.Camera.SectorRendering
 	}
 

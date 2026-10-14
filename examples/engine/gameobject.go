@@ -32,17 +32,17 @@ func (player *Player) Update() {
 	move := tetra3d.Vector3{}
 	moveSpd := float32(0.1)
 
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
 		move.X -= moveSpd
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
 		move.X += moveSpd
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyUp) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
 		move.Z -= moveSpd
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
 		move.Z += moveSpd
 	}
 

@@ -97,19 +97,19 @@ func (g *Game) Update() error {
 	// Change the active vertex color channels
 	gameMap := g.Scene.Root.Get("GameMap").(*tetra3d.Model)
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		gameMap.Mesh().VertexActiveColorChannel = ChannelColor
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key2) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit2) {
 		gameMap.Mesh().VertexActiveColorChannel = ChannelLight
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key3) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit3) {
 		gameMap.Mesh().VertexActiveColorChannel = ChannelCombined
 	}
 
-	if inpututil.IsKeyJustPressed(ebiten.Key4) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit4) {
 		for _, mp := range gameMap.Mesh().MeshParts {
 			mp.Material.UseTexture = !mp.Material.UseTexture
 		}

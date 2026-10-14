@@ -93,7 +93,7 @@ func (g *Game) Init() {
 
 func (g *Game) Update() error {
 
-	if inpututil.IsKeyJustPressed(ebiten.Key1) {
+	if inpututil.IsKeyJustPressed(ebiten.KeyDigit1) {
 		// Cloning a Node is as simple as getting it (from any Scene), Cloning it, and adding it under the hierarchy of your target Scene.
 		player := g.Library.Scenes[0].Root.Get("Player")
 		g.Scene.Root.AddChildren(player.Clone())

@@ -67,17 +67,17 @@ func (g *Game) Update() error {
 
 	movement := g.Movement.Modify() // Modification Vector
 
-	if ebiten.IsKeyPressed(ebiten.KeyRight) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowRight) {
 		movement.X += accel
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyLeft) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) {
 		movement.X -= accel
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyUp) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowUp) {
 		movement.Z -= accel
 	}
-	if ebiten.IsKeyPressed(ebiten.KeyDown) {
+	if ebiten.IsKeyPressed(ebiten.KeyArrowDown) {
 		movement.Z += accel
 	}
 
