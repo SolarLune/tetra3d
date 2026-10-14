@@ -52,12 +52,8 @@ func (capsule *ColliderCapsule) Clone() INode {
 	return clone
 }
 
-// Returns the up axis for the capsule.
-func (capsule *ColliderCapsule) UpAxis() ColliderCapsuleUpAxis {
-	return capsule.up
-}
-
-func (capsule *ColliderCapsule) updateTransform() {
+// Returns the transformed up axis for the capsule.
+func (capsule *ColliderCapsule) UpAxis() Vector3 {
 	var up Vector3
 	switch capsule.up {
 	case 0:
@@ -67,10 +63,16 @@ func (capsule *ColliderCapsule) updateTransform() {
 	case 2:
 		up = capsule.Node.WorldRotation().Forward()
 	}
-	capsule.cachedLineTop = capsule.Node.WorldPosition().Add(up.Scale(capsule.WorldHeight()/2 - capsule.WorldRadius()))
+	return up
+}
+
+func (capsule *ColliderCapsule) updateTransform() {
+
+	up := capsule.UpAxis()
+	capsule.cachedLineTop = capsule.Node.WorldPosition().Add(up.Scale(max(capsule.WorldHeight()/2-capsule.WorldRadius(), 0)))
 	capsule.cachedTop = capsule.Node.WorldPosition().Add(up.Scale(capsule.WorldHeight() / 2))
 
-	capsule.cachedLineBottom = capsule.Node.WorldPosition().Add(up.Scale(-capsule.WorldHeight()/2 + capsule.WorldRadius()))
+	capsule.cachedLineBottom = capsule.Node.WorldPosition().Add(up.Scale(max(-capsule.WorldHeight()/2+capsule.WorldRadius(), 0)))
 	capsule.cachedBottom = capsule.Node.WorldPosition().Add(up.Scale(-capsule.WorldHeight() / 2))
 
 }

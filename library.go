@@ -9,9 +9,8 @@ type Library struct {
 	Materials     []*Material  // A selection of Materials (because they can be cloned while having the same names)
 	Worlds        []*World     // A Map of Worlds to their names
 
-	autosubdivisionLevels   []AutoSubdivisionLevel
-	maxAutoSubdivisionCount int
-	bitfieldNames           []bitfieldNamePair
+	autosubdivisionLevels []AutoSubdivisionLevel
+	bitfieldNames         []bitfieldNamePair
 }
 
 // NewLibrary creates a new Library.
@@ -22,8 +21,6 @@ func NewLibrary() *Library {
 		Animations: []*Animation{},
 		Materials:  []*Material{},
 		Worlds:     []*World{},
-
-		maxAutoSubdivisionCount: 3,
 	}
 }
 
@@ -205,7 +202,8 @@ func (lib *Library) BitfieldValueByName(name string) Bitfield {
 
 type AutoSubdivisionLevel struct {
 	DistanceSquared     float32
-	MaximumTriangleSize float32
+	SubdivisionLevel    int
+	MinimumTriangleSize float32
 }
 
 type bitfieldNamePair struct {

@@ -20,7 +20,7 @@ bl_info = {
     "name": "Tetra3D",  # The name in the addon search menu
     "author": "SolarLune Games",
     "description": "An addon for exporting GLTF content from Blender for use with Tetra3D.",
-    "blender": (5, 1, 0),  # Lowest version to use
+    "blender": (5, 2, 0),  # Lowest version to use
     "location": "View3D",
     "category": "Gamedev",
     "version": (0, 17, 1),
@@ -1220,34 +1220,20 @@ class t3dAutoSubdivisionLevel__(bpy.types.PropertyGroup):
         name="Max Distance",
         default=40,
         min=0,
-        description="How far away from the camera a triangle can be before being subdivided",
+        description="How far away from the camera a triangle can be before being subdivided at this level",
     )
-    maximumTriangleSize: bpy.props.FloatProperty(
-        name="Maximum Triangle Size",
-        default=4,
+    subdivisionLevel: bpy.props.IntProperty(
+        name="Subdivision Level",
+        default=1,
+        min=1,
+        description="How many subdivision iterations to perform on triangles",
+    )
+    minimumTriangleSize: bpy.props.FloatProperty(
+        name="Minimum Triangle Size",
+        default=0,
         min=0,
-        description="The target triangle span size (distance across its maximum dimension) - if a triangle is bigger than this, it's subdivided repeatedly until it's smaller than this value",
+        description="The minimum span (distance across its maximum dimensions) a triangle has to be in order to be subdivided",
     )
-
-# class t3dAutoSubdivisionLevel__(bpy.types.PropertyGroup):
-#     distance: bpy.props.FloatProperty(
-#         name="Max Distance",
-#         default=40,
-#         min=0,
-#         description="How far away from the camera a triangle can be before being subdivided at this level",
-#     )
-#     subdivisionLevel: bpy.props.IntProperty(
-#         name="Subdivision Level",
-#         default=1,
-#         min=1,
-#         description="How many subdivision iterations to perform on triangles",
-#     )
-#     minimumTriangleSize: bpy.props.FloatProperty(
-#         name="Minimum Triangle Size",
-#         default=0,
-#         min=0,
-#         description="The minimum span (distance across its maximum dimensions) a triangle has to be in order to be subdivided",
-#     )
 
 
 class TEXT_OT_tetra3dAddAutoSubdivisionLevel(bpy.types.Operator):
@@ -1930,7 +1916,7 @@ def handleT3DProperties(self, base, props, operatorType, enabled=True, objectInd
         elif prop.valueType == "float":
             row.prop(prop, "valueFloat")
         elif prop.valueType == "string":
-            row.prop(prop, "valueString")
+            row.textbox(prop, "valueString", initial_visible_lines=1)
             op = row.operator(
                 OBJECT_OT_tetra3dSearchStringProperties.bl_idname,
                 text="",
@@ -2259,7 +2245,7 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         box = self.layout.box()
 
         row = box.row()
-        row.label(text="Resolution Settings")
+        row.label(text="Scene Resolution Settings")
 
         row.prop(
             context.window_manager,
@@ -2303,7 +2289,7 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
 
         box = self.layout.box()
         row = box.row()
-        row.label(text="Sector Settings")
+        row.label(text="Scene Sector Settings")
         row.prop(
             context.window_manager,
             "t3dExpandSectorSettings__",
@@ -2334,9 +2320,6 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
         )
 
         if context.window_manager.t3dExpandAutoSubdivisionSettings__:
-
-            row = box.row()
-            row.prop(settings, "t3dMaxAutoSubdivisionCount__", expand=True)
 
             row = box.row()
             row.operator(TEXT_OT_tetra3dAddAutoSubdivisionLevel.bl_idname, icon="PLUS")
@@ -2376,8 +2359,10 @@ class RENDER_PT_tetra3d(bpy.types.Panel):
                 deleteOptions.index = index
 
                 row = box2.row()
+                row.prop(prop, "subdivisionLevel")
+                row = box2.row()
                 row.prop(prop, "distance")
-                row.prop(prop, "maximumTriangleSize")
+                row.prop(prop, "minimumTriangleSize")
 
         box = self.layout.box()
 
@@ -2631,7 +2616,8 @@ def export():
             for level in settings.t3dAutoSubdivisionLevels__:
                 subdivs.append({
                     "distance":level.distance,
-                    "maximumTriangleSize":level.maximumTriangleSize,
+                    "subdivisionLevel": level.subdivisionLevel,
+                    "minimumTriangleSize":level.minimumTriangleSize,
                 })
 
             globalSettings["t3dAutoSubdivisionLevels__"] = subdivs
@@ -2820,7 +2806,7 @@ def export():
             blendfileName = blendPath.split(os.sep)[-1]
             with open(os.path.join(abspath, blendfileName + ".go"), "w") as filePtr:
 
-                structName = blendfileName.replace(".blend","").replace(".", "_").replace("/", "_").capitalize()
+                structName = blendfileName.replace(".blend","_blend").replace(".", "_").replace("/", "_").capitalize()
 
                 filePtr.write("// This file was auto-generated by Tetra3d; you can edit it if you like,\n// but re-exporting it will overwrite your changes.\n")
                 filePtr.write("package {}\n\n".format(directoryName))
@@ -3749,13 +3735,6 @@ def register():
         type=t3dAutoSubdivisionLevel__
     )
 
-    bpy.types.Text.t3dMaxAutoSubdivisionCount__ = bpy.props.IntProperty(
-        name="Max Autosubdivision Level",
-        description="How many times maximum a triangle can be auto-subdivided",
-        default=3,
-        min=1
-    )
-
     bpy.types.Text.t3dSectorDetectionType__ = bpy.props.EnumProperty(
         items=sectorDetectionType,
         name="Sector Detection Type",
@@ -4249,7 +4228,6 @@ def unregister():
     del bpy.types.Scene.t3dGameProperties__
 
     del bpy.types.Text.t3dAutoSubdivisionLevels__
-    del bpy.types.Text.t3dMaxAutoSubdivisionCount__
     del bpy.types.Text.t3dBitfieldNames__
     del bpy.types.Text.t3dReorderBitfieldsOnModify__
     del bpy.types.Text.t3dActiveBitfieldIndex__

@@ -124,11 +124,11 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 
 				// Fog mode is 4th channel in Fog vector ([4]float32)
 				if Fog.a == 0 {
-					colorTex.rgb += Fog.rgb * fogMult * colorTex.a
+					colorTex.rgb += Fog.rgb * fogMult
 				} else if Fog.a == 1 {
-					colorTex.rgb -= Fog.rgb * fogMult * colorTex.a
+					colorTex.rgb -= Fog.rgb * fogMult
 				} else if Fog.a == 2 {
-					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, fogMult) * colorTex.a
+					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, fogMult)
 				// } else if Fog.a == 3 {
 				// 	colorTex.a *= abs(1-d) * step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
 				// 	colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
@@ -137,11 +137,11 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 			} else {
 
 				if Fog.a == 0 {
-					colorTex.rgb += Fog.rgb * d * colorTex.a
+					colorTex.rgb += Fog.rgb * d
 				} else if Fog.a == 1 {
-					colorTex.rgb -= Fog.rgb * d * colorTex.a
+					colorTex.rgb -= Fog.rgb * d
 				} else if Fog.a == 2 {
-					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d) * colorTex.a
+					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d)
 				// } else if Fog.a == 3 {
 				// 	colorTex.a *= abs(1-d)
 				// 	colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)

@@ -528,7 +528,7 @@ func (vec Vector3) Dot(other Vector3) float32 {
 }
 
 // Round rounds the Vector's components off to the given increments, returning a new Vector.
-// For example, Vector{0.1, 1.47, 3.33}.Round(0.25) will return Vector{0, 1.5, 3.25}.
+// For example, Vector3{0.1, 1.47, 3.33}.Round(0.25) will return Vector{0, 1.5, 3.25}.
 func (vec Vector3) Round(roundToUnits float32) Vector3 {
 	vec.X = math32.Round(vec.X/roundToUnits) * roundToUnits
 	vec.Y = math32.Round(vec.Y/roundToUnits) * roundToUnits

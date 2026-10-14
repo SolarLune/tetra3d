@@ -879,6 +879,11 @@ func btCapsuleTriangles(capsule *ColliderCapsule, triangles *ColliderTriangles) 
 	capsuleTop := invertedTransform.MultVec(capsule.lineTop())
 	capsuleBottom := invertedTransform.MultVec(capsule.lineBottom())
 	capsuleLine := capsuleTop.Sub(capsuleBottom)
+
+	if capsuleLine.IsZero() {
+		capsuleLine = capsule.UpAxis().Scale(0.001)
+	}
+
 	capDot := capsuleLine.Dot(capsuleLine)
 
 	var closestCapsulePoint Vector3

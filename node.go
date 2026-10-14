@@ -223,25 +223,6 @@ type INode interface {
 	// scale, and rotation) are altered to keep the object in the same absolute location, even though the origin changes.
 	ClearLocalTransform()
 
-	// ResetWorldTransform resets the local transform properties (position, scale, and rotation) for the Node to the original transform when
-	// the Node was first created / cloned / instantiated in the Scene.
-	ResetWorldTransform()
-
-	// ResetWorldPosition resets the Node's local position to the value the Node had when
-	// it was first instantiated in the Scene or cloned.
-	ResetWorldPosition()
-
-	// ResetWorldScale resets the Node's local scale to the value the Node had when
-	// it was first instantiated in the Scene or cloned.
-	ResetWorldScale()
-
-	// ResetWorldRotation resets the Node's local rotation to the value the Node had when
-	// it was first instantiated in the Scene or cloned.
-	ResetWorldRotation()
-
-	getOriginalTransform() Matrix4
-	setOriginalTransform()
-
 	// SetWorldTransform sets the Node's global (world) transform to the full 4x4 transformation matrix provided.
 	SetWorldTransform(transform Matrix4)
 
@@ -508,8 +489,8 @@ func (node *Node) clone(newOwner INode) INode {
 	newNode.position = node.position
 	newNode.scale = node.scale
 	newNode.rotation = node.rotation.Clone()
-	newNode.setOriginalTransform()
 	newNode.visible = node.visible
+	newNode.dirtyTransform()
 	newNode.data = node.data
 	newNode.sectorType = node.sectorType
 	newNode.cachedSector = node.cachedSector
@@ -539,8 +520,6 @@ func (node *Node) clone(newOwner INode) INode {
 			model.ReassignBones(newNode)
 		}
 	}
-
-	newNode.dirtyTransform()
 
 	newNode.isBone = node.isBone
 	if newNode.isBone {
@@ -691,45 +670,6 @@ func (node *Node) ClearLocalTransform() {
 	node.scale.Z = 1
 	node.rotation = NewMatrix4()
 	node.dirtyTransform()
-}
-
-// ResetWorldTransform resets the Node's world transform properties (position, scale, and rotation) for the Node to the original
-// values when the Node was first instantiated in the Scene or cloned.
-func (node *Node) ResetWorldTransform() {
-	node.SetWorldTransform(node.originalTransform)
-	node.dirtyTransform()
-}
-
-// ResetWorldPosition resets the Node's local position to the value the Node had when
-// it was first instantiated in the Scene or cloned.
-func (node *Node) ResetWorldPosition() {
-	p, _, _ := node.originalTransform.Decompose()
-	node.SetWorldPositionVec(p)
-	node.dirtyTransform()
-}
-
-// ResetWorldScale resets the Node's local scale to the value the Node had when
-// it was first instantiated in the Scene or cloned.
-func (node *Node) ResetWorldScale() {
-	_, s, _ := node.originalTransform.Decompose()
-	node.SetWorldScaleVec(s)
-	node.dirtyTransform()
-}
-
-// ResetWorldRotation resets the Node's local rotation to the value the Node had when
-// it was first instantiated in the Scene or cloned.
-func (node *Node) ResetWorldRotation() {
-	_, _, r := node.originalTransform.Decompose()
-	node.SetWorldRotation(r)
-	node.dirtyTransform()
-}
-
-func (node *Node) setOriginalTransform() {
-	node.originalTransform = node.Transform()
-}
-
-func (node *Node) getOriginalTransform() Matrix4 {
-	return node.originalTransform
 }
 
 // WorldPosition returns a 3D Vector consisting of the object's world position (position relative to the world origin point of {0, 0, 0}).
@@ -1153,6 +1093,7 @@ func (node *Node) AddChildren(children ...INode) {
 
 		child.setParent(me)
 		child.dirtyTransform()
+
 		node.children = append(node.children, child.getOwner())
 
 		if runCallbacks && child.Callbacks().OnReparent != nil {
@@ -1331,7 +1272,9 @@ func (node *Node) PropertiesContainsBitByName(bitfieldBitName string) bool {
 	if node.library != nil {
 		if bv := node.library.BitfieldValueByName(bitfieldBitName); bv > 0 {
 			for _, p := range node.props.data {
-				return p.IsBitfield() && p.AsBitfield().Contains(bv)
+				if p.IsBitfield() && p.AsBitfield().Contains(bv) {
+					return true
+				}
 			}
 		}
 	}

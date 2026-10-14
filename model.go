@@ -1315,6 +1315,8 @@ func (model *Model) setParent(parent INode) {
 
 	} else {
 
+		model.autoBatched = false
+
 		if prevScene != nil {
 			prevScene.updateAutobatch = true
 		}

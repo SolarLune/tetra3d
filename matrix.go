@@ -309,7 +309,7 @@ func (matrix Matrix4) Inverted() Matrix4 {
 func (matrix Matrix4) Round(unitSize float32) Matrix4 {
 	for i := range 4 {
 		for j := range 4 {
-			matrix[i][j] = math32.Round(matrix[i][j]*unitSize) / unitSize
+			matrix[i][j] = math32.Round(matrix[i][j]/unitSize) * unitSize
 		}
 	}
 	return matrix

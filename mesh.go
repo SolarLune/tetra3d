@@ -226,6 +226,10 @@ func (v VertexColorChannel) Colors() []Color4 {
 	return v.colors
 }
 
+func (v *VertexColorChannel) SetColor(index int, color Color4) {
+	v.colors[index] = color
+}
+
 // MeshShapeKey represents a shape key (shape target / morph target) for morphing a mesh between positions.
 type MeshShapeKey struct {
 	name            string
@@ -344,10 +348,12 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	for i := range mesh.VertexPositions {
 		newMesh.VertexPositions = append(newMesh.VertexPositions, mesh.VertexPositions[i])
+		newMesh.VertexPositionsOriginal = append(newMesh.VertexPositionsOriginal, mesh.VertexPositionsOriginal[i])
 	}
 
 	for i := range mesh.VertexNormals {
 		newMesh.VertexNormals = append(newMesh.VertexNormals, mesh.VertexNormals[i])
+		newMesh.VertexNormalsOriginal = append(newMesh.VertexNormalsOriginal, mesh.VertexNormalsOriginal[i])
 	}
 
 	for i := range mesh.vertexLights.colors {
@@ -356,7 +362,7 @@ func (mesh *Mesh) Clone() *Mesh {
 
 	for i := range mesh.VertexUVs {
 		newMesh.VertexUVs = append(newMesh.VertexUVs, mesh.VertexUVs[i])
-		newMesh.VertexUVsOriginal = append(newMesh.VertexUVsOriginal, mesh.VertexUVs[i])
+		newMesh.VertexUVsOriginal = append(newMesh.VertexUVsOriginal, mesh.VertexUVsOriginal[i])
 	}
 
 	newMesh.VertexColors = make([]*VertexColorChannel, 0, len(mesh.VertexColors))
@@ -443,39 +449,53 @@ func (mesh *Mesh) AutoSubdivide() bool {
 // The subdivision levels are set in the Mesh's Library from Blender.
 // After subdividing a mesh, the subdivisions are stored for rendering - there's
 // no way yet to recalculate mesh subdivisions.
+// This requires the mesh to have a Library reference.
 func (mesh *Mesh) SetAutoSubdivide(autoSubdivide bool) {
+	if mesh.library == nil {
+		return
+	}
+
 	mesh.autoSubdivide = autoSubdivide
 
 	if autoSubdivide && !mesh.allocatedForAutoSubdivisions {
 
-		triCount := len(mesh.Triangles)
+		maxLevel := 0
+		for _, level := range mesh.library.autosubdivisionLevels {
+			if level.SubdivisionLevel > maxLevel {
+				maxLevel = level.SubdivisionLevel
+			}
+		}
+
+		subbedTriCount := int(math32.Pow(4, float32(maxLevel)))
+		targetVertexCount := len(mesh.VertexPositions) * subbedTriCount * 3
+		mesh.allocateVertexBuffers(targetVertexCount) // Expand vertex buffers as necessary
+
+		totalTriCount := len(mesh.Triangles)
 
 		for _, mp := range mesh.MeshParts {
 
 			mp.forEachTri(false, func(tri *Triangle) {
 
-				// fmt.Println("subdivide", tri.id)
-
-				smallestMaxTriSize := math32.MaxFloat32
-
-				for _, sub := range mesh.Library().autosubdivisionLevels {
-					if sub.MaximumTriangleSize < smallestMaxTriSize {
-						smallestMaxTriSize = sub.MaximumTriangleSize
+				bigEnough := false
+				for _, level := range mesh.library.autosubdivisionLevels {
+					if tri.MaxSpan >= level.MinimumTriangleSize {
+						bigEnough = true
+						break
 					}
 				}
-
-				if tri.MaxSpan <= smallestMaxTriSize {
+				if !bigEnough {
 					return
 				}
 
-				for i := 0; i < mesh.library.maxAutoSubdivisionCount; i++ {
-					triCount := math32.Pow(4, float32(i+1))
+				triCount := math32.Pow(4, float32(maxLevel))
+
+				for i := 0; i < maxLevel; i++ {
 					tri.subdivisionLevels = append(tri.subdivisionLevels, make([]*Triangle, 0, int(triCount)))
 				}
 
-				tri.performSubdivision(0, tri, smallestMaxTriSize, mesh.library.maxAutoSubdivisionCount)
+				tri.performSubdivision(0, maxLevel, tri)
 
-				triCount += len(tri.subdivisionLevels[len(tri.subdivisionLevels)-1])
+				totalTriCount += len(tri.subdivisionLevels[len(tri.subdivisionLevels)-1])
 
 			})
 
@@ -485,7 +505,7 @@ func (mesh *Mesh) SetAutoSubdivide(autoSubdivide bool) {
 
 		// If there's more subdivided triangles than the transform list, we'll need to grow the list just in case
 		// they're all rendered at the same time.
-		for triCount > len(globalVertexTransforms)/3 {
+		for totalTriCount > len(globalVertexTransforms)/3 {
 			growDisplayLists()
 		}
 
@@ -709,9 +729,31 @@ func (mesh *Mesh) AddVertices(verts ...VertexInfo) {
 
 }
 
-// Library returns the Library from which this Mesh was loaded. If it was created through code, this function will return nil.
+// Library returns the Library associated with this Mesh.
 func (mesh *Mesh) Library() *Library {
 	return mesh.library
+}
+
+// Sets the Library associated with this Mesh.
+func (mesh *Mesh) SetLibrary(lib *Library) {
+
+	if lib != mesh.library && mesh.library != nil {
+		for i, m := range mesh.library.Meshes {
+			if m == mesh {
+				mesh.library.Meshes[i] = nil
+				mesh.library.Meshes = append(mesh.library.Meshes[:i], mesh.library.Meshes[i+1:]...)
+				break
+			}
+		}
+	}
+
+	mesh.library = lib
+	for _, m := range lib.Meshes {
+		if m == mesh {
+			return
+		}
+	}
+	lib.Meshes = append(lib.Meshes, mesh)
 }
 
 // UpdateDimensions updates the mesh's dimensions; call this after manually changing vertex positions.
@@ -1734,7 +1776,6 @@ func (tri *Triangle) Clone() *Triangle {
 	for level := range tri.subdivisionLevels {
 		newTri.subdivisionLevels[level] = append(make([]*Triangle, 0, len(tri.subdivisionLevels[level])), tri.subdivisionLevels[level]...)
 	}
-	newTri.visible = tri.visible
 	return newTri
 }
 
@@ -1754,9 +1795,9 @@ func (t *Triangle) VertexIndex(index int) int {
 
 const subdividedTriangleID = 999999
 
-func (t *Triangle) performSubdivision(subdivisionLevel int, base *Triangle, intendedMaxSize float32, maxSubdivisionCount int) {
+func (t *Triangle) performSubdivision(subdivisionLevel, maxSubdivisionLevel int, base *Triangle) {
 
-	if subdivisionLevel == maxSubdivisionCount || t.MaxSpan <= intendedMaxSize {
+	if subdivisionLevel >= maxSubdivisionLevel {
 		return
 	}
 
@@ -1823,6 +1864,7 @@ func (t *Triangle) performSubdivision(subdivisionLevel int, base *Triangle, inte
 	subTriA.Center = t.MeshPart.Mesh.VertexPositions[t1].
 		Add(t.MeshPart.Mesh.VertexPositions[subIndex]).
 		Add(t.MeshPart.Mesh.VertexPositions[subIndex+2]).Scale(1.0 / 3.0)
+	subTriA.visible = false
 
 	subTriB := NewTriangle(t.MeshPart, subIndex, t2, subIndex+1)
 	subTriB.subdivisionParent = base
@@ -1831,6 +1873,7 @@ func (t *Triangle) performSubdivision(subdivisionLevel int, base *Triangle, inte
 	subTriB.Center = t.MeshPart.Mesh.VertexPositions[subIndex].
 		Add(t.MeshPart.Mesh.VertexPositions[t2]).
 		Add(t.MeshPart.Mesh.VertexPositions[subIndex+1]).Scale(1.0 / 3.0)
+	subTriB.visible = false
 
 	subTriC := NewTriangle(t.MeshPart, subIndex+1, t3, subIndex+2)
 	subTriC.subdivisionParent = base
@@ -1839,6 +1882,7 @@ func (t *Triangle) performSubdivision(subdivisionLevel int, base *Triangle, inte
 	subTriC.Center = t.MeshPart.Mesh.VertexPositions[subIndex+1].
 		Add(t.MeshPart.Mesh.VertexPositions[t3]).
 		Add(t.MeshPart.Mesh.VertexPositions[subIndex+2]).Scale(1.0 / 3.0)
+	subTriC.visible = false
 
 	subTriD := NewTriangle(t.MeshPart, subIndex, subIndex+1, subIndex+2)
 	subTriD.subdivisionParent = base
@@ -1847,6 +1891,7 @@ func (t *Triangle) performSubdivision(subdivisionLevel int, base *Triangle, inte
 	subTriD.Center = t.MeshPart.Mesh.VertexPositions[subIndex].
 		Add(t.MeshPart.Mesh.VertexPositions[subIndex+1]).
 		Add(t.MeshPart.Mesh.VertexPositions[subIndex+2]).Scale(1.0 / 3.0)
+	subTriD.visible = false
 
 	base.subdivisionLevels[subdivisionLevel] = append(base.subdivisionLevels[subdivisionLevel],
 		subTriA,
@@ -1855,10 +1900,10 @@ func (t *Triangle) performSubdivision(subdivisionLevel int, base *Triangle, inte
 		subTriD,
 	)
 
-	subTriA.performSubdivision(subdivisionLevel+1, base, intendedMaxSize, maxSubdivisionCount)
-	subTriB.performSubdivision(subdivisionLevel+1, base, intendedMaxSize, maxSubdivisionCount)
-	subTriC.performSubdivision(subdivisionLevel+1, base, intendedMaxSize, maxSubdivisionCount)
-	subTriD.performSubdivision(subdivisionLevel+1, base, intendedMaxSize, maxSubdivisionCount)
+	subTriA.performSubdivision(subdivisionLevel+1, maxSubdivisionLevel, base)
+	subTriB.performSubdivision(subdivisionLevel+1, maxSubdivisionLevel, base)
+	subTriC.performSubdivision(subdivisionLevel+1, maxSubdivisionLevel, base)
+	subTriD.performSubdivision(subdivisionLevel+1, maxSubdivisionLevel, base)
 
 }
 
@@ -1913,47 +1958,13 @@ func (t *Triangle) handleSubdivision(cameraPos Vector3, model *Model, autoSubdiv
 		t.visible = true
 	} else {
 
-		ms := t.MaxSpan
-		subIndex := -1
+		subLevel := autoSubdivisionLevels[activeSubdivisionLevel].SubdivisionLevel - 1
 
-		for ms > autoSubdivisionLevels[activeSubdivisionLevel].MaximumTriangleSize {
-			ms /= 2
-			subIndex++
+		for _, subDiv := range t.subdivisionLevels[subLevel] {
+			subDiv.visible = true
 		}
 
-		if subIndex >= len(t.subdivisionLevels) {
-			subIndex = len(t.subdivisionLevels) - 1
-		}
-
-		if subIndex >= 0 {
-			for _, subDiv := range t.subdivisionLevels[subIndex] {
-				subDiv.visible = true
-			}
-		} else {
-			t.visible = true
-		}
-
-		// sub := t.subdivisionLevels[min(int(t.MaxSpan/maxSize), len(t.subdivisionLevels)-1)]
-
-		// for _, subDiv := range t.subdivisionLevels[closestLevel] {
-		// 	subDiv.visible = true
-		// }
 	}
-	// t.subdivisionLevels[closestLevel]
-
-	// t.subdivisionOn = true
-
-	// if t.id != subdividedTriangleID && t.subdivisionCount == 0 {
-	// 	t.performSubdivision(2, t)
-	// }
-
-	// if t.subdivisionIndex >= 0 {
-	// 	for i := t.subdivisionIndex; i < t.subdivisionIndex+t.subdivisionCount; i++ {
-	// 		if t.MeshPart.subdividedTriangles[i].Center.DistanceSquaredTo(camPos) < 20*20 {
-	// 			t.MeshPart.subdividedTriangles[i].subdivisionOn = true
-	// 		}
-	// 	}
-	// }
 
 }
 

@@ -638,9 +638,9 @@ func (s SearchOptions) ForEach(forEach func(node INode, index int) bool) {
 // You create a SearchOptions object with Node.Search(), specify filters like ByNames(), and then iterate over all
 // passing Nodes with SearchOptions.ForEach, or get a slice with GetSlice(). You can also get just the first or last
 // with GetFirst() and GetLast().
-func (n *Node) Search() SearchOptions {
+func (node *Node) Search() SearchOptions {
 	return SearchOptions{
-		Start: n,
+		Start: node,
 		// filterStack: func(node INode) bool { return true},
 	}
 }

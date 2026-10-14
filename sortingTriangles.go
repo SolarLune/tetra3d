@@ -120,7 +120,10 @@ func (s *sortingTriangleBucket) Clear() {
 	s.sorted = s.sorted[:0]
 }
 
-// ForEach calls forEach for each triangle in draw order, after Sort.
+func (s *sortingTriangleBucket) Count() int {
+	return s.unsetTriIndex
+}
+
 func (s *sortingTriangleBucket) ForEach(forEach func(triIndex int, triangle *Triangle)) {
 	for triIndex, tri := range s.sorted {
 		forEach(triIndex, tri.Triangle)

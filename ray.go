@@ -98,7 +98,18 @@ func (r RayHit) UV() (Vector2, error) {
 
 }
 
-func capsuleSphereRayTest(center Vector3, radius float32, from, to Vector3) (RayHit, bool) {
+func colliderSphereRayTest(center Vector3, radius float32, from, to Vector3) (RayHit, bool) {
+
+	if (from.X > center.X+radius && to.X > center.X+radius) ||
+		(from.X < center.X-radius && to.X < center.X-radius) ||
+
+		(from.Y > center.Y+radius && to.Y > center.Y+radius) ||
+		(from.Y < center.Y-radius && to.Y < center.Y-radius) ||
+
+		(from.Z > center.Z+radius && to.Z > center.Z+radius) ||
+		(from.Z < center.Z-radius && to.Z < center.Z-radius) {
+		return RayHit{}, false
+	}
 
 	// normal := to.Sub(from)
 	// normalUnit := normal.Unit()
@@ -214,7 +225,20 @@ func capsuleSphereRayTest(center Vector3, radius float32, from, to Vector3) (Ray
 
 }
 
-func capsuleAABBRayTest(from, to Vector3, test *ColliderAABB) (RayHit, bool) {
+func colliderAABBRayTest(from, to Vector3, test *ColliderAABB) (RayHit, bool) {
+
+	dim := test.Dimensions()
+
+	if (from.X > dim.Max.X && to.X > dim.Max.X) ||
+		(from.X < dim.Min.X && to.X < dim.Min.X) ||
+
+		(from.Y > dim.Max.Y && to.Y > dim.Max.Y) ||
+		(from.Y < dim.Min.Y && to.Y < dim.Min.Y) ||
+
+		(from.Z > dim.Max.Z && to.Z > dim.Max.Z) ||
+		(from.Z < dim.Min.Z && to.Z < dim.Min.Z) {
+		return RayHit{}, false
+	}
 
 	rayLine := to.Sub(from)
 	rayLineUnit := rayLine.Unit()
@@ -266,13 +290,30 @@ func capsuleAABBRayTest(from, to Vector3, test *ColliderAABB) (RayHit, bool) {
 
 var ColliderTrianglesRayTestResults = []RayHit{}
 
-func ColliderTrianglesRayTest(from, to Vector3, test *ColliderTriangles, doublesided bool) []RayHit {
+func colliderTrianglesRayTest(from, to Vector3, test *ColliderTriangles, doublesided bool) []RayHit {
+
+	invertedTransform := test.Transform().Inverted()
+	invFrom := invertedTransform.MultVec(from)
+	invTo := invertedTransform.MultVec(to)
+
+	dim := test.Mesh.Dimensions
+
+	if (invFrom.X > dim.Max.X && invTo.X > dim.Max.X) ||
+		(invFrom.X < dim.Min.X && invTo.X < dim.Min.X) ||
+
+		(invFrom.Y > dim.Max.Y && invTo.Y > dim.Max.Y) ||
+		(invFrom.Y < dim.Min.Y && invTo.Y < dim.Min.Y) ||
+
+		(invFrom.Z > dim.Max.Z && invTo.Z > dim.Max.Z) ||
+		(invFrom.Z < dim.Min.Z && invTo.Z < dim.Min.Z) {
+		return nil
+	}
 
 	check := false
 
 	if test.colliderAABB.PointInside(from) || test.colliderAABB.PointInside(to) {
 		check = true
-	} else if _, ok := capsuleAABBRayTest(from, to, test.colliderAABB); ok {
+	} else if _, ok := colliderAABBRayTest(from, to, test.colliderAABB); ok {
 		check = true
 	}
 
@@ -282,9 +323,6 @@ func ColliderTrianglesRayTest(from, to Vector3, test *ColliderTriangles, doubles
 
 		r := test.Transform().DecomposeRotation()
 
-		invertedTransform := test.Transform().Inverted()
-		invFrom := invertedTransform.MultVec(from)
-		invTo := invertedTransform.MultVec(to)
 		dir := invTo.Sub(invFrom).Unit()
 		plane := newCollisionPlane()
 
@@ -294,6 +332,11 @@ func ColliderTrianglesRayTest(from, to Vector3, test *ColliderTriangles, doubles
 		// test.broadphase.ForEachTriangleFromCollider(workingAABB, func(tri *Triangle) bool {
 
 		for _, tri := range test.Mesh.Triangles {
+
+			// Skip if it's not collideable
+			if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportRays {
+				continue
+			}
 
 			v0 := test.Mesh.VertexPositions[tri.VertexIndexA]
 			v1 := test.Mesh.VertexPositions[tri.VertexIndexB]
@@ -314,11 +357,6 @@ func ColliderTrianglesRayTest(from, to Vector3, test *ColliderTriangles, doubles
 					invTo.Z > v0.Z && invTo.Z > v1.Z && invTo.Z > v2.Z) ||
 				(invFrom.Z < v0.Z && invFrom.Z < v1.Z && invFrom.Z < v2.Z &&
 					invTo.Z < v0.Z && invTo.Z < v1.Z && invTo.Z < v2.Z) {
-				continue
-			}
-
-			// Skip if it's not collideable
-			if tri.MeshPart.Material != nil && !tri.MeshPart.Material.ReportRays {
 				continue
 			}
 
@@ -436,7 +474,7 @@ func RayTest(options RayTestOptions) *RayHit {
 
 			case *ColliderSphere:
 
-				if result, ok := capsuleSphereRayTest(test.WorldPosition(), test.WorldRadius(), from, to); ok {
+				if result, ok := colliderSphereRayTest(test.WorldPosition(), test.WorldRadius(), from, to); ok {
 					result.Object = test
 					internalRayTest = append(internalRayTest, result)
 				}
@@ -445,21 +483,21 @@ func RayTest(options RayTestOptions) *RayHit {
 
 				closestPoint, _ := test.nearestPointsToLine(from, to)
 
-				if result, ok := capsuleSphereRayTest(closestPoint, test.WorldRadius(), from, to); ok {
+				if result, ok := colliderSphereRayTest(closestPoint, test.WorldRadius(), from, to); ok {
 					result.Object = test
 					internalRayTest = append(internalRayTest, result)
 				}
 
 			case *ColliderAABB:
 
-				if result, ok := capsuleAABBRayTest(from, to, test); ok {
+				if result, ok := colliderAABBRayTest(from, to, test); ok {
 					internalRayTest = append(internalRayTest, result)
 				}
 
 			case *ColliderTriangles:
 
 				// Raycasting against triangles can hit multiple triangles, so we can't bail early and have to return all potential hits
-				internalRayTest = append(internalRayTest, ColliderTrianglesRayTest(from, to, test, options.Doublesided)...)
+				internalRayTest = append(internalRayTest, colliderTrianglesRayTest(from, to, test, options.Doublesided)...)
 
 			}
 

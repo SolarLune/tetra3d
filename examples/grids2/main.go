@@ -23,7 +23,6 @@ import (
 type GridPointMarker struct {
 	Model     *tetra3d.Model
 	Gridpoint *tetra3d.GridPoint
-	lines     []*tetra3d.Model
 }
 
 func NewGridPointMarker(gridPoint *tetra3d.GridPoint) *GridPointMarker {
@@ -41,11 +40,10 @@ func NewGridPointMarker(gridPoint *tetra3d.GridPoint) *GridPointMarker {
 		line := scene.Get("Line").Clone()
 		line.SetLocalPosition(0, 0, 0)
 		model.AddChildren(line)
-		rot := tetra3d.NewMatrix4LookAt(gridPoint.WorldPosition(), connection.To.WorldPosition(), tetra3d.WorldUp)
-		dist := gridPoint.DistanceTo(connection.To)
+		rot := tetra3d.NewMatrix4LookAt(gridPoint.WorldPosition(), connection.WorldPosition(), tetra3d.WorldUp)
+		dist := gridPoint.DistanceTo(connection)
 		line.SetLocalScale(1, 1, dist)
 		line.SetWorldRotation(rot)
-		marker.lines = append(marker.lines, line.(*tetra3d.Model))
 	}
 
 	return marker
@@ -53,31 +51,15 @@ func NewGridPointMarker(gridPoint *tetra3d.GridPoint) *GridPointMarker {
 
 func (m *GridPointMarker) Update() {
 
-	lib := m.Model.Library()
-
-	red := false
-
-	for i, connection := range m.Gridpoint.Connections {
-		if connection.Passable {
-			m.lines[i].SetMesh(lib.MeshByName("Line"))
+	if m.Gridpoint.Passable() {
+		if m.Gridpoint.Cost() > 0 {
+			m.Model.Color = colors.Green()
 		} else {
-			red = true
-			m.lines[i].SetMesh(lib.MeshByName("BrokenLine"))
+			m.Model.Color = colors.White()
 		}
-		if connection.Cost > 0 {
-			m.lines[i].Color = colors.Green()
-		} else {
-			m.lines[i].Color = colors.White()
-		}
-	}
-
-	m.Model.Color = colors.White()
-
-	if red {
+	} else {
 		m.Model.Color = colors.PaleRed()
 	}
-
-	// for _, connection := range m.
 
 }
 
@@ -192,19 +174,15 @@ func (g *Game) Update() error {
 			cursor.SetVisible(true, true)
 
 			if inpututil.IsKeyJustPressed(ebiten.KeyE) {
-				for _, c := range targetPoint.Connections {
-					c.Passable = !c.Passable
-				}
+				targetPoint.SetPassable(!targetPoint.Passable())
 			}
 
 			if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
-				for _, c := range targetPoint.Connections {
-					// c.Passable = !c.Passable
-					if c.Cost == 0 {
-						c.Cost = 100
-					} else {
-						c.Cost = 0
-					}
+				// c.Passable = !c.Passable
+				if targetPoint.Cost() == 0 {
+					targetPoint.SetCost(100)
+				} else {
+					targetPoint.SetCost(0)
 				}
 			}
 
@@ -254,8 +232,8 @@ This is so that each connection (from A to B, and B to A)
 can have different costs or passability values.
 
 Mouse over nodes to select them.
-The E key toggles passability >from< the selected Node.
-The Q key toggles increased costs from the selected Node.
+The E key toggles whether the cube can pass through the selected Node.
+The Q key increases costs to the selected Node by 100.
 Left-click moves the cube to the selected Node.
 `
 		tetra3d.DrawDebugText(screen, txt, 0, 220, 1, colors.White())

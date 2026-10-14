@@ -3,28 +3,12 @@ package tetra3d
 import (
 	"math"
 	"math/rand"
+	"slices"
 	"sort"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
-
-// A GridConnection represents a one-way connection from one GridPoint to another.
-type GridConnection struct {
-	To       *GridPoint
-	Passable bool    // Whether the connection should be considered as passable when performing pathfinding.
-	Cost     float32 // The cost of the jump, from one grid point to another. Defaults to 0.
-	length   float32 // the length of the jump from one GridPoint to another.
-}
-
-// Clone the GridConnection.
-func (c *GridConnection) Clone() *GridConnection {
-	return &GridConnection{
-		To:       c.To,
-		Passable: c.Passable,
-		Cost:     c.Cost,
-	}
-}
 
 // GridPoint represents a point on a Grid, used for pathfinding or connecting points in space.
 // GridPoints are parented to a Grid and the connections are created seperate from their positions,
@@ -32,10 +16,9 @@ func (c *GridConnection) Clone() *GridConnection {
 // to be in the same Grid only if they have the same direct parent (being the Grid).
 type GridPoint struct {
 	*Node
-	Connections       []*GridConnection
-	sortedConnections []*GridConnection
-	prevLink          *GridPoint
-	costSoFar         float32
+	passable    bool
+	cost        float32
+	Connections []*GridPoint
 }
 
 // NewGridPoint creates a new GridPoint.
@@ -47,7 +30,8 @@ func NewGridPoint(name string) *GridPoint {
 func NewGridPointFromNode(node *Node) *GridPoint {
 	gridPoint := &GridPoint{
 		Node:        node,
-		Connections: []*GridConnection{},
+		Connections: []*GridPoint{},
+		passable:    true,
 	}
 	gridPoint.owner = gridPoint
 	return gridPoint
@@ -57,8 +41,10 @@ func NewGridPointFromNode(node *Node) *GridPoint {
 func (point *GridPoint) Clone() INode {
 	newPoint := &GridPoint{}
 	newPoint.Node = point.Node.clone(point).(*Node)
-	newPoint.Connections = append([]*GridConnection{}, point.Connections...)
-	newPoint.sortedConnections = append([]*GridConnection{}, point.Connections...)
+	newPoint.Connections = append([]*GridPoint{}, point.Connections...)
+
+	newPoint.passable = point.passable
+	newPoint.cost = point.cost
 
 	if runCallbacks && newPoint.Callbacks().OnClone != nil {
 		newPoint.Callbacks().OnClone(newPoint)
@@ -67,11 +53,27 @@ func (point *GridPoint) Clone() INode {
 	return newPoint
 }
 
+func (point *GridPoint) Cost() float32 {
+	return point.cost
+}
+
+func (point *GridPoint) SetCost(cost float32) {
+	point.cost = cost
+}
+
+func (point *GridPoint) Passable() bool {
+	return point.passable
+}
+
+func (point *GridPoint) SetPassable(passable bool) {
+	point.passable = passable
+}
+
 // IsConnected returns if the provided GridPoint is connected to the given other GridPoint.
 func (point *GridPoint) IsConnected(other *GridPoint) bool {
 
 	for _, c := range point.Connections {
-		if c.To == other {
+		if c == other {
 			return true
 		}
 	}
@@ -86,47 +88,20 @@ func (point *GridPoint) IsOnSameGrid(other *GridPoint) bool {
 }
 
 // Connect connects the GridPoint to the given other GridPoint.
-func (point *GridPoint) Connect(other *GridPoint) (aToB, bToA *GridConnection) {
+func (point *GridPoint) Connect(other *GridPoint) {
 
 	if point == other {
 		return
 	}
 
 	if !point.IsConnected(other) {
-		aToB = &GridConnection{
-			To:       other,
-			Passable: true,
-			length:   point.DistanceTo(other),
-		}
-		point.Connections = append(point.Connections, aToB)
-		point.sortedConnections = append(point.sortedConnections, aToB)
+		point.Connections = append(point.Connections, other)
 	}
 
 	if !other.IsConnected(point) {
-		bToA = &GridConnection{
-			To:       point,
-			Passable: true,
-			length:   other.DistanceTo(point),
-		}
-		other.Connections = append(other.Connections, bToA)
-		other.sortedConnections = append(other.sortedConnections, bToA)
+		other.Connections = append(other.Connections, point)
 	}
 
-	return
-
-}
-
-// Connection returns the GridConnection from one GridPoint to another.
-// If they aren't connected, this function will return nil.
-// Note that a connection between GridPoints goes both ways (so there are
-// two connections between two GridPoints - one from either direction).
-func (point *GridPoint) Connection(other *GridPoint) *GridConnection {
-	for _, c := range point.Connections {
-		if c.To == other {
-			return c
-		}
-	}
-	return nil
 }
 
 // Disconnect disconnects the GridPoint from the given other GridPoint.
@@ -137,26 +112,14 @@ func (point *GridPoint) Disconnect(other *GridPoint) {
 	}
 
 	for i := len(point.Connections) - 1; i >= 0; i-- {
-		for si := range point.sortedConnections {
-			if point.sortedConnections[si] == point.Connections[i] {
-				point.sortedConnections[si] = nil
-				point.sortedConnections = append(point.sortedConnections[:si], point.sortedConnections[si+1:]...)
-			}
-		}
-		if point.Connections[i].To == other {
+		if point.Connections[i] == other {
 			point.Connections[i] = nil
 			point.Connections = append(point.Connections[:i], point.Connections[i+1:]...)
 		}
 	}
 
 	for i := len(other.Connections) - 1; i >= 0; i-- {
-		for si := range point.sortedConnections {
-			if point.sortedConnections[si] == point.Connections[i] {
-				point.sortedConnections[si] = nil
-				point.sortedConnections = append(point.sortedConnections[:si], point.sortedConnections[si+1:]...)
-			}
-		}
-		if other.Connections[i].To == point {
+		if other.Connections[i] == point {
 			other.Connections[i] = nil
 			other.Connections = append(other.Connections[:i], other.Connections[i+1:]...)
 		}
@@ -167,81 +130,102 @@ func (point *GridPoint) Disconnect(other *GridPoint) {
 // DisconnectAll disconnects the GridPoint from all other GridPoints.
 func (point *GridPoint) DisconnectAll() {
 	for i := len(point.Connections) - 1; i >= 0; i-- {
-		point.Disconnect(point.Connections[i].To)
+		point.Disconnect(point.Connections[i])
 	}
 }
 
-// PathTo creates a path going from the GridPoint to the given other GridPoint. The path generated
-// should be the shortest-possible route, taking into account both the cumulative lengths (in units)
-// and costs of individual hops.
+// An internal struct to assist with pathfinding on a Grid.
+type pathNode struct {
+	gp                  *GridPoint
+	next                *pathNode
+	runningCostDistance float32
+}
+
+// PathTo creates a path going from the GridPoint to the given goal GridPoint.
+// It'll be the shortest-possible route out of all possible paths to the goal,
+// taking into account both the overall cumulative length (in world units) and costs of each GridPoint on the path.
 // If a path is not possible from the starting point to the end point, then PathTo will return nil.
+
 func (point *GridPoint) PathTo(goal *GridPoint) *GridPath {
 
-	if point.parent == nil || point.parent.Type() != NodeTypeGrid || !point.IsOnSameGrid(goal) {
+	if point.parent.Type() != NodeTypeGrid || !point.IsOnSameGrid(goal) || !goal.passable || !point.passable {
 		return nil
 	}
 
 	if point == goal {
 		return &GridPath{
-			GridPoints: []Vector3{point.WorldPosition()},
+			gridPoints: []*GridPoint{point},
 		}
 	}
 
-	point.parent.(*Grid).ForEachPoint(func(gridPoint *GridPoint) {
-		gridPoint.prevLink = nil
-		gridPoint.costSoFar = 0
-	})
+	checked := []*GridPoint{goal}
+	toCheck := []*pathNode{&pathNode{gp: goal}}
 
-	path := &GridPath{
-		GridPoints: []Vector3{},
+	// If we've checked a grid point already, then we don't have to check it again
+	alreadyChecked := func(node *pathNode, conn *GridPoint) bool {
+		for _, c := range checked {
+			if c == conn {
+				return true
+			}
+		}
+		return false
 	}
 
-	toCheck := []*GridPoint{point}
-
-	goal.prevLink = nil
-	point.prevLink = nil
-
-	var next *GridPoint
-
-	// finishedForLoop:
+	// Represents a linked series of nodes, representing the final path.
+	var foundPath *pathNode
 
 	for {
 
-		if next == goal {
+		if len(toCheck) == 0 {
 			break
 		}
 
-		if len(toCheck) == 0 {
-			return nil
-		}
-
-		next = toCheck[0]
+		next := toCheck[0]
 		toCheck = toCheck[1:]
 
-		for _, c := range next.Connections {
+		if next.gp == point {
+			// Managed to find the start; this should be the most ideal path.
+			foundPath = next
+			break
+		}
 
-			if c.Passable {
-				nextCost := next.costSoFar + c.Cost + c.length
-				if c.To != point && (c.To.costSoFar == 0 || c.To.costSoFar > nextCost) {
-					c.To.costSoFar = nextCost
-					c.To.prevLink = next
-					toCheck = append(toCheck, c.To)
+		// We loop through connections and insert them to the toCheck list with the position depending on their overall running cost.
+		// The longer the path and higher the cost, the lower priority (later in the list) it is.
+		for _, conn := range next.gp.Connections {
+
+			if conn.passable && !alreadyChecked(next, conn) {
+
+				node := &pathNode{
+					gp:                  conn,
+					next:                next,
+					runningCostDistance: conn.cost + conn.DistanceSquaredTo(next.gp) + next.runningCostDistance,
 				}
+
+				insertIndex := len(toCheck)
+
+				for i, c := range toCheck {
+					if node.runningCostDistance < c.runningCostDistance {
+						insertIndex = i
+						break
+					}
+				}
+
+				toCheck = slices.Insert(toCheck, insertIndex, node)
+				checked = append(checked, conn)
+
 			}
 
 		}
 
-		sort.Slice(toCheck, func(i, j int) bool { return toCheck[i].costSoFar < toCheck[j].costSoFar })
-
 	}
 
-	for next.prevLink != nil {
-		path.GridPoints = append(path.GridPoints, next.WorldPosition())
-		next = next.prevLink
+	path := &GridPath{
+		gridPoints: []*GridPoint{},
 	}
 
-	for i, j := 0, len(path.GridPoints)-1; i < j; i, j = i+1, j-1 {
-		path.GridPoints[i], path.GridPoints[j] = path.GridPoints[j], path.GridPoints[i]
+	for foundPath != nil {
+		path.gridPoints = append(path.gridPoints, foundPath.gp)
+		foundPath = foundPath.next
 	}
 
 	return path
@@ -284,14 +268,14 @@ func (grid *Grid) Clone() INode {
 	newGrid.Node = grid.Node.clone(newGrid).(*Node)
 
 	for _, c := range newGrid.Points() {
-		c.Connections = []*GridConnection{}
+		c.Connections = []*GridPoint{}
 	}
 
 	for _, c := range grid.Points() {
 
-		start := newGrid.ClosestGridPoint(c.LocalPosition())
+		start := newGrid.ClosestGridPoint(c.WorldPosition())
 		for _, connect := range c.Connections {
-			end := newGrid.ClosestGridPoint(connect.To.LocalPosition())
+			end := newGrid.ClosestGridPoint(connect.WorldPosition())
 			start.Connect(end)
 		}
 
@@ -342,11 +326,13 @@ func (grid *Grid) MergeDuplicatePoints(margin float32) {
 
 			if point.WorldPosition().DistanceSquaredTo(point2.WorldPosition()) < margin {
 				for _, c := range point2.Connections {
-					nc := c.Clone()
-					point.Connections = append(point.Connections, nc)
+					point.Connections = append(point.Connections, c)
 
-					nc2 := c.To.Connection(point2).Clone()
-					nc2.To = point
+					// nc := c.Clone()
+					// point.Connections = append(point.Connections, c)
+
+					// nc2 := c.To.Connection(point2).Clone()
+					// nc2.To = point
 				}
 				point2.DisconnectAll()
 				point2.Unparent()
@@ -355,38 +341,6 @@ func (grid *Grid) MergeDuplicatePoints(margin float32) {
 		})
 
 	})
-}
-
-// HopCount indicates an instances of how many hops it takes to get to the specified GridPoint from the starting GridPoint.
-type HopCount struct {
-	Start       *GridPoint // The start of the path
-	Destination *GridPoint // The end of the path
-	HopCount    int        // How many hops it takes to get there (i.e. length of the path between the two points minus one)
-}
-
-// HopCounts returns the number of hops from the closest grid point to the starting position (from)
-// to the closest grid points to all other provided positions.
-func (grid *Grid) HopCounts(from Vector3, targetPositions ...Vector3) []HopCount {
-
-	start := grid.ClosestGridPoint(from)
-
-	hopCounts := []HopCount{}
-
-	for _, point := range targetPositions {
-		hc := HopCount{
-			Start:       start,
-			Destination: grid.ClosestGridPoint(point),
-		}
-		hc.HopCount = len(start.PathTo(hc.Destination).GridPoints) - 1
-		hopCounts = append(hopCounts, hc)
-	}
-
-	sort.Slice(hopCounts, func(i, j int) bool {
-		return hopCounts[i].HopCount < hopCounts[j].HopCount
-	})
-
-	return hopCounts
-
 }
 
 // ClosestPositionOnGrid returns the nearest world position on the Grid to the given world position.
@@ -402,7 +356,7 @@ func (grid *Grid) ClosestPositionOnGrid(position Vector3) Vector3 {
 
 	for _, connection := range nearestPoint.Connections {
 		// diff := connection.WorldPosition().Sub(pos)
-		end := connection.To.WorldPosition()
+		end := connection.WorldPosition()
 		segment := end.Sub(start)
 		newPos := position.Sub(start)
 		t := newPos.Dot(segment) / segment.Dot(segment)
@@ -558,23 +512,23 @@ func (grid *Grid) Type() NodeType {
 // GridPath represents a sequence of grid points, used to traverse a path.
 // GridPath implements IPath.
 type GridPath struct {
-	GridPoints []Vector3
+	gridPoints []*GridPoint
 }
 
-// Length returns the length of the overall path.
+// Returns the length of the overall path.
 func (gp *GridPath) Length() float32 {
 
 	dist := float32(0)
 
-	if len(gp.GridPoints) <= 1 {
+	if len(gp.gridPoints) <= 1 {
 		return 0
 	}
 
-	start := gp.GridPoints[0]
+	start := gp.gridPoints[0]
 
-	for i := 1; i < len(gp.GridPoints); i++ {
-		next := gp.GridPoints[i]
-		dist += next.Sub(start).Magnitude()
+	for i := 1; i < len(gp.gridPoints); i++ {
+		next := gp.gridPoints[i]
+		dist += next.WorldPosition().Sub(start.WorldPosition()).Magnitude()
 		start = next
 	}
 
@@ -582,15 +536,27 @@ func (gp *GridPath) Length() float32 {
 
 }
 
-// Points returns the points of the GridPath in a slice.
+// Returns the grid points of the GridPath in a slice.
+func (gp *GridPath) GridPoints() []*GridPoint {
+	points := make([]*GridPoint, 0, len(gp.gridPoints))
+	for _, gp := range gp.gridPoints {
+		points = append(points, gp)
+	}
+	return points
+}
+
+// Returns the positions of the GridPoints of the GridPath in a slice.
 func (gp *GridPath) Points() []Vector3 {
-	points := append(make([]Vector3, 0, len(gp.GridPoints)), gp.GridPoints...)
+	points := make([]Vector3, 0, len(gp.gridPoints))
+	for _, gp := range gp.gridPoints {
+		points = append(points, gp.WorldPosition())
+	}
 	return points
 }
 
 // HopCount returns the number of hops in the path (i.e. the number of nodes - 1).
 func (gp *GridPath) HopCount() int {
-	return len(gp.GridPoints) - 1
+	return len(gp.gridPoints) - 1
 }
 
 func (gp *GridPath) isClosed() bool {

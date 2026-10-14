@@ -2,6 +2,7 @@ package tetra3d
 
 import (
 	"fmt"
+	"slices"
 	"sync/atomic"
 )
 
@@ -128,18 +129,18 @@ func (scene *Scene) Clone() *Scene {
 }
 
 // ID returns the unique ID for this specific scene. Each scene has its own ID.
-func (s *Scene) ID() uint32 {
-	return s.id
+func (scene *Scene) ID() uint32 {
+	return scene.id
 }
 
 // SetName sets the name of the scene to the specified desired value.
-func (s *Scene) SetName(name string) {
-	s.name = name
+func (scene *Scene) SetName(name string) {
+	scene.name = name
 }
 
 // Name returns the name of the Scene.
-func (s *Scene) Name() string {
-	return s.name
+func (scene *Scene) Name() string {
+	return scene.name
 }
 
 // String returns the scene as a string in a human-readable format if ReadableReferences is on.
@@ -162,9 +163,31 @@ func (scene *Scene) SetData(data any) {
 	scene.data = data
 }
 
-// Library returns the Library from which this Scene was loaded. If it was created through code and not associated with a Library, this function will return nil.
+// Library returns the Library from which this Scene was loaded.
 func (scene *Scene) Library() *Library {
 	return scene.library
+}
+
+// Sets the Library associated with this Scene.
+func (scene *Scene) SetLibrary(lib *Library) {
+
+	if lib != scene.library && scene.library != nil {
+		for i, m := range scene.library.Scenes {
+			if m == scene {
+				scene.library.Scenes[i] = nil
+				scene.library.Scenes = append(scene.library.Scenes[:i], scene.library.Scenes[i+1:]...)
+				break
+			}
+		}
+	}
+
+	scene.library = lib
+	for _, m := range lib.Scenes {
+		if m == scene {
+			return
+		}
+	}
+	lib.Scenes = append(lib.Scenes, scene)
 }
 
 func (scene *Scene) Properties() *Properties {
@@ -173,13 +196,16 @@ func (scene *Scene) Properties() *Properties {
 
 var autobatchBlankMat = NewMaterial("autobatch null material")
 
-func (scene *Scene) HandleAutobatch() {
+func (scene *Scene) handleAutobatch() {
 
+	// TODO: Update this to no longer loop through everything all of the time
 	if scene.updateAutobatch {
 
 		scene.Root.ForEachChild(true, func(node INode, index int) bool {
 
 			if model, ok := node.(*Model); ok {
+
+				// fmt.Println("MODEL:", model.name, model.autoBatched, model.AutoBatchMode)
 
 				if !model.autoBatched {
 
@@ -241,9 +267,7 @@ func (scene *Scene) HandleAutobatch() {
 
 			for _, models := range dyn.DynamicBatchModels {
 
-				modelList := append(make([]*Model, 0, len(models)), models...)
-
-				for _, model := range modelList {
+				for _, model := range slices.Backward(models) {
 
 					if model.Root() == nil {
 						dyn.DynamicBatchRemove(model)

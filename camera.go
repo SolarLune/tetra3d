@@ -1339,7 +1339,7 @@ func setDepthRectQuad(rect image.Rectangle) {
 // Also, the function will automatically include the Scene's world ambient light, if there is a world.
 func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
-	scene.HandleAutobatch()
+	scene.handleAutobatch()
 
 	camera.DebugInfo.currentFrameTime.StartTimer()
 
@@ -1513,6 +1513,11 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 		model.processVertices(vpMatrix, camera, meshPart, true, autosubdivisionLevels, lighting)
 		// lastVertexListIndex := vertexListIndex
+
+		// Ionno man, display list is too short
+		for len(globalMeshAlteredVertexPositions) < globalSortingTriangleBucket.Count()*3 {
+			growDisplayLists()
+		}
 
 		if vertexListIndex == 0 {
 			return
@@ -2596,7 +2601,7 @@ func (camera *Camera) DrawDebugWireframe(screen *ebiten.Image, rootNode INode, c
 				p1 := worldToScreenPixels(point.WorldPosition())
 				vector.StrokeCircle(screen, p1.X, p1.Y, 8, 1, image.White, false)
 				for _, connection := range point.Connections {
-					p2 := worldToScreenPixels(connection.To.WorldPosition())
+					p2 := worldToScreenPixels(connection.WorldPosition())
 					vector.StrokeLine(screen, p1.X, p1.Y, p2.X, p2.Y, 1, color.ToNRGBA64(), false)
 				}
 

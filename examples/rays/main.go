@@ -52,7 +52,7 @@ func (g *Game) Update() error {
 
 	// Used to profile ray testing
 	//
-	// solids := g.Scene.Root.Search(tetra3d.SearchOptions{}.ByType(tetra3d.NodeTypeCollider))
+	// solids := g.Scene.Root.Search().ByType(tetra3d.NodeTypeCollider)
 	// t := time.Now()
 	// for range 1000 {
 	// 	tetra3d.RayTest(tetra3d.RayTestOptions{

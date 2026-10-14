@@ -45,10 +45,22 @@ func (props *Properties) CopyFrom(src *Properties, overwrite bool) {
 	}
 }
 
-// Remove removes the tag specified from the Properties object.
-func (props *Properties) Remove(key string) {
+// Removes the property in the specified index from the Properties object.
+// If the property cannot be found, nothing happens.
+func (props *Properties) Remove(index int) {
+	for i := range props.data {
+		if i == index {
+			props.data[i] = nil
+			props.data = append(props.data[:i], props.data[i+1:]...)
+		}
+	}
+}
+
+// Removes a property with the specified name from the Properties object.
+// If the property cannot be found, nothing happens.
+func (props *Properties) RemoveByName(propName string) {
 	for i, p := range props.data {
-		if p.name == key {
+		if p.name == propName {
 			props.data[i] = nil
 			props.data = append(props.data[:i], props.data[i+1:]...)
 		}
@@ -69,7 +81,8 @@ func (props *Properties) Add(propName string) *Property {
 		}
 	}
 	newProp := &Property{
-		name: propName,
+		name:       propName,
+		properties: props,
 	}
 	props.data = append(props.data, newProp)
 	return newProp
@@ -157,8 +170,18 @@ func (props *Properties) Count() int {
 
 // Property represents a game property on a Node or other resource.
 type Property struct {
-	name  string
-	Value any
+	properties *Properties
+	name       string
+	Value      any
+}
+
+func (prop *Property) Index() int {
+	for i, p := range prop.properties.data {
+		if p == prop {
+			return i
+		}
+	}
+	return -1
 }
 
 func (prop *Property) Name() string {

@@ -283,16 +283,12 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					d := getOrDefaultFloat(data, "distance", 40)
 					library.autosubdivisionLevels = append(library.autosubdivisionLevels, AutoSubdivisionLevel{
 						DistanceSquared:     d * d,
-						MaximumTriangleSize: getOrDefaultFloat(data, "maximumTriangleSize", 0),
+						SubdivisionLevel:    int(getOrDefaultFloat(data, "subdivisionLevel", 1)),
+						MinimumTriangleSize: getOrDefaultFloat(data, "minimumTriangleSize", 0),
 					})
 
 				}
 
-			}
-
-			// Default's 3
-			if value, exists := globalExporterSettings["t3dMaxAutoSubdivisionCount__"]; exists {
-				library.maxAutoSubdivisionCount = int(value.(float64))
 			}
 
 		}
@@ -583,16 +579,16 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		for _, v := range mesh.Primitives {
 
-			vertPos, err := modeler.ReadPosition(doc, doc.Accessors[v.Attributes[gltf.POSITION]], posBuffer)
 			clear(posBuffer)
+			posBuffer, err = modeler.ReadPosition(doc, doc.Accessors[v.Attributes[gltf.POSITION]], posBuffer)
 
 			if err != nil {
 				return nil, err
 			}
 
-			vertexData := make([]VertexInfo, len(vertPos))
+			vertexData := make([]VertexInfo, len(posBuffer))
 
-			for i, v := range vertPos[:doc.Accessors[v.Attributes[gltf.POSITION]].Count] {
+			for i, v := range posBuffer[:doc.Accessors[v.Attributes[gltf.POSITION]].Count] {
 
 				vertexData[i] = NewVertex(
 					float32(v[0]),
@@ -605,8 +601,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if texCoordAccessor, texCoordExists := v.Attributes[gltf.TEXCOORD_0]; texCoordExists {
 
-				texCoords, err := modeler.ReadTextureCoord(doc, doc.Accessors[texCoordAccessor], uvBuffer)
 				clear(uvBuffer)
+				uvBuffer, err = modeler.ReadTextureCoord(doc, doc.Accessors[texCoordAccessor], uvBuffer)
 
 				if err != nil {
 					return nil, err
@@ -616,7 +612,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					return nil, err
 				}
 
-				for i, v := range texCoords[:doc.Accessors[texCoordAccessor].Count] {
+				for i, v := range uvBuffer[:doc.Accessors[texCoordAccessor].Count] {
 					vertexData[i].U = float32(v[0])
 					vertexData[i].V = -(float32(v[1]) - 1)
 				}
@@ -625,8 +621,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 			if normalAccessor, normalExists := v.Attributes[gltf.NORMAL]; normalExists {
 
-				normals, err := modeler.ReadNormal(doc, doc.Accessors[normalAccessor], normalBuffer)
 				clear(normalBuffer)
+				normalBuffer, err = modeler.ReadNormal(doc, doc.Accessors[normalAccessor], normalBuffer)
 
 				if err != nil {
 					return nil, err
@@ -636,7 +632,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					return nil, err
 				}
 
-				for i, v := range normals[:doc.Accessors[normalAccessor].Count] {
+				for i, v := range normalBuffer[:doc.Accessors[normalAccessor].Count] {
 					vertexData[i].NormalX = float32(v[0])
 					vertexData[i].NormalY = float32(v[1])
 					vertexData[i].NormalZ = float32(v[2])
@@ -656,8 +652,8 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					continue // Shouldn't be possible to have COLOR_0 and COLOR_2 but not COLOR_1?
 				}
 
-				colors, err := modeler.ReadColor(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
 				clear(vcBuffer)
+				vcBuffer, err = modeler.ReadColor(doc, doc.Accessors[vertexColorAccessor], vcBuffer)
 
 				if err != nil {
 					return nil, err
@@ -667,7 +663,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 					return nil, err
 				}
 
-				for i, colorData := range colors[:doc.Accessors[vertexColorAccessor].Count] {
+				for i, colorData := range vcBuffer[:doc.Accessors[vertexColorAccessor].Count] {
 
 					// Vertex colors exported from Blender no longer need to be
 					// converted from linear / to sRGB format; the GLTF addon must
@@ -746,7 +742,16 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 			}
 
 			if autoSubdivide {
-				triCount := int(math32.Pow(4, float32(library.maxAutoSubdivisionCount)))
+
+				maxLevel := 0
+
+				for _, sub := range library.autosubdivisionLevels {
+					if sub.SubdivisionLevel > maxLevel {
+						maxLevel = sub.SubdivisionLevel
+					}
+				}
+
+				triCount := int(math32.Pow(4, float32(maxLevel)))
 				newMesh.allocateVertexBuffers(len(vertexData) * triCount * 3)
 			} else {
 				newMesh.allocateVertexBuffers(len(vertexData))
@@ -1009,7 +1014,7 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 					marker := mData.(map[string]any)
 
-					anim.markers = append(anim.markers, Marker{
+					anim.markers = append(anim.markers, AnimationMarker{
 						Name: marker["name"].(string),
 						Time: float32(marker["time"].(float64)),
 					})
@@ -1837,8 +1842,6 @@ func LoadGLTFData(data io.Reader, gltfLoadOptions *GLTFLoadOptions) (*Library, e
 
 		// This has to make a copy of the children because the nodes are reparented
 		scene.Root.Children(true).ForEach(func(node INode, index int) bool {
-
-			node.setOriginalTransform()
 
 			if node, ok := node.(*Node); ok && len(node.collectionObjects) > 0 {
 
