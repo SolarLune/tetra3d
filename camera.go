@@ -1570,6 +1570,7 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 
 		customDepthFunctionSet := mat != nil && mat.CustomDepthFunction != nil
 		vertexClipFunctionOn := model != nil && model.VertexClipFunction != nil
+		screenFromVertexPass := globalVertexScreenValid && camera.perspective && !vertexClipFunctionOn
 
 		vertexListIndex = startingVertexListIndex
 
@@ -1622,25 +1623,38 @@ func (camera *Camera) Render(scene *Scene, lights, models NodeIterator) {
 				// CLIP SCREEN START
 				w := globalVertexTransforms[vertexIndex].W
 
-				if !camera.perspective {
-					w = 1.0
+				var dx, dy float32
+
+				if screenFromVertexPass && w >= 0 {
+
+					// The vertex pass divided by the same w, and y / -w is -(y / w) exactly.
+					s := globalVertexScreen[vertexIndex]
+					dx = float32(s.X*float32(camWidth) + halfCamWidth)
+					dy = float32((-s.Y)*float32(camHeight) + halfCamHeight)
+
+				} else {
+
+					if !camera.perspective {
+						w = 1.0
+					}
+
+					// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
+					// If it's too small, there will be visual artifacts when the camera is right up against surfaces
+					// If it's too large, then textures and vertices will appear to warp and bend "around" the screen, towards the "back" of the camera
+					if w < 0 {
+						w = 0.001
+					}
+
+					target := globalVertexTransforms[vertexIndex]
+
+					if vertexClipFunctionOn {
+						target = model.VertexClipFunction(target, vertexIndex)
+					}
+
+					dx = float32((target.X/w)*float32(camWidth) + halfCamWidth)
+					dy = float32((target.Y/-w)*float32(camHeight) + halfCamHeight)
+
 				}
-
-				// If the trangle is beyond the screen, we'll just pretend it's not and limit it to the closest possible value > 0
-				// If it's too small, there will be visual artifacts when the camera is right up against surfaces
-				// If it's too large, then textures and vertices will appear to warp and bend "around" the screen, towards the "back" of the camera
-				if w < 0 {
-					w = 0.001
-				}
-
-				target := globalVertexTransforms[vertexIndex]
-
-				if vertexClipFunctionOn {
-					target = model.VertexClipFunction(target, vertexIndex)
-				}
-
-				dx := float32((target.X/w)*float32(camWidth) + halfCamWidth)
-				dy := float32((target.Y/-w)*float32(camHeight) + halfCamHeight)
 
 				// CLIP SCREEN END
 

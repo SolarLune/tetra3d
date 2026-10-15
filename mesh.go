@@ -2202,6 +2202,12 @@ type MeshPart struct {
 	// no subdivided triangle shows, so Model.ProcessVertices can skip the
 	// disableSubdivision pass.
 	subdivisionsHidden bool
+
+	// The vertex range of the triangles, see vertexRange, and the triangle
+	// range and count that it is for.
+	vertexMin, vertexMax                  int
+	rangeTriStart, rangeTriEnd, rangeTris int
+	rangeSet                              bool
 }
 
 // NewMeshPart creates a new MeshPart that renders using the specified Material.
@@ -2268,6 +2274,33 @@ func (part *MeshPart) forEachTri(includeSubdivided bool, triFunc func(tri *Trian
 
 	}
 
+}
+
+// vertexRange returns the lowest vertex index that the triangles of the part
+// use, and one more than the highest. It keeps the result until the triangle
+// range of the part or the triangle count of the mesh changes, so a change to
+// the vertex indices of a triangle in place is not seen.
+func (part *MeshPart) vertexRange() (int, int) {
+	tris := part.Mesh.Triangles
+	if part.rangeSet && part.rangeTriStart == part.TriangleStart && part.rangeTriEnd == part.TriangleEnd && part.rangeTris == len(tris) {
+		return part.vertexMin, part.vertexMax
+	}
+	lo, hi := 0, 0
+	for i := part.TriangleStart; i <= part.TriangleEnd; i++ {
+		tri := tris[i]
+		for _, v := range [3]int{tri.VertexIndexA, tri.VertexIndexB, tri.VertexIndexC} {
+			if hi == 0 || v < lo {
+				lo = v
+			}
+			if v+1 > hi {
+				hi = v + 1
+			}
+		}
+	}
+	part.vertexMin, part.vertexMax = lo, hi
+	part.rangeTriStart, part.rangeTriEnd, part.rangeTris = part.TriangleStart, part.TriangleEnd, len(tris)
+	part.rangeSet = true
+	return lo, hi
 }
 
 // ForEachVertexIndex calls the provided function for each vertex index that the MeshPart uses.
