@@ -219,6 +219,10 @@ func (point *GridPoint) PathTo(goal *GridPoint) *GridPath {
 
 	}
 
+	if foundPath == nil {
+		return nil
+	}
+
 	path := &GridPath{
 		gridPoints: []*GridPoint{},
 	}
