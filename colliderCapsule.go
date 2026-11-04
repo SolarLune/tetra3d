@@ -69,10 +69,10 @@ func (capsule *ColliderCapsule) UpAxis() Vector3 {
 func (capsule *ColliderCapsule) updateTransform() {
 
 	up := capsule.UpAxis()
-	capsule.cachedLineTop = capsule.Node.WorldPosition().Add(up.Scale(max(capsule.WorldHeight()/2-capsule.WorldRadius(), 0)))
+	capsule.cachedLineTop = capsule.Node.WorldPosition().Add(up.Scale(max((capsule.WorldHeight()/2)-capsule.WorldRadius(), 0)))
 	capsule.cachedTop = capsule.Node.WorldPosition().Add(up.Scale(capsule.WorldHeight() / 2))
 
-	capsule.cachedLineBottom = capsule.Node.WorldPosition().Add(up.Scale(max(-capsule.WorldHeight()/2+capsule.WorldRadius(), 0)))
+	capsule.cachedLineBottom = capsule.Node.WorldPosition().Add(up.Scale(-max((capsule.WorldHeight()/2)-capsule.WorldRadius(), 0)))
 	capsule.cachedBottom = capsule.Node.WorldPosition().Add(up.Scale(-capsule.WorldHeight() / 2))
 
 }
@@ -185,90 +185,24 @@ func (capsule *ColliderCapsule) NearestPointOnLine(point Vector3) Vector3 {
 	return NearestPointOnLine(capsule.lineBottom(), capsule.lineTop(), point)
 }
 
-func (capsule *ColliderCapsule) closestPointCapsules(other *ColliderCapsule) Vector3 {
+func (capsule *ColliderCapsule) closestPointCapsuleCollisionStart(other *ColliderCapsule) Vector3 {
 
-	aTop := capsule.lineTop()
-	aBottom := capsule.lineBottom()
+	// Cribbed from Wicked Engine on capsule-capsule collision: https://wickedengine.net/category/devblog/2020/04/26/capsule-collision-detection/index.html
 
-	bTop := other.lineTop()
-	bBottom := other.lineBottom()
-
-	aNormal := aTop.Sub(aBottom)
-	aOffset := aNormal.Scale(capsule.radius)
-	aStart := aBottom.Add(aOffset)
-	aEnd := aTop.Add(aOffset)
-
-	bNormal := bTop.Sub(bBottom)
-	bOffset := bNormal.Scale(other.radius)
-	bStart := bBottom.Add(bOffset)
-	bEnd := bTop.Add(bOffset)
-
-	v0 := bStart.Sub(aStart)
-	v1 := bEnd.Sub(aStart)
-	v2 := bStart.Sub(aEnd)
-	v3 := bEnd.Sub(aEnd)
+	v0 := other.lineBottom().Sub(capsule.lineBottom())
+	v1 := other.lineTop().Sub(capsule.lineBottom())
+	v2 := other.lineBottom().Sub(capsule.lineTop())
+	v3 := other.lineTop().Sub(capsule.lineTop())
 
 	d0 := v0.Dot(v0)
 	d1 := v1.Dot(v1)
 	d2 := v2.Dot(v2)
 	d3 := v3.Dot(v3)
 
-	var bestA Vector3
-
 	if d2 < d0 || d2 < d1 || d3 < d0 || d3 < d1 {
-		bestA = aEnd
-	} else {
-		bestA = aStart
+		return capsule.lineBottom()
 	}
-
-	bestB := NearestPointOnLine(bStart, bEnd, bestA)
-
-	bestA = NearestPointOnLine(aStart, aEnd, bestB)
-
-	return bestA
-
-	// capsule.
-
-	// capsule A:
-	// float3 a_Normal = normalize(a.tip – a.base);
-	// float3 a_LineEndOffset = a_Normal * a.radius;
-	// float3 a_A = a.base + a_LineEndOffset;
-	// float3 a_B = a.tip - a_LineEndOffset;
-
-	// // capsule B:
-	// float3 b_Normal = normalize(b.tip – b.base);
-	// float3 b_LineEndOffset = b_Normal * b.radius;
-	// float3 b_A = b.base + b_LineEndOffset;
-	// float3 b_B = b.tip - b_LineEndOffset;
-
-	// // vectors between line endpoints:
-	// float3 v0 = b_A – a_A;
-	// float3 v1 = b_B – a_A;
-	// float3 v2 = b_A – a_B;
-	// float3 v3 = b_B – a_B;
-
-	// // squared distances:
-	// float d0 = dot(v0, v0);
-	// float d1 = dot(v1, v1);
-	// float d2 = dot(v2, v2);
-	// float d3 = dot(v3, v3);
-
-	// // select best potential endpoint on capsule A:
-	// float3 bestA;
-	// if (d2 < d0 || d2 < d1 || d3 < d0 || d3 < d1)
-	// {
-	// bestA = a_B;
-	// }
-	// else
-	// {
-	// bestA = a_A;
-	// }
-
-	// // select point on capsule B line segment nearest to best potential endpoint on A capsule:
-	// float3 bestB = ClosestPointOnLineSegment(b_A, b_B, bestA);
-
-	// // now do the same for capsule A segment:
-	// bestA = ClosestPointOnLineSegment(a_A, a_B, bestB);
+	return capsule.lineTop()
 
 }
 

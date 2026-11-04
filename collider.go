@@ -355,6 +355,8 @@ func btSphereAABB(sphere *ColliderSphere, aabb *ColliderAABB) *Collision {
 
 func btSphereTriangles(sphere *ColliderSphere, triangles *ColliderTriangles) *Collision {
 
+	// Call Transform() first to ensure we have the up-to-date transform state for the ColliderTriangles object
+	triTrans := triangles.Transform()
 	aabbDim := triangles.colliderAABB.Dimensions()
 
 	sphereWorldPosition := sphere.WorldPosition()
@@ -370,7 +372,6 @@ func btSphereTriangles(sphere *ColliderSphere, triangles *ColliderTriangles) *Co
 		return nil
 	}
 
-	triTrans := triangles.Transform()
 	invertedTransform := triTrans.Inverted()
 	transformNoLoc := triTrans.Clone()
 	transformNoLoc.SetRow(3, Vector4{0, 0, 0, 1})
@@ -804,19 +805,19 @@ func btTrianglesTriangles(trianglesA, trianglesB *ColliderTriangles) *Collision 
 }
 
 func btCapsuleCapsule(capsuleA, capsuleB *ColliderCapsule) *Collision {
-	capsuleA.internalSphere.SetLocalScaleVec(capsuleA.LocalScale())
 
-	// By getting the closest point to the world position (center), and then getting it again, we get closer to the
-	// true closest point for both capsules, which is good enough for now lol
-	caClosest := capsuleA.NearestPointOnLine(capsuleB.WorldPosition())
-	cbClosest := capsuleB.NearestPointOnLine(capsuleA.WorldPosition())
+	capsuleA.Transform()
+	capsuleB.Transform()
+
+	potential := capsuleA.closestPointCapsuleCollisionStart(capsuleB)
+	cbClosest := capsuleB.NearestPointOnLine(potential)
+	caClosest := capsuleA.NearestPointOnLine(cbClosest)
 
 	capsuleA.internalSphere.SetLocalPositionVec(capsuleA.NearestPointOnLine(cbClosest))
-	capsuleA.internalSphere.radius = capsuleA.radius
+	capsuleA.internalSphere.radius = capsuleA.WorldRadius()
 
-	capsuleB.internalSphere.SetLocalScaleVec(capsuleB.LocalScale())
 	capsuleB.internalSphere.SetLocalPositionVec(capsuleB.NearestPointOnLine(caClosest))
-	capsuleB.internalSphere.radius = capsuleB.radius
+	capsuleB.internalSphere.radius = capsuleB.WorldRadius()
 
 	col := btSphereSphere(capsuleA.internalSphere, capsuleB.internalSphere)
 	if col != nil {
@@ -826,9 +827,12 @@ func btCapsuleCapsule(capsuleA, capsuleB *ColliderCapsule) *Collision {
 }
 
 func btSphereCapsule(sphere *ColliderSphere, capsule *ColliderCapsule) *Collision {
-	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
+
+	sphere.Transform()
+	capsule.Transform()
+
 	capsule.internalSphere.SetLocalPositionVec(capsule.NearestPointOnLine(sphere.WorldPosition()))
-	capsule.internalSphere.radius = capsule.radius
+	capsule.internalSphere.radius = capsule.WorldRadius()
 	col := btSphereSphere(sphere, capsule.internalSphere)
 	if col != nil {
 		col.Object = capsule
@@ -837,13 +841,34 @@ func btSphereCapsule(sphere *ColliderSphere, capsule *ColliderCapsule) *Collisio
 }
 
 func btCapsuleAABB(capsule *ColliderCapsule, aabb *ColliderAABB) *Collision {
-	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
-	capsule.internalSphere.SetLocalPositionVec(capsule.NearestPointOnLine(aabb.WorldPosition()))
-	capsule.internalSphere.radius = capsule.radius
+
+	capsule.Transform()
+	aabb.Transform()
+
+	// TODO: FIX THIS
+
+	lineTop := capsule.lineTop()
+	closest := capsule.lineBottom()
+	capPos := capsule.WorldPosition()
+	aabbPos := aabb.WorldPosition()
+
+	if aabbPos.DistanceSquaredTo(lineTop) < aabbPos.DistanceSquaredTo(closest) {
+		closest = lineTop
+	}
+
+	if aabbPos.DistanceSquaredTo(capPos) < aabbPos.DistanceSquaredTo(closest) {
+		closest = capPos
+	}
+
+	capsule.internalSphere.SetLocalPositionVec(capsule.NearestPointOnLine(aabb.ClosestPoint(closest)))
+	capsule.internalSphere.radius = capsule.WorldRadius()
 	return btSphereAABB(capsule.internalSphere, aabb)
 }
 
 func btCapsuleTriangles(capsule *ColliderCapsule, triangles *ColliderTriangles) *Collision {
+
+	capsule.Transform()
+	triangles.Transform()
 
 	capTop := capsule.Top()
 	capBottom := capsule.Bottom()
@@ -859,9 +884,8 @@ func btCapsuleTriangles(capsule *ColliderCapsule, triangles *ColliderTriangles) 
 		return nil
 	}
 
-	capsule.internalSphere.SetLocalScaleVec(capsule.LocalScale())
 	capsule.internalSphere.SetLocalPositionVec(capsule.NearestPointOnLine(triangles.colliderAABB.WorldPosition()))
-	capsule.internalSphere.radius = capsule.radius
+	capsule.internalSphere.radius = capsule.WorldRadius()
 
 	// // If we're not intersecting the triangle's bounding AABB, we couldn't possibly be colliding with any of the triangles, so we're good
 	// if !capsule.internalSphere.Colliding(triangles.colliderAABB) {
