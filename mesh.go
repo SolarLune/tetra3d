@@ -67,6 +67,10 @@ func (dim Dimensions) Depth() float32 {
 	return dim.Max.Z - dim.Min.Z
 }
 
+func (dim Dimensions) IsZero() bool {
+	return dim.Min.IsZero() && dim.Max.IsZero()
+}
+
 func (dim Dimensions) Dimension(axis int) float32 {
 	if axis == 0 {
 		return dim.Width()
@@ -2362,6 +2366,9 @@ func (part *MeshPart) AddTriangles(indices ...int) {
 
 // TriangleCount returns the total number of triangles in the MeshPart, specifically.
 func (part *MeshPart) TriangleCount() int {
+	if part.TriangleStart == math.MaxInt {
+		return 0
+	}
 	return part.TriangleEnd - part.TriangleStart + 1
 }
 

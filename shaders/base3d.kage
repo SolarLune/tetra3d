@@ -71,9 +71,9 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 
 	color := vc
 
-	depth := imageSrc1UnsafeAt(dstPosToSrcPos(dstPos.xy))
+	depthTex := imageSrc1UnsafeAt(dstPosToSrcPos(dstPos.xy))
 	
-	if depth.a > 0 {
+	if depthTex.a > 0 {
 
 		srcOrigin := imageSrc0Origin()
 		srcSize := imageSrc0Size()
@@ -100,54 +100,41 @@ func Fragment(dstPos vec4, srcPos vec2, vc, custom vec4) vec4 {
 
 		// tetra3d Custom Fragment Call Location //
 		
-		// We have to multiply the rgb component by a to fade out over time
+		// We have to multiply the rgb component by a to fade out with the fog
 		colorTex.rgb *= color.a
 		
 		if Fogless == 0 {
 
 			var d float
 		
+			depth := decodeDepth(depthTex)
+
 			if FogCurve == 0 {
-				d = smoothstep(FogRange[0], FogRange[1], decodeDepth(depth))
+				d = smoothstep(FogRange[0], FogRange[1], depth)
 			} else if FogCurve == 1 {
-				d = smoothstep(FogRange[0], FogRange[1], OutCirc(decodeDepth(depth)))
+				d = smoothstep(FogRange[0], FogRange[1], OutCirc(depth))
 			} else if FogCurve == 2 {
-				d = smoothstep(FogRange[0], FogRange[1], InCirc(decodeDepth(depth)))
+				d = smoothstep(FogRange[0], FogRange[1], InCirc(depth))
 			}
 
 			if DitherSize > 0 {
 
 				yc := int(dstPos.y / DitherSize)%4
 				xc := int(dstPos.x / DitherSize)%4
-
-				fogMult := step(0, d - BayerMatrix[(yc*4) + xc])
-
-				// Fog mode is 4th channel in Fog vector ([4]float32)
-				if Fog.a == 0 {
-					colorTex.rgb += Fog.rgb * fogMult
-				} else if Fog.a == 1 {
-					colorTex.rgb -= Fog.rgb * fogMult
-				} else if Fog.a == 2 {
-					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, fogMult)
-				// } else if Fog.a == 3 {
-				// 	colorTex.a *= abs(1-d) * step(0, abs(1-d) - BayerMatrix[(yc*4) + xc])
-				// 	colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
-				}
-
-			} else {
-
-				if Fog.a == 0 {
-					colorTex.rgb += Fog.rgb * d
-				} else if Fog.a == 1 {
-					colorTex.rgb -= Fog.rgb * d
-				} else if Fog.a == 2 {
-					colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d)
-				// } else if Fog.a == 3 {
-				// 	colorTex.a *= abs(1-d)
-				// 	colorTex.rgb = mix(vec3(0, 0, 0), colorTex.rgb, colorTex.a)
-				}
+				d = step(0, d - BayerMatrix[(yc*4) + xc])
 
 			}
+
+			if Fog.a == 0 {
+				colorTex.rgb += Fog.rgb * d
+			} else if Fog.a == 1 {
+				colorTex.rgb -= Fog.rgb * d
+			} else if Fog.a == 2 {
+				colorTex.rgb = mix(colorTex.rgb, Fog.rgb, d)
+			}
+
+			// Blend alpha channel by fog so that transparent objects fade out into the fog by distance
+			colorTex.a = mix(colorTex.a, 1, d)
 
 		}
 		
